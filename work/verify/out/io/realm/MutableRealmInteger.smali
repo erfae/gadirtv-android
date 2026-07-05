@@ -1,0 +1,274 @@
+.class public abstract Lio/realm/MutableRealmInteger;
+.super Ljava/lang/Object;
+.source "MutableRealmInteger.java"
+
+# interfaces
+.implements Ljava/lang/Comparable;
+.implements Lio/realm/internal/ManageableObject;
+
+
+# annotations
+.annotation system Ldalvik/annotation/MemberClasses;
+    value = {
+        Lio/realm/MutableRealmInteger$Managed;,
+        Lio/realm/MutableRealmInteger$Unmanaged;
+    }
+.end annotation
+
+.annotation system Ldalvik/annotation/Signature;
+    value = {
+        "Ljava/lang/Object;",
+        "Ljava/lang/Comparable<",
+        "Lio/realm/MutableRealmInteger;",
+        ">;",
+        "Lio/realm/internal/ManageableObject;"
+    }
+.end annotation
+
+
+# direct methods
+.method public constructor <init>()V
+    .registers 1
+
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+
+    return-void
+.end method
+
+.method public static ofNull()Lio/realm/MutableRealmInteger;
+    .registers 2
+
+    new-instance v0, Lio/realm/MutableRealmInteger$Unmanaged;
+
+    const/4 v1, 0x0
+
+    invoke-direct {v0, v1}, Lio/realm/MutableRealmInteger$Unmanaged;-><init>(Ljava/lang/Long;)V
+
+    return-object v0
+.end method
+
+.method public static valueOf(J)Lio/realm/MutableRealmInteger;
+    .registers 2
+
+    .line 2
+    invoke-static {p0, p1}, Ljava/lang/Long;->valueOf(J)Ljava/lang/Long;
+
+    move-result-object p0
+
+    invoke-static {p0}, Lio/realm/MutableRealmInteger;->valueOf(Ljava/lang/Long;)Lio/realm/MutableRealmInteger;
+
+    move-result-object p0
+
+    return-object p0
+.end method
+
+.method public static valueOf(Ljava/lang/Long;)Lio/realm/MutableRealmInteger;
+    .registers 2
+
+    .line 1
+    new-instance v0, Lio/realm/MutableRealmInteger$Unmanaged;
+
+    invoke-direct {v0, p0}, Lio/realm/MutableRealmInteger$Unmanaged;-><init>(Ljava/lang/Long;)V
+
+    return-object v0
+.end method
+
+.method public static valueOf(Ljava/lang/String;)Lio/realm/MutableRealmInteger;
+    .registers 3
+
+    .line 3
+    invoke-static {p0}, Ljava/lang/Long;->parseLong(Ljava/lang/String;)J
+
+    move-result-wide v0
+
+    invoke-static {v0, v1}, Lio/realm/MutableRealmInteger;->valueOf(J)Lio/realm/MutableRealmInteger;
+
+    move-result-object p0
+
+    return-object p0
+.end method
+
+
+# virtual methods
+.method public final compareTo(Lio/realm/MutableRealmInteger;)I
+    .registers 3
+
+    .line 2
+    invoke-virtual {p0}, Lio/realm/MutableRealmInteger;->get()Ljava/lang/Long;
+
+    move-result-object v0
+
+    .line 3
+    invoke-virtual {p1}, Lio/realm/MutableRealmInteger;->get()Ljava/lang/Long;
+
+    move-result-object p1
+
+    if-nez v0, :cond_10
+
+    if-nez p1, :cond_e
+
+    const/4 p1, 0x0
+
+    goto :goto_18
+
+    :cond_e
+    const/4 p1, -0x1
+
+    goto :goto_18
+
+    :cond_10
+    if-nez p1, :cond_14
+
+    const/4 p1, 0x1
+
+    goto :goto_18
+
+    .line 4
+    :cond_14
+    invoke-virtual {v0, p1}, Ljava/lang/Long;->compareTo(Ljava/lang/Long;)I
+
+    move-result p1
+
+    :goto_18
+    return p1
+.end method
+
+.method public bridge synthetic compareTo(Ljava/lang/Object;)I
+    .registers 2
+
+    .line 1
+    check-cast p1, Lio/realm/MutableRealmInteger;
+
+    invoke-virtual {p0, p1}, Lio/realm/MutableRealmInteger;->compareTo(Lio/realm/MutableRealmInteger;)I
+
+    move-result p1
+
+    return p1
+.end method
+
+.method public abstract decrement(J)V
+.end method
+
+.method public final equals(Ljava/lang/Object;)Z
+    .registers 5
+
+    const/4 v0, 0x1
+
+    if-ne p1, p0, :cond_4
+
+    return v0
+
+    .line 1
+    :cond_4
+    instance-of v1, p1, Lio/realm/MutableRealmInteger;
+
+    const/4 v2, 0x0
+
+    if-nez v1, :cond_a
+
+    return v2
+
+    .line 2
+    :cond_a
+    invoke-virtual {p0}, Lio/realm/MutableRealmInteger;->get()Ljava/lang/Long;
+
+    move-result-object v1
+
+    .line 3
+    check-cast p1, Lio/realm/MutableRealmInteger;
+
+    invoke-virtual {p1}, Lio/realm/MutableRealmInteger;->get()Ljava/lang/Long;
+
+    move-result-object p1
+
+    if-nez v1, :cond_1b
+
+    if-nez p1, :cond_19
+
+    goto :goto_1f
+
+    :cond_19
+    const/4 v0, 0x0
+
+    goto :goto_1f
+
+    .line 4
+    :cond_1b
+    invoke-virtual {v1, p1}, Ljava/lang/Long;->equals(Ljava/lang/Object;)Z
+
+    move-result v0
+
+    :goto_1f
+    return v0
+.end method
+
+.method public abstract get()Ljava/lang/Long;
+    .annotation runtime Ljavax/annotation/Nullable;
+    .end annotation
+.end method
+
+.method public final hashCode()I
+    .registers 2
+
+    .line 1
+    invoke-virtual {p0}, Lio/realm/MutableRealmInteger;->get()Ljava/lang/Long;
+
+    move-result-object v0
+
+    if-nez v0, :cond_8
+
+    const/4 v0, 0x0
+
+    goto :goto_c
+
+    .line 2
+    :cond_8
+    invoke-virtual {v0}, Ljava/lang/Long;->hashCode()I
+
+    move-result v0
+
+    :goto_c
+    return v0
+.end method
+
+.method public abstract increment(J)V
+.end method
+
+.method public final isNull()Z
+    .registers 2
+
+    invoke-virtual {p0}, Lio/realm/MutableRealmInteger;->get()Ljava/lang/Long;
+
+    move-result-object v0
+
+    if-nez v0, :cond_8
+
+    const/4 v0, 0x1
+
+    goto :goto_9
+
+    :cond_8
+    const/4 v0, 0x0
+
+    :goto_9
+    return v0
+.end method
+
+.method public final set(J)V
+    .registers 3
+
+    invoke-static {p1, p2}, Ljava/lang/Long;->valueOf(J)Ljava/lang/Long;
+
+    move-result-object p1
+
+    invoke-virtual {p0, p1}, Lio/realm/MutableRealmInteger;->set(Ljava/lang/Long;)V
+
+    return-void
+.end method
+
+.method public abstract set(Ljava/lang/Long;)V
+    .param p1    # Ljava/lang/Long;
+        .annotation runtime Ljavax/annotation/Nullable;
+        .end annotation
+    .end param
+.end method

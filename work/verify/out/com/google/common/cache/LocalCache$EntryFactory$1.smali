@@ -1,0 +1,61 @@
+.class final enum Lcom/google/common/cache/LocalCache$EntryFactory$1;
+.super Lcom/google/common/cache/LocalCache$EntryFactory;
+.source "LocalCache.java"
+
+
+# annotations
+.annotation system Ldalvik/annotation/EnclosingClass;
+    value = Lcom/google/common/cache/LocalCache$EntryFactory;
+.end annotation
+
+.annotation system Ldalvik/annotation/InnerClass;
+    accessFlags = 0x4011
+    name = null
+.end annotation
+
+
+# direct methods
+.method public constructor <init>()V
+    .registers 4
+
+    const-string v0, "STRONG"
+
+    const/4 v1, 0x0
+
+    const/4 v2, 0x0
+
+    invoke-direct {p0, v0, v1, v2}, Lcom/google/common/cache/LocalCache$EntryFactory;-><init>(Ljava/lang/String;ILcom/google/common/cache/LocalCache$1;)V
+
+    return-void
+.end method
+
+
+# virtual methods
+.method public final newEntry(Lcom/google/common/cache/LocalCache$Segment;Ljava/lang/Object;ILcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+    .registers 5
+    .param p4    # Lcom/google/common/cache/ReferenceEntry;
+        .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+        .end annotation
+    .end param
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "<K:",
+            "Ljava/lang/Object;",
+            "V:",
+            "Ljava/lang/Object;",
+            ">(",
+            "Lcom/google/common/cache/LocalCache$Segment<",
+            "TK;TV;>;TK;I",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;)",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;"
+        }
+    .end annotation
+
+    new-instance p1, Lcom/google/common/cache/LocalCache$StrongEntry;
+
+    invoke-direct {p1, p2, p3, p4}, Lcom/google/common/cache/LocalCache$StrongEntry;-><init>(Ljava/lang/Object;ILcom/google/common/cache/ReferenceEntry;)V
+
+    return-object p1
+.end method

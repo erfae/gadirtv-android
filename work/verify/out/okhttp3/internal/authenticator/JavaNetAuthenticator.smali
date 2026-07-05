@@ -1,0 +1,480 @@
+.class public final Lokhttp3/internal/authenticator/JavaNetAuthenticator;
+.super Ljava/lang/Object;
+.source "JavaNetAuthenticator.kt"
+
+# interfaces
+.implements Lokhttp3/Authenticator;
+
+
+# annotations
+.annotation runtime Lkotlin/Metadata;
+    bv = {
+        0x1,
+        0x0,
+        0x3
+    }
+    d1 = {
+        "\u00006\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\u0008\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\u0008\u0002\u0018\u00002\u00020\u0001B\u000f\u0012\u0008\u0008\u0002\u0010\u0002\u001a\u00020\u0003\u00a2\u0006\u0002\u0010\u0004J\u001c\u0010\u0005\u001a\u0004\u0018\u00010\u00062\u0008\u0010\u0007\u001a\u0004\u0018\u00010\u00082\u0006\u0010\t\u001a\u00020\nH\u0016J\u001c\u0010\u000b\u001a\u00020\u000c*\u00020\r2\u0006\u0010\u000e\u001a\u00020\u000f2\u0006\u0010\u0010\u001a\u00020\u0003H\u0002R\u000e\u0010\u0002\u001a\u00020\u0003X\u0082\u0004\u00a2\u0006\u0002\n\u0000\u00a8\u0006\u0011"
+    }
+    d2 = {
+        "Lokhttp3/internal/authenticator/JavaNetAuthenticator;",
+        "Lokhttp3/Authenticator;",
+        "defaultDns",
+        "Lokhttp3/Dns;",
+        "(Lokhttp3/Dns;)V",
+        "authenticate",
+        "Lokhttp3/Request;",
+        "route",
+        "Lokhttp3/Route;",
+        "response",
+        "Lokhttp3/Response;",
+        "connectToInetAddress",
+        "Ljava/net/InetAddress;",
+        "Ljava/net/Proxy;",
+        "url",
+        "Lokhttp3/HttpUrl;",
+        "dns",
+        "okhttp"
+    }
+    k = 0x1
+    mv = {
+        0x1,
+        0x4,
+        0x1
+    }
+.end annotation
+
+
+# instance fields
+.field private final defaultDns:Lokhttp3/Dns;
+
+
+# direct methods
+.method public constructor <init>()V
+    .registers 3
+
+    const/4 v0, 0x0
+
+    const/4 v1, 0x1
+
+    invoke-direct {p0, v0, v1, v0}, Lokhttp3/internal/authenticator/JavaNetAuthenticator;-><init>(Lokhttp3/Dns;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+
+    return-void
+.end method
+
+.method public constructor <init>(Lokhttp3/Dns;)V
+    .registers 3
+    .param p1    # Lokhttp3/Dns;
+        .annotation build Lorg/jetbrains/annotations/NotNull;
+        .end annotation
+    .end param
+
+    const-string v0, "defaultDns"
+
+    invoke-static {p1, v0}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter(Ljava/lang/Object;Ljava/lang/String;)V
+
+    .line 1
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+
+    iput-object p1, p0, Lokhttp3/internal/authenticator/JavaNetAuthenticator;->defaultDns:Lokhttp3/Dns;
+
+    return-void
+.end method
+
+.method public synthetic constructor <init>(Lokhttp3/Dns;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+    .registers 4
+
+    and-int/lit8 p2, p2, 0x1
+
+    if-eqz p2, :cond_6
+
+    .line 2
+    sget-object p1, Lokhttp3/Dns;->SYSTEM:Lokhttp3/Dns;
+
+    :cond_6
+    invoke-direct {p0, p1}, Lokhttp3/internal/authenticator/JavaNetAuthenticator;-><init>(Lokhttp3/Dns;)V
+
+    return-void
+.end method
+
+.method private final connectToInetAddress(Ljava/net/Proxy;Lokhttp3/HttpUrl;Lokhttp3/Dns;)Ljava/net/InetAddress;
+    .registers 6
+    .annotation system Ldalvik/annotation/Throws;
+        value = {
+            Ljava/io/IOException;
+        }
+    .end annotation
+
+    .line 1
+    invoke-virtual {p1}, Ljava/net/Proxy;->type()Ljava/net/Proxy$Type;
+
+    move-result-object v0
+
+    if-nez v0, :cond_7
+
+    goto :goto_12
+
+    :cond_7
+    sget-object v1, Lokhttp3/internal/authenticator/JavaNetAuthenticator$WhenMappings;->$EnumSwitchMapping$0:[I
+
+    invoke-virtual {v0}, Ljava/lang/Enum;->ordinal()I
+
+    move-result v0
+
+    aget v0, v1, v0
+
+    const/4 v1, 0x1
+
+    if-eq v0, v1, :cond_27
+
+    .line 2
+    :goto_12
+    invoke-virtual {p1}, Ljava/net/Proxy;->address()Ljava/net/SocketAddress;
+
+    move-result-object p1
+
+    const-string p2, "null cannot be cast to non-null type java.net.InetSocketAddress"
+
+    invoke-static {p1, p2}, Ljava/util/Objects;->requireNonNull(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+
+    check-cast p1, Ljava/net/InetSocketAddress;
+
+    invoke-virtual {p1}, Ljava/net/InetSocketAddress;->getAddress()Ljava/net/InetAddress;
+
+    move-result-object p1
+
+    const-string p2, "(address() as InetSocketAddress).address"
+
+    invoke-static {p1, p2}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullExpressionValue(Ljava/lang/Object;Ljava/lang/String;)V
+
+    goto :goto_35
+
+    .line 3
+    :cond_27
+    invoke-virtual {p2}, Lokhttp3/HttpUrl;->host()Ljava/lang/String;
+
+    move-result-object p1
+
+    invoke-interface {p3, p1}, Lokhttp3/Dns;->lookup(Ljava/lang/String;)Ljava/util/List;
+
+    move-result-object p1
+
+    invoke-static {p1}, Lkotlin/collections/CollectionsKt;->first(Ljava/util/List;)Ljava/lang/Object;
+
+    move-result-object p1
+
+    check-cast p1, Ljava/net/InetAddress;
+
+    :goto_35
+    return-object p1
+.end method
+
+
+# virtual methods
+.method public authenticate(Lokhttp3/Route;Lokhttp3/Response;)Lokhttp3/Request;
+    .registers 21
+    .param p1    # Lokhttp3/Route;
+        .annotation build Lorg/jetbrains/annotations/Nullable;
+        .end annotation
+    .end param
+    .param p2    # Lokhttp3/Response;
+        .annotation build Lorg/jetbrains/annotations/NotNull;
+        .end annotation
+    .end param
+    .annotation system Ldalvik/annotation/Throws;
+        value = {
+            Ljava/io/IOException;
+        }
+    .end annotation
+
+    .annotation build Lorg/jetbrains/annotations/Nullable;
+    .end annotation
+
+    move-object/from16 v0, p0
+
+    const-string v1, "response"
+
+    move-object/from16 v2, p2
+
+    invoke-static {v2, v1}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter(Ljava/lang/Object;Ljava/lang/String;)V
+
+    .line 1
+    invoke-virtual/range {p2 .. p2}, Lokhttp3/Response;->challenges()Ljava/util/List;
+
+    move-result-object v1
+
+    .line 2
+    invoke-virtual/range {p2 .. p2}, Lokhttp3/Response;->request()Lokhttp3/Request;
+
+    move-result-object v3
+
+    .line 3
+    invoke-virtual {v3}, Lokhttp3/Request;->url()Lokhttp3/HttpUrl;
+
+    move-result-object v4
+
+    .line 4
+    invoke-virtual/range {p2 .. p2}, Lokhttp3/Response;->code()I
+
+    move-result v2
+
+    const/16 v5, 0x197
+
+    if-ne v2, v5, :cond_1f
+
+    const/4 v2, 0x1
+
+    goto :goto_20
+
+    :cond_1f
+    const/4 v2, 0x0
+
+    :goto_20
+    if-eqz p1, :cond_29
+
+    .line 5
+    invoke-virtual/range {p1 .. p1}, Lokhttp3/Route;->proxy()Ljava/net/Proxy;
+
+    move-result-object v5
+
+    if-eqz v5, :cond_29
+
+    goto :goto_2b
+
+    :cond_29
+    sget-object v5, Ljava/net/Proxy;->NO_PROXY:Ljava/net/Proxy;
+
+    .line 6
+    :goto_2b
+    invoke-interface {v1}, Ljava/util/List;->iterator()Ljava/util/Iterator;
+
+    move-result-object v1
+
+    :cond_2f
+    :goto_2f
+    invoke-interface {v1}, Ljava/util/Iterator;->hasNext()Z
+
+    move-result v6
+
+    if-eqz v6, :cond_ea
+
+    invoke-interface {v1}, Ljava/util/Iterator;->next()Ljava/lang/Object;
+
+    move-result-object v6
+
+    check-cast v6, Lokhttp3/Challenge;
+
+    .line 7
+    invoke-virtual {v6}, Lokhttp3/Challenge;->scheme()Ljava/lang/String;
+
+    move-result-object v7
+
+    const-string v8, "Basic"
+
+    invoke-static {v8, v7}, Lkotlin/text/StringsKt;->equals(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result v7
+
+    if-nez v7, :cond_48
+
+    goto :goto_2f
+
+    :cond_48
+    if-eqz p1, :cond_57
+
+    .line 8
+    invoke-virtual/range {p1 .. p1}, Lokhttp3/Route;->address()Lokhttp3/Address;
+
+    move-result-object v7
+
+    if-eqz v7, :cond_57
+
+    invoke-virtual {v7}, Lokhttp3/Address;->dns()Lokhttp3/Dns;
+
+    move-result-object v7
+
+    if-eqz v7, :cond_57
+
+    goto :goto_59
+
+    :cond_57
+    iget-object v7, v0, Lokhttp3/internal/authenticator/JavaNetAuthenticator;->defaultDns:Lokhttp3/Dns;
+
+    :goto_59
+    const-string v8, "proxy"
+
+    if-eqz v2, :cond_8e
+
+    .line 9
+    invoke-virtual {v5}, Ljava/net/Proxy;->address()Ljava/net/SocketAddress;
+
+    move-result-object v9
+
+    const-string v10, "null cannot be cast to non-null type java.net.InetSocketAddress"
+
+    invoke-static {v9, v10}, Ljava/util/Objects;->requireNonNull(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;
+
+    check-cast v9, Ljava/net/InetSocketAddress;
+
+    .line 10
+    invoke-virtual {v9}, Ljava/net/InetSocketAddress;->getHostName()Ljava/lang/String;
+
+    move-result-object v10
+
+    .line 11
+    invoke-static {v5, v8}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullExpressionValue(Ljava/lang/Object;Ljava/lang/String;)V
+
+    invoke-direct {v0, v5, v4, v7}, Lokhttp3/internal/authenticator/JavaNetAuthenticator;->connectToInetAddress(Ljava/net/Proxy;Lokhttp3/HttpUrl;Lokhttp3/Dns;)Ljava/net/InetAddress;
+
+    move-result-object v11
+
+    .line 12
+    invoke-virtual {v9}, Ljava/net/InetSocketAddress;->getPort()I
+
+    move-result v12
+
+    .line 13
+    invoke-virtual {v4}, Lokhttp3/HttpUrl;->scheme()Ljava/lang/String;
+
+    move-result-object v13
+
+    .line 14
+    invoke-virtual {v6}, Lokhttp3/Challenge;->realm()Ljava/lang/String;
+
+    move-result-object v14
+
+    .line 15
+    invoke-virtual {v6}, Lokhttp3/Challenge;->scheme()Ljava/lang/String;
+
+    move-result-object v15
+
+    .line 16
+    invoke-virtual {v4}, Lokhttp3/HttpUrl;->url()Ljava/net/URL;
+
+    move-result-object v16
+
+    .line 17
+    sget-object v17, Ljava/net/Authenticator$RequestorType;->PROXY:Ljava/net/Authenticator$RequestorType;
+
+    .line 18
+    invoke-static/range {v10 .. v17}, Ljava/net/Authenticator;->requestPasswordAuthentication(Ljava/lang/String;Ljava/net/InetAddress;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/net/URL;Ljava/net/Authenticator$RequestorType;)Ljava/net/PasswordAuthentication;
+
+    move-result-object v7
+
+    goto :goto_b5
+
+    .line 19
+    :cond_8e
+    invoke-virtual {v4}, Lokhttp3/HttpUrl;->host()Ljava/lang/String;
+
+    move-result-object v9
+
+    .line 20
+    invoke-static {v5, v8}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullExpressionValue(Ljava/lang/Object;Ljava/lang/String;)V
+
+    invoke-direct {v0, v5, v4, v7}, Lokhttp3/internal/authenticator/JavaNetAuthenticator;->connectToInetAddress(Ljava/net/Proxy;Lokhttp3/HttpUrl;Lokhttp3/Dns;)Ljava/net/InetAddress;
+
+    move-result-object v7
+
+    .line 21
+    invoke-virtual {v4}, Lokhttp3/HttpUrl;->port()I
+
+    move-result v10
+
+    .line 22
+    invoke-virtual {v4}, Lokhttp3/HttpUrl;->scheme()Ljava/lang/String;
+
+    move-result-object v11
+
+    .line 23
+    invoke-virtual {v6}, Lokhttp3/Challenge;->realm()Ljava/lang/String;
+
+    move-result-object v12
+
+    .line 24
+    invoke-virtual {v6}, Lokhttp3/Challenge;->scheme()Ljava/lang/String;
+
+    move-result-object v13
+
+    .line 25
+    invoke-virtual {v4}, Lokhttp3/HttpUrl;->url()Ljava/net/URL;
+
+    move-result-object v14
+
+    .line 26
+    sget-object v15, Ljava/net/Authenticator$RequestorType;->SERVER:Ljava/net/Authenticator$RequestorType;
+
+    move-object v8, v9
+
+    move-object v9, v7
+
+    .line 27
+    invoke-static/range {v8 .. v15}, Ljava/net/Authenticator;->requestPasswordAuthentication(Ljava/lang/String;Ljava/net/InetAddress;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/net/URL;Ljava/net/Authenticator$RequestorType;)Ljava/net/PasswordAuthentication;
+
+    move-result-object v7
+
+    :goto_b5
+    if-eqz v7, :cond_2f
+
+    if-eqz v2, :cond_bc
+
+    const-string v1, "Proxy-Authorization"
+
+    goto :goto_be
+
+    :cond_bc
+    const-string v1, "Authorization"
+
+    .line 28
+    :goto_be
+    invoke-virtual {v7}, Ljava/net/PasswordAuthentication;->getUserName()Ljava/lang/String;
+
+    move-result-object v2
+
+    const-string v4, "auth.userName"
+
+    invoke-static {v2, v4}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullExpressionValue(Ljava/lang/Object;Ljava/lang/String;)V
+
+    invoke-virtual {v7}, Ljava/net/PasswordAuthentication;->getPassword()[C
+
+    move-result-object v4
+
+    const-string v5, "auth.password"
+
+    invoke-static {v4, v5}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullExpressionValue(Ljava/lang/Object;Ljava/lang/String;)V
+
+    new-instance v5, Ljava/lang/String;
+
+    invoke-direct {v5, v4}, Ljava/lang/String;-><init>([C)V
+
+    invoke-virtual {v6}, Lokhttp3/Challenge;->charset()Ljava/nio/charset/Charset;
+
+    move-result-object v4
+
+    .line 29
+    invoke-static {v2, v5, v4}, Lokhttp3/Credentials;->basic(Ljava/lang/String;Ljava/lang/String;Ljava/nio/charset/Charset;)Ljava/lang/String;
+
+    move-result-object v2
+
+    .line 30
+    invoke-virtual {v3}, Lokhttp3/Request;->newBuilder()Lokhttp3/Request$Builder;
+
+    move-result-object v3
+
+    .line 31
+    invoke-virtual {v3, v1, v2}, Lokhttp3/Request$Builder;->header(Ljava/lang/String;Ljava/lang/String;)Lokhttp3/Request$Builder;
+
+    move-result-object v1
+
+    .line 32
+    invoke-virtual {v1}, Lokhttp3/Request$Builder;->build()Lokhttp3/Request;
+
+    move-result-object v1
+
+    return-object v1
+
+    :cond_ea
+    const/4 v1, 0x0
+
+    return-object v1
+.end method

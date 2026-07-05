@@ -1,0 +1,48 @@
+.class final enum Lcom/google/common/util/concurrent/CycleDetectingLockFactory$Policies$2;
+.super Lcom/google/common/util/concurrent/CycleDetectingLockFactory$Policies;
+.source "CycleDetectingLockFactory.java"
+
+
+# annotations
+.annotation system Ldalvik/annotation/EnclosingClass;
+    value = Lcom/google/common/util/concurrent/CycleDetectingLockFactory$Policies;
+.end annotation
+
+.annotation system Ldalvik/annotation/InnerClass;
+    accessFlags = 0x4011
+    name = null
+.end annotation
+
+
+# direct methods
+.method public constructor <init>()V
+    .locals 3
+
+    const-string v0, "WARN"
+
+    const/4 v1, 0x1
+
+    const/4 v2, 0x0
+
+    invoke-direct {p0, v0, v1, v2}, Lcom/google/common/util/concurrent/CycleDetectingLockFactory$Policies;-><init>(Ljava/lang/String;ILcom/google/common/util/concurrent/CycleDetectingLockFactory$1;)V
+
+    return-void
+.end method
+
+
+# virtual methods
+.method public handlePotentialDeadlock(Lcom/google/common/util/concurrent/CycleDetectingLockFactory$PotentialDeadlockException;)V
+    .locals 3
+
+    invoke-static {}, Lcom/google/common/util/concurrent/CycleDetectingLockFactory;->access$100()Ljava/util/logging/Logger;
+
+    move-result-object v0
+
+    sget-object v1, Ljava/util/logging/Level;->SEVERE:Ljava/util/logging/Level;
+
+    const-string v2, "Detected potential deadlock"
+
+    invoke-virtual {v0, v1, v2, p1}, Ljava/util/logging/Logger;->log(Ljava/util/logging/Level;Ljava/lang/String;Ljava/lang/Throwable;)V
+
+    return-void
+.end method

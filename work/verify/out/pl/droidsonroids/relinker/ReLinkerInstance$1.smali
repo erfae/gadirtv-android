@@ -1,0 +1,99 @@
+.class Lpl/droidsonroids/relinker/ReLinkerInstance$1;
+.super Ljava/lang/Object;
+.source "ReLinkerInstance.java"
+
+# interfaces
+.implements Ljava/lang/Runnable;
+
+
+# annotations
+.annotation system Ldalvik/annotation/EnclosingMethod;
+    value = Lpl/droidsonroids/relinker/ReLinkerInstance;->loadLibrary(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Lpl/droidsonroids/relinker/ReLinker$LoadListener;)V
+.end annotation
+
+.annotation system Ldalvik/annotation/InnerClass;
+    accessFlags = 0x1
+    name = null
+.end annotation
+
+
+# instance fields
+.field public final synthetic this$0:Lpl/droidsonroids/relinker/ReLinkerInstance;
+
+.field public final synthetic val$context:Landroid/content/Context;
+
+.field public final synthetic val$library:Ljava/lang/String;
+
+.field public final synthetic val$listener:Lpl/droidsonroids/relinker/ReLinker$LoadListener;
+
+.field public final synthetic val$version:Ljava/lang/String;
+
+
+# direct methods
+.method public constructor <init>(Lpl/droidsonroids/relinker/ReLinkerInstance;Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Lpl/droidsonroids/relinker/ReLinker$LoadListener;)V
+    .registers 6
+
+    iput-object p1, p0, Lpl/droidsonroids/relinker/ReLinkerInstance$1;->this$0:Lpl/droidsonroids/relinker/ReLinkerInstance;
+
+    iput-object p2, p0, Lpl/droidsonroids/relinker/ReLinkerInstance$1;->val$context:Landroid/content/Context;
+
+    iput-object p3, p0, Lpl/droidsonroids/relinker/ReLinkerInstance$1;->val$library:Ljava/lang/String;
+
+    iput-object p4, p0, Lpl/droidsonroids/relinker/ReLinkerInstance$1;->val$version:Ljava/lang/String;
+
+    iput-object p5, p0, Lpl/droidsonroids/relinker/ReLinkerInstance$1;->val$listener:Lpl/droidsonroids/relinker/ReLinker$LoadListener;
+
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+
+    return-void
+.end method
+
+
+# virtual methods
+.method public run()V
+    .registers 5
+
+    .line 1
+    :try_start_0
+    iget-object v0, p0, Lpl/droidsonroids/relinker/ReLinkerInstance$1;->this$0:Lpl/droidsonroids/relinker/ReLinkerInstance;
+
+    iget-object v1, p0, Lpl/droidsonroids/relinker/ReLinkerInstance$1;->val$context:Landroid/content/Context;
+
+    iget-object v2, p0, Lpl/droidsonroids/relinker/ReLinkerInstance$1;->val$library:Ljava/lang/String;
+
+    iget-object v3, p0, Lpl/droidsonroids/relinker/ReLinkerInstance$1;->val$version:Ljava/lang/String;
+
+    # invokes: Lpl/droidsonroids/relinker/ReLinkerInstance;->loadLibraryInternal(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)V
+    invoke-static {v0, v1, v2, v3}, Lpl/droidsonroids/relinker/ReLinkerInstance;->access$000(Lpl/droidsonroids/relinker/ReLinkerInstance;Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)V
+
+    .line 2
+    iget-object v0, p0, Lpl/droidsonroids/relinker/ReLinkerInstance$1;->val$listener:Lpl/droidsonroids/relinker/ReLinker$LoadListener;
+
+    invoke-interface {v0}, Lpl/droidsonroids/relinker/ReLinker$LoadListener;->success()V
+    :try_end_10
+    .catch Ljava/lang/UnsatisfiedLinkError; {:try_start_0 .. :try_end_10} :catch_18
+    .catch Lpl/droidsonroids/relinker/MissingLibraryException; {:try_start_0 .. :try_end_10} :catch_11
+
+    goto :goto_1e
+
+    :catch_11
+    move-exception v0
+
+    .line 3
+    iget-object v1, p0, Lpl/droidsonroids/relinker/ReLinkerInstance$1;->val$listener:Lpl/droidsonroids/relinker/ReLinker$LoadListener;
+
+    invoke-interface {v1, v0}, Lpl/droidsonroids/relinker/ReLinker$LoadListener;->failure(Ljava/lang/Throwable;)V
+
+    goto :goto_1e
+
+    :catch_18
+    move-exception v0
+
+    .line 4
+    iget-object v1, p0, Lpl/droidsonroids/relinker/ReLinkerInstance$1;->val$listener:Lpl/droidsonroids/relinker/ReLinker$LoadListener;
+
+    invoke-interface {v1, v0}, Lpl/droidsonroids/relinker/ReLinker$LoadListener;->failure(Ljava/lang/Throwable;)V
+
+    :goto_1e
+    return-void
+.end method
