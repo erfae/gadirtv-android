@@ -351,7 +351,7 @@
 .end method
 
 .method public getResult()Ljava/util/List;
-    .locals 1
+    .locals 4
     .annotation system Ldalvik/annotation/Signature;
         value = {
             "()",
@@ -369,7 +369,30 @@
 
     invoke-direct {v0}, Ljava/util/ArrayList;-><init>()V
 
+    return-object v0
+
     :cond_0
+    invoke-interface {v0}, Ljava/util/List;->size()I
+
+    move-result v1
+
+    const/4 v2, 0x2
+
+    if-lt v1, v2, :cond_1
+
+    const/4 v1, 0x1
+
+    invoke-interface {v0, v1}, Ljava/util/List;->get(I)Ljava/lang/Object;
+
+    move-result-object v2
+
+    check-cast v2, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;
+
+    const-string v3, "GADIR"
+
+    invoke-virtual {v2, v3}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->setName(Ljava/lang/String;)V
+
+    :cond_1
     return-object v0
 .end method
 
