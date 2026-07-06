@@ -1144,7 +1144,7 @@
 
     move-result-object v0
 
-    const-string v2, "gadir.co"
+    const-string v2, "seismeses01"
 
     invoke-virtual {v0, v2}, Ljava/lang/String;->contains(Ljava/lang/CharSequence;)Z
 
