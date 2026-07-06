@@ -392,25 +392,6 @@
 
     invoke-virtual {v2, v3}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->setName(Ljava/lang/String;)V
 
-    invoke-virtual {v2}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
-
-    move-result-object v3
-
-    if-eqz v3, :cond_1
-
-    const-string v4, "gadir.co:80/get.php"
-
-    invoke-virtual {v3, v4}, Ljava/lang/String;->contains(Ljava/lang/CharSequence;)Z
-
-    move-result v4
-
-    if-nez v4, :cond_2
-
-    :cond_1
-    const-string v3, "http://gadir.co:80/get.php?username=&password=&type=m3u_plus&output=mpegts"
-
-    invoke-virtual {v2, v3}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->setUrl(Ljava/lang/String;)V
-
     :cond_2
     return-object v0
 .end method
