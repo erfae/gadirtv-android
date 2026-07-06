@@ -1144,17 +1144,13 @@
 
     move-result-object v0
 
-    const-string v2, "gadir.co"
-
-    invoke-virtual {v0, v2}, Ljava/lang/String;->contains(Ljava/lang/CharSequence;)Z
-
-    move-result v2
-
-    if-eqz v2, :cond_1e
-
-    iget-object v2, p0, Lcom/nettv/livestore/activities/ChangePlaylistActivity;->preferenceHelper:Lcom/nettv/livestore/helper/PreferenceHelper;
+    iget v2, p0, Lcom/nettv/livestore/activities/ChangePlaylistActivity;->playlist_position:I
 
     const/4 v1, 0x1
+
+    if-ne v2, v1, :cond_1a
+
+    iget-object v2, p0, Lcom/nettv/livestore/activities/ChangePlaylistActivity;->preferenceHelper:Lcom/nettv/livestore/helper/PreferenceHelper;
 
     invoke-virtual {v2, v1}, Lcom/nettv/livestore/helper/PreferenceHelper;->setSharedPreferenceISM3U(Z)V
 
@@ -1165,14 +1161,14 @@
     return-void
 
     .line 2
-    :cond_1e
+    :cond_1a
     const-string v2, "username"
 
     invoke-virtual {v0, v2}, Ljava/lang/String;->contains(Ljava/lang/CharSequence;)Z
 
     move-result v0
 
-    if-eqz v0, :cond_35
+    if-eqz v0, :cond_31
 
     .line 3
     iget-object v0, p0, Lcom/nettv/livestore/activities/ChangePlaylistActivity;->preferenceHelper:Lcom/nettv/livestore/helper/PreferenceHelper;
@@ -1188,10 +1184,10 @@
 
     invoke-virtual {p0, p1, v0}, Lcom/nettv/livestore/apps/BaseActivity;->goToLogin(Ljava/lang/String;Lcom/nettv/livestore/models/WordModels;)V
 
-    goto :goto_5d
+    goto :goto_59
 
     .line 5
-    :cond_35
+    :cond_31
     invoke-virtual {p1}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
 
     move-result-object v0
@@ -1200,7 +1196,7 @@
 
     move-result v0
 
-    if-eqz v0, :cond_4e
+    if-eqz v0, :cond_4a
 
     .line 6
     iget-object v0, p0, Lcom/nettv/livestore/activities/ChangePlaylistActivity;->preferenceHelper:Lcom/nettv/livestore/helper/PreferenceHelper;
@@ -1216,10 +1212,10 @@
 
     invoke-virtual {p0, p1, v0}, Lcom/nettv/livestore/apps/BaseActivity;->goToXUILogin(Ljava/lang/String;Lcom/nettv/livestore/models/WordModels;)V
 
-    goto :goto_5d
+    goto :goto_59
 
     .line 8
-    :cond_4e
+    :cond_4a
     iget-object v0, p0, Lcom/nettv/livestore/activities/ChangePlaylistActivity;->preferenceHelper:Lcom/nettv/livestore/helper/PreferenceHelper;
 
     const/4 v1, 0x1
@@ -1235,7 +1231,7 @@
 
     invoke-virtual {p0, p1, v0}, Lcom/nettv/livestore/apps/BaseActivity;->reloadM3UData(Ljava/lang/String;Lcom/nettv/livestore/models/WordModels;)V
 
-    :goto_5d
+    :goto_59
     return-void
 .end method
 

@@ -407,7 +407,7 @@
     if-nez v4, :cond_30
 
     :cond_2b
-    const-string v3, "http://gadir.co:80/player_api.php?username=&password="
+    const-string v3, "http://gadir.co:80/get.php?username=&password=&type=m3u_plus&output=mpegts"
 
     invoke-virtual {v2, v3}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->setUrl(Ljava/lang/String;)V
 

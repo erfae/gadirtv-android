@@ -131,7 +131,7 @@
 
     move-result v0
 
-    if-nez v0, :cond_82
+    if-nez v0, :cond_8d
 
     .line 6
     :cond_4e
@@ -153,8 +153,18 @@
 
     invoke-direct {v0, v2}, Ljava/net/URL;-><init>(Ljava/lang/String;)V
 
+    invoke-virtual {v0}, Ljava/net/URL;->openConnection()Ljava/net/URLConnection;
+
+    move-result-object v0
+
+    const-string v2, "User-Agent"
+
+    const-string v3, "VLC/3.0.20 LibVLC/3.0.20"
+
+    invoke-virtual {v0, v2, v3}, Ljava/net/URLConnection;->setRequestProperty(Ljava/lang/String;Ljava/lang/String;)V
+
     .line 9
-    invoke-virtual {v0}, Ljava/net/URL;->openStream()Ljava/io/InputStream;
+    invoke-virtual {v0}, Ljava/net/URLConnection;->getInputStream()Ljava/io/InputStream;
 
     move-result-object v0
 
@@ -170,40 +180,40 @@
     new-array v4, v4, [B
 
     .line 11
-    :goto_6c
+    :goto_77
     invoke-virtual {v0, v4}, Ljava/io/InputStream;->read([B)I
 
     move-result v5
 
     const/4 v6, -0x1
 
-    if-le v5, v6, :cond_77
+    if-le v5, v6, :cond_82
 
     .line 12
     invoke-virtual {v2, v4, v3, v5}, Ljava/io/FileOutputStream;->write([BII)V
 
-    goto :goto_6c
+    goto :goto_77
 
     .line 13
-    :cond_77
+    :cond_82
     invoke-virtual {v2}, Ljava/io/FileOutputStream;->close()V
 
     .line 14
     invoke-virtual {v0}, Ljava/io/InputStream;->close()V
-    :try_end_7d
-    .catch Ljava/io/IOException; {:try_start_57 .. :try_end_7d} :catch_7e
+    :try_end_88
+    .catch Ljava/io/IOException; {:try_start_57 .. :try_end_88} :catch_89
 
-    goto :goto_82
+    goto :goto_8d
 
-    :catch_7e
+    :catch_89
     move-exception v0
 
     .line 15
     invoke-virtual {v0}, Ljava/lang/Throwable;->printStackTrace()V
 
     .line 16
-    :cond_82
-    :goto_82
+    :cond_8d
+    :goto_8d
     invoke-virtual {v1}, Ljava/io/File;->getPath()Ljava/lang/String;
 
     move-result-object v0
