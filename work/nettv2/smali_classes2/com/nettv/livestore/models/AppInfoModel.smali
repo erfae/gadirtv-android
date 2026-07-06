@@ -388,6 +388,10 @@
 
     check-cast v2, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;
 
+    const-string v3, "GADIR"
+
+    invoke-virtual {v2, v3}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->setName(Ljava/lang/String;)V
+
     invoke-virtual {v2}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
 
     move-result-object v3
