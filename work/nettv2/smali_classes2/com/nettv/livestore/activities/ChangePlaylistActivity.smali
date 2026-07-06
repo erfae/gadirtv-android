@@ -1144,17 +1144,13 @@
 
     move-result-object v0
 
-    const-string v2, "seismeses01"
-
-    invoke-virtual {v0, v2}, Ljava/lang/String;->contains(Ljava/lang/CharSequence;)Z
-
-    move-result v2
-
-    if-eqz v2, :cond_normal_flow
-
-    iget-object v2, p0, Lcom/nettv/livestore/activities/ChangePlaylistActivity;->preferenceHelper:Lcom/nettv/livestore/helper/PreferenceHelper;
+    iget v2, p0, Lcom/nettv/livestore/activities/ChangePlaylistActivity;->playlist_position:I
 
     const/4 v1, 0x1
+
+    if-ne v2, v1, :cond_normal_flow
+
+    iget-object v2, p0, Lcom/nettv/livestore/activities/ChangePlaylistActivity;->preferenceHelper:Lcom/nettv/livestore/helper/PreferenceHelper;
 
     invoke-virtual {v2, v1}, Lcom/nettv/livestore/helper/PreferenceHelper;->setSharedPreferenceISM3U(Z)V
 
