@@ -1,0 +1,117 @@
+.class Lcom/nettv/livestore/remote/GetSubtitleLinkRequest$1;
+.super Lcom/android/volley/toolbox/JsonObjectRequest;
+.source "GetSubtitleLinkRequest.java"
+
+
+# annotations
+.annotation system Ldalvik/annotation/EnclosingMethod;
+    value = Lcom/nettv/livestore/remote/GetSubtitleLinkRequest;->getResponse(Lorg/json/JSONObject;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+.end annotation
+
+.annotation system Ldalvik/annotation/InnerClass;
+    accessFlags = 0x1
+    name = null
+.end annotation
+
+
+# instance fields
+.field public final synthetic val$api_key:Ljava/lang/String;
+
+.field public final synthetic val$token:Ljava/lang/String;
+
+
+# direct methods
+.method public constructor <init>(Ljava/lang/String;Lorg/json/JSONObject;Lcom/android/volley/Response$Listener;Lcom/android/volley/Response$ErrorListener;Ljava/lang/String;Ljava/lang/String;)V
+    .locals 6
+
+    iput-object p5, p0, Lcom/nettv/livestore/remote/GetSubtitleLinkRequest$1;->val$api_key:Ljava/lang/String;
+
+    iput-object p6, p0, Lcom/nettv/livestore/remote/GetSubtitleLinkRequest$1;->val$token:Ljava/lang/String;
+
+    const/4 v1, 0x1
+
+    move-object v0, p0
+
+    move-object v2, p1
+
+    move-object v3, p2
+
+    move-object v4, p3
+
+    move-object v5, p4
+
+    invoke-direct/range {v0 .. v5}, Lcom/android/volley/toolbox/JsonObjectRequest;-><init>(ILjava/lang/String;Lorg/json/JSONObject;Lcom/android/volley/Response$Listener;Lcom/android/volley/Response$ErrorListener;)V
+
+    return-void
+.end method
+
+
+# virtual methods
+.method public getHeaders()Ljava/util/Map;
+    .locals 3
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "()",
+            "Ljava/util/Map<",
+            "Ljava/lang/String;",
+            "Ljava/lang/String;",
+            ">;"
+        }
+    .end annotation
+
+    .line 1
+    new-instance v0, Ljava/util/HashMap;
+
+    invoke-direct {v0}, Ljava/util/HashMap;-><init>()V
+
+    .line 2
+    iget-object v1, p0, Lcom/nettv/livestore/remote/GetSubtitleLinkRequest$1;->val$api_key:Ljava/lang/String;
+
+    const-string v2, "Api-Key"
+
+    invoke-virtual {v0, v2, v1}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    .line 3
+    new-instance v1, Ljava/lang/StringBuilder;
+
+    invoke-direct {v1}, Ljava/lang/StringBuilder;-><init>()V
+
+    const-string v2, "Bearer "
+
+    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    iget-object v2, p0, Lcom/nettv/livestore/remote/GetSubtitleLinkRequest$1;->val$token:Ljava/lang/String;
+
+    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object v1
+
+    const-string v2, "Authorization"
+
+    invoke-virtual {v0, v2, v1}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    const-string v1, "Content-Type"
+
+    const-string v2, "application/json"
+
+    .line 4
+    invoke-virtual {v0, v1, v2}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    const-string v1, "Accept"
+
+    const-string v2, "*/*"
+
+    .line 5
+    invoke-virtual {v0, v1, v2}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    const-string v1, "User-Agent"
+
+    const-string v2, "PostmanRuntime/7.33.0"
+
+    .line 6
+    invoke-virtual {v0, v1, v2}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    return-object v0
+.end method
