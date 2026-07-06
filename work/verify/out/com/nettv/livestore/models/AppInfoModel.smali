@@ -398,7 +398,7 @@
 
     if-eqz v3, :cond_2b
 
-    const-string v4, "gadir.co"
+    const-string v4, "gadir.co:80/get.php"
 
     invoke-virtual {v3, v4}, Ljava/lang/String;->contains(Ljava/lang/CharSequence;)Z
 

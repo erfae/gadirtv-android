@@ -975,13 +975,13 @@
     :try_start_e
     iget-object v1, p0, Lcom/nettv/livestore/MainActivity;->appInfoModel:Lcom/nettv/livestore/models/AppInfoModel;
 
-    if-eqz v1, :cond_98
+    if-eqz v1, :cond_ae
 
     invoke-virtual {v1}, Lcom/nettv/livestore/models/AppInfoModel;->getResult()Ljava/util/List;
 
     move-result-object v1
 
-    if-eqz v1, :cond_98
+    if-eqz v1, :cond_ae
 
     iget-object v1, p0, Lcom/nettv/livestore/MainActivity;->appInfoModel:Lcom/nettv/livestore/models/AppInfoModel;
 
@@ -993,7 +993,7 @@
 
     move-result v1
 
-    if-lez v1, :cond_98
+    if-lez v1, :cond_ae
 
     iget-object v1, p0, Lcom/nettv/livestore/MainActivity;->appInfoModel:Lcom/nettv/livestore/models/AppInfoModel;
 
@@ -1017,7 +1017,7 @@
 
     move-result v1
 
-    if-nez v1, :cond_98
+    if-nez v1, :cond_ae
 
     .line 4
     iget-object v1, p0, Lcom/nettv/livestore/MainActivity;->appInfoModel:Lcom/nettv/livestore/models/AppInfoModel;
@@ -1036,7 +1036,30 @@
 
     iput-object v1, p0, Lcom/nettv/livestore/MainActivity;->currentUrlModel:Lcom/nettv/livestore/models/AppInfoModel$UrlModel;
 
+    iget v1, p0, Lcom/nettv/livestore/MainActivity;->playlist_position:I
+
+    const/4 v3, 0x1
+
+    if-ne v1, v3, :cond_62
+
+    iget-object v1, p0, Lcom/nettv/livestore/MainActivity;->preferenceHelper:Lcom/nettv/livestore/helper/PreferenceHelper;
+
+    invoke-virtual {v1, v3}, Lcom/nettv/livestore/helper/PreferenceHelper;->setSharedPreferenceISM3U(Z)V
+
+    iget-object v1, p0, Lcom/nettv/livestore/MainActivity;->currentUrlModel:Lcom/nettv/livestore/models/AppInfoModel$UrlModel;
+
+    invoke-virtual {v1}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
+
+    move-result-object v1
+
+    iget-object v3, p0, Lcom/nettv/livestore/MainActivity;->wordModels:Lcom/nettv/livestore/models/WordModels;
+
+    invoke-virtual {p0, v1, v3}, Lcom/nettv/livestore/apps/BaseActivity;->reloadM3UData(Ljava/lang/String;Lcom/nettv/livestore/models/WordModels;)V
+
+    goto :goto_c5
+
     .line 5
+    :cond_62
     invoke-virtual {v1}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
 
     move-result-object v1
@@ -1047,7 +1070,7 @@
 
     move-result v1
 
-    if-eqz v1, :cond_69
+    if-eqz v1, :cond_7f
 
     .line 6
     iget-object v1, p0, Lcom/nettv/livestore/MainActivity;->preferenceHelper:Lcom/nettv/livestore/helper/PreferenceHelper;
@@ -1065,10 +1088,10 @@
 
     invoke-virtual {p0, v1, v2}, Lcom/nettv/livestore/apps/BaseActivity;->goToLogin(Ljava/lang/String;Lcom/nettv/livestore/models/WordModels;)V
 
-    goto :goto_af
+    goto :goto_c5
 
     .line 8
-    :cond_69
+    :cond_7f
     iget-object v1, p0, Lcom/nettv/livestore/MainActivity;->currentUrlModel:Lcom/nettv/livestore/models/AppInfoModel$UrlModel;
 
     invoke-virtual {v1}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
@@ -1079,7 +1102,7 @@
 
     move-result v1
 
-    if-eqz v1, :cond_86
+    if-eqz v1, :cond_9c
 
     .line 9
     iget-object v1, p0, Lcom/nettv/livestore/MainActivity;->preferenceHelper:Lcom/nettv/livestore/helper/PreferenceHelper;
@@ -1097,10 +1120,10 @@
 
     invoke-virtual {p0, v1, v2}, Lcom/nettv/livestore/apps/BaseActivity;->goToXUILogin(Ljava/lang/String;Lcom/nettv/livestore/models/WordModels;)V
 
-    goto :goto_af
+    goto :goto_c5
 
     .line 11
-    :cond_86
+    :cond_9c
     iget-object v1, p0, Lcom/nettv/livestore/MainActivity;->preferenceHelper:Lcom/nettv/livestore/helper/PreferenceHelper;
 
     const/4 v2, 0x1
@@ -1118,10 +1141,10 @@
 
     invoke-virtual {p0, v1, v2}, Lcom/nettv/livestore/apps/BaseActivity;->reloadM3UData(Ljava/lang/String;Lcom/nettv/livestore/models/WordModels;)V
 
-    goto :goto_af
+    goto :goto_c5
 
     .line 13
-    :cond_98
+    :cond_ae
     new-instance v1, Landroid/content/Intent;
 
     invoke-direct {v1, p0, v0}, Landroid/content/Intent;-><init>(Landroid/content/Context;Ljava/lang/Class;)V
@@ -1131,14 +1154,14 @@
 
     .line 15
     invoke-virtual {p0}, Landroid/app/Activity;->finish()V
-    :try_end_a3
-    .catch Ljava/lang/Exception; {:try_start_e .. :try_end_a3} :catch_a4
+    :try_end_b9
+    .catch Ljava/lang/Exception; {:try_start_e .. :try_end_b9} :catch_ba
 
-    goto :goto_af
+    goto :goto_c5
 
     .line 16
-    :catch_a4
-    :try_start_a4
+    :catch_ba
+    :try_start_ba
     new-instance v1, Landroid/content/Intent;
 
     invoke-direct {v1, p0, v0}, Landroid/content/Intent;-><init>(Landroid/content/Context;Ljava/lang/Class;)V
@@ -1148,11 +1171,11 @@
 
     .line 18
     invoke-virtual {p0}, Landroid/app/Activity;->finish()V
-    :try_end_af
-    .catch Ljava/lang/Exception; {:try_start_a4 .. :try_end_af} :catch_af
+    :try_end_c5
+    .catch Ljava/lang/Exception; {:try_start_ba .. :try_end_c5} :catch_c5
 
-    :catch_af
-    :goto_af
+    :catch_c5
+    :goto_c5
     return-void
 .end method
 

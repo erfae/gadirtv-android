@@ -1036,29 +1036,6 @@
 
     iput-object v1, p0, Lcom/nettv/livestore/MainActivity;->currentUrlModel:Lcom/nettv/livestore/models/AppInfoModel$UrlModel;
 
-    iget v1, p0, Lcom/nettv/livestore/MainActivity;->playlist_position:I
-
-    const/4 v3, 0x1
-
-    if-ne v1, v3, :cond_normal_ma
-
-    iget-object v1, p0, Lcom/nettv/livestore/MainActivity;->preferenceHelper:Lcom/nettv/livestore/helper/PreferenceHelper;
-
-    invoke-virtual {v1, v3}, Lcom/nettv/livestore/helper/PreferenceHelper;->setSharedPreferenceISM3U(Z)V
-
-    iget-object v1, p0, Lcom/nettv/livestore/MainActivity;->currentUrlModel:Lcom/nettv/livestore/models/AppInfoModel$UrlModel;
-
-    invoke-virtual {v1}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
-
-    move-result-object v1
-
-    iget-object v3, p0, Lcom/nettv/livestore/MainActivity;->wordModels:Lcom/nettv/livestore/models/WordModels;
-
-    invoke-virtual {p0, v1, v3}, Lcom/nettv/livestore/apps/BaseActivity;->reloadM3UData(Ljava/lang/String;Lcom/nettv/livestore/models/WordModels;)V
-
-    goto :goto_0
-
-    :cond_normal_ma
     .line 5
     invoke-virtual {v1}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
 
