@@ -50,33 +50,59 @@ const http = require('http');
 const https = require('https');
 const { URL } = require('url');
 
-function nodeHttpJson({ host, port, protocol, path: p, timeoutMs }) {
-  return new Promise((resolve, reject) => {
+// Reuse sockets like VLC/IPTV Smarters do. Some Xtream servers return
+// empty bodies when the client keeps opening new sockets rapidly.
+const httpAgent  = new http.Agent({ keepAlive: true, maxSockets: 4 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 4 });
+
+function nodeHttpJsonOnce({ host, port, protocol, path: p, timeoutMs }) {
+  return new Promise((resolve) => {
     const lib = protocol === 'https:' ? https : http;
+    const agent = protocol === 'https:' ? httpsAgent : httpAgent;
     const req = lib.request({
-      host,
-      port,
-      path: p,
-      method: 'GET',
-      timeout: timeoutMs || 25000,
+      host, port, path: p, method: 'GET',
+      timeout: timeoutMs || 30000,
+      agent,
       headers: {
         'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20',
-        'Accept': '*/*',
-        'Connection': 'close',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Encoding': 'identity',
+        'Connection': 'keep-alive',
       },
     }, (res) => {
       const chunks = [];
       res.on('data', c => chunks.push(c));
       res.on('end', () => {
         const buf = Buffer.concat(chunks).toString('utf8');
-        try { resolve({ ok: true, status: res.statusCode, data: JSON.parse(buf) }); }
-        catch (_) { resolve({ ok: true, status: res.statusCode, data: buf }); }
+        try { resolve({ ok: true, status: res.statusCode, data: JSON.parse(buf), rawLen: buf.length }); }
+        catch (_) { resolve({ ok: true, status: res.statusCode, data: buf, rawLen: buf.length }); }
       });
+      res.on('error', (e) => resolve({ ok: false, error: 'res:' + e.message }));
     });
     req.on('timeout', () => { req.destroy(new Error('timeout')); });
     req.on('error', (e) => resolve({ ok: false, error: e.message }));
     req.end();
   });
+}
+
+// Retry when the server returns 200 but empty body (gadir.co does this
+// under load / anti-abuse for large payloads like live/series categories).
+async function nodeHttpJson(opts) {
+  let last = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const res = await nodeHttpJsonOnce(opts);
+    last = res;
+    if (!res.ok) {
+      // network-level error — retry
+    } else if (Array.isArray(res.data) || (res.data && typeof res.data === 'object')) {
+      return res; // real data
+    } else if (typeof res.data === 'string' && res.data.trim().length > 0) {
+      return res; // non-empty string (could still be usable)
+    }
+    // empty body → wait and retry with slightly increasing delay
+    await new Promise(r => setTimeout(r, 400 * attempt));
+  }
+  return last;
 }
 
 ipcMain.handle('xtream:get', async (_evt, { baseUrl, username, password, action, extra }) => {
@@ -95,7 +121,7 @@ ipcMain.handle('xtream:get', async (_evt, { baseUrl, username, password, action,
       port: u.port || (u.protocol === 'https:' ? 443 : 80),
       protocol: u.protocol,
       path: p,
-      timeoutMs: 25000,
+      timeoutMs: 30000,
     });
   } catch (e) {
     return { ok: false, error: e.message };
