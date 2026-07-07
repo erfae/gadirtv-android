@@ -92,3 +92,7 @@ electron/dist_manual/GadirTV/GadirTV.exe
 electron/dist/win-unpacked/GadirTV.exe
 electron/GadirTV-Windows-x64.zip
 electron/GadirTV-portable-encrypted.zip
+electron/dist_manual/GadirTV/mpv/mpv.exe
+electron/GadirTV-Setup-1.0.0.exe
+electron/mpv/mpv.exe
+electron/GadirTV-Installer.zip

@@ -1,11 +1,57 @@
-const { app, BrowserWindow, Menu, session, globalShortcut } = require('electron');
+const { app, BrowserWindow, Menu, session, globalShortcut, ipcMain } = require('electron');
 const path = require('path');
+const { spawn } = require('child_process');
+const fs = require('fs');
 
-// Fully disable Chromium security features that block IPTV streaming
 app.commandLine.appendSwitch('disable-features', 'CrossOriginOpenerPolicy,IsolateOrigins,site-per-process,BlockInsecurePrivateNetworkRequests');
 app.commandLine.appendSwitch('allow-insecure-localhost');
 app.commandLine.appendSwitch('ignore-certificate-errors');
 app.commandLine.appendSwitch('disable-web-security');
+
+function resolveMpv() {
+  // Look for bundled mpv.exe next to the app (both dev and packaged)
+  const candidates = [
+    path.join(__dirname, 'mpv', 'mpv.exe'),
+    path.join(process.resourcesPath || __dirname, 'mpv', 'mpv.exe'),
+    path.join(process.resourcesPath || __dirname, '..', 'mpv', 'mpv.exe'),
+  ];
+  for (const c of candidates) { if (fs.existsSync(c)) return c; }
+  return null;
+}
+
+let mpvProc = null;
+function killMpv() {
+  if (mpvProc && !mpvProc.killed) {
+    try { mpvProc.kill(); } catch (_) {}
+  }
+  mpvProc = null;
+}
+
+ipcMain.handle('mpv:play', (evt, { url, name, fullscreen }) => {
+  const mpv = resolveMpv();
+  if (!mpv) return { ok: false, error: 'mpv.exe no encontrado en el paquete' };
+  killMpv();
+  const args = [
+    url,
+    `--title=${name || 'GadirTV'}`,
+    '--force-window=yes',
+    '--keep-open=no',
+    '--osc=yes',
+    '--hwdec=auto-safe',
+    '--cache=yes',
+    '--demuxer-max-bytes=200M',
+    '--demuxer-readahead-secs=20',
+    '--user-agent=VLC/3.0.20 LibVLC/3.0.20',
+  ];
+  if (fullscreen) args.push('--fs');
+  try {
+    mpvProc = spawn(mpv, args, { detached: false, stdio: 'ignore' });
+    mpvProc.on('exit', () => { mpvProc = null; });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -18,24 +64,20 @@ function createWindow() {
     title: 'GadirTV',
     autoHideMenuBar: true,
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       webSecurity: false,
       allowRunningInsecureContent: true,
-      experimentalFeatures: true,
     },
   });
   Menu.setApplicationMenu(null);
 
-  // Force a common IPTV client user-agent for gadir.co requests and inject
-  // permissive CORS headers so browser cannot block them for any reason.
-  const filter = { urls: ['http://gadir.co/*', 'https://gadir.co/*', 'http://*/*', 'https://*/*'] };
+  const filter = { urls: ['http://gadir.co/*', 'https://gadir.co/*'] };
   session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, cb) => {
-    if (/gadir\.co/i.test(details.url)) {
-      details.requestHeaders['User-Agent'] = 'VLC/3.0.20 LibVLC/3.0.20';
-      delete details.requestHeaders['Origin'];
-      delete details.requestHeaders['Referer'];
-    }
+    details.requestHeaders['User-Agent'] = 'VLC/3.0.20 LibVLC/3.0.20';
+    delete details.requestHeaders['Origin'];
+    delete details.requestHeaders['Referer'];
     cb({ requestHeaders: details.requestHeaders });
   });
   session.defaultSession.webRequest.onHeadersReceived((details, cb) => {
@@ -46,21 +88,17 @@ function createWindow() {
     cb({ responseHeaders: headers });
   });
 
-  // Toggle DevTools with Ctrl+Shift+I to help debug from the user side.
   globalShortcut.register('CommandOrControl+Shift+I', () => {
     if (win.webContents.isDevToolsOpened()) win.webContents.closeDevTools();
     else win.webContents.openDevTools({ mode: 'right' });
   });
 
   win.loadFile(path.join(__dirname, 'app', 'index.html'));
-
-  // If the page can't be reached (blank screen), open DevTools so user can screenshot the error.
-  win.webContents.on('did-fail-load', () => {
-    win.webContents.openDevTools({ mode: 'right' });
-  });
+  win.webContents.on('did-fail-load', () => win.webContents.openDevTools({ mode: 'right' }));
+  win.on('closed', () => killMpv());
 }
 
 app.whenReady().then(createWindow);
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('window-all-closed', () => { killMpv(); if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
-app.on('will-quit', () => { globalShortcut.unregisterAll(); });
+app.on('will-quit', () => { globalShortcut.unregisterAll(); killMpv(); });

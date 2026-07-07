@@ -626,7 +626,7 @@ function fmtTime(ts) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function LivePreview({ channel, profile, fsSignal, onClose }) {
+function LivePreview({ channel, profile, fsSignal, onClose, onFullscreen }) {
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const [err, setErr] = useState("");
@@ -686,30 +686,26 @@ function LivePreview({ channel, profile, fsSignal, onClose }) {
   }, [channel, profile]);
 
   const goFullscreen = () => {
+    // Prefer mpv (via Electron IPC) since it handles all codecs. If unavailable, fall back to browser fullscreen.
+    if (onFullscreen) { onFullscreen(); return; }
     const el = containerRef.current;
     if (!el) return;
-    if (!document.fullscreenElement) {
-      el.requestFullscreen && el.requestFullscreen().catch(()=>{});
-    } else {
-      document.exitFullscreen && document.exitFullscreen();
-    }
-    // Ensure video keeps playing
+    if (!document.fullscreenElement) el.requestFullscreen && el.requestFullscreen().catch(()=>{});
+    else document.exitFullscreen && document.exitFullscreen();
     setTimeout(() => { const v = videoRef.current; if (v && v.paused) v.play().catch(()=>{}); }, 100);
   };
 
   // Auto-fullscreen when fsSignal changes (triggered by double-click on channel)
   useEffect(() => {
     if (!fsSignal || !channel) return;
-    // Wait for video to actually start rendering before going fullscreen
+    // Delegate to onFullscreen (which launches mpv) instead of browser FS
+    if (onFullscreen) { onFullscreen(); return; }
     const t = setTimeout(() => {
       const el = containerRef.current;
-      if (el && !document.fullscreenElement) {
-        el.requestFullscreen && el.requestFullscreen().catch(()=>{});
-        setTimeout(() => { const v = videoRef.current; if (v && v.paused) v.play().catch(()=>{}); }, 200);
-      }
+      if (el && !document.fullscreenElement) el.requestFullscreen && el.requestFullscreen().catch(()=>{});
     }, 400);
     return () => clearTimeout(t);
-  }, [fsSignal, channel]);
+  }, [fsSignal, channel, onFullscreen]);
 
   // Show current program name briefly whenever entering fullscreen or changing channel
   useEffect(() => {
@@ -801,10 +797,22 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
   const [tab, setTab] = useState("home");
   const [liveChannel, setLiveChannel] = useState(null);
   const [fsSignal, setFsSignal] = useState(0);
+
+  const playLiveInMpv = async (item, fullscreen) => {
+    const url = api.streamUrl(profile, { stream_id: item.stream_id, kind: "live", ext: "ts" });
+    if (window.electronAPI && window.electronAPI.playInMpv) {
+      const res = await window.electronAPI.playInMpv({ url, name: item.name, fullscreen });
+      if (!res || !res.ok) alert("No se pudo lanzar mpv: " + (res && res.error));
+    } else {
+      // Web fallback: open full-screen player
+      onPlay(item, "live");
+    }
+  };
+
   const handleSelect = (item, kind) => {
     if (kind === "series") onOpenSeries(item);
     else if (kind === "movie") onOpenMovie(item);
-    else if (kind === "live_fs") { setLiveChannel(item); setFsSignal(Date.now()); }
+    else if (kind === "live_fs") { setLiveChannel(item); playLiveInMpv(item, true); }
     else if (kind === "live") setLiveChannel(item);
   };
   useEffect(() => { if (tab !== "live") setLiveChannel(null); }, [tab]);
@@ -815,7 +823,7 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
         <button onClick={onLogout} data-testid="logout-btn" className="w-10 h-10 rounded-lg bg-black/60 hover:bg-black/80 flex items-center justify-center text-neutral-400 hover:text-white backdrop-blur"><LogOut size={18}/></button>
       </div>
       {tab==="home" && <HomeTab profile={profile} onSelect={handleSelect}/>}
-      {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={handleSelect} livePreview={<LivePreview channel={liveChannel} profile={profile} fsSignal={fsSignal} onClose={()=>setLiveChannel(null)}/>}/>}
+      {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={handleSelect} livePreview={<LivePreview channel={liveChannel} profile={profile} fsSignal={fsSignal} onClose={()=>setLiveChannel(null)} onFullscreen={()=>liveChannel && playLiveInMpv(liveChannel, true)}/>}/>}
       {tab==="movies" && <CategorySection kind="movie" profile={profile} onSelect={handleSelect}/>}
       {tab==="series" && <CategorySection kind="series" profile={profile} onSelect={handleSelect}/>}
       <BottomNav tab={tab} setTab={setTab}/>
@@ -829,6 +837,19 @@ function App() {
   const [playing, setPlaying] = useState(null);
   const [seriesOpen, setSeriesOpen] = useState(null);
   const [movieOpen, setMovieOpen] = useState(null);
+
+  const playInMpv = async (item, kind) => {
+    const streamId = item.stream_id || item.id || item.series_id;
+    const ext = kind === "live" ? "ts" : (item.container_extension || "mp4");
+    const url = api.streamUrl(profile, { stream_id: streamId, kind, ext });
+    if (window.electronAPI && window.electronAPI.playInMpv) {
+      const res = await window.electronAPI.playInMpv({ url, name: item.name || item.title, fullscreen: true });
+      if (!res || !res.ok) { alert("mpv falló, usando reproductor interno"); setPlaying({item,kind}); }
+    } else {
+      setPlaying({ item, kind });
+    }
+  };
+
   useEffect(() => {
     const a = store.getActive();
     if (a) { setProfile(a); setScreen("main"); }
@@ -843,13 +864,13 @@ function App() {
           profile={profile}
           onLogout={()=>{store.setActive(null);setProfile(null);setPlaying(null);setSeriesOpen(null);setMovieOpen(null);setScreen("profiles");}}
           onSwitch={()=>{setPlaying(null);setSeriesOpen(null);setMovieOpen(null);setScreen("profiles");}}
-          onPlay={(i,k)=>setPlaying({item:i,kind:k})}
+          onPlay={(i,k)=>playInMpv(i,k)}
           onOpenSeries={s=>setSeriesOpen(s)}
           onOpenMovie={m=>setMovieOpen(m)}
         />
       )}
-      {movieOpen && profile && <MovieDetail movie={movieOpen} profile={profile} onClose={()=>setMovieOpen(null)} onPlay={(m,k)=>{setMovieOpen(null); setPlaying({item:m,kind:k});}}/>}
-      {seriesOpen && profile && <SeriesDetail series={seriesOpen} profile={profile} onClose={()=>setSeriesOpen(null)} onPlay={(ep,k)=>{setSeriesOpen(null); setPlaying({item:ep,kind:k});}}/>}
+      {movieOpen && profile && <MovieDetail movie={movieOpen} profile={profile} onClose={()=>setMovieOpen(null)} onPlay={(m,k)=>{setMovieOpen(null); playInMpv(m,k);}}/>}
+      {seriesOpen && profile && <SeriesDetail series={seriesOpen} profile={profile} onClose={()=>setSeriesOpen(null)} onPlay={(ep,k)=>{setSeriesOpen(null); playInMpv(ep,k);}}/>}
       {playing && profile && <Player item={playing.item} kind={playing.kind} profile={profile} onClose={()=>setPlaying(null)}/>}
     </div>
   );
