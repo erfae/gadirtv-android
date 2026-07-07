@@ -90,3 +90,4 @@ frontend/public/GadirTV-Windows.zip
 electron/node_modules/electron/dist/electron
 electron/dist_manual/GadirTV/GadirTV.exe
 electron/dist/win-unpacked/GadirTV.exe
+electron/GadirTV-Windows-x64.zip

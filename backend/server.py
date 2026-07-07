@@ -41,6 +41,14 @@ async def download_installer():
         raise HTTPException(404, "installer not built yet")
     return FileResponse(path, filename="GadirTV-Setup-1.0.0.exe", media_type="application/octet-stream")
 
+
+@app.get("/api/download/portable")
+async def download_portable():
+    path = "/app/electron/GadirTV-Windows-x64.zip"
+    if not os.path.exists(path):
+        raise HTTPException(404, "portable zip not built yet")
+    return FileResponse(path, filename="GadirTV-Windows-x64.zip", media_type="application/zip")
+
 @app.post("/api/login")
 async def login(body: LoginBody):
     try:
