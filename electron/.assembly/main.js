@@ -24,10 +24,36 @@ function resolveMpv() {
 let mpvProc = null;
 function killMpv() {
   if (mpvProc && !mpvProc.killed) {
-    try { mpvProc.kill(); } catch (_) {}
+    const pid = mpvProc.pid;
+    try {
+      if (process.platform === 'win32' && pid) {
+        require('child_process').spawnSync('taskkill', ['/F', '/T', '/PID', String(pid)]);
+      } else {
+        mpvProc.kill('SIGKILL');
+      }
+    } catch (_) {}
+  }
+  // Also blanket-kill any lingering mpv.exe just in case (Windows)
+  if (process.platform === 'win32') {
+    try { require('child_process').spawnSync('taskkill', ['/F', '/IM', 'mpv.exe']); } catch (_) {}
   }
   mpvProc = null;
 }
+
+ipcMain.handle('mpv:kill', () => { killMpv(); return { ok: true }; });
+
+ipcMain.handle('session:reset', async () => {
+  try {
+    killMpv();
+    // Force-close all TCP connections held by Chromium (HTTP/1.1 keep-alives to gadir)
+    if (session.defaultSession.closeAllConnections) {
+      try { await session.defaultSession.closeAllConnections(); } catch (_) {}
+    }
+    await session.defaultSession.clearStorageData({ storages: ['cookies', 'cachestorage', 'serviceworkers', 'shadercache'] });
+    await session.defaultSession.clearCache();
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
 
 ipcMain.handle('mpv:play', (evt, { url, name, fullscreen }) => {
   const mpv = resolveMpv();
@@ -35,20 +61,40 @@ ipcMain.handle('mpv:play', (evt, { url, name, fullscreen }) => {
   killMpv();
   const args = [
     url,
-    `--title=${name || 'GadirTV'}`,
-    '--force-window=yes',
+    '--force-window=immediate',
     '--keep-open=no',
+    '--idle=no',
     '--osc=yes',
+    '--volume=100',
     '--hwdec=auto-safe',
     '--cache=yes',
-    '--demuxer-max-bytes=200M',
-    '--demuxer-readahead-secs=20',
-    '--user-agent=VLC/3.0.20 LibVLC/3.0.20',
+    '--cache-secs=10',
+    '--demuxer-max-bytes=100M',
+    '--demuxer-readahead-secs=10',
+    '--network-timeout=20',
+    '--stream-lavf-o=reconnect=1,reconnect_streamed=1,reconnect_delay_max=5,reconnect_on_network_error=1',
+    '--force-seekable=yes',
+    '--audio-fallback-to-null=yes',
+    '--ytdl=no',
+    '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0 Safari/537.36',
+    '--msg-level=all=warn',
+    '--vd-lavc-fast=yes',
   ];
+  if (name) args.push(`--title=${name}`);
   if (fullscreen) args.push('--fs');
   try {
-    mpvProc = spawn(mpv, args, { detached: false, stdio: 'ignore' });
-    mpvProc.on('exit', () => { mpvProc = null; });
+    mpvProc = spawn(mpv, args, { detached: false, stdio: ['ignore', 'ignore', 'pipe'], cwd: path.dirname(mpv) });
+    let stderr = '';
+    if (mpvProc.stderr) {
+      mpvProc.stderr.setEncoding('utf8');
+      mpvProc.stderr.on('data', d => { stderr += d; if (stderr.length > 2000) stderr = stderr.slice(-2000); });
+    }
+    mpvProc.on('exit', (code) => {
+      mpvProc = null;
+      BrowserWindow.getAllWindows().forEach(w => {
+        try { w.webContents.send('mpv:exited', { code, stderr: stderr.slice(-1000) }); } catch (_) {}
+      });
+    });
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message };
@@ -104,6 +150,16 @@ function createWindow() {
   });
 
   win.loadFile(path.join(__dirname, 'app', 'index.html'));
+
+  // Disable reload shortcuts (F5, Ctrl+R, Ctrl+Shift+R) so accidental
+  // page reload does not wipe the current session.
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    const k = (input.key || '').toLowerCase();
+    if (k === 'f5') { event.preventDefault(); return; }
+    if ((input.control || input.meta) && k === 'r') { event.preventDefault(); return; }
+    if ((input.control || input.meta) && input.shift && k === 'r') { event.preventDefault(); return; }
+  });
   win.webContents.on('did-fail-load', () => win.webContents.openDevTools({ mode: 'right' }));
   win.on('closed', () => killMpv());
 }

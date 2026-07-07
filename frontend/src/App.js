@@ -3,7 +3,7 @@ import axios from "axios";
 import mpegts from "mpegts.js";
 import Hls from "hls.js";
 import { Play, Search, Tv, Film, Clapperboard, LogOut, Plus, X, ChevronLeft, Home as HomeIcon, ChevronRight, Trash2, Settings, Maximize2, RefreshCw, Volume2, VolumeX, Minus, Square } from "lucide-react";
-import { api, IS_ELECTRON } from "./api";
+import { api, IS_ELECTRON, newSession } from "./api";
 import "./App.css";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -305,16 +305,21 @@ function HomeTab({ profile, onSelect, onHover }) {
       const loadFromCategories = async (fetchCats, fetchStreams, tag) => {
         try {
           console.log(`[home] loading ${tag} categories...`);
-          const cats = await withTimeout(fetchCats(profile), 15000);
-          if (!Array.isArray(cats) || !cats.length) { console.warn(`[home] no ${tag} categories`); return []; }
-          console.log(`[home] got ${cats.length} ${tag} categories`);
-          const sample = cats.slice(0, 3);
-          const results = await Promise.all(sample.map(c =>
-            withTimeout(fetchStreams(profile, c.category_id), 12000).catch(err => { console.warn(`[home] ${tag} cat ${c.category_id} failed:`, err.message); return []; })
-          ));
-          const flat = [].concat(...results.filter(Array.isArray));
-          console.log(`[home] ${tag} total items: ${flat.length}`);
-          return sortByAdded(flat);
+          const cats = await withTimeout(fetchCats(profile), 10000);
+          const catList = Array.isArray(cats) ? cats : [];
+          console.log(`[home] ${tag}: ${catList.length} categories`);
+          if (catList.length) {
+            const sample = catList.slice(0, 4);
+            const results = await Promise.all(sample.map(c =>
+              withTimeout(fetchStreams(profile, c.category_id), 8000).catch(()=>[])
+            ));
+            const flat = [].concat(...results.filter(Array.isArray));
+            if (flat.length) return sortByAdded(flat);
+          }
+          // Fallback: fetch all streams without a category
+          console.log(`[home] ${tag} fallback: fetching all streams...`);
+          const all = await withTimeout(fetchStreams(profile), 15000).catch(()=>[]);
+          return sortByAdded(Array.isArray(all) ? all : []);
         } catch (e) { console.error(`[home] ${tag} failed:`, e.message); return []; }
       };
       const [movies, series] = await Promise.all([
@@ -322,9 +327,12 @@ function HomeTab({ profile, onSelect, onHover }) {
         loadFromCategories(api.seriesCategories, api.seriesList, "series"),
       ]);
       if (cancelled) return;
+      console.log(`[home] final: ${movies.length} movies, ${series.length} series`);
       setRM(movies.slice(0, 30));
       setRS(series.slice(0, 30));
       if (!movies.length && !series.length) setMsg("No se pudo cargar contenido reciente. Comprueba conexión con gadir.co o si tu cuenta tiene VOD/Series.");
+      else if (!movies.length) setMsg("Tu cuenta no tiene películas VOD. Sólo se muestran series.");
+      else if (!series.length) setMsg("Tu cuenta no tiene series. Sólo se muestran películas.");
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -659,45 +667,49 @@ function fmtTime(ts) {
 function LivePreview({ channel, profile, fsSignal, onClose, onFullscreen }) {
   const videoRef = useRef(null);
   const containerRef = useRef(null);
+  const mpRef = useRef(null);
   const [err, setErr] = useState("");
   const [epg, setEpg] = useState([]);
   const [epgLoading, setEpgLoading] = useState(false);
   const [currentTitle, setCurrentTitle] = useState("");
   const [showTitle, setShowTitle] = useState(false);
+  const [paused, setPaused] = useState(false); // when true, tear down mpegts to release audio
+
+  const teardown = () => {
+    const mp = mpRef.current;
+    if (mp) { try { mp.pause && mp.pause(); } catch (_) {} try { mp.unload && mp.unload(); } catch (_) {} try { mp.detachMediaElement && mp.detachMediaElement(); } catch (_) {} try { mp.destroy && mp.destroy(); } catch (_) {} mpRef.current = null; }
+    const v = videoRef.current;
+    if (v) { try { v.pause(); v.muted = true; v.removeAttribute("src"); v.load(); } catch (_) {} }
+  };
+
+  // When channel changes (user selects another), always resume preview
+  useEffect(() => { setPaused(false); }, [channel]);
 
   useEffect(() => {
-    let mp;
     setErr("");
-    if (!channel) return;
+    if (!channel || paused) { teardown(); return; }
     const url = api.streamUrl(profile, { stream_id: channel.stream_id, kind: "live", ext: "ts" });
     const v = videoRef.current;
     if (!v) return;
+    v.muted = false; v.volume = 1;
     try {
       if (mpegts && mpegts.isSupported && mpegts.isSupported()) {
-        mp = mpegts.createPlayer(
+        const mp = mpegts.createPlayer(
           { type: "mpegts", isLive: true, url },
-          {
-            enableStashBuffer: true,
-            stashInitialSize: 1024,
-            enableWorker: false,
-            fixAudioTimestampGap: true,
-            lazyLoad: false,
-            autoCleanupSourceBuffer: true,
-            autoCleanupMaxBackwardDuration: 30,
-            autoCleanupMinBackwardDuration: 15,
-          }
+          { enableStashBuffer: true, stashInitialSize: 1024, enableWorker: false, fixAudioTimestampGap: true, lazyLoad: false, autoCleanupSourceBuffer: true }
         );
         mp.on(mpegts.Events.ERROR, (type, detail) => setErr(`${type}: ${detail}`));
         mp.attachMediaElement(v);
         mp.load();
         mp.play().catch(e => setErr(e.message));
+        mpRef.current = mp;
       } else {
         v.src = url;
         v.play().catch(()=>{});
       }
     } catch (e) { setErr(e.message); }
-    return () => { try { if (mp) mp.destroy(); } catch (_) {} };
-  }, [channel, profile]);
+    return teardown;
+  }, [channel, profile, paused]);
 
   useEffect(() => {
     if (!channel) { setEpg([]); return; }
@@ -715,21 +727,30 @@ function LivePreview({ channel, profile, fsSignal, onClose, onFullscreen }) {
     return () => { cancelled = true; };
   }, [channel, profile]);
 
+  // Resume the preview when the external mpv fullscreen player closes
+  useEffect(() => {
+    if (!window.electronAPI || !window.electronAPI.onMpvExited) return;
+    const unsub = window.electronAPI.onMpvExited(() => setPaused(false));
+    return () => { if (unsub) unsub(); };
+  }, []);
+
   const goFullscreen = () => {
-    // Prefer mpv (via Electron IPC) since it handles all codecs. If unavailable, fall back to browser fullscreen.
-    if (onFullscreen) { onFullscreen(); return; }
+    // Tear down mpegts synchronously so audio doesn't overlap with mpv
+    teardown();
+    setPaused(true);
+    if (onFullscreen) { setTimeout(() => onFullscreen(), 100); return; }
     const el = containerRef.current;
     if (!el) return;
     if (!document.fullscreenElement) el.requestFullscreen && el.requestFullscreen().catch(()=>{});
     else document.exitFullscreen && document.exitFullscreen();
-    setTimeout(() => { const v = videoRef.current; if (v && v.paused) v.play().catch(()=>{}); }, 100);
   };
 
   // Auto-fullscreen when fsSignal changes (triggered by double-click on channel)
   useEffect(() => {
     if (!fsSignal || !channel) return;
-    // Delegate to onFullscreen (which launches mpv) instead of browser FS
-    if (onFullscreen) { onFullscreen(); return; }
+    teardown();
+    setPaused(true);
+    if (onFullscreen) { setTimeout(() => onFullscreen(), 100); return; }
     const t = setTimeout(() => {
       const el = containerRef.current;
       if (el && !document.fullscreenElement) el.requestFullscreen && el.requestFullscreen().catch(()=>{});
@@ -881,9 +902,39 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
 function App() {
   const [screen, setScreen] = useState("profiles");
   const [profile, setProfile] = useState(null);
+  const [profileNonce, setProfileNonce] = useState(0);
   const [playing, setPlaying] = useState(null);
   const [seriesOpen, setSeriesOpen] = useState(null);
   const [movieOpen, setMovieOpen] = useState(null);
+  const [switching, setSwitching] = useState(false);
+
+  const activateProfile = async (p) => {
+    setSwitching(true);
+    await newSession();
+    store.setActive(p);
+    setProfile(p);
+    setProfileNonce(n => n + 1);
+    setPlaying(null); setSeriesOpen(null); setMovieOpen(null);
+    setScreen("main");
+    setSwitching(false);
+  };
+
+  const doSwitch = async () => {
+    setSwitching(true);
+    await newSession();
+    setPlaying(null); setSeriesOpen(null); setMovieOpen(null);
+    setScreen("profiles");
+    setSwitching(false);
+  };
+
+  const doLogout = async () => {
+    setSwitching(true);
+    await newSession();
+    store.setActive(null); setProfile(null);
+    setPlaying(null); setSeriesOpen(null); setMovieOpen(null);
+    setScreen("profiles");
+    setSwitching(false);
+  };
 
   const playInMpv = async (item, kind) => {
     const streamId = item.stream_id || item.id || item.series_id;
@@ -891,7 +942,10 @@ function App() {
     const url = api.streamUrl(profile, { stream_id: streamId, kind, ext });
     if (window.electronAPI && window.electronAPI.playInMpv) {
       const res = await window.electronAPI.playInMpv({ url, name: item.name || item.title, fullscreen: true });
-      if (!res || !res.ok) { alert("mpv falló, usando reproductor interno"); setPlaying({item,kind}); }
+      if (!res || !res.ok) {
+        alert("Error de mpv: " + (res && res.error) + "\nUsando reproductor interno.");
+        setPlaying({ item, kind });
+      }
     } else {
       setPlaying({ item, kind });
     }
@@ -899,19 +953,26 @@ function App() {
 
   useEffect(() => {
     const a = store.getActive();
-    if (a) { setProfile(a); setScreen("main"); }
+    if (a) { setProfile(a); setProfileNonce(1); setScreen("main"); }
   }, []);
   return (
     <div className="App">
       <TitleBar/>
-      {screen==="profiles" && <Profiles onSelect={p=>{store.setActive(p);setProfile(p);setScreen("main");}} onAdd={()=>setScreen("login")}/>}
-      {screen==="login" && <Login onLogin={p=>{store.setActive(p);setProfile(p);setScreen("main");}} onCancel={()=>setScreen("profiles")}/>}
+      {switching && (
+        <div className="fixed inset-0 z-[300] bg-black/90 backdrop-blur flex flex-col items-center justify-center gap-4" data-testid="switching-overlay">
+          <div className="w-12 h-12 rounded-full border-4 border-red-600/30 border-t-red-600 animate-spin"/>
+          <div className="text-white text-lg font-medium">Cambiando de usuario…</div>
+          <div className="text-neutral-500 text-sm">Cerrando conexión anterior con gadir</div>
+        </div>
+      )}
+      {screen==="profiles" && <Profiles onSelect={activateProfile} onAdd={()=>setScreen("login")}/>}
+      {screen==="login" && <Login onLogin={activateProfile} onCancel={()=>setScreen("profiles")}/>}
       {screen==="main" && profile && (
         <Main
-          key={profile.username}
+          key={`${profile.username}-${profileNonce}`}
           profile={profile}
-          onLogout={()=>{store.setActive(null);setProfile(null);setPlaying(null);setSeriesOpen(null);setMovieOpen(null);setScreen("profiles");}}
-          onSwitch={()=>{setPlaying(null);setSeriesOpen(null);setMovieOpen(null);setScreen("profiles");}}
+          onLogout={doLogout}
+          onSwitch={doSwitch}
           onPlay={(i,k)=>playInMpv(i,k)}
           onOpenSeries={s=>setSeriesOpen(s)}
           onOpenMovie={m=>setMovieOpen(m)}
