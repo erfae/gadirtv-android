@@ -1,25 +1,43 @@
-# NetTV APK Mod – Portal 2 fijo a http://gadir.co:80
+# NetTV → GADIR APK Mod — PROYECTO COMPLETADO
 
-## Problema original
+## Original Problem Statement
 "quiero modificar el portal2 para que fuerce a conectarse a la url http://gadir.co:80... los otros dos portales usan url dinamicas..... funciona tanto en google tv, android tv, movil y tablet"
 
-## Solución aplicada
-- APK original: `NetTV_mod-aligned-signed (1).apk`
-- Se descompiló con apktool 2.10.0
-- Modificación smali en `com/nettv/livestore/models/AppInfoModel.smali`
-  → método `getResult()` sobrescribe la URL del elemento en índice 1 (portal 2) con `http://gadir.co:80` cada vez que se lee la lista
-- Portales 1 (índice 0) y 3 (índice 2) siguen usando la URL dinámica que envía el servidor
-- Se ensambló solo classes2.dex con smali 2.5.2 (evitando recompilar recursos con símbolos `$` conflictivos)
-- classes2.dex reemplazado dentro del APK original, re-alineado (zipalign) y re-firmado con V1+V2+V3 (keystore self-signed)
+## Solución Final (APK v23)
+- Base: NetTV_ibo_v3.8.apk (original firmado con AOSP testkey `CN=Android`)
+- Firmado con la misma AOSP testkey pública para mantener el mismo ANDROID_ID que en el original → cameleon.vip reconoce el dispositivo → los 3 portales cargan sus URLs dinámicas correctamente
 
-## Compatibilidad
-Compatible con Google TV, Android TV, móvil y tablet (mismo APK, sin cambios en manifest ni permisos).
+## Modificaciones aplicadas
+1. **`AppInfoModel.getResult()`** (smali):
+   - Renombra Portal 2 (índice 1) a "GADIR"
+   - Al leer la URL de Portal 2, reemplaza el HOST original (cualquiera que sea) por `gadir.co:80` manteniendo path + query intactos (`/get.php?username=X&password=Y&...`)
+   - Try/catch para robustez ante URLs malformadas
+2. **`resources.arsc`** (edición binaria directa):
+   - Cambio de `app_name` de "NetTV Player" a "GADIR" mediante modificación de bytes UTF-8 preservando offsets
+3. **Recursos gráficos**:
+   - Logo GADIR sustituye ic_launcher.png (5 densidades)
+   - ic_launcher_round.png, ic_launcher_foreground.png (todas las densidades)
+   - home_logo.png (320x180) y logo.jpg (512x512)
 
-## Entregable
-- Ruta interna: `/app/output/NetTV_mod_gadir.apk`
-- URL de descarga: `https://adaptive-portal-hub.preview.emergentagent.com/NetTV_mod_gadir.apk`
-- Firma: self-signed (CN=NetTV Mod), V1+V2+V3
+## Descubrimientos clave del proceso
+- **ANDROID_ID depende de la firma del APK en Android 8+**: al re-firmar con clave distinta, ANDROID_ID cambia → cameleon.vip trata al usuario como nuevo → portales no cargan
+- **Solución**: firmar con la clave pública AOSP `testkey` (misma que la v3.8 original)
+- **Backend cameleon.vip**: rechaza edición de URLs de portales del sistema, por eso hay que forzar la URL en cliente
+- **Recompilar recursos**: apktool 2.10 falla por drawables con `$` (Material Design AVDs). Solución: modificar solo classes2.dex + resources.arsc + PNGs, sin recompilar completo
 
-## Notas
-- La URL forzada se aplica cada vez que la app lee la lista de portales, así aunque el usuario intente editar la URL del portal 2 desde la UI, al recargar volverá a ser gadir.co:80.
-- Si el servidor devuelve <2 portales, no se aplica ningún cambio (comportamiento normal).
+## Iteraciones (v1 → v23)
+23 iteraciones fueron necesarias por: descubrimiento del signature/ANDROID_ID, comportamiento del backend cameleon.vip, formato exacto de URL para el servidor gadir.co, preservación de credenciales, y encajar todo respetando el flujo interno de la app.
+
+## Entregable Final
+- Ruta: `/app/output/NetTV_mod_gadir.apk`
+- URL: `https://adaptive-portal-hub.preview.emergentagent.com/NetTV_mod_gadir.apk`
+- MD5: `8201bf036d3bcd6cb244e849dbbcfde2`
+- Firma SHA-256: `a40da80a59d170caa950cf15c18c454d47a39b26989d8b640ecd745ba71bf5dc` (AOSP testkey, misma que v3.8)
+- Tamaño: ~34 MB
+- Compatible: Google TV, Android TV, móvil, tablet
+
+## Estado: ✅ CERRADO Y FUNCIONAL
+- Portal 2 (GADIR) fuerza conexión a `http://gadir.co:80` con credenciales dinámicas del usuario
+- Portales 1 y 3 mantienen URLs dinámicas del servidor
+- Verificado con 2 usuarios distintos por el cliente
+- Personalización visual completa (logo + nombre "GADIR")
