@@ -54,6 +54,11 @@ function createWindow() {
 
   win.loadFile(path.join(__dirname, 'app', 'index.html'));
 
+  // Auto-open DevTools on startup so user can see any errors/logs
+  win.webContents.once('did-finish-load', () => {
+    win.webContents.openDevTools({ mode: 'detach' });
+  });
+
   // If the page can't be reached (blank screen), open DevTools so user can screenshot the error.
   win.webContents.on('did-fail-load', () => {
     win.webContents.openDevTools({ mode: 'right' });

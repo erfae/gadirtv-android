@@ -270,25 +270,30 @@ function HomeTab({ profile, onSelect }) {
     (async () => {
       setLoading(true); setMsg("");
       const sortByAdded = arr => Array.isArray(arr) ? [...arr].sort((a,b)=>(parseInt(b.added||b.last_modified||0))-(parseInt(a.added||a.last_modified||0))) : [];
-      const loadFromCategories = async (fetchCats, fetchStreams) => {
+      const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(()=>rej(new Error("timeout")), ms))]);
+      const loadFromCategories = async (fetchCats, fetchStreams, tag) => {
         try {
-          const cats = await fetchCats(profile);
-          if (!Array.isArray(cats) || !cats.length) return [];
-          // Fetch first N categories in parallel and merge
-          const sample = cats.slice(0, 6);
-          const results = await Promise.all(sample.map(c => fetchStreams(profile, c.category_id).catch(()=>[])));
+          console.log(`[home] loading ${tag} categories...`);
+          const cats = await withTimeout(fetchCats(profile), 15000);
+          if (!Array.isArray(cats) || !cats.length) { console.warn(`[home] no ${tag} categories`); return []; }
+          console.log(`[home] got ${cats.length} ${tag} categories`);
+          const sample = cats.slice(0, 3);
+          const results = await Promise.all(sample.map(c =>
+            withTimeout(fetchStreams(profile, c.category_id), 12000).catch(err => { console.warn(`[home] ${tag} cat ${c.category_id} failed:`, err.message); return []; })
+          ));
           const flat = [].concat(...results.filter(Array.isArray));
+          console.log(`[home] ${tag} total items: ${flat.length}`);
           return sortByAdded(flat);
-        } catch (_) { return []; }
+        } catch (e) { console.error(`[home] ${tag} failed:`, e.message); return []; }
       };
       const [movies, series] = await Promise.all([
-        loadFromCategories(api.vodCategories, api.vodStreams),
-        loadFromCategories(api.seriesCategories, api.seriesList),
+        loadFromCategories(api.vodCategories, api.vodStreams, "vod"),
+        loadFromCategories(api.seriesCategories, api.seriesList, "series"),
       ]);
       if (cancelled) return;
       setRM(movies.slice(0, 30));
       setRS(series.slice(0, 30));
-      if (!movies.length && !series.length) setMsg("No se pudo cargar contenido. Comprueba tu conexión con el servidor IPTV.");
+      if (!movies.length && !series.length) setMsg("No se pudo cargar contenido reciente. Comprueba conexión con gadir.co o si tu cuenta tiene VOD/Series.");
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -441,11 +446,19 @@ function Player({ item, kind, profile, onClose }) {
   }, [onClose]);
 
   return (
-    <div ref={containerRef} onDoubleClick={toggleFs} className="fixed inset-0 z-[100] bg-black" data-testid="player-screen">
+    <div ref={containerRef} className="fixed inset-0 z-[100] bg-black" data-testid="player-screen">
       <button onClick={onClose} data-testid="close-player-btn" className="absolute top-6 right-6 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white transition-colors" title="Cerrar (Esc)"><X size={22}/></button>
       <button onClick={toggleFs} data-testid="fullscreen-btn" className="absolute top-6 right-20 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white transition-colors" title="Pantalla completa (F / doble clic)"><Maximize2 size={20}/></button>
       <div className="absolute top-6 left-6 z-10 text-white text-xl font-medium max-w-[70%] truncate">{item.name || item.title}</div>
-      <video ref={videoRef} controls autoPlay playsInline className="w-full h-full object-contain bg-black" data-testid="video-player"/>
+      <video
+        ref={videoRef}
+        controls
+        autoPlay
+        playsInline
+        onDoubleClick={(e)=>{ e.preventDefault(); toggleFs(); }}
+        className="w-full h-full object-contain bg-black"
+        data-testid="video-player"
+      />
 
       {/* Custom volume slider (bottom-right) */}
       <div className="absolute bottom-6 right-6 z-10 flex items-center gap-3 px-4 py-2.5 rounded-full bg-black/70 backdrop-blur border border-white/10" data-testid="volume-panel">
@@ -635,7 +648,7 @@ function LivePreview({ channel, profile, onClose }) {
           {
             enableStashBuffer: true,
             stashInitialSize: 1024,
-            enableWorker: true,
+            enableWorker: false,
             fixAudioTimestampGap: true,
             lazyLoad: false,
             autoCleanupSourceBuffer: true,
@@ -714,14 +727,15 @@ function LivePreview({ channel, profile, onClose }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div ref={containerRef} className="relative rounded-xl overflow-hidden bg-black border border-white/10 group/preview" data-testid="live-preview">
-        <video ref={videoRef} controls autoPlay playsInline className="w-full aspect-video object-contain bg-black" data-testid="preview-video"/>
-        {/* Transparent overlay to catch double-click for fullscreen without letting native <video> intercept it */}
-        <div
-          onDoubleClick={goFullscreen}
-          onClick={e => e.stopPropagation()}
-          className="absolute inset-0 bottom-14 cursor-pointer"
-          title="Doble clic para pantalla completa"
+      <div ref={containerRef} className="relative rounded-xl overflow-hidden bg-black border border-white/10" data-testid="live-preview">
+        <video
+          ref={videoRef}
+          controls
+          autoPlay
+          playsInline
+          onDoubleClick={(e)=>{ e.preventDefault(); goFullscreen(); }}
+          className="w-full aspect-video object-contain bg-black cursor-pointer"
+          data-testid="preview-video"
         />
         {showTitle && currentTitle && (
           <div className="absolute top-3 left-3 px-3 py-1.5 rounded-lg bg-black/80 backdrop-blur text-white text-xs font-medium border border-white/10 pointer-events-none animate-fade-out">
