@@ -93,49 +93,39 @@ function Login({ onLogin, onCancel }) {
     setDiag(null); setDiagLoading(true);
     const lines = [];
     lines.push(`IS_ELECTRON = ${IS_ELECTRON}`);
-    lines.push(`window.electronAPI present = ${!!(typeof window !== 'undefined' && window.electronAPI)}`);
-    lines.push(`window.electronAPI.xtreamGet present = ${!!(typeof window !== 'undefined' && window.electronAPI && window.electronAPI.xtreamGet)}`);
+    lines.push(`electronAPI.xtreamGet = ${!!(typeof window !== 'undefined' && window.electronAPI && window.electronAPI.xtreamGet)}`);
     lines.push('');
     const testU = u || 'seismeses01';
     const testP = p || '3d13zxs5oz';
-    // 1) IPC / Node.js path
-    if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.xtreamGet) {
-      lines.push('--- [1] Node.js IPC path (main process) ---');
-      try {
-        const t0 = Date.now();
-        const res = await window.electronAPI.xtreamGet({
-          baseUrl: 'http://gadir.co:80', username: testU, password: testP,
-        });
-        const ms = Date.now() - t0;
-        lines.push(`ok=${res && res.ok} status=${res && res.status} time=${ms}ms`);
-        if (res && res.error) lines.push(`error: ${res.error}`);
-        if (res && res.data) {
-          const snippet = typeof res.data === 'string'
-            ? res.data.slice(0, 200)
-            : JSON.stringify(res.data).slice(0, 200);
-          lines.push(`data: ${snippet}`);
-        }
-      } catch (e) {
-        lines.push(`EXCEPTION: ${e.message}`);
-      }
-    } else {
-      lines.push('--- [1] Node.js IPC path: NOT AVAILABLE (this is the bug!) ---');
-    }
-    lines.push('');
-    // 2) Renderer axios path (baseline)
-    lines.push('--- [2] Renderer axios path (Chromium) ---');
-    try {
+    const testProfile = { username: testU, password: testP };
+    const testCall = async (label, promise) => {
+      lines.push(`--- ${label} ---`);
       const t0 = Date.now();
-      const r = await axios.get('http://gadir.co:80/player_api.php', {
-        params: { username: testU, password: testP },
-        timeout: 10000,
-      });
-      lines.push(`ok status=${r.status} time=${Date.now()-t0}ms`);
-      const snippet = typeof r.data === 'string' ? r.data.slice(0, 200) : JSON.stringify(r.data).slice(0, 200);
-      lines.push(`data: ${snippet}`);
-    } catch (e) {
-      lines.push(`FAIL: ${e.message}${e.code ? ' code=' + e.code : ''}`);
+      try {
+        const data = await promise;
+        const ms = Date.now() - t0;
+        const isArr = Array.isArray(data);
+        const kind = isArr ? `array(${data.length})` : (data === null ? 'null' : typeof data);
+        lines.push(`ok time=${ms}ms type=${kind}`);
+        const snippet = (typeof data === 'string' ? data : JSON.stringify(data)).slice(0, 260);
+        lines.push(`data: ${snippet}`);
+      } catch (e) {
+        lines.push(`FAIL time=${Date.now()-t0}ms name=${e.name} msg=${e.message}${e.code ? ' code=' + e.code : ''}`);
+      }
+      lines.push('');
+    };
+    // 0) auth
+    if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.xtreamGet) {
+      lines.push('--- [0] auth via IPC ---');
+      try {
+        const res = await window.electronAPI.xtreamGet({ baseUrl: 'http://gadir.co:80', username: testU, password: testP });
+        lines.push(`ok=${res && res.ok} status=${res && res.status}${res && res.error ? ' err='+res.error : ''}`);
+      } catch (e) { lines.push('EXC: ' + e.message); }
+      lines.push('');
     }
+    await testCall('[1] get_live_categories', api.liveCategories(testProfile));
+    await testCall('[2] get_vod_categories',  api.vodCategories(testProfile));
+    await testCall('[3] get_series_categories', api.seriesCategories(testProfile));
     setDiag(lines.join('\n'));
     setDiagLoading(false);
   };
@@ -258,8 +248,8 @@ function CategorySection({ kind, profile, onSelect, livePreview, onHover }) {
         c.sort((a,b)=>String(a.category_name||"").localeCompare(String(b.category_name||""), "es", { numeric: true, sensitivity: "base" }));
         setCats(c);
         if (c.length) setActive(c[0]);
-        else setErr("El servidor no devolvió grupos. Comprueba tus credenciales o conexión.");
-      } catch(e) { if (!cancelled) setErr("No se pudo conectar con el servidor IPTV."); }
+        else setErr(`El servidor no devolvió grupos (tipo: ${Array.isArray(data)?'array vacío':typeof data}). Contenido: ${JSON.stringify(data).slice(0,180)}`);
+      } catch(e) { if (!cancelled) setErr(`No se pudo conectar: ${e.name || 'Error'}: ${e.message}${e.code ? ' ['+e.code+']' : ''}`); }
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
