@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout android:id="@id/relativeLayout" android:layout_width="fill_parent" android:layout_height="wrap_content"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="19.0dip" android:textColor="@android:color/black" android:id="@id/tvShowTypeTextView" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="5.0dip" android:layout_marginBottom="15.0dip" android:layout_marginStart="16.0dip" />
-    <com.magoware.magoware.webtv.custom_views.MagoTextView android:id="@id/seeMore" android:padding="8.0dip" android:clickable="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignBaseline="@id/tvShowTypeTextView" android:layout_marginEnd="16.0dip" android:layout_alignParentEnd="true" />
-    <androidx.recyclerview.widget.RecyclerView android:orientation="horizontal" android:id="@id/vod_categories_recycler" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginBottom="15.0dip" android:layout_below="@id/tvShowTypeTextView"
-      xmlns:android="http://schemas.android.com/apk/res/android" />
-    <View android:id="@id/activityMainDivider" android:background="#31c7c7cc" android:layout_width="fill_parent" android:layout_height="1.0dip" android:layout_marginBottom="5.0dip" android:layout_below="@id/vod_categories_recycler" />
-</RelativeLayout>

@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<menu
-  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
-    <item android:icon="@drawable/home" android:id="@id/nav_home" android:title="@string/home_label" />
-    <item android:icon="@drawable/baseline_chrome_reader_mode_24" android:id="@id/nav_news" android:title="@string/home_news" />
-    <item android:icon="@drawable/ic_baseline_search_24" android:id="@id/nav_search" android:title="@string/home_search" />
-    <item android:icon="@drawable/baseline_support_agent_24" android:id="@id/nav_support" android:title="@string/support_label" />
-    <item android:icon="@drawable/baseline_more_horiz_24" android:id="@id/nav_account" android:title="@string/home_more" app:showAsAction="ifRoom" />
-</menu>

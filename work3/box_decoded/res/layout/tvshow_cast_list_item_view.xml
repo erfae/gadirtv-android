@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="wrap_content"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <de.hdodenhof.circleimageview.CircleImageView android:id="@id/tvshowCastImage" android:layout_width="75.0dip" android:layout_height="75.0dip" android:layout_marginTop="10.0dip" android:layout_marginBottom="10.0dip" android:layout_marginStart="@dimen/activity_horizontal_margin" />
-    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textColor="@android:color/black" android:id="@id/tvshowCastName" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_centerInParent="true" android:layout_marginStart="5.0dip" android:layout_toEndOf="@id/tvshowCastImage" />
-    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textStyle="italic" android:id="@id/tvshowCastCharacter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_toRightOf="@id/tvshowCastName" android:layout_centerInParent="true" android:layout_marginStart="25.0dip" />
-    <View android:id="@id/tvshowCastDivider" android:background="#31c7c7cc" android:layout_width="fill_parent" android:layout_height="1.0dip" android:layout_below="@id/movieCastImage" />
-</RelativeLayout>

@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <dimen name="main_menu_Item_width">210.0dip</dimen>
-    <dimen name="main_menu_item_height">250.0dip</dimen>
-    <dimen name="text_25sp">18.75sp</dimen>
-    <dimen name="text_30sp">22.5sp</dimen>
-    <dimen name="text_35sp">26.25sp</dimen>
-    <item type="dimen" name="vod_subtitles_text_size">0.065</item>
-</resources>

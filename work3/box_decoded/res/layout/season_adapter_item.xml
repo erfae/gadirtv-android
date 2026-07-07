@@ -1,3 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="16.0sp" android:textColor="@color/white" android:id="@id/textView3" android:paddingTop="@dimen/dimen_12dp" android:paddingBottom="@dimen/dimen_12dp" android:layout_width="120.0dip" android:layout_height="wrap_content" android:text="@string/season" android:drawableEnd="@android:drawable/arrow_down_float" android:paddingEnd="@dimen/dimen_12dp"
-  xmlns:android="http://schemas.android.com/apk/res/android" />

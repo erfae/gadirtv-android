@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <integer name="channel_list_headers_width">363</integer>
-    <integer name="channel_menu_column_number">8</integer>
-    <integer name="menu_tv_percent">50</integer>
-    <integer name="subtitle_size">38</integer>
-</resources>

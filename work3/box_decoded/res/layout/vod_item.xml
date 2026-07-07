@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView android:id="@id/cardView" android:layout_width="126.0dip" android:layout_height="176.0dip" android:layout_marginStart="8.0dip" android:elevation="2.0dip" app:cardBackgroundColor="@android:color/transparent" app:cardCornerRadius="0.0dip" app:cardPreventCornerOverlap="false" app:cardUseCompatPadding="true"
-  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
-    <ImageView android:id="@id/thumbnailImageView" android:layout_width="fill_parent" android:layout_height="176.0dip" android:scaleType="fitXY" android:transitionName="posterImageTransition" />
-</androidx.cardview.widget.CardView>

@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout android:gravity="center" android:layout_gravity="center" android:orientation="vertical" android:background="@color/colorPrimaryDark" android:padding="@dimen/dimen_8dp" android:layout_width="@dimen/settings_card_width" android:layout_height="@dimen/settings_card_height"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <TextView android:textSize="16.0sp" android:textStyle="bold" android:gravity="center" android:id="@id/setting_name" android:background="@drawable/round_corner_12dp" android:padding="2.0dip" android:layout_width="fill_parent" android:layout_height="fill_parent" android:text="@string/action_settings" android:maxLines="1" android:textAlignment="center" />
-</RelativeLayout>

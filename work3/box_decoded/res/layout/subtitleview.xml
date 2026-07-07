@@ -1,3 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<com.google.android.exoplayer.text.SubtitleLayout android:layout_gravity="bottom|center" android:visibility="invisible" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="16.0dip" android:layout_marginRight="16.0dip" android:layout_marginBottom="32.0dip"
-  xmlns:android="http://schemas.android.com/apk/res/android" />

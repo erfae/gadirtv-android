@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout android:orientation="vertical" android:background="@color/colorPrimary" android:padding="@dimen/dimen_16dp" android:layout_width="fill_parent" android:layout_height="wrap_content"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <TextView android:textColor="@color/colorWhite80" android:gravity="center" android:padding="@dimen/dimen_4dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginBottom="@dimen/dimen_8dp" android:text="@string/guest_login_dialog_label" android:fontFamily="@font/roboto" />
-    <Button android:textColor="@android:color/black" android:id="@id/guest_login_dialog_btn" android:background="@drawable/round_button_ok_login_selected" android:focusable="false" android:layout_width="fill_parent" android:layout_height="@dimen/dimen_40dp" android:layout_marginBottom="@dimen/dimen_12dp" android:text="@string/login" android:textAllCaps="false" android:fontFamily="@font/roboto_bold" />
-    <Button android:textColor="@android:color/white" android:id="@id/guest_cancel_dialog_btn" android:background="@drawable/round_input_border" android:focusable="false" android:layout_width="fill_parent" android:layout_height="@dimen/dimen_40dp" android:text="@string/cancel" android:textAllCaps="false" android:fontFamily="@font/roboto_bold" />
-</LinearLayout>

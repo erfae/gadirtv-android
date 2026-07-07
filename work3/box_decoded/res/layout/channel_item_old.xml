@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout android:gravity="center" android:orientation="vertical" android:focusable="false" android:focusableInTouchMode="false" android:clickable="false" android:descendantFocusability="blocksDescendants" android:layout_width="fill_parent" android:layout_height="wrap_content" android:divider="#fff11818" android:measureWithLargestChild="true" android:transitionGroup="false"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <Button android:textSize="25.0sp" android:gravity="bottom" android:id="@id/channel_icon" android:background="#ffe6dbdb" android:focusable="false" android:focusableInTouchMode="false" android:clickable="false" android:layout_width="90.0dip" android:layout_height="90.0dip" android:minHeight="0.0dip" />
-    <com.magoware.magoware.webtv.custom_views.JosefinSansText.JosefinSansTextRegular android:textSize="15.0sp" android:textColor="#ffffffff" android:ellipsize="marquee" android:gravity="center_horizontal" android:layout_gravity="center" android:id="@id/channel_name" android:focusable="false" android:focusableInTouchMode="false" android:clickable="false" android:layout_width="wrap_content" android:layout_height="wrap_content" android:lines="2" android:scrollHorizontally="true" android:singleLine="false" android:marqueeRepeatLimit="marquee_forever" />
-</LinearLayout>

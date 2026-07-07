@@ -1,3 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/side_panel_item_text_size" android:textColor="@color/side_panel_item_text" android:background="?android:selectableItemBackground" android:paddingTop="@dimen/side_panel_item_padding_top" android:paddingBottom="@dimen/side_panel_item_padding_bottom" android:focusable="true" android:clipChildren="false" android:layout_width="fill_parent" android:layout_height="wrap_content" android:singleLine="true" android:fontFamily="sans-serif-condensed" android:paddingStart="@dimen/side_panel_padding_start" android:paddingEnd="@dimen/side_panel_padding_end" android:layout_alignParentStart="true"
-  xmlns:android="http://schemas.android.com/apk/res/android" />

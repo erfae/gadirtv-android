@@ -1,0 +1,32 @@
+{
+  "name": "gadirtv",
+  "version": "1.0.0",
+  "description": "GadirTV - IPTV Netflix-style",
+  "main": "main.js",
+  "author": "GadirTV",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "31.3.1",
+    "electron-builder": "24.13.3"
+  },
+  "build": {
+    "appId": "com.gadir.tv",
+    "productName": "GadirTV",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "icon.png"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GadirTV"
+    }
+  }
+}

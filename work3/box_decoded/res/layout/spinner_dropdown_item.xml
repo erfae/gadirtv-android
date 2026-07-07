@@ -1,3 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<com.magoware.magoware.webtv.custom_views.MagoTextView android:ellipsize="marquee" android:gravity="center" android:id="@id/text1" android:background="@drawable/language_colorlist" android:layout_width="fill_parent" android:layout_height="60.0dip" android:singleLine="true"
-  xmlns:android="http://schemas.android.com/apk/res/android" />

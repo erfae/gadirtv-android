@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<FrameLayout android:background="@drawable/rounded_shape" android:layout_width="fill_parent" android:layout_height="fill_parent"
-  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
-    <com.google.android.exoplayer2.ui.PlayerView android:id="@id/player_view" android:layout_width="fill_parent" android:layout_height="fill_parent" app:controller_layout_id="@layout/custom_playback_control" app:default_artwork="@drawable/space_1" app:fastforward_increment="10000" app:rewind_increment="10000" app:surface_type="surface_view" app:use_artwork="true" />
-</FrameLayout>

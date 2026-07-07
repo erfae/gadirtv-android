@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<merge android:layout_width="fill_parent" android:layout_height="wrap_content"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <androidx.leanback.widget.SearchOrbView android:layout_gravity="start|center" android:id="@id/search_orb" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8.0dip" android:paddingStart="48.0dip" />
-    <ImageView android:layout_gravity="end|center" android:id="@id/logo" android:visibility="gone" android:layout_width="@dimen/dimen_72dp" android:layout_height="@dimen/dimen_72dp" android:src="@drawable/i_iconblue" android:scaleType="fitXY" android:layout_marginStart="@dimen/lb_browse_rows_margin_start" />
-    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textAppearance="@android:style/TextAppearance.Large" android:id="@id/title_tv1" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="24.0dip" android:layout_alignParentEnd="true" />
-    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textAppearance="@android:style/TextAppearance.Large" android:id="@id/title_tv2" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/app_name" android:layout_below="@id/title_tv1" android:layout_marginEnd="24.0dip" android:layout_alignParentEnd="true" />
-    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="22.0sp" android:textColor="@color/White1" android:id="@id/title_tv3" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/tiboweb" android:fontFamily="@font/lato" android:layout_marginEnd="24.0dip" android:layout_alignParentEnd="true" />
-</merge>

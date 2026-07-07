@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout android:gravity="center_horizontal" android:orientation="vertical" android:background="@drawable/layout_bg_apps" android:layout_width="fill_parent" android:layout_height="fill_parent"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <ImageView android:layout_gravity="center_horizontal" android:id="@id/app_icon" android:layout_width="@dimen/dp_95" android:layout_height="@dimen/dp_95" android:layout_marginTop="@dimen/dp_5" android:scaleType="fitXY" />
-    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textStyle="bold" android:textColor="@color/White1" android:ellipsize="marquee" android:gravity="center" android:id="@id/app_name" android:layout_width="@dimen/dp_95" android:layout_height="wrap_content" android:lines="2" />
-</LinearLayout>

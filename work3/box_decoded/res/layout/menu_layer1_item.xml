@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout android:gravity="center" android:orientation="vertical" android:id="@id/menu_item_layout" android:padding="5.0dip" android:focusable="true" android:focusableInTouchMode="true" android:clickable="true" android:layout_width="wrap_content" android:layout_height="wrap_content"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <ImageView android:id="@id/menu_icon" android:focusable="false" android:focusableInTouchMode="false" android:clickable="false" android:layout_width="@dimen/menu_icon_layer" android:layout_height="@dimen/menu_icon_layer" />
-    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/menu_title_size" android:textColor="@color/white" android:id="@id/menu_title" android:focusable="false" android:focusableInTouchMode="false" android:clickable="false" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/menu_layer_item_label_margintop" />
-</LinearLayout>
