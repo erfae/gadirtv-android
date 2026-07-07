@@ -9,13 +9,15 @@ app.commandLine.appendSwitch('ignore-certificate-errors');
 app.commandLine.appendSwitch('disable-web-security');
 
 function resolveMpv() {
-  // Look for bundled mpv.exe next to the app (both dev and packaged)
+  const exeDir = path.dirname(app.getPath('exe'));
   const candidates = [
-    path.join(__dirname, 'mpv', 'mpv.exe'),
-    path.join(process.resourcesPath || __dirname, 'mpv', 'mpv.exe'),
+    path.join(exeDir, 'mpv', 'mpv.exe'),
     path.join(process.resourcesPath || __dirname, '..', 'mpv', 'mpv.exe'),
+    path.join(process.resourcesPath || __dirname, 'mpv', 'mpv.exe'),
+    path.join(__dirname, 'mpv', 'mpv.exe'),
   ];
   for (const c of candidates) { if (fs.existsSync(c)) return c; }
+  console.error('[mpv] not found. Searched:', candidates);
   return null;
 }
 
@@ -59,6 +61,8 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
+    frame: false,
+    titleBarStyle: 'hidden',
     backgroundColor: '#050505',
     icon: path.join(__dirname, 'icon.png'),
     title: 'GadirTV',
@@ -72,6 +76,12 @@ function createWindow() {
     },
   });
   Menu.setApplicationMenu(null);
+
+  // Expose window control IPCs
+  ipcMain.handle('win:min', () => win.minimize());
+  ipcMain.handle('win:max', () => (win.isMaximized() ? win.unmaximize() : win.maximize()));
+  ipcMain.handle('win:close', () => win.close());
+  ipcMain.handle('win:isMax', () => win.isMaximized());
 
   const filter = { urls: ['http://gadir.co/*', 'https://gadir.co/*'] };
   session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, cb) => {

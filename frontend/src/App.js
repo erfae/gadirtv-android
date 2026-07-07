@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import mpegts from "mpegts.js";
 import Hls from "hls.js";
-import { Play, Search, Tv, Film, Clapperboard, LogOut, Plus, X, ChevronLeft, Home as HomeIcon, ChevronRight, Trash2, Settings, Maximize2, RefreshCw, Volume2, VolumeX } from "lucide-react";
+import { Play, Search, Tv, Film, Clapperboard, LogOut, Plus, X, ChevronLeft, Home as HomeIcon, ChevronRight, Trash2, Settings, Maximize2, RefreshCw, Volume2, VolumeX, Minus, Square } from "lucide-react";
 import { api, IS_ELECTRON } from "./api";
 import "./App.css";
 
@@ -14,6 +14,29 @@ const store = {
   getActive: () => JSON.parse(localStorage.getItem("ga") || "null"),
   setActive: (p) => localStorage.setItem("ga", JSON.stringify(p)),
 };
+
+function TitleBar() {
+  const isElectron = typeof window !== "undefined" && !!window.electronAPI;
+  if (!isElectron) return null;
+  return (
+    <div
+      className="fixed top-0 left-0 right-0 h-8 flex items-center justify-end z-[200] pointer-events-none"
+      style={{ WebkitAppRegion: "drag" }}
+    >
+      <div className="flex items-center gap-1 pr-2 pointer-events-auto" style={{ WebkitAppRegion: "no-drag" }}>
+        <button onClick={()=>window.electronAPI.winMin()} data-testid="win-min" title="Minimizar" className="w-9 h-7 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 rounded transition-colors">
+          <Minus size={14}/>
+        </button>
+        <button onClick={()=>window.electronAPI.winMax()} data-testid="win-max" title="Maximizar" className="w-9 h-7 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 rounded transition-colors">
+          <Square size={12}/>
+        </button>
+        <button onClick={()=>window.electronAPI.winClose()} data-testid="win-close" title="Cerrar" className="w-9 h-7 flex items-center justify-center text-white/40 hover:text-white hover:bg-red-600 rounded transition-colors">
+          <X size={14}/>
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function Profiles({ onSelect, onAdd }) {
   const [profiles, setProfiles] = useState(store.getProfiles());
@@ -29,7 +52,7 @@ function Profiles({ onSelect, onAdd }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#050505]" data-testid="profile-screen">
       <div className="text-center w-full px-8">
-        <h1 className="text-6xl font-medium tracking-tight text-white mb-4" style={{fontFamily:"'Outfit',sans-serif"}}>Gadir<span className="text-red-600">TV</span></h1>
+        <img src="./gadir-logo.png" alt="GadirTV" className="mx-auto mb-6 w-72 h-auto drop-shadow-2xl" style={{filter:"drop-shadow(0 0 30px rgba(220,38,38,0.4))"}} onError={e=>e.target.style.display='none'}/>
         <p className="text-neutral-500 text-lg mb-12">{manage ? "Toca la papelera para eliminar" : "¿Quién está viendo?"}</p>
         <div className="flex flex-wrap gap-8 justify-center max-w-4xl mx-auto">
           {profiles.map((p, i) => (
@@ -89,7 +112,7 @@ function Login({ onLogin, onCancel }) {
     <div className="min-h-screen flex items-center justify-center bg-[#050505]" style={{backgroundImage:"linear-gradient(rgba(0,0,0,0.75),rgba(5,5,5,1)),url(https://images.unsplash.com/photo-1489599328109-c6b8b7cfd3aa?w=1920)",backgroundSize:"cover"}} data-testid="login-screen">
       <div className="w-full max-w-md p-10 rounded-3xl backdrop-blur-2xl bg-black/60 border border-white/10">
         <button onClick={onCancel} className="text-neutral-500 hover:text-white mb-6 flex items-center gap-2" data-testid="back-btn"><ChevronLeft size={20}/>Volver</button>
-        <h1 className="text-4xl font-medium text-white mb-8" style={{fontFamily:"'Outfit',sans-serif"}}>Gadir<span className="text-red-600">TV</span></h1>
+        <img src="./gadir-logo.png" alt="GadirTV" className="w-48 h-auto mb-6 drop-shadow-xl" style={{filter:"drop-shadow(0 0 20px rgba(220,38,38,0.5))"}} onError={e=>e.target.style.display='none'}/>
         <form onSubmit={submit} className="space-y-4">
           <input placeholder="Nombre perfil (opcional)" value={name} onChange={e=>setName(e.target.value)} className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600" data-testid="profile-name-input"/>
           <input placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="username-input"/>
@@ -127,31 +150,38 @@ function BottomNav({ tab, setTab }) {
   );
 }
 
-function ItemCard({ item, onSelect, big, sm }) {
+function ItemCard({ item, onSelect, big, sm, onHover }) {
   const cover = item.stream_icon || item.cover;
+  const proxied = api.proxyImg(cover) || IMG_FB;
   return (
-    <button onClick={onSelect} data-testid={`card-${item.stream_id||item.series_id}`} className={"shrink-0 group " + (big?"w-40":sm?"w-28":"w-36 md:w-40")}>
-      <div className={"aspect-[2/3] rounded-md overflow-hidden bg-neutral-900 group-hover:ring-2 ring-red-600 group-hover:scale-105 transition-all duration-300 shadow-xl"}>
-        <img src={api.proxyImg(cover) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="w-full h-full object-cover" loading="lazy" alt=""/>
+    <button
+      onClick={onSelect}
+      onMouseEnter={()=>onHover && onHover(proxied)}
+      onMouseLeave={()=>onHover && onHover(null)}
+      data-testid={`card-${item.stream_id||item.series_id}`}
+      className={"shrink-0 group " + (big?"w-40":sm?"w-28":"w-36 md:w-40")}
+    >
+      <div className="aspect-[2/3] rounded-md overflow-hidden bg-neutral-900 group-hover:ring-2 ring-red-600 group-hover:scale-110 group-hover:z-20 relative transition-all duration-300 shadow-xl">
+        <img src={proxied} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="w-full h-full object-cover" loading="lazy" alt=""/>
       </div>
       <p className="text-xs text-neutral-300 mt-1.5 truncate group-hover:text-white">{item.name}</p>
     </button>
   );
 }
 
-function Rail({ title, items, onSelect, big, sm }) {
+function Rail({ title, items, onSelect, big, sm, onHover }) {
   if (!items || !items.length) return null;
   return (
     <section className="mb-4">
       <h2 className="text-lg font-medium text-white mb-2 tracking-tight px-8" style={{fontFamily:"'Outfit',sans-serif"}}>{title}</h2>
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-8 pb-2">
-        {items.slice(0, 30).map((it, i) => <ItemCard key={i} item={it} big={big} sm={sm} onSelect={()=>onSelect(it)}/>)}
+      <div className="flex gap-3 overflow-x-auto overflow-y-visible scrollbar-hide px-8 pb-6 pt-2">
+        {items.slice(0, 30).map((it, i) => <ItemCard key={i} item={it} big={big} sm={sm} onHover={onHover} onSelect={()=>onSelect(it)}/>)}
       </div>
     </section>
   );
 }
 
-function CategorySection({ kind, profile, onSelect, livePreview }) {
+function CategorySection({ kind, profile, onSelect, livePreview, onHover }) {
   const [cats, setCats] = useState([]);
   const [byCat, setByCat] = useState({});
   const [active, setActive] = useState(null);
@@ -242,8 +272,8 @@ function CategorySection({ kind, profile, onSelect, livePreview }) {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin pr-2">
-                {filtered.map((it, i) => <ItemCard key={i} item={it} onSelect={()=>onSelect(it, kind)} sm/>)}
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin pr-2 pt-2">
+                {filtered.map((it, i) => <ItemCard key={i} item={it} onHover={onHover} onSelect={()=>onSelect(it, kind)} sm/>)}
               </div>
             )}
             {!filtered.length && active && <p className="text-neutral-500">No hay contenido en este grupo</p>}
@@ -259,7 +289,7 @@ function CategorySection({ kind, profile, onSelect, livePreview }) {
   );
 }
 
-function HomeTab({ profile, onSelect }) {
+function HomeTab({ profile, onSelect, onHover }) {
   const [recentMovies, setRM] = useState([]);
   const [recentSeries, setRS] = useState([]);
   const [heroIdx, setHeroIdx] = useState(0);
@@ -327,8 +357,8 @@ function HomeTab({ profile, onSelect }) {
       <div className="flex-1 min-h-0 overflow-hidden pt-3">
         {loading && <div className="text-center text-neutral-500 py-10" data-testid="loading-home">Cargando contenido reciente...</div>}
         {!loading && msg && <div className="text-center text-red-400 py-10 text-sm px-8" data-testid="home-msg">{msg}</div>}
-        <Rail title="Películas recientes" items={recentMovies} onSelect={i=>onSelect(i,"movie")} sm/>
-        <Rail title="Series recientes" items={recentSeries} onSelect={i=>onSelect(i,"series")} sm/>
+        <Rail title="Películas recientes" items={recentMovies} onSelect={i=>onSelect(i,"movie")} onHover={onHover} sm/>
+        <Rail title="Series recientes" items={recentSeries} onSelect={i=>onSelect(i,"series")} onHover={onHover} sm/>
       </div>
     </div>
   );
@@ -797,6 +827,7 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
   const [tab, setTab] = useState("home");
   const [liveChannel, setLiveChannel] = useState(null);
   const [fsSignal, setFsSignal] = useState(0);
+  const [hoverBg, setHoverBg] = useState(null);
 
   const playLiveInMpv = async (item, fullscreen) => {
     const url = api.streamUrl(profile, { stream_id: item.stream_id, kind: "live", ext: "ts" });
@@ -804,7 +835,6 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
       const res = await window.electronAPI.playInMpv({ url, name: item.name, fullscreen });
       if (!res || !res.ok) alert("No se pudo lanzar mpv: " + (res && res.error));
     } else {
-      // Web fallback: open full-screen player
       onPlay(item, "live");
     }
   };
@@ -816,16 +846,33 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
     else if (kind === "live") setLiveChannel(item);
   };
   useEffect(() => { if (tab !== "live") setLiveChannel(null); }, [tab]);
+
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
-      <div className="fixed top-4 right-6 z-30 flex items-center gap-3">
-        <button onClick={onSwitch} data-testid="switch-profile-btn" className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center font-medium text-white shadow-lg">{profile.name.charAt(0).toUpperCase()}</button>
-        <button onClick={onLogout} data-testid="logout-btn" className="w-10 h-10 rounded-lg bg-black/60 hover:bg-black/80 flex items-center justify-center text-neutral-400 hover:text-white backdrop-blur"><LogOut size={18}/></button>
+    <div className="min-h-screen bg-[#050505] text-white relative overflow-hidden">
+      {/* Ambient background from hovered card */}
+      {hoverBg && (
+        <div className="fixed inset-0 pointer-events-none transition-opacity duration-500 opacity-40" style={{zIndex: 0}}>
+          <img src={hoverBg} alt="" className="w-full h-full object-cover blur-3xl scale-110"/>
+          <div className="absolute inset-0 bg-black/50"/>
+        </div>
+      )}
+
+      {/* Top-left logo (all screens except player) */}
+      <div className="fixed top-4 left-6 z-30 flex items-center gap-3">
+        <img src="./gadir-logo.png" alt="GadirTV" className="h-10 w-auto drop-shadow-lg" onError={e=>e.target.style.display='none'}/>
       </div>
-      {tab==="home" && <HomeTab profile={profile} onSelect={handleSelect}/>}
-      {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={handleSelect} livePreview={<LivePreview channel={liveChannel} profile={profile} fsSignal={fsSignal} onClose={()=>setLiveChannel(null)} onFullscreen={()=>liveChannel && playLiveInMpv(liveChannel, true)}/>}/>}
-      {tab==="movies" && <CategorySection kind="movie" profile={profile} onSelect={handleSelect}/>}
-      {tab==="series" && <CategorySection kind="series" profile={profile} onSelect={handleSelect}/>}
+
+      <div className="fixed top-4 right-6 z-30 flex items-center gap-3">
+        <button onClick={onSwitch} data-testid="switch-profile-btn" title="Cambiar perfil" className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center font-medium text-white shadow-lg">{profile.name.charAt(0).toUpperCase()}</button>
+        <button onClick={onLogout} data-testid="logout-btn" title="Cerrar sesión" className="w-10 h-10 rounded-lg bg-black/60 hover:bg-black/80 flex items-center justify-center text-neutral-400 hover:text-white backdrop-blur"><LogOut size={18}/></button>
+      </div>
+
+      <div className="relative" style={{zIndex: 1}}>
+        {tab==="home" && <HomeTab profile={profile} onSelect={handleSelect} onHover={setHoverBg}/>}
+        {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={handleSelect} onHover={setHoverBg} livePreview={<LivePreview channel={liveChannel} profile={profile} fsSignal={fsSignal} onClose={()=>setLiveChannel(null)} onFullscreen={()=>liveChannel && playLiveInMpv(liveChannel, true)}/>}/>}
+        {tab==="movies" && <CategorySection kind="movie" profile={profile} onSelect={handleSelect} onHover={setHoverBg}/>}
+        {tab==="series" && <CategorySection kind="series" profile={profile} onSelect={handleSelect} onHover={setHoverBg}/>}
+      </div>
       <BottomNav tab={tab} setTab={setTab}/>
     </div>
   );
@@ -856,6 +903,7 @@ function App() {
   }, []);
   return (
     <div className="App">
+      <TitleBar/>
       {screen==="profiles" && <Profiles onSelect={p=>{store.setActive(p);setProfile(p);setScreen("main");}} onAdd={()=>setScreen("login")}/>}
       {screen==="login" && <Login onLogin={p=>{store.setActive(p);setProfile(p);setScreen("main");}} onCancel={()=>setScreen("profiles")}/>}
       {screen==="main" && profile && (
