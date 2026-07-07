@@ -40,6 +40,12 @@ function killMpv() {
   mpvProc = null;
 }
 
+// Awaitable variant used before spawning a new mpv so audio never overlaps.
+function killMpvAndWait(ms = 250) {
+  killMpv();
+  return new Promise(r => setTimeout(r, ms));
+}
+
 ipcMain.handle('mpv:kill', () => { killMpv(); return { ok: true }; });
 
 // Native Node HTTP client used to talk to the Xtream server. This
@@ -141,10 +147,11 @@ ipcMain.handle('session:reset', async () => {
   } catch (e) { return { ok: false, error: e.message }; }
 });
 
-ipcMain.handle('mpv:play', (evt, { url, name, fullscreen }) => {
+ipcMain.handle('mpv:play', async (evt, { url, name, fullscreen }) => {
   const mpv = resolveMpv();
   if (!mpv) return { ok: false, error: 'mpv.exe no encontrado en el paquete' };
-  killMpv();
+  // Kill any prior mpv AND wait so audio never overlaps.
+  await killMpvAndWait(250);
   const args = [
     url,
     '--force-window=immediate',
@@ -153,6 +160,7 @@ ipcMain.handle('mpv:play', (evt, { url, name, fullscreen }) => {
     '--osc=yes',
     '--volume=100',
     '--hwdec=auto-safe',
+    '--vd-lavc-software-fallback=yes',
     '--cache=yes',
     '--cache-secs=10',
     '--demuxer-max-bytes=100M',
@@ -162,11 +170,15 @@ ipcMain.handle('mpv:play', (evt, { url, name, fullscreen }) => {
     '--force-seekable=yes',
     '--audio-fallback-to-null=yes',
     '--ytdl=no',
-    '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0 Safari/537.36',
+    '--user-agent=VLC/3.0.20 LibVLC/3.0.20',
     '--msg-level=all=warn',
     '--vd-lavc-fast=yes',
+    // MPEG-TS live streams: extra tolerance
+    '--demuxer-lavf-probe-info=yes',
+    '--demuxer-lavf-analyzeduration=5',
+    '--demuxer-lavf-probesize=10000000',
   ];
-  if (name) args.push(`--title=${name}`);
+  if (name) args.push(`--title=GadirTV — ${name}`);
   if (fullscreen) args.push('--fs');
   try {
     mpvProc = spawn(mpv, args, { detached: false, stdio: ['ignore', 'ignore', 'pipe'], cwd: path.dirname(mpv) });
@@ -247,10 +259,12 @@ function createWindow() {
     if ((input.control || input.meta) && input.shift && k === 'r') { event.preventDefault(); return; }
   });
   win.webContents.on('did-fail-load', () => win.webContents.openDevTools({ mode: 'right' }));
+  win.on('close', () => killMpv());
   win.on('closed', () => killMpv());
 }
 
 app.whenReady().then(createWindow);
+app.on('before-quit', () => { killMpv(); });
 app.on('window-all-closed', () => { killMpv(); if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 app.on('will-quit', () => { globalShortcut.unregisterAll(); killMpv(); });
