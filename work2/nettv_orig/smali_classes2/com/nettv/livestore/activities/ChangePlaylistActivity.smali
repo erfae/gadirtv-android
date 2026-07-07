@@ -1140,52 +1140,11 @@
 
     invoke-virtual {v0, v1}, Landroid/view/View;->setVisibility(I)V
 
-    invoke-virtual {p1}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
-
-    move-result-object v0
-
-    iget v2, p0, Lcom/nettv/livestore/activities/ChangePlaylistActivity;->playlist_position:I
-
-    const/4 v1, 0x1
-
-    if-ne v2, v1, :cond_no_swap
-
-    :try_start_swap
-    new-instance v1, Ljava/net/URL;
-
-    invoke-direct {v1, v0}, Ljava/net/URL;-><init>(Ljava/lang/String;)V
-
-    invoke-virtual {v1}, Ljava/net/URL;->getFile()Ljava/lang/String;
-
-    move-result-object v1
-
-    new-instance v2, Ljava/lang/StringBuilder;
-
-    invoke-direct {v2}, Ljava/lang/StringBuilder;-><init>()V
-
-    const-string v0, "http://gadir.co:80"
-
-    invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    invoke-virtual {v2, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    invoke-virtual {v2}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
-
-    move-result-object v0
-    :try_end_swap
-    .catch Ljava/lang/Exception; {:try_start_swap .. :try_end_swap} :catch_swap
-
-    goto :cond_no_swap
-
-    :catch_swap
-    invoke-virtual {p1}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
-
-    move-result-object v0
-
-    :cond_no_swap
-    const/4 v1, 0x0
-
     .line 2
+    invoke-virtual {p1}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
+
+    move-result-object v0
+
     const-string v2, "username"
 
     invoke-virtual {v0, v2}, Ljava/lang/String;->contains(Ljava/lang/CharSequence;)Z

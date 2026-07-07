@@ -351,7 +351,7 @@
 .end method
 
 .method public getResult()Ljava/util/List;
-    .locals 4
+    .locals 6
     .annotation system Ldalvik/annotation/Signature;
         value = {
             "()",
@@ -391,6 +391,56 @@
     const-string v3, "GADIR"
 
     invoke-virtual {v2, v3}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->setName(Ljava/lang/String;)V
+
+    invoke-virtual {v2}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
+
+    move-result-object v3
+
+    if-eqz v3, :cond_1
+
+    :try_start_swap
+    new-instance v4, Ljava/net/URL;
+
+    invoke-direct {v4, v3}, Ljava/net/URL;-><init>(Ljava/lang/String;)V
+
+    invoke-virtual {v4}, Ljava/net/URL;->getHost()Ljava/lang/String;
+
+    move-result-object v5
+
+    const-string v3, "gadir.co"
+
+    invoke-virtual {v5, v3}, Ljava/lang/String;->equalsIgnoreCase(Ljava/lang/String;)Z
+
+    move-result v3
+
+    if-nez v3, :cond_1
+
+    invoke-virtual {v4}, Ljava/net/URL;->getFile()Ljava/lang/String;
+
+    move-result-object v4
+
+    new-instance v5, Ljava/lang/StringBuilder;
+
+    invoke-direct {v5}, Ljava/lang/StringBuilder;-><init>()V
+
+    const-string v3, "http://gadir.co:80"
+
+    invoke-virtual {v5, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v5, v4}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v5}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object v3
+
+    invoke-virtual {v2, v3}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->setUrl(Ljava/lang/String;)V
+    :try_end_swap
+    .catch Ljava/lang/Exception; {:try_start_swap .. :try_end_swap} :catch_swap
+
+    goto :cond_1
+
+    :catch_swap
+    nop
 
     :cond_1
     return-object v0

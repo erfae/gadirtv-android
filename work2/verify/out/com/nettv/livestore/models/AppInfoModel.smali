@@ -351,7 +351,7 @@
 .end method
 
 .method public getResult()Ljava/util/List;
-    .registers 9
+    .registers 5
     .annotation system Ldalvik/annotation/Signature;
         value = {
             "()",
@@ -378,7 +378,7 @@
 
     const/4 v2, 0x2
 
-    if-lt v1, v2, :cond_56
+    if-lt v1, v2, :cond_1d
 
     const/4 v1, 0x1
 
@@ -392,60 +392,7 @@
 
     invoke-virtual {v2, v3}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->setName(Ljava/lang/String;)V
 
-    invoke-virtual {v2}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
-
-    move-result-object v3
-
-    if-nez v3, :cond_25
-
-    const-string v3, ""
-
-    :cond_25
-    invoke-static {v3}, Lcom/nettv/livestore/helper/GetSharedInfo;->getUsernameFromUrl(Ljava/lang/String;)Ljava/lang/String;
-
-    move-result-object v4
-
-    invoke-static {v3}, Lcom/nettv/livestore/helper/GetSharedInfo;->getPasswordFromUrl(Ljava/lang/String;)Ljava/lang/String;
-
-    move-result-object v5
-
-    new-instance v6, Ljava/lang/StringBuilder;
-
-    invoke-direct {v6}, Ljava/lang/StringBuilder;-><init>()V
-
-    const-string v7, "http://gadir.co:80/get.php?username="
-
-    invoke-virtual {v6, v7}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    if-nez v4, :cond_3b
-
-    const-string v4, ""
-
-    :cond_3b
-    invoke-virtual {v6, v4}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    const-string v7, "&password="
-
-    invoke-virtual {v6, v7}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    if-nez v5, :cond_47
-
-    const-string v5, ""
-
-    :cond_47
-    invoke-virtual {v6, v5}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    const-string v7, "&output=ts&type=m3u_plus"
-
-    invoke-virtual {v6, v7}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    invoke-virtual {v6}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
-
-    move-result-object v6
-
-    invoke-virtual {v2, v6}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->setUrl(Ljava/lang/String;)V
-
-    :cond_56
+    :cond_1d
     return-object v0
 .end method
 
