@@ -63,18 +63,26 @@ function Profiles({ onSelect, onAdd }) {
 
 function Login({ onLogin, onCancel }) {
   const [name, setName] = useState(""), [u, setU] = useState(""), [p, setP] = useState("");
-  const [loading, setLoading] = useState(false), [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false), [warn, setWarn] = useState("");
   const submit = async (e) => {
-    e.preventDefault(); setErr(""); setLoading(true);
+    e.preventDefault(); setWarn(""); setLoading(true);
+    const prof = { name: name || u, username: u, password: p };
+    // Save profile locally regardless of server reachability (optimistic).
+    const ps = store.getProfiles();
+    const i = ps.findIndex(x => x.username === u);
+    if (i >= 0) ps[i] = prof; else ps.push(prof);
+    store.saveProfiles(ps);
+    // Try to validate in background — do not block entry.
     try {
-      const { data } = await axios.post(`${API}/login`, { username: u, password: p });
-      if (!data.ok) { setErr(data.error || "Credenciales inválidas"); setLoading(false); return; }
-      const prof = { name: name || u, username: u, password: p };
-      const ps = store.getProfiles();
-      const i = ps.findIndex(x => x.username === u);
-      if (i >= 0) ps[i] = prof; else ps.push(prof);
-      store.saveProfiles(ps); onLogin(prof);
-    } catch (e) { setErr("Error de conexión"); setLoading(false); }
+      const { data } = await axios.post(`${API}/login`, { username: u, password: p }, { timeout: 8000 });
+      if (data && data.ok === false) {
+        setWarn("Credenciales rechazadas por el servidor. Puedes entrar igualmente para revisar.");
+      }
+    } catch (_) {
+      // Server unreachable — allow entry anyway.
+    }
+    setLoading(false);
+    onLogin(prof);
   };
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#050505]" style={{backgroundImage:"linear-gradient(rgba(0,0,0,0.75),rgba(5,5,5,1)),url(https://images.unsplash.com/photo-1489599328109-c6b8b7cfd3aa?w=1920)",backgroundSize:"cover"}} data-testid="login-screen">
@@ -86,8 +94,8 @@ function Login({ onLogin, onCancel }) {
           <input placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="username-input"/>
           <input type="password" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="password-input"/>
           <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span></div>
-          {err && <div className="text-red-500 text-sm text-center" data-testid="error-msg">{err}</div>}
-          <button type="submit" disabled={loading} className="w-full py-4 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium transition-colors disabled:opacity-50" data-testid="login-btn">{loading?"Conectando...":"Entrar"}</button>
+          {warn && <div className="text-amber-400 text-xs text-center" data-testid="warn-msg">{warn}</div>}
+          <button type="submit" disabled={loading} className="w-full py-4 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium transition-colors disabled:opacity-50" data-testid="login-btn">{loading?"Guardando...":"Entrar"}</button>
         </form>
       </div>
     </div>
