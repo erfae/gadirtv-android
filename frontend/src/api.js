@@ -26,6 +26,20 @@ export async function newSession() {
 function sig() { return _abortCtl.signal; }
 
 async function xtreamGet(username, password, action, extra = {}) {
+  // In Electron desktop app: route via Node.js main process to bypass
+  // Chromium restrictions that silently block http://gadir.co calls.
+  if (IS_ELECTRON && typeof window !== 'undefined' && window.electronAPI && window.electronAPI.xtreamGet) {
+    const res = await window.electronAPI.xtreamGet({
+      baseUrl: XTREAM_HOST,
+      username, password, action, extra,
+    });
+    if (!res || !res.ok) {
+      const err = new Error((res && res.error) || 'network error');
+      err.isNetwork = true;
+      throw err;
+    }
+    return res.data;
+  }
   const params = { username, password, ...extra };
   if (action) params.action = action;
   try {

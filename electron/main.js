@@ -42,6 +42,66 @@ function killMpv() {
 
 ipcMain.handle('mpv:kill', () => { killMpv(); return { ok: true }; });
 
+// Native Node HTTP client used to talk to the Xtream server. This
+// completely bypasses Chromium's networking stack (which was silently
+// blocking the plain-HTTP requests to gadir.co from the renderer even
+// with webSecurity disabled). Mimics VLC exactly.
+const http = require('http');
+const https = require('https');
+const { URL } = require('url');
+
+function nodeHttpJson({ host, port, protocol, path: p, timeoutMs }) {
+  return new Promise((resolve, reject) => {
+    const lib = protocol === 'https:' ? https : http;
+    const req = lib.request({
+      host,
+      port,
+      path: p,
+      method: 'GET',
+      timeout: timeoutMs || 25000,
+      headers: {
+        'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20',
+        'Accept': '*/*',
+        'Connection': 'close',
+      },
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks).toString('utf8');
+        try { resolve({ ok: true, status: res.statusCode, data: JSON.parse(buf) }); }
+        catch (_) { resolve({ ok: true, status: res.statusCode, data: buf }); }
+      });
+    });
+    req.on('timeout', () => { req.destroy(new Error('timeout')); });
+    req.on('error', (e) => resolve({ ok: false, error: e.message }));
+    req.end();
+  });
+}
+
+ipcMain.handle('xtream:get', async (_evt, { baseUrl, username, password, action, extra }) => {
+  try {
+    const u = new URL(baseUrl || 'http://gadir.co:80');
+    const params = new URLSearchParams({ username, password });
+    if (action) params.set('action', action);
+    if (extra && typeof extra === 'object') {
+      for (const [k, v] of Object.entries(extra)) {
+        if (v !== undefined && v !== null && v !== '') params.set(k, String(v));
+      }
+    }
+    const p = `/player_api.php?${params.toString()}`;
+    return await nodeHttpJson({
+      host: u.hostname,
+      port: u.port || (u.protocol === 'https:' ? 443 : 80),
+      protocol: u.protocol,
+      path: p,
+      timeoutMs: 25000,
+    });
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
 ipcMain.handle('session:reset', async () => {
   try {
     killMpv();
