@@ -83,6 +83,23 @@ async def stream_url(username: str, password: str, stream_id: str, kind: str = "
     return {"url": f"{XTREAM_HOST}/{paths[kind]}/{u}/{p}/{stream_id}.{ext}"}
 
 
+@app.get("/api/img")
+async def img_proxy(url: str):
+    """Proxies remote (usually HTTP) images through HTTPS so browsers
+    don't block them for mixed-content reasons."""
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(400, "invalid url")
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    except Exception as e:
+        raise HTTPException(502, f"img fetch failed: {e}")
+    if r.status_code >= 400:
+        raise HTTPException(r.status_code, "upstream error")
+    ct = r.headers.get("content-type", "image/jpeg")
+    return StreamingResponse(iter([r.content]), media_type=ct, headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/api/stream")
 async def stream(request: Request, kind: str, username: str, password: str, stream_id: str, ext: str = "ts"):
     paths = {"live": "live", "movie": "movie", "series": "series"}

@@ -88,3 +88,5 @@ work3/box_gadir.apk
 work3/box_gadir_v1.apk
 frontend/public/GadirTV-Windows.zip
 electron/node_modules/electron/dist/electron
+electron/dist_manual/GadirTV/GadirTV.exe
+electron/dist/win-unpacked/GadirTV.exe

@@ -3,6 +3,7 @@ import axios from "axios";
 import mpegts from "mpegts.js";
 import Hls from "hls.js";
 import { Play, Search, Tv, Film, Clapperboard, LogOut, Plus, X, ChevronLeft, Home as HomeIcon, ChevronRight, Trash2, Settings } from "lucide-react";
+import { api, IS_ELECTRON } from "./api";
 import "./App.css";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -74,7 +75,7 @@ function Login({ onLogin, onCancel }) {
     store.saveProfiles(ps);
     // Try to validate in background — do not block entry.
     try {
-      const { data } = await axios.post(`${API}/login`, { username: u, password: p }, { timeout: 8000 });
+      const data = await api.login(u, p);
       if (data && data.ok === false) {
         setWarn("Credenciales rechazadas por el servidor. Puedes entrar igualmente para revisar.");
       }
@@ -126,24 +127,25 @@ function BottomNav({ tab, setTab }) {
   );
 }
 
-function ItemCard({ item, onSelect, big }) {
+function ItemCard({ item, onSelect, big, sm }) {
+  const cover = item.stream_icon || item.cover;
   return (
-    <button onClick={onSelect} data-testid={`card-${item.stream_id||item.series_id}`} className={"shrink-0 group " + (big?"w-52":"w-36 md:w-40")}>
+    <button onClick={onSelect} data-testid={`card-${item.stream_id||item.series_id}`} className={"shrink-0 group " + (big?"w-40":sm?"w-28":"w-36 md:w-40")}>
       <div className={"aspect-[2/3] rounded-md overflow-hidden bg-neutral-900 group-hover:ring-2 ring-red-600 group-hover:scale-105 transition-all duration-300 shadow-xl"}>
-        <img src={item.stream_icon || item.cover || IMG_FB} onError={e=>e.target.src=IMG_FB} className="w-full h-full object-cover" loading="lazy" alt=""/>
+        <img src={api.proxyImg(cover) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="w-full h-full object-cover" loading="lazy" alt=""/>
       </div>
-      <p className="text-sm text-neutral-300 mt-2 truncate group-hover:text-white">{item.name}</p>
+      <p className="text-xs text-neutral-300 mt-1.5 truncate group-hover:text-white">{item.name}</p>
     </button>
   );
 }
 
-function Rail({ title, items, onSelect, big }) {
+function Rail({ title, items, onSelect, big, sm }) {
   if (!items || !items.length) return null;
   return (
-    <section className="mb-10">
-      <h2 className="text-xl md:text-2xl font-medium text-white mb-4 tracking-tight px-8" style={{fontFamily:"'Outfit',sans-serif"}}>{title}</h2>
-      <div className="flex gap-4 overflow-x-auto scrollbar-hide px-8 pb-4">
-        {items.slice(0, 30).map((it, i) => <ItemCard key={i} item={it} big={big} onSelect={()=>onSelect(it)}/>)}
+    <section className="mb-4">
+      <h2 className="text-lg font-medium text-white mb-2 tracking-tight px-8" style={{fontFamily:"'Outfit',sans-serif"}}>{title}</h2>
+      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-8 pb-2">
+        {items.slice(0, 30).map((it, i) => <ItemCard key={i} item={it} big={big} sm={sm} onSelect={()=>onSelect(it)}/>)}
       </div>
     </section>
   );
@@ -154,20 +156,21 @@ function CategorySection({ kind, profile, onSelect }) {
   const [byCat, setByCat] = useState({});
   const [active, setActive] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
     (async () => {
-      setLoading(true); setActive(null); setSearch(""); setByCat({});
-      const p = { username: profile.username, password: profile.password };
+      setLoading(true); setActive(null); setSearch(""); setByCat({}); setErr("");
       try {
-        const catUrl = kind==="live"?"live/categories":kind==="movie"?"vod/categories":"series/categories";
-        const { data } = await axios.get(`${API}/${catUrl}`, { params: p });
+        const fn = kind==="live"?api.liveCategories:kind==="movie"?api.vodCategories:api.seriesCategories;
+        const data = await fn(profile);
         const c = Array.isArray(data) ? data : [];
-        c.sort((a,b)=>String(a.category_name||"").localeCompare(String(b.category_name||"")));
+        c.sort((a,b)=>String(a.category_name||"").localeCompare(String(b.category_name||""), "es", { numeric: true, sensitivity: "base" }));
         setCats(c);
         if (c.length) setActive(c[0]);
-      } catch(e) { console.error(e); }
+        else setErr("El servidor no devolvió grupos. Comprueba tus credenciales o conexión.");
+      } catch(e) { setErr("No se pudo conectar con el servidor IPTV."); }
       setLoading(false);
     })();
   }, [kind, profile]);
@@ -175,10 +178,9 @@ function CategorySection({ kind, profile, onSelect }) {
   useEffect(() => {
     if (!active || byCat[active.category_id]) return;
     (async () => {
-      const p = { username: profile.username, password: profile.password, category_id: active.category_id };
-      const url = kind==="live"?"live/streams":kind==="movie"?"vod/streams":"series/list";
       try {
-        const { data } = await axios.get(`${API}/${url}`, { params: p });
+        const fn = kind==="live"?api.liveStreams:kind==="movie"?api.vodStreams:api.seriesList;
+        const data = await fn(profile, active.category_id);
         setByCat(prev => ({ ...prev, [active.category_id]: Array.isArray(data)?data:[] }));
       } catch(e) { console.error(e); }
     })();
@@ -189,17 +191,18 @@ function CategorySection({ kind, profile, onSelect }) {
   const filtered = q ? items.filter(x => (x.name||"").toLowerCase().includes(q)) : items;
 
   return (
-    <div className="pt-24 pb-32 px-8" data-testid={`section-${kind}`}>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-medium tracking-tight" style={{fontFamily:"'Outfit',sans-serif"}}>{kind==="live"?"TV en Vivo":kind==="movie"?"Películas":"Series"}</h1>
+    <div className="pt-16 pb-24 px-8" data-testid={`section-${kind}`}>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-medium tracking-tight" style={{fontFamily:"'Outfit',sans-serif"}}>{kind==="live"?"TV en Vivo":kind==="movie"?"Películas":"Series"}</h1>
         <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500"/>
-          <input placeholder="Buscar..." value={search} onChange={e=>setSearch(e.target.value)} data-testid={`search-${kind}`} className="pl-9 pr-3 py-2 rounded-full bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-red-600 w-64"/>
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500"/>
+          <input placeholder="Buscar..." value={search} onChange={e=>setSearch(e.target.value)} data-testid={`search-${kind}`} className="pl-9 pr-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-red-600 w-56"/>
         </div>
       </div>
       {loading && <div className="text-neutral-500 py-20" data-testid="loading">Cargando...</div>}
-      {!loading && (
-        <div className="grid grid-cols-[240px_1fr] gap-8">
+      {!loading && err && <div className="text-red-400 py-20 text-center" data-testid="cat-error">{err}</div>}
+      {!loading && !err && (
+        <div className="grid grid-cols-[220px_1fr] gap-6">
           <aside className="max-h-[calc(100vh-220px)] overflow-y-auto pr-2 scrollbar-thin">
             <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-3">Grupos ({cats.length})</h3>
             <div className="space-y-1">
@@ -212,10 +215,24 @@ function CategorySection({ kind, profile, onSelect }) {
             </div>
           </aside>
           <main>
-            {active && <h2 className="text-lg text-neutral-400 mb-4">{active.category_name} <span className="text-neutral-600">· {filtered.length}</span></h2>}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {filtered.map((it, i) => <ItemCard key={i} item={it} onSelect={()=>onSelect(it, kind)}/>)}
-            </div>
+            {active && <h2 className="text-base text-neutral-400 mb-3">{active.category_name} <span className="text-neutral-600">· {filtered.length}</span></h2>}
+            {kind === "live" ? (
+              <div className="space-y-1 max-h-[calc(100vh-200px)] overflow-y-auto pr-2 scrollbar-thin">
+                {filtered.map((it, i) => (
+                  <button key={i} onClick={()=>onSelect(it, kind)} data-testid={`card-${it.stream_id}`} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-white/5 transition-colors group">
+                    <div className="w-10 h-10 rounded bg-neutral-900 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                      <img src={api.proxyImg(it.stream_icon) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="w-full h-full object-contain" loading="lazy" alt=""/>
+                    </div>
+                    <span className="text-neutral-300 group-hover:text-white text-sm truncate flex-1">{it.name}</span>
+                    <Play size={14} className="text-neutral-600 group-hover:text-red-500 flex-shrink-0"/>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin pr-2">
+                {filtered.map((it, i) => <ItemCard key={i} item={it} onSelect={()=>onSelect(it, kind)} sm/>)}
+              </div>
+            )}
             {!filtered.length && active && <p className="text-neutral-500">No hay contenido en este grupo</p>}
           </main>
         </div>
@@ -233,11 +250,10 @@ function HomeTab({ profile, onSelect }) {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const p = { username: profile.username, password: profile.password };
       try {
         const [m, s] = await Promise.all([
-          axios.get(`${API}/vod/streams`, { params: p }).then(r=>r.data),
-          axios.get(`${API}/series/list`, { params: p }).then(r=>r.data),
+          api.vodStreams(profile).catch(()=>[]),
+          api.seriesList(profile).catch(()=>[]),
         ]);
         const sortByAdded = arr => Array.isArray(arr) ? [...arr].sort((a,b)=>(parseInt(b.added||b.last_modified||0))-(parseInt(a.added||a.last_modified||0))) : [];
         setRM(sortByAdded(m).slice(0, 40));
@@ -256,25 +272,25 @@ function HomeTab({ profile, onSelect }) {
   const hero = heroList[heroIdx];
 
   return (
-    <div className="pb-32" data-testid="home-tab">
+    <div className="flex flex-col h-screen pb-24 overflow-hidden" data-testid="home-tab">
       {hero && (
-        <div className="relative h-[65vh]">
-          <img src={hero.stream_icon||hero.cover||IMG_FB} onError={e=>e.target.src=IMG_FB} className="absolute inset-0 w-full h-full object-cover" alt=""/>
-          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/40 to-transparent"/>
+        <div className="relative flex-shrink-0" style={{height:"38vh"}}>
+          <img src={api.proxyImg(hero.stream_icon||hero.cover) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover" alt=""/>
+          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/50 to-transparent"/>
           <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent"/>
-          <div className="absolute bottom-24 left-8 max-w-2xl">
-            <p className="text-red-500 text-sm font-medium tracking-widest uppercase mb-3">{hero.series_id?"Serie":"Película"} · Reciente</p>
-            <h1 className="text-5xl md:text-6xl font-medium tracking-tight mb-6" style={{fontFamily:"'Outfit',sans-serif"}}>{hero.name}</h1>
-            <button onClick={()=>onSelect(hero, hero.series_id?"series":"movie")} data-testid="hero-play-btn" className="flex items-center gap-2 bg-white text-black px-8 py-3 rounded-full font-medium hover:bg-neutral-200 transition-colors">
-              <Play size={18} fill="black"/>Reproducir
+          <div className="absolute bottom-6 left-8 max-w-2xl">
+            <p className="text-red-500 text-xs font-medium tracking-widest uppercase mb-2">{hero.series_id?"Serie":"Película"} · Reciente</p>
+            <h1 className="text-3xl md:text-4xl font-medium tracking-tight mb-3" style={{fontFamily:"'Outfit',sans-serif"}}>{hero.name}</h1>
+            <button onClick={()=>onSelect(hero, hero.series_id?"series":"movie")} data-testid="hero-play-btn" className="flex items-center gap-2 bg-white text-black px-6 py-2 rounded-full font-medium hover:bg-neutral-200 transition-colors text-sm">
+              <Play size={16} fill="black"/>Reproducir
             </button>
           </div>
         </div>
       )}
-      <div className={hero?"-mt-24 relative z-10":"pt-24"}>
-        {loading && <div className="text-center text-neutral-500 py-20" data-testid="loading-home">Cargando...</div>}
-        <Rail title="Películas recientes" items={recentMovies} onSelect={i=>onSelect(i,"movie")} big/>
-        <Rail title="Series recientes" items={recentSeries} onSelect={i=>onSelect(i,"series")} big/>
+      <div className="flex-1 min-h-0 overflow-hidden pt-3">
+        {loading && <div className="text-center text-neutral-500 py-10" data-testid="loading-home">Cargando...</div>}
+        <Rail title="Películas recientes" items={recentMovies} onSelect={i=>onSelect(i,"movie")} sm/>
+        <Rail title="Series recientes" items={recentSeries} onSelect={i=>onSelect(i,"series")} sm/>
       </div>
     </div>
   );
@@ -288,17 +304,26 @@ function Player({ item, kind, profile, onClose }) {
     let mp, hlsInst;
     (async () => {
       setErr(""); setLoading(true);
-      const streamId = item.stream_id || item.series_id;
+      const streamId = item.stream_id || item.id || item.series_id;
       const isLive = kind === "live";
       const ext = isLive ? "ts" : (item.container_extension || "mp4");
-      const proxied = `${API}/stream?kind=${kind==="series"?"series":isLive?"live":"movie"}&username=${encodeURIComponent(profile.username)}&password=${encodeURIComponent(profile.password)}&stream_id=${streamId}&ext=${ext}`;
+      const url = api.streamUrl(profile, { stream_id: streamId, kind: kind==="series"?"series":isLive?"live":"movie", ext });
       const v = videoRef.current;
       if (!v) return;
       try {
         if (isLive && mpegts && mpegts.isSupported && mpegts.isSupported()) {
           mp = mpegts.createPlayer(
-            { type: "mpegts", isLive: true, url: proxied },
-            { enableStashBuffer: false, liveBufferLatencyChasing: true, lazyLoad: false }
+            { type: "mpegts", isLive: true, url },
+            {
+              enableStashBuffer: false,
+              stashInitialSize: 128,
+              liveBufferLatencyChasing: true,
+              liveBufferLatencyMaxLatency: 3.0,
+              liveBufferLatencyMinRemain: 0.5,
+              lazyLoad: false,
+              autoCleanupSourceBuffer: true,
+              fixAudioTimestampGap: false,
+            }
           );
           mp.on(mpegts.Events.ERROR, (type, detail, info) => {
             setErr(`Error de reproducción: ${type} ${detail}`);
@@ -308,11 +333,11 @@ function Player({ item, kind, profile, onClose }) {
           try { await mp.play(); setLoading(false); } catch (e) { setErr("No se pudo iniciar: " + e.message); setLoading(false); }
         } else if (ext === "m3u8" && Hls.isSupported()) {
           hlsInst = new Hls();
-          hlsInst.loadSource(proxied);
+          hlsInst.loadSource(url);
           hlsInst.attachMedia(v);
           v.play().catch(()=>{}); setLoading(false);
         } else {
-          v.src = proxied;
+          v.src = url;
           try { await v.play(); } catch(e) { /* user gesture may be needed */ }
           setLoading(false);
         }
@@ -320,7 +345,7 @@ function Player({ item, kind, profile, onClose }) {
         setErr("Error: " + e.message); setLoading(false);
       }
     })();
-    return () => { try { if (mp) mp.destroy(); } catch{} try { if (hlsInst) hlsInst.destroy(); } catch{} };
+    return () => { try { if (mp) mp.destroy(); } catch (_) {} try { if (hlsInst) hlsInst.destroy(); } catch (_) {} };
   }, [item, kind, profile]);
   return (
     <div className="fixed inset-0 z-[100] bg-black" data-testid="player-screen">
@@ -333,18 +358,103 @@ function Player({ item, kind, profile, onClose }) {
   );
 }
 
-function Main({ profile, onLogout, onSwitch, onPlay }) {
+function SeriesDetail({ series, profile, onClose, onPlay }) {
+  const [info, setInfo] = useState(null);
+  const [season, setSeason] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    (async () => {
+      setLoading(true); setErr("");
+      try {
+        const data = await api.seriesInfo(profile, series.series_id);
+        setInfo(data);
+        const eps = data && data.episodes ? data.episodes : {};
+        const keys = Object.keys(eps).sort((a,b)=>parseInt(a)-parseInt(b));
+        if (keys.length) setSeason(keys[0]);
+      } catch(e) { setErr("No se pudo cargar la serie"); }
+      setLoading(false);
+    })();
+  }, [series, profile]);
+
+  const seasons = info && info.episodes ? Object.keys(info.episodes).sort((a,b)=>parseInt(a)-parseInt(b)) : [];
+  const episodes = info && season && info.episodes ? (info.episodes[season] || []) : [];
+  const meta = info && info.info ? info.info : {};
+  const cover = api.proxyImg(meta.cover || series.cover) || IMG_FB;
+
+  return (
+    <div className="fixed inset-0 z-[90] bg-[#050505] overflow-y-auto" data-testid="series-detail">
+      <button onClick={onClose} data-testid="close-series-btn" className="fixed top-6 right-6 z-10 w-11 h-11 rounded-full bg-black/70 hover:bg-black/90 flex items-center justify-center text-white border border-white/10"><X size={20}/></button>
+      <div className="relative h-[45vh]">
+        <img src={cover} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover" alt=""/>
+        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent"/>
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent"/>
+        <div className="absolute bottom-6 left-8 max-w-2xl">
+          <h1 className="text-4xl font-medium tracking-tight mb-2" style={{fontFamily:"'Outfit',sans-serif"}}>{series.name}</h1>
+          <div className="text-sm text-neutral-400 flex flex-wrap gap-3">
+            {meta.releaseDate && <span>{meta.releaseDate.slice(0,4)}</span>}
+            {meta.rating && <span className="text-amber-400">★ {meta.rating}</span>}
+            {meta.genre && <span>{meta.genre}</span>}
+          </div>
+          {meta.plot && <p className="mt-3 text-neutral-300 text-sm max-w-xl line-clamp-3">{meta.plot}</p>}
+        </div>
+      </div>
+
+      <div className="px-8 pb-16 -mt-4">
+        {loading && <div className="text-neutral-500 py-10">Cargando temporadas...</div>}
+        {err && <div className="text-red-400 py-10">{err}</div>}
+        {!loading && !err && seasons.length === 0 && <div className="text-neutral-500 py-10">Esta serie no tiene episodios disponibles.</div>}
+        {seasons.length > 0 && (
+          <>
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide mb-6 pb-2">
+              {seasons.map(s => (
+                <button key={s} onClick={()=>setSeason(s)} data-testid={`season-${s}`} className={"shrink-0 px-4 py-2 rounded-full text-sm transition-all " + (season===s?"bg-red-600 text-white":"bg-white/5 text-neutral-400 hover:bg-white/10 hover:text-white")}>
+                  Temporada {s}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-2">
+              {episodes.map((ep, i) => {
+                const epCover = api.proxyImg(ep.info?.movie_image || ep.info?.cover_big) || cover;
+                return (
+                  <button key={i} onClick={()=>onPlay(ep, "series")} data-testid={`ep-${ep.id}`} className="w-full flex items-center gap-4 p-3 rounded-lg text-left hover:bg-white/5 transition-colors group border border-white/5">
+                    <div className="w-32 h-20 rounded overflow-hidden bg-neutral-900 flex-shrink-0">
+                      <img src={epCover} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="w-full h-full object-cover" loading="lazy" alt=""/>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-white font-medium truncate">{ep.episode_num}. {ep.title || `Episodio ${ep.episode_num}`}</div>
+                      {ep.info?.plot && <div className="text-xs text-neutral-500 line-clamp-2 mt-1">{ep.info.plot}</div>}
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-white/5 group-hover:bg-red-600 flex items-center justify-center transition-colors">
+                      <Play size={16} className="text-white" fill="white"/>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries }) {
   const [tab, setTab] = useState("home");
+  const handle = (item, kind) => {
+    if (kind === "series") onOpenSeries(item);
+    else onPlay(item, kind);
+  };
   return (
     <div className="min-h-screen bg-[#050505] text-white">
       <div className="fixed top-4 right-6 z-30 flex items-center gap-3">
         <button onClick={onSwitch} data-testid="switch-profile-btn" className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center font-medium text-white shadow-lg">{profile.name.charAt(0).toUpperCase()}</button>
         <button onClick={onLogout} data-testid="logout-btn" className="w-10 h-10 rounded-lg bg-black/60 hover:bg-black/80 flex items-center justify-center text-neutral-400 hover:text-white backdrop-blur"><LogOut size={18}/></button>
       </div>
-      {tab==="home" && <HomeTab profile={profile} onSelect={(i,k)=>onPlay(i,k)}/>}
-      {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={onPlay}/>}
-      {tab==="movies" && <CategorySection kind="movie" profile={profile} onSelect={onPlay}/>}
-      {tab==="series" && <CategorySection kind="series" profile={profile} onSelect={onPlay}/>}
+      {tab==="home" && <HomeTab profile={profile} onSelect={handle}/>}
+      {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={handle}/>}
+      {tab==="movies" && <CategorySection kind="movie" profile={profile} onSelect={handle}/>}
+      {tab==="series" && <CategorySection kind="series" profile={profile} onSelect={handle}/>}
       <BottomNav tab={tab} setTab={setTab}/>
     </div>
   );
@@ -354,6 +464,7 @@ function App() {
   const [screen, setScreen] = useState("profiles");
   const [profile, setProfile] = useState(null);
   const [playing, setPlaying] = useState(null);
+  const [seriesOpen, setSeriesOpen] = useState(null);
   useEffect(() => {
     const a = store.getActive();
     if (a) { setProfile(a); setScreen("main"); }
@@ -362,7 +473,8 @@ function App() {
     <div className="App">
       {screen==="profiles" && <Profiles onSelect={p=>{store.setActive(p);setProfile(p);setScreen("main");}} onAdd={()=>setScreen("login")}/>}
       {screen==="login" && <Login onLogin={p=>{store.setActive(p);setProfile(p);setScreen("main");}} onCancel={()=>setScreen("profiles")}/>}
-      {screen==="main" && profile && <Main profile={profile} onLogout={()=>{store.setActive(null);setProfile(null);setScreen("profiles");}} onSwitch={()=>setScreen("profiles")} onPlay={(i,k)=>setPlaying({item:i,kind:k})}/>}
+      {screen==="main" && profile && <Main profile={profile} onLogout={()=>{store.setActive(null);setProfile(null);setScreen("profiles");}} onSwitch={()=>setScreen("profiles")} onPlay={(i,k)=>setPlaying({item:i,kind:k})} onOpenSeries={s=>setSeriesOpen(s)}/>}
+      {seriesOpen && profile && <SeriesDetail series={seriesOpen} profile={profile} onClose={()=>setSeriesOpen(null)} onPlay={(ep,k)=>{setPlaying({item:ep,kind:k});}}/>}
       {playing && profile && <Player item={playing.item} kind={playing.kind} profile={profile} onClose={()=>setPlaying(null)}/>}
     </div>
   );

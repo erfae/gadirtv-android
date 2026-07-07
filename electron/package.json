@@ -1,12 +1,14 @@
 {
   "name": "gadirtv",
   "version": "1.0.0",
-  "description": "GadirTV - IPTV Netflix-style",
+  "description": "GadirTV - IPTV Player Windows Desktop",
   "main": "main.js",
   "author": "GadirTV",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win --x64 --publish never"
+    "prebuild": "node ./scripts/prepare.js",
+    "build": "electron-builder --win --x64 --publish never",
+    "dist": "yarn --cwd ../frontend build && node ./scripts/prepare.js && electron-builder --win --x64 --publish never"
   },
   "devDependencies": {
     "electron": "31.3.1",
@@ -16,7 +18,7 @@
     "appId": "com.gadir.tv",
     "productName": "GadirTV",
     "directories": { "output": "dist" },
-    "files": ["main.js", "icon.png"],
+    "files": ["main.js", "icon.png", "app/**/*"],
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
       "icon": "icon.png"
