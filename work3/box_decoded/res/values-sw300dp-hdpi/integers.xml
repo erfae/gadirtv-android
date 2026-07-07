@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <integer name="home_padding_start">63</integer>
+    <integer name="home_padding_top">103</integer>
+    <integer name="lb_browse_headers_transition_delay">100</integer>
+    <integer name="lb_browse_headers_transition_duration">200</integer>
+</resources>

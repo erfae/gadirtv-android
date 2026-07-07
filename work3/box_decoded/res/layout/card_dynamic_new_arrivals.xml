@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingStart="@dimen/epg_box_15dp" android:paddingEnd="@dimen/epg_box_15dp"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="@dimen/epg_box_20sp" android:id="@id/my_list_title" android:layout_width="@dimen/feed_square_backdrop_width" android:layout_height="wrap_content" android:layout_marginTop="8.0dip" android:layout_marginBottom="@dimen/dimen_4dp" android:maxLines="2" android:minLines="2" android:layout_alignParentTop="true" android:fontFamily="@font/roboto" />
+    <ImageView android:id="@id/my_list_image" android:layout_width="@dimen/feed_square_backdrop_width" android:layout_height="@dimen/feed_square_backdrop_height" android:layout_marginTop="4.0dip" android:src="@drawable/poster_size" android:scaleType="fitCenter" android:layout_below="@id/my_list_title" />
+    <TextView android:textSize="12.0sp" android:gravity="center_horizontal" android:id="@id/my_list_text" android:background="@color/tibo_jeshile_50" android:visibility="gone" android:layout_width="@dimen/feed_square_backdrop_width" android:layout_height="wrap_content" android:text="@string/my_list" android:layout_alignBottom="@id/my_list_image" android:fontFamily="@font/roboto" />
+</RelativeLayout>

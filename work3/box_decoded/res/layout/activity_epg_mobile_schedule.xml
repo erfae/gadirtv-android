@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:weightSum="1.0"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:layout_gravity="start" android:orientation="horizontal" android:background="@color/Black" android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <LinearLayout android:gravity="center" android:orientation="horizontal" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_weight="1.0">
+            <com.magoware.magoware.webtv.custom_views.MagoTextView android:textStyle="bold" android:textColor="@color/White1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Channel" />
+        </LinearLayout>
+        <LinearLayout android:orientation="horizontal" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_weight="3.0">
+            <com.magoware.magoware.webtv.custom_views.MagoTextView android:textStyle="bold" android:textColor="@color/White1" android:gravity="center" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="Starts" android:layout_weight="1.0" />
+            <com.magoware.magoware.webtv.custom_views.MagoTextView android:textStyle="bold" android:textColor="@color/White1" android:gravity="center" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="Ends" android:layout_weight="1.0" />
+            <com.magoware.magoware.webtv.custom_views.MagoTextView android:textStyle="bold" android:textColor="@color/White1" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="Program Name" android:layout_weight="3.0" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout android:gravity="start" android:layout_gravity="start" android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="0.96">
+        <ListView android:id="@id/EpgList" android:focusable="false" android:focusableInTouchMode="false" android:layout_width="fill_parent" android:layout_height="fill_parent" android:listSelector="@drawable/layout_bg_epg_mobile" android:choiceMode="none" />
+    </LinearLayout>
+</LinearLayout>

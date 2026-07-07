@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingStart="@dimen/epg_box_15dp" android:paddingEnd="@dimen/epg_box_15dp"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="@dimen/epg_box_20sp" android:id="@id/paused_title" android:layout_width="@dimen/feed_square_backdrop_width" android:layout_height="wrap_content" android:layout_marginTop="8.0dip" android:layout_marginBottom="@dimen/dimen_4dp" android:text="TextView" android:maxLines="2" android:minLines="2" android:fontFamily="@font/roboto" />
+    <FrameLayout android:visibility="visible" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4.0dip" android:layout_marginBottom="4.0dip">
+        <ImageView android:id="@id/paused_program_image" android:layout_width="@dimen/feed_square_backdrop_width" android:layout_height="@dimen/feed_square_backdrop_height" android:src="@drawable/poster_size" android:scaleType="fitCenter" android:layout_below="@id/paused_title" />
+        <ImageView android:layout_gravity="center" android:id="@id/paused_image" android:background="@drawable/play_icon" android:visibility="visible" android:layout_width="80.0dip" android:layout_height="80.0dip" />
+    </FrameLayout>
+    <ProgressBar android:id="@id/paused_progress_bar" android:visibility="visible" android:layout_width="@dimen/feed_square_backdrop_width" android:layout_height="5.0dip" android:max="100" style="@style/TrendingNowProgressBar" />
+</LinearLayout>

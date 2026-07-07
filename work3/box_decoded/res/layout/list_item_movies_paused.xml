@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:tag="layout/list_item_movies_paused_0" android:padding="@dimen/dimen_8dp" android:layout_width="wrap_content" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <TextView android:textColor="@android:color/white" android:id="@id/feed_movie_title" android:tag="binding_1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="@dimen/dimen_4dp" android:fontFamily="@font/roboto_light" />
+    <androidx.cardview.widget.CardView android:tag="binding_2" android:layout_width="@dimen/feed_square_backdrop_width" android:layout_height="@dimen/feed_square_backdrop_height" app:cardBackgroundColor="@color/colorPrimary" app:cardCornerRadius="@dimen/feed_carousel_radius" app:cardElevation="4.0dip" app:cardUseCompatPadding="false">
+        <ImageView android:id="@id/feed_movie_paused_poster" android:tag="binding_3" android:layout_width="fill_parent" android:layout_height="fill_parent" android:scaleType="centerCrop" />
+        <View android:background="@android:color/black" android:layout_width="fill_parent" android:layout_height="fill_parent" android:alpha="0.5" />
+        <ImageView android:layout_gravity="center" android:id="@id/imageView" android:layout_width="48.0dip" android:layout_height="48.0dip" app:srcCompat="@drawable/play_icon" />
+        <ProgressBar android:layout_gravity="bottom" android:id="@id/progressBar3" android:tag="binding_4" android:layout_width="fill_parent" android:layout_height="2.0dip" android:layout_marginLeft="2.0dip" android:layout_marginRight="2.0dip" style="?android:progressBarStyleHorizontal" />
+    </androidx.cardview.widget.CardView>
+</LinearLayout>

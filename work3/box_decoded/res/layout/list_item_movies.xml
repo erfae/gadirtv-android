@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView android:tag="layout/list_item_movies_0" android:layout_width="@dimen/feed_movie_poster_width" android:layout_height="@dimen/feed_movie_poster_height" app:cardBackgroundColor="@color/colorPrimary" app:cardCornerRadius="@dimen/feed_carousel_radius" app:cardElevation="4.0dip" app:cardUseCompatPadding="true"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <ImageView android:id="@id/feed_movie_poster" android:tag="binding_1" android:layout_width="fill_parent" android:layout_height="fill_parent" android:scaleType="centerCrop" />
+</androidx.cardview.widget.CardView>

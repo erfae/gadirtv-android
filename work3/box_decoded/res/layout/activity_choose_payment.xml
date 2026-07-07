@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout android:background="@color/colorPrimary" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <TextView android:textSize="22.0sp" android:textStyle="bold" android:textColor="@android:color/white" android:id="@id/textView7" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="32.0dip" android:text="@string/pay_with" app:layout_constraintStart_toStartOf="@id/voucher_code_btn" app:layout_constraintTop_toTopOf="parent" />
+    <Button android:textColor="@android:color/white" android:id="@id/voucher_code_btn" android:background="@drawable/rounded_btn_green" android:layout_width="300.0dip" android:layout_height="64.0dip" android:layout_marginTop="16.0dip" android:text="@string/voucher_code" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/textView7" />
+    <Button android:textColor="@android:color/white" android:id="@id/pay_pal_btn" android:background="@drawable/rounded_btn_yellow" android:layout_width="300.0dip" android:layout_height="64.0dip" android:layout_marginTop="24.0dip" android:text="@string/paypal" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/voucher_code_btn" />
+</androidx.constraintlayout.widget.ConstraintLayout>

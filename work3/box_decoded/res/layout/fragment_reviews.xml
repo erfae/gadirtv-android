@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <androidx.recyclerview.widget.RecyclerView android:orientation="vertical" android:id="@id/reviewsRecyclerView" android:layout_width="fill_parent" android:layout_height="fill_parent" />
+    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="19.0dip" android:id="@id/noReviewsTextView" android:visibility="invisible" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/activity_vertical_margin" android:layout_marginStart="16.0dip" android:layout_marginEnd="16.0dip" />
+</RelativeLayout>

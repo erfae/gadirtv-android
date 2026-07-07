@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape android:shape="rectangle"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/catchup_days_button_focused_bg" />
+    <stroke android:width="0.0dip" android:color="@color/mago_blue" />
+    <corners android:radius="0.0dip" />
+</shape>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.magoware.magoware.webtv.mobile_homepage.SwipeRefreshLayoutExtension android:id="@id/home_feed_swipe_refresh" android:tag="layout/fragment_home_feed_0" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <ScrollView android:background="@color/colorPrimaryDark" android:layout_width="fill_parent" android:layout_height="fill_parent">
+        <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content">
+            <androidx.appcompat.widget.Toolbar android:theme="?actionBarTheme" android:id="@id/login_toolbar" android:background="?colorPrimary" android:layout_width="fill_parent" android:layout_height="wrap_content" android:minHeight="?actionBarSize" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent" app:titleTextColor="@android:color/white">
+                <ImageView android:id="@id/imageView2" android:layout_width="@dimen/dimen_72dp" android:layout_height="@dimen/dimen_24dp" app:srcCompat="@drawable/magoware_logo_text" />
+                <TextView android:textSize="@dimen/text_16sp" android:textColor="@android:color/white" android:gravity="end" android:id="@id/login_toolbar_title" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="@string/login" android:alpha="0.9" android:fontFamily="@font/roboto_medium" android:paddingStart="@dimen/dimen_8dp" android:paddingEnd="@dimen/dimen_8dp" />
+            </androidx.appcompat.widget.Toolbar>
+            <LinearLayout android:orientation="vertical" android:id="@id/home_feed_linear" android:layout_width="fill_parent" android:layout_height="wrap_content" />
+            <ProgressBar android:layout_gravity="center" android:id="@id/progressBar" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        </LinearLayout>
+    </ScrollView>
+</com.magoware.magoware.webtv.mobile_homepage.SwipeRefreshLayoutExtension>

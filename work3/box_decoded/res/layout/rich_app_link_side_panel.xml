@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:background="@color/side_panel_background" android:layout_width="@dimen/side_panel_width" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:lb="http://schemas.android.com/apk/res-auto">
+    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/side_panel_header_text_size" android:textColor="#ffeeeeee" android:ellipsize="end" android:gravity="center_vertical" android:id="@id/title" android:background="@color/side_panel_header_background" android:paddingTop="@dimen/side_panel_header_padding_top" android:focusable="false" android:layout_width="fill_parent" android:layout_height="@dimen/side_panel_header_height" android:text="@string/app_link_title_1" android:singleLine="true" android:fontFamily="sans-serif-condensed" android:paddingStart="@dimen/side_panel_padding_start" android:paddingEnd="@dimen/side_panel_padding_end" android:elevation="@dimen/side_panel_header_elevation" />
+    <androidx.leanback.widget.VerticalGridView android:id="@id/list" android:focusable="true" android:layout_width="fill_parent" android:layout_height="fill_parent" lb:verticalMargin="0.0dip" />
+</LinearLayout>

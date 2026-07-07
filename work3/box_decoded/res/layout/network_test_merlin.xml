@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:id="@id/displayerAttachableView" android:paddingTop="@dimen/content_padding_top" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <Button android:layout_gravity="center_horizontal" android:id="@id/current_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/current_status" />
+    <Button android:layout_gravity="center_horizontal" android:id="@id/wifi_connected" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/is_wifi_connected" />
+    <Button android:layout_gravity="center_horizontal" android:id="@id/mobile_connected" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/is_mobile_connected" />
+    <Button android:layout_gravity="center_horizontal" android:id="@id/network_subtype" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/get_network_subtype" />
+    <Button android:layout_gravity="center_horizontal" android:id="@id/has_internet_access" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/has_internet_access" />
+    <Button android:layout_gravity="center_horizontal" android:id="@id/next_activity" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/next_activity" />
+</LinearLayout>

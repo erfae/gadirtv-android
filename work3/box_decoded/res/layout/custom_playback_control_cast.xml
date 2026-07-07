@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:layout_gravity="bottom" android:orientation="vertical" android:background="#cc000000" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layoutDirection="ltr"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <LinearLayout android:gravity="center" android:orientation="horizontal" android:id="@id/mobile_glue" android:paddingTop="4.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <ImageButton android:id="@id/exo_rew" android:layout_marginRight="16.0dip" style="@style/ExoMediaButton.Rewind" />
+        <ImageButton android:id="@id/exo_play" style="@style/ExoMediaButton.Play" />
+        <ImageButton android:id="@id/exo_pause" style="@style/ExoMediaButton.Pause" />
+        <ImageButton android:id="@id/exo_ffwd" android:layout_marginLeft="16.0dip" style="@style/ExoMediaButton.FastForward" />
+        <ImageView android:id="@id/exo_subtitles_custom" android:visibility="gone" android:layout_width="40.0dip" android:layout_height="40.0dip" android:layout_marginLeft="32.0dip" app:srcCompat="@drawable/subtitles" />
+        <ImageView android:id="@id/exo_audio_custom" android:visibility="gone" android:layout_width="35.0dip" android:layout_height="35.0dip" android:layout_marginLeft="32.0dip" app:srcCompat="@drawable/exoplayer_audio_button" />
+        <ImageView android:id="@id/exo_video_custom" android:visibility="gone" android:layout_width="35.0dip" android:layout_height="35.0dip" android:layout_marginLeft="32.0dip" app:srcCompat="@drawable/exoplayer_video_button" />
+        <androidx.mediarouter.app.MediaRouteButton android:id="@id/media_route_button_cast" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="4.0dip">
+        <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="#ffbebebe" android:id="@id/exo_position" android:paddingLeft="4.0dip" android:paddingRight="4.0dip" android:layout_width="wrap_content" android:layout_height="wrap_content" android:includeFontPadding="false" />
+        <com.google.android.exoplayer2.ui.DefaultTimeBar android:id="@id/exo_progress" android:layout_width="0.0dip" android:layout_height="26.0dip" android:layout_weight="1.0" />
+        <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="#ffbebebe" android:id="@id/exo_duration" android:paddingLeft="4.0dip" android:paddingRight="4.0dip" android:layout_width="wrap_content" android:layout_height="wrap_content" android:includeFontPadding="false" />
+    </LinearLayout>
+</LinearLayout>

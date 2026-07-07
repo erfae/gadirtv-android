@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:tag="layout/list_item_coming_channels_0" android:padding="@dimen/dimen_8dp" android:layout_width="wrap_content" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <TextView android:textSize="13.0sp" android:textColor="@android:color/white" android:id="@id/feed_coming_channel_title" android:layout_width="@dimen/feed_square_backdrop_width" android:layout_height="wrap_content" android:layout_marginBottom="@dimen/dimen_4dp" android:singleLine="true" android:fontFamily="@font/roboto" android:paddingStart="@dimen/dimen_2dp" android:paddingEnd="@dimen/dimen_2dp" />
+    <androidx.cardview.widget.CardView android:layout_width="@dimen/feed_square_backdrop_width" android:layout_height="@dimen/feed_square_backdrop_height" app:cardBackgroundColor="@color/colorPrimary" app:cardCornerRadius="@dimen/feed_carousel_radius" app:cardElevation="4.0dip" app:cardUseCompatPadding="false">
+        <ImageView android:id="@id/feed_epg_icon" android:layout_width="fill_parent" android:layout_height="fill_parent" android:src="@drawable/channel_placeholder" android:scaleType="centerCrop" />
+    </androidx.cardview.widget.CardView>
+    <LinearLayout android:layout_width="@dimen/feed_square_backdrop_width" android:layout_height="wrap_content" android:layout_marginTop="@dimen/dimen_4dp">
+        <LinearLayout android:gravity="center" android:id="@id/feed_channel_schedule_linear" android:background="@drawable/round_corner_radius_4dp_primary" android:layout_width="0.0dip" android:layout_height="@dimen/dimen_32dp" android:layout_weight="6.0" android:layout_marginEnd="@dimen/dimen_4dp">
+            <ImageView android:id="@id/feed_channel_schedule_icon" android:layout_width="22.0dip" android:layout_height="22.0dip" android:layout_marginEnd="@dimen/dimen_2dp" app:srcCompat="@drawable/baseline_check_24" />
+            <TextView android:textColor="@android:color/white" android:id="@id/feed_channel_schedule_label" android:clickable="false" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/schedule" android:fontFamily="@font/roboto" />
+        </LinearLayout>
+        <Button android:textColor="@android:color/white" android:id="@id/feed_channel_info" android:background="@drawable/round_corner_radius_4dp_primary" android:layout_width="0.0dip" android:layout_height="@dimen/dimen_32dp" android:text="@string/Info" android:layout_weight="4.0" android:textAllCaps="false" />
+    </LinearLayout>
+</LinearLayout>

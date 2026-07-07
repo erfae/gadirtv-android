@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="rule_text">27.0dip</dimen>
+    <dimen name="show_africa_menu_item_height">352.0dip</dimen>
+    <dimen name="show_africa_menu_item_width">132.0dip</dimen>
+    <dimen name="show_africa_poster_height">352.0dip</dimen>
+    <dimen name="show_africa_poster_width">264.0dip</dimen>
+    <dimen name="text_25sp">28.0sp</dimen>
+    <dimen name="text_30sp">34.0sp</dimen>
+    <dimen name="text_35sp">40.0sp</dimen>
+    <dimen name="vod_carousel_height">160.0dip</dimen>
+    <dimen name="vod_header_paddingStart">23.0dip</dimen>
+    <item type="dimen" name="vod_subtitles_text_size">0.0987</item>
+</resources>

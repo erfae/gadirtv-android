@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:orientation="vertical" android:id="@id/main_layout" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@id/background" android:layout_width="fill_parent" android:layout_height="fill_parent" android:src="@drawable/space_1" />
+    <ImageView android:id="@id/logo" android:longClickable="true" android:layout_width="250.0dip" android:layout_height="150.0dip" android:src="@drawable/logo_menu_mago" android:baselineAlignBottom="true" android:layout_alignParentTop="true" android:layout_centerHorizontal="true" />
+    <LinearLayout android:layout_gravity="center" android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginTop="150.0dip" android:layout_marginBottom="10.0dip" android:layout_weight="9.0">
+        <fragment android:name="com.magoware.magoware.webtv.linkvue.MainMenuLayersFragment" android:id="@id/page_list_fragment" android:layout_width="fill_parent" android:layout_height="0.0dip" android:layout_weight="4.0" />
+        <FrameLayout android:id="@id/page_list_fragment1" android:layout_width="wrap_content" android:layout_height="0.0dip" android:layout_weight="4.0" />
+        <RelativeLayout android:layout_gravity="center" android:id="@id/description_layout" android:layout_width="wrap_content" android:layout_height="0.0dip" android:layout_weight="1.0">
+            <com.magoware.magoware.webtv.custom_views.MagoTextView android:gravity="center" android:id="@id/menu_description" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        </RelativeLayout>
+        <LinearLayout android:gravity="right" android:orientation="horizontal" android:paddingLeft="5.0dip" android:paddingRight="6.0dip" android:paddingBottom="6.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_alignParentBottom="true">
+            <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/White" android:id="@id/user_txt" android:paddingRight="10.0dip" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="user_textt" />
+            <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="12.0sp" android:textStyle="bold" android:textColor="@color/White" android:id="@id/version_txt" android:paddingRight="10.0dip" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+            <com.magoware.magoware.webtv.custom_views.MagoTextView android:textColor="@color/White" android:id="@id/application_model" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="application_model" />
+            <com.magoware.magoware.webtv.custom_views.MagoTextView android:id="@id/subscription_expired_notification" android:visibility="gone" android:clickable="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="10.0dip" android:layout_marginBottom="10.0dip" android:layout_alignParentBottom="true" />
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>

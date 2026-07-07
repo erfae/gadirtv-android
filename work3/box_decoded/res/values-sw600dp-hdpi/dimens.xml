@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="default_image_card_height">126.0dip</dimen>
+    <dimen name="default_image_card_width">224.0dip</dimen>
+    <dimen name="icon_image_card_height">109.0dip</dimen>
+    <dimen name="icon_image_card_width">224.0dip</dimen>
+    <dimen name="lb_browse_headers_width">270.0dip</dimen>
+    <dimen name="lb_browse_row_hovercard_max_width">400.0dip</dimen>
+    <dimen name="lb_browse_rows_margin_start">258.0dip</dimen>
+    <dimen name="lb_details_overview_height_large">274.0dip</dimen>
+    <dimen name="lb_details_overview_height_small">159.0dip</dimen>
+    <dimen name="lb_details_rows_align_top">167.0dip</dimen>
+    <dimen name="lb_details_v2_align_pos_for_actions">270.0dip</dimen>
+    <dimen name="lb_details_v2_blank_height">160.0dip</dimen>
+    <dimen name="lb_details_v2_card_height">540.0dip</dimen>
+    <dimen name="lb_playback_controls_margin_end">82.0dip</dimen>
+    <dimen name="lb_playback_controls_margin_start">82.0dip</dimen>
+    <dimen name="lb_playback_controls_padding_bottom">-450.0dip</dimen>
+    <dimen name="movie_image_card_height">172.0dip</dimen>
+    <dimen name="movie_image_card_width">120.0dip</dimen>
+    <dimen name="movie_subs_size">16.0sp</dimen>
+    <dimen name="playback_now_playing_card_width">240.0dip</dimen>
+    <dimen name="playback_subtitles_display_height">160.0dip</dimen>
+    <dimen name="square_image_card_height">158.0dip</dimen>
+    <dimen name="square_image_card_width">158.0dip</dimen>
+    <dimen name="font_size">32.0sp</dimen>
+    <dimen name="lb_playback_controls_padding_top">216.0dip</dimen>
+    <dimen name="margin_medium">100.0dip</dimen>
+    <dimen name="textview_height">280.0dip</dimen>
+    <dimen name="textview_width">380.0dip</dimen>
+    <dimen name="title_tv_layout_height">150.0dip</dimen>
+    <dimen name="title_tv_layout_width">250.0dip</dimen>
+</resources>

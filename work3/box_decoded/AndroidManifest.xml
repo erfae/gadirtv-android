@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?><manifest xmlns:android="http://schemas.android.com/apk/res/android" android:compileSdkVersion="23" android:compileSdkVersionCodename="6.0-2438415" android:label="@string/app_name" android:sharedUserId="com.magoware.blingtv.system" package="com.magoware.blingtv.stb" platformBuildVersionCode="23" platformBuildVersionName="6.0-2438415">
+    <uses-feature android:name="android.hardware.screen.portrait" android:required="false"/>
+    <uses-feature android:name="android.hardware.microphone" android:required="false"/>
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+    <uses-feature android:name="android.software.leanback" android:required="false"/>
+    <supports-screens android:largeScreens="true" android:normalScreens="false" android:smallScreens="false" android:xlargeScreens="true"/>
+    <permission android:name="android.permission.INTERNET"/>
+    <permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <permission android:name="android.permission.REBOOT"/>
+    <permission android:name="android.permission.ACCESS_CACHE_FILESYSTEM"/>
+    <permission android:name="android.permission.DELETE_CACHE_FILES"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.CLEAR_APP_USER_DATA"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.SET_TIME_ZONE"/>
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.GET_TASKS"/>
+    <uses-permission android:name="android.permission.ACCESS_CACHE_FILESYSTEM"/>
+    <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE"/>
+    <uses-permission android:name="android.permission.MOUNT_UNMOUNT_FILESYSTEMS"/>
+    <uses-permission android:name="android.permission.ACCESS_DOWNLOAD_MANAGER"/>
+    <uses-permission android:name="android.permission.SEND_DOWNLOAD_COMPLETED_INTENTS"/>
+    <uses-permission android:name="android.permission.BIND_WALLPAPER"/>
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.READ_LOGS"/>
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.GET_ACCOUNTS"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA"/>
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE"/>
+    <application android:allowBackup="true" android:appComponentFactory="androidx.core.app.CoreComponentFactory" android:banner="@drawable/i_iconblue" android:hardwareAccelerated="true" android:icon="@drawable/i_iconblue" android:label="@string/app_name" android:largeHeap="true" android:name="com.magoware.magoware.webtv.MagowareApplication" android:networkSecurityConfig="@xml/network_security_config" android:supportsRtl="true" android:theme="@style/AppTheme" android:vmSafeMode="true">
+        <activity android:name="com.magoware.magoware.webtv.vod.mobile.activities.CastDetailActivity" android:theme="@style/vodAppTheme"/>
+        <activity android:name="com.magoware.magoware.webtv.mobile_homepage.login.LoginActivity" android:theme="@style/vodAppTheme.NoActionBar"/>
+        <activity android:name="com.magoware.magoware.webtv.mobile_homepage.HomePageActivity" android:screenOrientation="portrait" android:theme="@style/vodAppTheme.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.SENDTO"/>
+                <data android:scheme="mailto"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+        </activity>
+        <activity android:name="com.magoware.magoware.webtv.vod.mobile.activities.EpisodeActivity" android:theme="@style/AppTheme.NoActionBar"/>
+        <provider android:authorities="com.magoware.blingtv.stb.provider" android:exported="false" android:grantUriPermissions="true" android:name="androidx.core.content.FileProvider">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/provider_paths"/>
+        </provider>
+        <activity android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.mobile_homepage.tv.TvHomePageActivity" android:theme="@style/DynamicTvHome"/>
+        <receiver android:name="com.magoware.magoware.webtv.DeviceAdmin" android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin"/>
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED"/>
+                <action android:name="android.app.action.ACTION_DEVICE_ADMIN_DISABLE_REQUESTED"/>
+                <action android:name="android.app.action.ACTION_DEVICE_ADMIN_DISABLED"/>
+            </intent-filter>
+        </receiver>
+        <activity android:name="com.magoware.magoware.webtv.payment.PaymentComboListActivity" android:theme="@style/vodAppTheme"/>
+        <activity android:name="com.magoware.magoware.webtv.vr.VRTest"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.MainActivity" android:theme="@style/SplashTheme" android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <activity android:exported="true" android:name="com.magoware.magoware.webtv.LauncherActivity"/>
+        <activity android:name="com.magoware.magoware.webtv.payment.ChoosePaymentActivity" android:theme="@style/vodAppTheme"/>
+        <activity android:name="com.magoware.magoware.webtv.payment.VoucherActivity" android:theme="@style/vodAppTheme"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.homepage.dashboard.DashboardActivity" android:theme="@style/vodAppTheme"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.deviceApps.AppsActivity" android:screenOrientation="landscape" android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.homepage.smarttv.MainActivity2SmartTv" android:screenOrientation="landscape" android:theme="@style/SmartTvBrowseStyle"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.players.ChannelActivity" android:noHistory="true" android:screenOrientation="landscape" android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenLayout|screenSize" android:label="@string/app_name" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.players.default_player.PlayerActivity" android:screenOrientation="landscape" android:theme="@style/vodAppTheme"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.players.exoplayer.ExoPlayerActivity" android:screenOrientation="landscape" android:theme="@style/vodAppTheme"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.players.GCMinfoActivity" android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.activities.AlertDialogActivity" android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.players.default_player.PasswordDialogActivity" android:screenOrientation="landscape" android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.network_test.presentation.NetworkTestMerlin" android:screenOrientation="landscape" android:windowSoftInputMode="stateAlwaysHidden"/>
+        <activity android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.players.channelMenu.LiveTvChannelMenuActivity" android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.account.mobile.AccountMobileActivity" android:theme="@style/vodAppTheme.NoActionBar"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.account.tv_settings.GuidedStepPersonalActivity" android:screenOrientation="landscape" android:theme="@style/PersonalLeanbackDialog"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:excludeFromRecents="true" android:label="@string/app_name" android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.players.epg.mobile.EpgMobileGridActivity" android:theme="@android:style/Theme.Dialog"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:excludeFromRecents="true" android:label="@string/app_name" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.players.PasswordActivity" android:theme="@android:style/Theme.Dialog"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.login.ResetPasswordActivity" android:theme="@style/vodAppTheme" android:windowSoftInputMode="adjustPan"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.activities.ResetPasswordActivity" android:theme="@style/vodAppTheme" android:windowSoftInputMode="adjustPan"/>
+        <activity android:label="@string/title_activity_schedule_program" android:name="com.magoware.magoware.webtv.activities.ScheduleProgramActivity"/>
+        <activity android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode" android:label="@string/app_name" android:name="com.magoware.magoware.webtv.ads.MyAdsActivity"/>
+        <activity android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.players.channelMenu.search.ChannelMenuSearchActivity" android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.webview.WebViewActivity" android:screenOrientation="landscape" android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.exoplayer_activities.ExoPlayerActivity2" android:screenOrientation="landscape" android:theme="@style/PlayerTheme"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenLayout|screenSize" android:label="@string/app_name" android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.activities.PlayerActivity2" android:screenOrientation="landscape" android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.linkvue.MainMenuLayers" android:screenOrientation="landscape" android:theme="@style/Theme.Leanback.Browse"/>
+        <activity android:configChanges="keyboardHidden|orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.linkvue.MainMenuLinkvue" android:screenOrientation="landscape" android:theme="@style/Theme.Leanback.Browse"/>
+        <activity android:name="com.magoware.magoware.webtv.vod.bigscreen.ui.main.SearchActivity" android:theme="@style/Theme.Leanback"/>
+        <activity android:exported="true" android:name="com.magoware.magoware.webtv.vod.bigscreen.ui.main.DetailActivity" android:theme="@style/Theme.Leanback.Details"/>
+        <activity android:exported="true" android:name="com.magoware.magoware.webtv.vod.bigscreen.ui.main.GridActivity" android:theme="@style/Theme.Leanback.Details"/>
+        <activity android:name="vod.bigscreen.ui.main.PinActivity"/>
+        <activity android:launchMode="singleTop" android:name="com.magoware.magoware.webtv.vod.mobile.activities.SearchVodActivity" android:screenOrientation="portrait" android:theme="@style/vodAppTheme.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.SEARCH"/>
+            </intent-filter>
+            <meta-data android:name="android.app.searchable" android:resource="@xml/vod_searchable"/>
+        </activity>
+        <activity android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.vod.mobile.activities.MainVodActivityMobile" android:screenOrientation="sensor" android:theme="@style/vodAppTheme.NoActionBar"/>
+        <activity android:label="@string/title_activity_main3" android:name="com.magoware.magoware.webtv.vod.mobile.activities.SeeAllMoviesActivity" android:screenOrientation="portrait" android:theme="@style/vodAppTheme.NoActionBar"/>
+        <activity android:name="com.magoware.magoware.webtv.vod.mobile.activities.VodDetailsActivity" android:screenOrientation="portrait" android:theme="@style/vodAppTheme.NoActionBar"/>
+        <activity android:name="com.magoware.magoware.webtv.vod.bigscreen.ui.main.PinActivity"/>
+        <activity android:banner="@drawable/banner" android:icon="@drawable/banner" android:label="@string/app_name" android:logo="@drawable/banner" android:name="com.magoware.magoware.webtv.vod.bigscreen.ui.main.MainVodActivity" android:screenOrientation="landscape" android:theme="@style/MainVodTvStyle"/>
+        <activity android:configChanges="layoutDirection|orientation|screenLayout|screenSize|smallestScreenSize" android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.players.exoplayer.ExoPlayerVodActivity" android:resizeableActivity="true" android:screenOrientation="landscape" android:supportsPictureInPicture="true" android:theme="@style/vodAppTheme.NoActionBar"/>
+        <activity android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize" android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.visualon.VisualonPlayerVod" android:resizeableActivity="true" android:screenOrientation="landscape" android:theme="@style/vodAppTheme.NoActionBar"/>
+        <activity android:configChanges="layoutDirection|orientation|screenLayout|screenSize|smallestScreenSize" android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.vod.mobile.activities.ExoPlayerVodCastActivity" android:resizeableActivity="true" android:screenOrientation="landscape" android:supportsPictureInPicture="true" android:theme="@style/vodCastTheme.NoActionBar"/>
+        <activity android:name="com.magoware.magoware.webtv.vod.mobile.activities.BuyMovieWebView" android:theme="@style/Theme.AppCompat.Light"/>
+        <activity android:name="com.magoware.magoware.webtv.vod.bigscreen.ui.main.TrailerActivity"/>
+        <activity android:name="com.magoware.magoware.webtv.login.AuthSmsActivity" android:theme="@style/vodAppTheme.NoActionBar"/>
+        <activity android:configChanges="orientation|screenSize" android:label="@string/app_name" android:launchMode="singleTask" android:name="com.magoware.magoware.webtv.players.epg.big_screen.EpgBigScreen" android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen"/>
+        <activity android:configChanges="keyboardHidden|orientation" android:label="@string/app_name" android:name="com.magoware.magoware.webtv.visualon.VisualonPlayer" android:screenOrientation="landscape" android:theme="@android:style/Theme.NoTitleBar.Fullscreen"/>
+        <activity android:name="com.magoware.magoware.webtv.vod.mobile.fragments.MovieTrailerActivity" android:theme="@style/vodAppTheme"/>
+        <activity android:name="com.magoware.magoware.webtv.mobile_homepage.tv.android_tv_app_channels.OpenFromTvChannelApps" android:theme="@style/SimpleBlackTheme">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:host="com.magoware.magoware.webtv"/>
+                <data android:host="com.magoware.tibo.ftv"/>
+                <data android:scheme="http"/>
+                <data android:scheme="https"/>
+                <data android:pathPattern=".*"/>
+            </intent-filter>
+        </activity>
+        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="@string/admob_app_id"/>
+        <meta-data android:name="firebase_crashlytics_collection_enabled" android:value="true"/>
+        <meta-data android:name="io.fabric.ApiKey" android:value="b292278cb6f4bd66ed1c58af359ef4290bbe4198"/>
+        <meta-data android:name="preloaded_fonts" android:resource="@array/preloaded_fonts"/>
+        <meta-data android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME" android:value="com.google.android.exoplayer2.ext.cast.DefaultCastOptionsProvider"/>
+        <receiver android:enabled="true" android:exported="false" android:name="com.google.android.gms.analytics.AnalyticsReceiver">
+            <intent-filter>
+                <action android:name="com.google.android.gms.analytics.ANALYTICS_DISPATCH"/>
+            </intent-filter>
+        </receiver>
+        <service android:enabled="true" android:exported="false" android:name="com.google.android.gms.analytics.AnalyticsService"/>
+        <service android:exported="false" android:name="com.magoware.magoware.webtv.firebase.MyFirebaseMessagingService">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
+            </intent-filter>
+        </service>
+        <service android:exported="true" android:name="com.magoware.magoware.webtv.sampletvinput.SampleJobService" android:permission="android.permission.BIND_JOB_SERVICE"/>
+        <uses-library android:name="org.apache.http.legacy" android:required="false"/>
+        <activity android:exported="true" android:name="androidx.leanback.supportleanbackshowcase.app.dialog.DialogExampleActivity" android:theme="@style/Theme.Example.LeanbackDialog"/>
+        <activity android:exported="true" android:name="androidx.leanback.supportleanbackshowcase.app.grid.GridExampleActivity" android:theme="@style/Theme.Example.LeanbackVerticalGrid"/>
+        <meta-data android:name="com.google.android.gms.ads.AD_MANAGER_APP" android:value="true"/>
+        <meta-data android:name="com.google.android.gms.version" android:value="@integer/google_play_services_version"/>
+        <receiver android:exported="false" android:name="com.google.android.gms.cast.framework.media.MediaIntentReceiver"/>
+        <service android:exported="false" android:name="com.google.android.gms.cast.framework.media.MediaNotificationService"/>
+        <service android:exported="false" android:name="com.google.android.gms.cast.framework.ReconnectionService"/>
+        <activity android:excludeFromRecents="true" android:exported="false" android:name="com.google.android.gms.auth.api.signin.internal.SignInHubActivity" android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
+        <service android:exported="true" android:name="com.google.android.gms.auth.api.signin.RevocationBoundService" android:permission="com.google.android.gms.auth.api.signin.permission.REVOCATION_NOTIFICATION" android:visibleToInstantApps="true"/>
+        <service android:exported="false" android:name="com.google.firebase.messaging.FirebaseMessagingService">
+            <intent-filter android:priority="-500">
+                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
+            </intent-filter>
+        </service>
+        <service android:directBootAware="true" android:exported="false" android:name="com.google.firebase.components.ComponentDiscoveryService">
+            <meta-data android:name="com.google.firebase.components:com.google.firebase.messaging.FirebaseMessagingRegistrar" android:value="com.google.firebase.components.ComponentRegistrar"/>
+            <meta-data android:name="com.google.firebase.components:com.google.firebase.analytics.connector.internal.AnalyticsConnectorRegistrar" android:value="com.google.firebase.components.ComponentRegistrar"/>
+            <meta-data android:name="com.google.firebase.components:com.google.firebase.crashlytics.CrashlyticsRegistrar" android:value="com.google.firebase.components.ComponentRegistrar"/>
+            <meta-data android:name="com.google.firebase.components:com.google.firebase.iid.Registrar" android:value="com.google.firebase.components.ComponentRegistrar"/>
+            <meta-data android:name="com.google.firebase.components:com.google.firebase.installations.FirebaseInstallationsRegistrar" android:value="com.google.firebase.components.ComponentRegistrar"/>
+            <meta-data android:name="com.google.firebase.components:com.google.firebase.datatransport.TransportRegistrar" android:value="com.google.firebase.components.ComponentRegistrar"/>
+            <meta-data android:name="com.google.firebase.components:com.google.firebase.dynamicloading.DynamicLoadingRegistrar" android:value="com.google.firebase.components.ComponentRegistrar"/>
+        </service>
+        <service android:enabled="true" android:exported="false" android:name="com.google.android.gms.analytics.AnalyticsJobService" android:permission="android.permission.BIND_JOB_SERVICE"/>
+        <receiver android:enabled="true" android:exported="false" android:name="com.google.android.gms.measurement.AppMeasurementReceiver"/>
+        <service android:enabled="true" android:exported="false" android:name="com.google.android.gms.measurement.AppMeasurementService"/>
+        <service android:enabled="true" android:exported="false" android:name="com.google.android.gms.measurement.AppMeasurementJobService" android:permission="android.permission.BIND_JOB_SERVICE"/>
+        <receiver android:exported="true" android:name="com.google.firebase.iid.FirebaseInstanceIdReceiver" android:permission="com.google.android.c2dm.permission.SEND">
+            <intent-filter>
+                <action android:name="com.google.android.c2dm.intent.RECEIVE"/>
+            </intent-filter>
+        </receiver>
+        <provider android:authorities="com.magoware.blingtv.stb.firebaseinitprovider" android:directBootAware="true" android:exported="false" android:initOrder="100" android:name="com.google.firebase.provider.FirebaseInitProvider"/>
+        <activity android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode" android:exported="false" android:name="com.google.android.gms.ads.AdActivity" android:theme="@android:style/Theme.Translucent"/>
+        <provider android:authorities="com.magoware.blingtv.stb.mobileadsinitprovider" android:exported="false" android:initOrder="100" android:name="com.google.android.gms.ads.MobileAdsInitProvider"/>
+        <service android:enabled="true" android:exported="false" android:name="com.google.android.gms.ads.AdService"/>
+        <activity android:exported="false" android:name="com.google.android.gms.common.api.GoogleApiActivity" android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
+        <provider android:authorities="com.magoware.blingtv.stb.workmanager-init" android:directBootAware="false" android:exported="false" android:multiprocess="true" android:name="androidx.work.impl.WorkManagerInitializer"/>
+        <service android:directBootAware="false" android:enabled="@bool/enable_system_alarm_service_default" android:exported="false" android:name="androidx.work.impl.background.systemalarm.SystemAlarmService"/>
+        <service android:directBootAware="false" android:enabled="@bool/enable_system_job_service_default" android:exported="true" android:name="androidx.work.impl.background.systemjob.SystemJobService" android:permission="android.permission.BIND_JOB_SERVICE"/>
+        <receiver android:directBootAware="false" android:enabled="true" android:exported="false" android:name="androidx.work.impl.utils.ForceStopRunnable$BroadcastReceiver"/>
+        <receiver android:directBootAware="false" android:enabled="false" android:exported="false" android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryChargingProxy">
+            <intent-filter>
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED"/>
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED"/>
+            </intent-filter>
+        </receiver>
+        <receiver android:directBootAware="false" android:enabled="false" android:exported="false" android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryNotLowProxy">
+            <intent-filter>
+                <action android:name="android.intent.action.BATTERY_OKAY"/>
+                <action android:name="android.intent.action.BATTERY_LOW"/>
+            </intent-filter>
+        </receiver>
+        <receiver android:directBootAware="false" android:enabled="false" android:exported="false" android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$StorageNotLowProxy">
+            <intent-filter>
+                <action android:name="android.intent.action.DEVICE_STORAGE_LOW"/>
+                <action android:name="android.intent.action.DEVICE_STORAGE_OK"/>
+            </intent-filter>
+        </receiver>
+        <receiver android:directBootAware="false" android:enabled="false" android:exported="false" android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$NetworkStateProxy">
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE"/>
+            </intent-filter>
+        </receiver>
+        <receiver android:directBootAware="false" android:enabled="false" android:exported="false" android:name="androidx.work.impl.background.systemalarm.RescheduleReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.TIME_SET"/>
+                <action android:name="android.intent.action.TIMEZONE_CHANGED"/>
+            </intent-filter>
+        </receiver>
+        <receiver android:directBootAware="false" android:enabled="@bool/enable_system_alarm_service_default" android:exported="false" android:name="androidx.work.impl.background.systemalarm.ConstraintProxyUpdateReceiver">
+            <intent-filter>
+                <action android:name="androidx.work.impl.background.systemalarm.UpdateProxies"/>
+            </intent-filter>
+        </receiver>
+        <service android:exported="false" android:name="androidx.room.MultiInstanceInvalidationService"/>
+        <service android:exported="false" android:name="com.novoda.merlin.MerlinService"/>
+        <service android:exported="false" android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery">
+            <meta-data android:name="backend:com.google.android.datatransport.cct.CctBackendFactory" android:value="cct"/>
+        </service>
+        <service android:exported="false" android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService" android:permission="android.permission.BIND_JOB_SERVICE"/>
+        <receiver android:exported="false" android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver"/>
+        <provider android:authorities="com.magoware.blingtv.stb.lifecycle-process" android:exported="false" android:multiprocess="true" android:name="androidx.lifecycle.ProcessLifecycleOwnerInitializer"/>
+        <activity android:enabled="false" android:exported="false" android:launchMode="singleInstance" android:name="com.google.android.play.core.missingsplits.PlayCoreMissingSplitsActivity" android:process=":playcore_missing_splits_activity" android:stateNotNeeded="true"/>
+        <activity android:enabled="false" android:exported="false" android:name="com.google.android.play.core.common.PlayCoreDialogWrapperActivity" android:stateNotNeeded="true" android:theme="@style/Theme.PlayCore.Transparent"/>
+        <service android:enabled="false" android:exported="true" android:name="com.google.android.play.core.assetpacks.AssetPackExtractionService"/>
+        <activity android:name="com.jakewharton.processphoenix.ProcessPhoenix" android:process=":phoenix" android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
+    </application>
+</manifest>

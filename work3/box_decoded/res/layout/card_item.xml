@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:orientation="vertical" android:id="@id/movie_item" android:paddingLeft="@dimen/lb_browse_item_vertical_spacing" android:focusable="true" android:layout_width="@dimen/movie_image_card_width" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@id/movie_item_icon" android:paddingBottom="0.0dip" android:focusable="false" android:focusableInTouchMode="false" android:clickable="false" android:layout_width="@dimen/movie_image_card_width" android:layout_height="@dimen/movie_image_card_height" android:scaleType="centerCrop" android:adjustViewBounds="true" android:contentDescription="@null" style="@style/Widget.Leanback.ImageCardViewStyle" />
+    <RelativeLayout android:layout_width="@dimen/movie_image_card_width" android:layout_height="wrap_content" android:layout_below="@id/movie_item_icon" android:layout_alignParentStart="true" style="@style/Widget.Leanback.ImageCardView.InfoAreaStyle">
+        <com.magoware.magoware.webtv.custom_views.MagoTextView android:textColor="@color/White1" android:ellipsize="end" android:id="@id/movie_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxLines="1" android:layout_alignParentTop="true" style="@style/Widget.Leanback.ImageCardView.TitleStyle" />
+        <com.magoware.magoware.webtv.custom_views.MagoTextView android:textColor="@color/White1" android:ellipsize="end" android:id="@id/movie_description" android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxLines="1" android:layout_below="@id/movie_title" style="@style/Widget.Leanback.ImageCardView.TitleStyle" />
+    </RelativeLayout>
+</RelativeLayout>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="180.0dip" android:layout_height="280.0dip"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@id/cast_profile" android:layout_width="fill_parent" android:layout_height="0.0dip" android:scaleType="centerCrop" android:layout_weight="1.0" android:contentDescription="@string/movie_poster" />
+    <LinearLayout android:orientation="vertical" android:padding="8.0dip" android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="14.0sp" android:gravity="center" android:id="@id/cast_name" android:layout_width="fill_parent" android:layout_height="wrap_content" android:drawablePadding="8.0dip" android:layout_marginStart="8.0dip" android:layout_marginEnd="8.0dip" />
+        <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="12.0sp" android:gravity="center" android:id="@id/cast_character" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="4.0dip" />
+    </LinearLayout>
+</LinearLayout>

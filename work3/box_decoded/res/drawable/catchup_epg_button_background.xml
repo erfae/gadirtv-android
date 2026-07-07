@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true" android:drawable="@drawable/mago_catchup_buttons" />
+    <item android:drawable="@drawable/mago_catchup_buttons" android:state_activated="true" />
+    <item android:state_pressed="true" android:drawable="@drawable/mago_catchup_buttons" />
+    <item>
+        <shape>
+            <solid android:color="@color/tibo_white" />
+            <stroke android:width="1.0dip" android:color="@color/tibo_dark_green" />
+            <corners android:radius="0.0dip" />
+        </shape>
+    </item>
+</selector>

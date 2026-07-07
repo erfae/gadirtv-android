@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout android:id="@id/root_player_view" android:focusable="true" android:layout_width="fill_parent" android:layout_height="fill_parent" android:keepScreenOn="true"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <com.google.android.exoplayer2.ui.PlayerView android:id="@id/player_view" android:layout_width="fill_parent" android:layout_height="fill_parent" />
+    <com.magoware.magoware.webtv.players.exoplayer.VirtualRemoteOnScreen android:id="@id/virtual_remote" android:layout_width="wrap_content" android:layout_height="wrap_content" android:foregroundGravity="center_horizontal" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <include android:layout_width="fill_parent" android:layout_height="fill_parent" layout="@layout/livetv_player_ui" />
+</androidx.constraintlayout.widget.ConstraintLayout>

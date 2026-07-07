@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:gravity="center_horizontal" android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <ImageView android:id="@id/menu_poster" android:layout_width="@dimen/show_africa_poster_width" android:layout_height="@dimen/show_africa_poster_height" android:layout_marginRight="48.0dip" app:srcCompat="@drawable/poster_size" />
+    <androidx.recyclerview.widget.RecyclerView android:id="@id/menu_recycler" android:focusable="true" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+</LinearLayout>

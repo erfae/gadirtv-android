@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:orientation="horizontal" android:id="@id/relative_custom_toast" android:layout_width="fill_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="500.0dip" android:weightSum="2.0">
+        <LinearLayout android:orientation="vertical" android:id="@id/linearlayout_body_title" android:visibility="gone" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="1.8">
+            <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="20.0sp" android:textColor="@color/Black" android:layout_gravity="center" android:id="@id/txt_title" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+            <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="12.0sp" android:textColor="@color/Black" android:layout_gravity="center" android:id="@id/txt_body" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        </LinearLayout>
+        <RelativeLayout android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="0.2">
+            <ImageView android:id="@id/img" android:layout_width="fill_parent" android:layout_height="fill_parent" android:adjustViewBounds="true" />
+        </RelativeLayout>
+    </LinearLayout>
+</RelativeLayout>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout android:layout_width="fill_parent" android:layout_height="fill_parent" lb:cardBackground="@null" lb:layout_viewType="main"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:lb="http://schemas.android.com/apk/res-auto">
+    <LinearLayout android:orientation="vertical" android:layout_width="wrap_content" android:layout_height="wrap_content">
+        <FrameLayout android:id="@id/container" android:background="@drawable/character_not_focused_padding" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <com.magoware.magoware.webtv.custom_views.MagoTextView android:gravity="center" android:id="@id/primary_text" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="7.0dip" android:fontFamily="sans-serif-condensed" style="@style/Widget.Leanback.ImageCardView.TitleStyle" />
+    </LinearLayout>
+</FrameLayout>

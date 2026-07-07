@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:gravity="right" android:id="@id/epg_layout" android:background="@color/first_blue" android:visibility="gone" android:layout_width="fill_parent" android:layout_height="fill_parent" android:alpha="0.9"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:orientation="vertical" android:background="@drawable/background" android:layout_width="fill_parent" android:layout_height="fill_parent">
+        <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginLeft="48.0dip" android:layout_marginTop="27.0dip" android:layout_marginRight="48.0dip" android:layout_weight="2.0">
+            <LinearLayout android:orientation="horizontal" android:paddingTop="@dimen/epg_box_30dp" android:paddingBottom="@dimen/epg_box_30dp" android:layout_width="fill_parent" android:layout_height="0.0dip" android:layout_weight="2.0">
+                <LinearLayout android:orientation="vertical" android:background="@color/translucent_white" android:layout_width="@dimen/epg_box_200dp" android:layout_height="fill_parent">
+                    <ImageView android:layout_gravity="center_horizontal" android:id="@id/selected_channel_icon" android:layout_width="fill_parent" android:layout_height="fill_parent" android:scaleType="fitCenter" />
+                </LinearLayout>
+                <LinearLayout android:orientation="vertical" android:background="@color/translucent_white" android:layout_width="@dimen/epg_box_770dp" android:layout_height="fill_parent">
+                    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/epg_box_20sp" android:typeface="serif" android:textStyle="bold" android:textColor="@color/blue_purple" android:id="@id/channel_title" android:layout_width="fill_parent" android:layout_height="@dimen/epg_box_40dp" android:layout_marginLeft="@dimen/epg_box_20dp" android:ems="10" />
+                    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/epg_box_20sp" android:typeface="sans" android:textStyle="italic" android:textColor="@color/blue_purple" android:id="@id/channel_description" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginLeft="@dimen/epg_box_20dp" android:layout_marginTop="@dimen/epg_box_10dp" android:ems="10" />
+                </LinearLayout>
+                <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginRight="@dimen/epg_box_20dp">
+                    <ImageView android:layout_gravity="center" android:id="@id/logo_view" android:layout_width="fill_parent" android:layout_height="fill_parent" android:src="@drawable/logo_menu_mago" android:scaleType="fitCenter" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginLeft="48.0dip" android:layout_marginRight="48.0dip" android:layout_marginBottom="27.0dip" android:layout_weight="1.0">
+            <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent" android:baselineAligned="false" android:layout_weight="1.0">
+                <LinearLayout android:layout_gravity="left" android:orientation="horizontal" android:background="@drawable/epgbutton" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="3.0">
+                    <RelativeLayout android:layout_width="fill_parent" android:layout_height="fill_parent">
+                        <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/epg_box_20sp" android:textStyle="bold" android:textColor="@color/blue_purple" android:gravity="center" android:id="@id/day" android:layout_width="fill_parent" android:layout_height="fill_parent" android:ems="10" android:textAlignment="center" />
+                    </RelativeLayout>
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/epg_timebar_layout" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="1.0" />
+            </LinearLayout>
+            <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent" android:baselineAligned="false" android:layout_weight="1.0">
+                <LinearLayout android:layout_gravity="left" android:orientation="horizontal" android:id="@id/first_channel_data" android:background="@drawable/epgbutton" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="3.0">
+                    <com.magoware.magoware.webtv.util.MySquareImageView android:layout_gravity="center" android:id="@id/first_channel_icon" android:layout_width="wrap_content" android:layout_height="fill_parent" android:adjustViewBounds="true" />
+                    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/epg_box_20sp" android:textStyle="bold" android:textColor="@color/first_blue" android:gravity="center|left" android:layout_gravity="center|left" android:id="@id/first_channel_name" android:layout_width="wrap_content" android:layout_height="fill_parent" android:ems="10" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/first_channel_epg" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="1.0" />
+            </LinearLayout>
+            <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent" android:baselineAligned="false" android:layout_weight="1.0">
+                <LinearLayout android:orientation="horizontal" android:id="@id/second_channel_data" android:background="@drawable/epgbutton" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="3.0">
+                    <com.magoware.magoware.webtv.util.MySquareImageView android:layout_gravity="center" android:id="@id/second_channel_icon" android:layout_width="wrap_content" android:layout_height="fill_parent" android:adjustViewBounds="true" />
+                    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/epg_box_20sp" android:textStyle="bold" android:textColor="@color/first_blue" android:gravity="center|left" android:layout_gravity="center|left" android:id="@id/second_channel_name" android:layout_width="wrap_content" android:layout_height="fill_parent" android:ems="10" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/second_channel_epg" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="1.0" />
+            </LinearLayout>
+            <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent" android:baselineAligned="false" android:layout_weight="1.0">
+                <LinearLayout android:orientation="horizontal" android:id="@id/third_channel_data" android:background="@drawable/epgbutton" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="3.0">
+                    <com.magoware.magoware.webtv.util.MySquareImageView android:layout_gravity="center" android:id="@id/third_channel_icon" android:layout_width="wrap_content" android:layout_height="fill_parent" android:adjustViewBounds="true" />
+                    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/epg_box_20sp" android:textStyle="bold" android:textColor="@color/first_blue" android:gravity="center|left" android:layout_gravity="center|left" android:id="@id/third_channel_name" android:layout_width="wrap_content" android:layout_height="fill_parent" android:ems="10" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/third_channel_epg" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="1.0" />
+            </LinearLayout>
+            <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent" android:baselineAligned="false" android:layout_weight="1.0">
+                <LinearLayout android:orientation="horizontal" android:id="@id/fourth_channel_data" android:background="@drawable/epgbutton" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="3.0">
+                    <com.magoware.magoware.webtv.util.MySquareImageView android:layout_gravity="center" android:id="@id/fourth_channel_icon" android:layout_width="wrap_content" android:layout_height="fill_parent" android:adjustViewBounds="true" />
+                    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/epg_box_20sp" android:textStyle="bold" android:textColor="@color/first_blue" android:gravity="center|left" android:layout_gravity="center|left" android:id="@id/forth_channel_name" android:layout_width="wrap_content" android:layout_height="fill_parent" android:ems="10" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/forth_channel_epg" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="1.0" />
+            </LinearLayout>
+            <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent" android:baselineAligned="false" android:layout_weight="1.0">
+                <LinearLayout android:orientation="horizontal" android:id="@id/fifth_channel_data" android:background="@drawable/epgbutton" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="3.0">
+                    <com.magoware.magoware.webtv.util.MySquareImageView android:layout_gravity="center" android:id="@id/fifth_channel_icon" android:layout_width="wrap_content" android:layout_height="fill_parent" android:adjustViewBounds="true" />
+                    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/epg_box_20sp" android:textStyle="bold" android:textColor="@color/first_blue" android:gravity="center|left" android:layout_gravity="center|left" android:id="@id/fitfth_channel_name" android:layout_width="wrap_content" android:layout_height="fill_parent" android:ems="10" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/fifth_channel_epg" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="1.0" />
+            </LinearLayout>
+            <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent" android:baselineAligned="false" android:layout_weight="1.0">
+                <LinearLayout android:layout_gravity="right" android:orientation="horizontal" android:id="@id/sixth_channel_data" android:background="@drawable/epgbutton" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="3.0">
+                    <com.magoware.magoware.webtv.util.MySquareImageView android:layout_gravity="center" android:id="@id/sixth_channel_icon" android:layout_width="wrap_content" android:layout_height="fill_parent" android:adjustViewBounds="true" />
+                    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/epg_box_20sp" android:textStyle="bold" android:textColor="@color/first_blue" android:gravity="center|left" android:layout_gravity="center|left" android:id="@id/sixth_channel_name" android:layout_width="wrap_content" android:layout_height="fill_parent" android:ems="10" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/sixth_channel_epg" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="1.0" />
+            </LinearLayout>
+            <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent" android:baselineAligned="false" android:layout_weight="1.0">
+                <LinearLayout android:orientation="horizontal" android:id="@id/seventh_channel_data" android:background="@drawable/epgbutton" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="3.0">
+                    <com.magoware.magoware.webtv.util.MySquareImageView android:layout_gravity="center" android:id="@id/seventh_channel_icon" android:layout_width="wrap_content" android:layout_height="fill_parent" android:adjustViewBounds="true" />
+                    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/epg_box_20sp" android:textStyle="bold" android:textColor="@color/first_blue" android:gravity="center|left" android:layout_gravity="center|left" android:id="@id/seventh_channel_name" android:layout_width="wrap_content" android:layout_height="fill_parent" android:ems="10" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/seventh_channel_epg" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="1.0" />
+            </LinearLayout>
+            <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent" android:baselineAligned="false" android:layout_weight="1.0">
+                <LinearLayout android:orientation="horizontal" android:id="@id/eighth_channel_data" android:background="@drawable/epgbutton" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="3.0">
+                    <com.magoware.magoware.webtv.util.MySquareImageView android:layout_gravity="center" android:id="@id/eighth_channel_icon" android:layout_width="wrap_content" android:layout_height="fill_parent" android:adjustViewBounds="true" />
+                    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/epg_box_20sp" android:textStyle="bold" android:textColor="@color/first_blue" android:gravity="center|left" android:layout_gravity="center|left" android:id="@id/eighth_channel_name" android:layout_width="wrap_content" android:layout_height="fill_parent" android:ems="10" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/eighth_channel_epg" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="1.0" />
+            </LinearLayout>
+            <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent" android:baselineAligned="false" android:layout_weight="1.0">
+                <LinearLayout android:orientation="horizontal" android:id="@id/ninth_channel_data" android:background="@drawable/epgbutton" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="3.0">
+                    <com.magoware.magoware.webtv.util.MySquareImageView android:layout_gravity="center" android:id="@id/ninth_channel_icon" android:layout_width="wrap_content" android:layout_height="fill_parent" android:adjustViewBounds="true" />
+                    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/epg_box_20sp" android:textStyle="bold" android:textColor="@color/first_blue" android:gravity="center|left" android:layout_gravity="center|left" android:id="@id/ninth_channel_name" android:layout_width="wrap_content" android:layout_height="fill_parent" android:ems="10" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/ninth_channel_epg" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="1.0" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/epg_box_20sp" android:textStyle="bold" android:textColor="@color/blue_purple" android:gravity="center" android:id="@id/current_time" android:layout_width="wrap_content" android:layout_height="@dimen/epg_box_40dp" android:layout_marginTop="@dimen/epg_box_180dp" android:layout_marginRight="@dimen/epg_box_45dp" android:ems="10" android:layout_alignParentRight="true" />
+    <ImageView android:id="@id/right_arrow" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/epg_box_265dp" android:layout_marginRight="@dimen/epg_box_35dp" android:src="@drawable/right3" android:layout_alignParentTop="true" android:layout_alignParentRight="true" />
+    <ImageView android:id="@id/left_arrow" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="@dimen/epg_box_310dp" android:layout_marginTop="@dimen/epg_box_265dp" android:src="@drawable/left2" android:layout_alignParentLeft="true" android:layout_alignParentTop="true" />
+    <ImageView android:id="@id/down_arrow" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="@dimen/epg_box_310dp" android:layout_marginBottom="@dimen/epg_box_25dp" android:src="@drawable/down2" android:layout_alignParentLeft="true" android:layout_alignParentBottom="true" />
+    <ImageView android:id="@id/up_arrow" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="@dimen/epg_box_310dp" android:layout_marginTop="@dimen/epg_box_280dp" android:src="@drawable/up2" android:layout_alignParentLeft="true" android:layout_alignParentTop="true" />
+    <LinearLayout android:orientation="vertical" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentLeft="true" android:layout_alignParentTop="true" android:layout_alignParentRight="true" android:layout_alignParentBottom="true">
+        <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="2.0" />
+        <LinearLayout android:orientation="horizontal" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginLeft="@dimen/epg_box_15dp" android:layout_marginRight="@dimen/epg_box_20dp" android:layout_marginBottom="@dimen/epg_box_20dp" android:layout_weight="1.0">
+            <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="3.0" />
+            <LinearLayout android:orientation="vertical" android:id="@id/epg_column_layout" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="1.0">
+                <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="1.0" />
+                <LinearLayout android:orientation="horizontal" android:id="@id/first_channel_epg_display" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginRight="@dimen/epg_box_15dp" android:baselineAligned="false" android:layout_weight="1.0">
+                    <LinearLayout android:orientation="vertical" android:id="@id/first_channel_gray_part" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="9.0" android:alpha="0.3">
+                        <LinearLayout android:layout_gravity="right" android:orientation="vertical" android:background="@color/Red" android:layout_width="2.0dip" android:layout_height="fill_parent" android:alpha="1.0" />
+                    </LinearLayout>
+                    <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="10.0" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/second_channel_epg_display" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginRight="@dimen/epg_box_15dp" android:baselineAligned="false" android:layout_weight="1.0">
+                    <LinearLayout android:orientation="vertical" android:id="@id/second_channel_gray_part" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="9.0" android:alpha="0.3">
+                        <LinearLayout android:layout_gravity="right" android:orientation="vertical" android:background="@color/Red" android:layout_width="2.0dip" android:layout_height="fill_parent" android:alpha="1.0" />
+                    </LinearLayout>
+                    <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="10.0" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/third_channel_epg_display" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginRight="@dimen/epg_box_15dp" android:baselineAligned="false" android:layout_weight="1.0">
+                    <LinearLayout android:orientation="vertical" android:id="@id/third_channel_gray_part" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="9.0" android:alpha="0.3">
+                        <LinearLayout android:layout_gravity="right" android:orientation="vertical" android:background="@color/Red" android:layout_width="2.0dip" android:layout_height="fill_parent" android:alpha="1.0" />
+                    </LinearLayout>
+                    <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="10.0" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/forth_channel_epg_display" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginRight="@dimen/epg_box_15dp" android:baselineAligned="false" android:layout_weight="1.0">
+                    <LinearLayout android:orientation="vertical" android:id="@id/forth_channel_gray_part" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="9.0" android:alpha="0.3">
+                        <LinearLayout android:layout_gravity="right" android:orientation="vertical" android:background="@color/Red" android:layout_width="2.0dip" android:layout_height="fill_parent" android:alpha="1.0" />
+                    </LinearLayout>
+                    <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="10.0" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/fifth_channel_epg_display" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginRight="@dimen/epg_box_15dp" android:baselineAligned="false" android:layout_weight="1.0">
+                    <LinearLayout android:orientation="vertical" android:id="@id/fifth_channel_gray_part" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="9.0" android:alpha="0.3">
+                        <LinearLayout android:layout_gravity="right" android:orientation="vertical" android:background="@color/Red" android:layout_width="2.0dip" android:layout_height="fill_parent" android:alpha="1.0" />
+                    </LinearLayout>
+                    <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="10.0" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/sixth_channel_epg_display" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginRight="@dimen/epg_box_15dp" android:baselineAligned="false" android:layout_weight="1.0">
+                    <LinearLayout android:orientation="vertical" android:id="@id/sixth_channel_gray_part" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="9.0" android:alpha="0.3">
+                        <LinearLayout android:layout_gravity="right" android:orientation="vertical" android:background="@color/Red" android:layout_width="2.0dip" android:layout_height="fill_parent" android:alpha="1.0" />
+                    </LinearLayout>
+                    <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="10.0" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/seventh_channel_epg_display" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginRight="@dimen/epg_box_15dp" android:baselineAligned="false" android:layout_weight="1.0">
+                    <LinearLayout android:orientation="vertical" android:id="@id/seventh_channel_gray_part" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="9.0" android:alpha="0.3">
+                        <LinearLayout android:layout_gravity="right" android:orientation="vertical" android:background="@color/Red" android:layout_width="2.0dip" android:layout_height="fill_parent" android:alpha="1.0" />
+                    </LinearLayout>
+                    <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="10.0" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/eight_channel_epg_display" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginRight="@dimen/epg_box_15dp" android:baselineAligned="false" android:layout_weight="1.0">
+                    <LinearLayout android:orientation="vertical" android:id="@id/eight_channel_gray_part" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="9.0" android:alpha="0.3">
+                        <LinearLayout android:layout_gravity="right" android:orientation="vertical" android:background="@color/Red" android:layout_width="2.0dip" android:layout_height="fill_parent" android:alpha="1.0" />
+                    </LinearLayout>
+                    <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="10.0" />
+                </LinearLayout>
+                <LinearLayout android:orientation="horizontal" android:id="@id/ninth_channel_epg_display" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_marginRight="@dimen/epg_box_15dp" android:layout_weight="1.0">
+                    <LinearLayout android:orientation="vertical" android:id="@id/ninth_channel_gray_part" android:background="@color/translucent_bblack" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="9.0" android:alpha="0.3">
+                        <LinearLayout android:layout_gravity="right" android:orientation="vertical" android:background="@color/Red" android:layout_width="2.0dip" android:layout_height="fill_parent" android:alpha="1.0" />
+                    </LinearLayout>
+                    <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent" android:layout_weight="10.0" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>

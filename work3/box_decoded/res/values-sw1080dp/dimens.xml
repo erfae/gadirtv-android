@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="menu_icon_layer">170.0dip</dimen>
+    <dimen name="menu_layer2_margintop">70.0dip</dimen>
+    <dimen name="menu_layer_item_label_margintop">15.0dip</dimen>
+    <dimen name="menu_layer_one_height">230.0dip</dimen>
+    <dimen name="menu_layers_layout_margin_top">150.0dip</dimen>
+    <dimen name="menu_layers_margin_top">110.0dip</dimen>
+    <dimen name="menu_title_size">27.0sp</dimen>
+    <dimen name="text_25sp">50.0sp</dimen>
+    <dimen name="text_30sp">60.0sp</dimen>
+    <dimen name="text_35sp">70.0sp</dimen>
+    <dimen name="virtual_remote_icon_margin">50.0dip</dimen>
+    <dimen name="virtual_remote_icon_size">80.0dip</dimen>
+    <dimen name="virtual_remote_label_size">30.0sp</dimen>
+    <item type="dimen" name="vod_subtitles_text_size">0.13</item>
+</resources>

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:background="@color/colorPrimary" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <androidx.appcompat.widget.Toolbar android:theme="?actionBarTheme" android:id="@id/accountToolbar" android:layout_width="fill_parent" android:layout_height="wrap_content" android:minHeight="?actionBarSize" app:navigationIcon="@drawable/baseline_arrow_back_24" app:title="@string/home_more" app:titleTextColor="@android:color/white" />
+    <ScrollView android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content">
+            <TextView android:textSize="@dimen/text_16sp" android:textColor="@color/colorWhite80" android:id="@id/textView11" android:background="@color/colorPrimaryDark" android:paddingTop="@dimen/dimen_16dp" android:paddingBottom="@dimen/dimen_8dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="@string/account_label" android:textAllCaps="true" android:fontFamily="@font/roboto" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp" />
+            <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content">
+                <LinearLayout android:orientation="horizontal" android:background="@color/colorPrimary" android:paddingTop="@dimen/dimen_12dp" android:paddingBottom="@dimen/dimen_12dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp">
+                    <TextView android:textSize="@dimen/text_16sp" android:textColor="@android:color/white" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="@string/account_label" android:layout_weight="8.0" android:fontFamily="@font/roboto" />
+                    <TextView android:textSize="@dimen/text_16sp" android:textColor="@android:color/white" android:id="@id/account_username" android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="@font/roboto_medium" />
+                </LinearLayout>
+                <View android:id="@id/personal_divider" android:background="@color/colorWhite50" android:layout_width="fill_parent" android:layout_height="0.100000024dip" android:layout_marginBottom="@dimen/dimen_16dp" android:layout_marginStart="@dimen/dimen_16dp" />
+                <LinearLayout android:orientation="horizontal" android:id="@id/personal_settings_linear" android:background="@drawable/account_item_selector" android:paddingBottom="@dimen/dimen_8dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp">
+                    <LinearLayout android:orientation="vertical" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_weight="1.0">
+                        <TextView android:textSize="@dimen/text_16sp" android:textColor="@android:color/white" android:id="@id/textView15" android:clickable="false" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginBottom="@dimen/dimen_4dp" android:text="@string/personal_settings_label" android:fontFamily="@font/roboto" />
+                        <TextView android:textSize="12.5sp" android:textColor="@android:color/white" android:id="@id/textView16" android:clickable="false" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="@string/personal_settings_subtitle" android:fontFamily="@font/roboto" />
+                    </LinearLayout>
+                    <ImageView android:layout_gravity="center_vertical" android:id="@id/textView17" android:clickable="false" android:layout_width="18.0dip" android:layout_height="18.0dip" app:srcCompat="@drawable/baseline_arrow_forward_24_gray" />
+                </LinearLayout>
+            </LinearLayout>
+            <TextView android:textSize="@dimen/text_16sp" android:textColor="@color/colorWhite80" android:background="@color/colorPrimaryDark" android:paddingTop="@dimen/dimen_16dp" android:paddingBottom="@dimen/dimen_8dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="@string/support_label" android:textAllCaps="true" android:fontFamily="@font/roboto" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp" />
+            <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content">
+                <LinearLayout android:orientation="horizontal" android:id="@id/help_support_linear" android:background="@drawable/account_item_selector" android:paddingTop="@dimen/dimen_12dp" android:paddingBottom="@dimen/dimen_12dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp">
+                    <TextView android:textSize="@dimen/text_16sp" android:textColor="@android:color/white" android:clickable="false" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="@string/help_support" android:layout_weight="8.0" android:fontFamily="@font/roboto" />
+                    <ImageView android:clickable="false" android:layout_width="18.0dip" android:layout_height="18.0dip" app:srcCompat="@drawable/baseline_arrow_forward_24_gray" />
+                </LinearLayout>
+                <View android:background="@color/colorWhite50" android:layout_width="fill_parent" android:layout_height="0.100000024dip" android:layout_marginStart="@dimen/dimen_16dp" />
+            </LinearLayout>
+            <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content">
+                <LinearLayout android:orientation="horizontal" android:id="@id/terms_and_conditions_linear" android:background="@drawable/account_item_selector" android:paddingTop="@dimen/dimen_12dp" android:paddingBottom="@dimen/dimen_12dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp">
+                    <TextView android:textSize="@dimen/text_16sp" android:textColor="@android:color/white" android:clickable="false" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="@string/privacy_policy_terms" android:layout_weight="8.0" android:fontFamily="@font/roboto" />
+                    <ImageView android:textColor="@android:color/white" android:clickable="false" android:layout_width="18.0dip" android:layout_height="18.0dip" app:srcCompat="@drawable/baseline_arrow_forward_24_gray" />
+                </LinearLayout>
+                <View android:background="@color/colorWhite50" android:layout_width="fill_parent" android:layout_height="0.100000024dip" android:layout_marginStart="@dimen/dimen_16dp" />
+            </LinearLayout>
+            <LinearLayout android:orientation="vertical" android:visibility="visible" android:layout_width="fill_parent" android:layout_height="wrap_content">
+                <LinearLayout android:orientation="horizontal" android:id="@id/contact_linear" android:background="@drawable/account_item_selector" android:paddingTop="@dimen/dimen_12dp" android:paddingBottom="@dimen/dimen_12dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp">
+                    <TextView android:textSize="@dimen/text_16sp" android:textColor="@android:color/white" android:clickable="false" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="@string/contact_label" android:layout_weight="8.0" android:fontFamily="@font/roboto" />
+                    <ImageView android:textColor="@android:color/white" android:clickable="false" android:layout_width="18.0dip" android:layout_height="18.0dip" app:srcCompat="@drawable/baseline_arrow_forward_24_gray" />
+                </LinearLayout>
+                <View android:background="@color/colorWhite50" android:layout_width="fill_parent" android:layout_height="0.100000024dip" android:layout_marginStart="@dimen/dimen_16dp" />
+            </LinearLayout>
+            <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content">
+                <LinearLayout android:orientation="horizontal" android:id="@id/send_feadback_linear" android:background="@drawable/account_item_selector" android:paddingTop="@dimen/dimen_12dp" android:paddingBottom="@dimen/dimen_12dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp">
+                    <TextView android:textSize="@dimen/text_16sp" android:textColor="@android:color/white" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="@string/send_feedback" android:layout_weight="8.0" android:fontFamily="@font/roboto" />
+                    <ImageView android:textColor="@android:color/white" android:layout_width="18.0dip" android:layout_height="18.0dip" app:srcCompat="@drawable/baseline_arrow_forward_24_gray" />
+                </LinearLayout>
+                <View android:background="@color/colorWhite50" android:layout_width="fill_parent" android:layout_height="0.100000024dip" android:layout_marginStart="@dimen/dimen_16dp" />
+            </LinearLayout>
+            <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content">
+                <LinearLayout android:orientation="horizontal" android:id="@id/rate_review_linear" android:background="@drawable/account_item_selector" android:paddingTop="@dimen/dimen_12dp" android:paddingBottom="@dimen/dimen_12dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp">
+                    <TextView android:textSize="@dimen/text_16sp" android:textColor="@android:color/white" android:clickable="false" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="@string/account_rate_review" android:layout_weight="8.0" android:fontFamily="@font/roboto" />
+                    <ImageView android:textColor="@android:color/white" android:clickable="false" android:layout_width="18.0dip" android:layout_height="18.0dip" app:srcCompat="@drawable/baseline_arrow_forward_24_gray" />
+                </LinearLayout>
+                <View android:background="@color/colorWhite50" android:layout_width="fill_parent" android:layout_height="0.100000024dip" android:layout_marginStart="@dimen/dimen_16dp" />
+            </LinearLayout>
+            <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content">
+                <LinearLayout android:orientation="horizontal" android:id="@id/share_app_linear" android:background="@drawable/account_item_selector" android:paddingTop="@dimen/dimen_12dp" android:paddingBottom="@dimen/dimen_12dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp">
+                    <TextView android:textSize="@dimen/text_16sp" android:textColor="@android:color/white" android:clickable="false" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="@string/account_share_tibo" android:layout_weight="8.0" android:fontFamily="@font/roboto" />
+                    <ImageView android:textColor="@android:color/white" android:clickable="false" android:layout_width="18.0dip" android:layout_height="18.0dip" app:srcCompat="@drawable/baseline_arrow_forward_24_gray" />
+                </LinearLayout>
+                <View android:background="@color/colorWhite50" android:layout_width="fill_parent" android:layout_height="0.100000024dip" android:layout_marginStart="@dimen/dimen_16dp" />
+            </LinearLayout>
+            <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content">
+                <LinearLayout android:orientation="horizontal" android:id="@id/language_linear" android:background="@drawable/account_item_selector" android:paddingTop="@dimen/dimen_12dp" android:paddingBottom="@dimen/dimen_12dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp">
+                    <TextView android:textSize="@dimen/text_16sp" android:textColor="@android:color/white" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="@string/account_language" android:layout_weight="8.0" android:fontFamily="@font/roboto" />
+                    <ImageView android:textColor="@android:color/white" android:layout_width="18.0dip" android:layout_height="18.0dip" app:srcCompat="@drawable/baseline_arrow_forward_24_gray" />
+                </LinearLayout>
+                <View android:background="@color/colorWhite50" android:layout_width="fill_parent" android:layout_height="0.100000024dip" android:layout_marginStart="@dimen/dimen_16dp" />
+            </LinearLayout>
+            <LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content">
+                <LinearLayout android:orientation="horizontal" android:paddingTop="@dimen/dimen_12dp" android:paddingBottom="@dimen/dimen_12dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp">
+                    <TextView android:textSize="@dimen/text_16sp" android:textColor="@android:color/white" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="@string/app_version" android:layout_weight="8.0" android:fontFamily="@font/roboto" />
+                    <TextView android:textColor="@android:color/white" android:id="@id/account_app_version" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+                </LinearLayout>
+            </LinearLayout>
+            <View android:background="@color/colorPrimaryDark" android:layout_width="fill_parent" android:layout_height="48.0dip" />
+            <TextView android:textSize="@dimen/text_16sp" android:textColor="@color/colorRedMaterial400" android:gravity="center" android:id="@id/account_logout" android:background="@color/colorPrimary" android:paddingTop="@dimen/dimen_12dp" android:paddingBottom="@dimen/dimen_12dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="@string/account_logout" android:fontFamily="@font/roboto_medium" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp" />
+            <TextView android:textColor="@color/colorWhite80" android:gravity="center" android:background="@color/colorPrimaryDark" android:paddingTop="@dimen/dimen_16dp" android:paddingBottom="@dimen/dimen_16dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="@string/powered_by_magoware" android:fontFamily="@font/roboto" android:paddingStart="@dimen/dimen_16dp" android:paddingEnd="@dimen/dimen_16dp" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

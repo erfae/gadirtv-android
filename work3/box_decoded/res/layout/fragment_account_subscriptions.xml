@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:background="@color/colorPrimaryDark" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <androidx.appcompat.widget.Toolbar android:theme="?actionBarTheme" android:id="@id/account_subscription_toolbar" android:background="@color/colorPrimary" android:layout_width="fill_parent" android:layout_height="wrap_content" android:minHeight="?actionBarSize" app:navigationIcon="@drawable/baseline_arrow_back_24" app:title="@string/subscription" app:titleTextColor="@android:color/white" />
+    <TextView android:textSize="@dimen/sp_15" android:textColor="@color/colorWhite80" android:gravity="center" android:id="@id/empty_subscriptions" android:visibility="gone" android:layout_width="fill_parent" android:layout_height="fill_parent" android:fontFamily="@font/roboto_medium" />
+    <androidx.recyclerview.widget.RecyclerView android:id="@id/account_subscription_recycler" android:layout_width="fill_parent" android:layout_height="fill_parent" app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+</LinearLayout>

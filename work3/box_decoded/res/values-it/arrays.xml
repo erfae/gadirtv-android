@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="countries">
+        <item>Pakistan</item>
+    </string-array>
+    <string-array name="languages_array">
+        <item>English</item>
+        <item>Shqip (Albanian)</item>
+        <item>Italiano (Italian)</item>
+        <item>Portuguese (Portuguese)</item>
+        <item>Español (Spanish)</item>
+    </string-array>
+    <string-array name="main_tabs_box">
+        <item>Login:0</item>
+        <item>Registrazione:1</item>
+        <item>Applicazioni:2</item>
+        <item>Test di rete:3</item>
+        <item>Guida:4</item>
+    </string-array>
+    <string-array name="main_tabs_tv">
+        <item>Login:0</item>
+        <item>Registrazione:1</item>
+        <item>Guida:4</item>
+    </string-array>
+    <string-array name="pakistan_cities">
+        <item>Karachi</item>
+        <item>Lahore</item>
+        <item>Faisalābād</item>
+        <item>Serai</item>
+        <item>Rāwalpindi</item>
+        <item>Multān</item>
+        <item>Gujrānwāla</item>
+        <item>Hyderābād City</item>
+        <item>Peshāwar</item>
+        <item>Abbottābād</item>
+        <item>Islamabad</item>
+        <item>Quetta</item>
+        <item>Bannu</item>
+        <item>Bahāwalpur</item>
+        <item>Sargodha</item>
+        <item>Siālkot City</item>
+        <item>Sukkur</item>
+        <item>Lārkāna</item>
+        <item>Sheikhupura</item>
+        <item>Mīrpur Khās</item>
+        <item>Rahīmyār Khān</item>
+        <item>Kohāt</item>
+        <item>Jhang Sadr</item>
+        <item>Gujrāt</item>
+        <item>Bardār</item>
+        <item>Kasūr</item>
+        <item>Dera Ghāzi Khān</item>
+        <item>Masīwāla</item>
+        <item>Nawābshāh</item>
+        <item>Okāra</item>
+        <item>Gilgit</item>
+        <item>Chiniot</item>
+        <item>Sādiqābād</item>
+        <item>Turbat</item>
+        <item>Dera Ismāīl Khān</item>
+        <item>Chaman</item>
+        <item>Zhob</item>
+        <item>Mehra</item>
+        <item>Parachinār</item>
+        <item>Gwādar</item>
+        <item>Kundiān</item>
+        <item>Shahdād Kot</item>
+        <item>Harīpur</item>
+        <item>Matiāri</item>
+        <item>Dera Allāhyār</item>
+        <item>Lodhrān</item>
+        <item>Batgrām</item>
+        <item>Thatta</item>
+        <item>Bāgh</item>
+        <item>Badīn</item>
+        <item>Mānsehra</item>
+        <item>Ziārat</item>
+        <item>Muzaffargarh</item>
+        <item>Tando Allāhyār</item>
+        <item>Dera Murād Jamāli</item>
+        <item>Karak</item>
+        <item>Mardan</item>
+        <item>Uthal</item>
+        <item>Nankāna Sāhib</item>
+        <item>Bārkhān</item>
+        <item>Hāfizābād</item>
+        <item>Kotli</item>
+        <item>Loralai</item>
+        <item>Dera Bugti</item>
+        <item>Jhang City</item>
+        <item>Sāhīwāl</item>
+        <item>Sānghar</item>
+        <item>Pākpattan</item>
+        <item>Chakwāl</item>
+        <item>Khushāb</item>
+        <item>Ghotki</item>
+        <item>Kohlu</item>
+        <item>Khuzdār</item>
+        <item>Awārān</item>
+        <item>Nowshera</item>
+        <item>Chārsadda</item>
+        <item>Qila Abdullāh</item>
+        <item>Bahāwalnagar</item>
+        <item>Dādu</item>
+        <item>Alīābad</item>
+        <item>Lakki Marwat</item>
+        <item>Chilās</item>
+        <item>Pishin</item>
+        <item>Tānk</item>
+        <item>Chitrāl</item>
+        <item>Qila Saifullāh</item>
+        <item>Shikārpur</item>
+        <item>Panjgūr</item>
+        <item>Mastung</item>
+        <item>Kalāt</item>
+        <item>Gandāvā</item>
+        <item>Khānewāl</item>
+        <item>Nārowāl</item>
+        <item>Khairpur</item>
+        <item>Malakand</item>
+        <item>Vihāri</item>
+        <item>Saidu Sharif</item>
+        <item>Jhelum</item>
+        <item>Mandi Bahāuddīn</item>
+        <item>Bhakkar</item>
+        <item>Toba Tek Singh</item>
+        <item>Jāmshoro</item>
+        <item>Khārān</item>
+        <item>Umarkot</item>
+        <item>Hangu</item>
+        <item>Timargara</item>
+        <item>Gākuch</item>
+        <item>Jacobābād</item>
+        <item>Alpūrai</item>
+        <item>Miānwāli</item>
+        <item>Mūsa Khel Bāzār</item>
+        <item>Naushahro Fīroz</item>
+        <item>New Mīrpur</item>
+        <item>Daggar</item>
+        <item>Eidgāh</item>
+        <item>Sibi</item>
+        <item>Dālbandīn</item>
+        <item>Rājanpur</item>
+        <item>Leiah</item>
+        <item>Upper Dir</item>
+        <item>Tando Muhammad Khān</item>
+        <item>Attock City</item>
+        <item>Rāwala Kot</item>
+        <item>Swābi</item>
+        <item>Kandhkot</item>
+        <item>Dasu</item>
+        <item>Athmuqam</item>
+    </string-array>
+    <string-array name="personal_activity_menu_items">
+        <item>Utente:0</item>
+        <item>Impostazioni:1</item>
+        <item>Abbonamento:2</item>
+        <item>Acquisti:3</item>
+        <item>Parenting:5</item>
+        <item>Lingua:6</item>
+    </string-array>
+    <string-array name="personal_activity_menu_items_icons">
+        <item>personal_account</item>
+        <item>personal_settings</item>
+        <item>personal_subscription</item>
+        <item>personal_purchases</item>
+        <item>personal_channels</item>
+        <item>personal_parenting</item>
+    </string-array>
+    <string-array name="planets_array">
+        <item>@string/selecttimezone</item>
+        <item>UTC-12:00</item>
+        <item>UTC-11:00</item>
+        <item>UTC-10:00</item>
+        <item>UTC-9:00</item>
+        <item>UTC-8:00</item>
+        <item>UTC-7:00</item>
+        <item>UTC-6:00</item>
+        <item>UTC-5:00</item>
+        <item>UTC-4:00</item>
+        <item>UTC-3:00</item>
+        <item>UTC-2:00</item>
+        <item>UTC-1:00</item>
+        <item>UTC 0:00</item>
+        <item>UTC+1:00</item>
+        <item>UTC+2:00</item>
+        <item>UTC+3:00</item>
+        <item>UTC+4:00</item>
+        <item>UTC+5:00</item>
+        <item>UTC+6:00</item>
+        <item>UTC+7:00</item>
+        <item>UTC+8:00</item>
+        <item>UTC+9:00</item>
+        <item>UTC+10:00</item>
+        <item>UTC+11:00</item>
+        <item>UTC+12:00</item>
+        <item>UTC+13:00</item>
+        <item>UTC+14:00</item>
+        <item>UTC+15:00</item>
+        <item>UTC+16:00</item>
+        <item>UTC+17:00</item>
+        <item>UTC+18:00</item>
+    </string-array>
+</resources>

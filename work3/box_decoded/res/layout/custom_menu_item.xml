@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:id="@id/login_main_constraint" android:padding="@dimen/dp_15" android:layout_width="wrap_content" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@id/image" android:background="@drawable/user" android:layout_width="@dimen/main_menu_Item_image_width" android:layout_height="@dimen/main_menu_item_image_height" android:scaleType="fitCenter" android:adjustViewBounds="true" android:layout_centerHorizontal="true" />
+    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textSize="@dimen/main_menu_Item_text" android:textColor="@color/White1" android:id="@id/title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_below="@id/image" android:layout_centerHorizontal="true" />
+    <com.magoware.magoware.webtv.custom_views.MagoTextView android:layout_width="wrap_content" android:layout_height="20.0dip" android:layout_below="@id/title" />
+</RelativeLayout>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:background="@drawable/lstselectorpersonal" android:layout_width="fill_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:layout_gravity="center" android:id="@id/personal_menu_icon" android:paddingLeft="20.0dip" android:paddingTop="5.0dip" android:paddingRight="10.0dip" android:paddingBottom="5.0dip" android:layout_width="70.0dip" android:layout_height="70.0dip" />
+    <com.magoware.magoware.webtv.custom_views.MagoTextView android:textAppearance="?android:textAppearanceListItemSmall" android:textSize="24.0sp" android:textStyle="bold" android:textColor="@drawable/lstselectorpersonaltext" android:gravity="center_vertical" android:id="@android:id/text1" android:paddingLeft="30.0dip" android:paddingRight="?android:listPreferredItemPaddingRight" android:layout_width="fill_parent" android:layout_height="wrap_content" android:minHeight="?android:listPreferredItemHeightSmall" android:paddingStart="30.0dip" android:paddingEnd="?android:listPreferredItemPaddingEnd" />
+</LinearLayout>

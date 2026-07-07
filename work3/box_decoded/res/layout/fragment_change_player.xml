@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:background="@color/colorPrimaryDark" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <androidx.appcompat.widget.Toolbar android:theme="?actionBarTheme" android:id="@id/settings_player_toolbar" android:background="@color/colorPrimary" android:layout_width="fill_parent" android:layout_height="wrap_content" android:minHeight="?actionBarSize" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent" app:navigationIcon="@drawable/baseline_arrow_back_24" app:title="@string/changePlayer" app:titleTextColor="@android:color/white" />
+    <LinearLayout android:gravity="center" android:background="@color/colorPrimary" android:padding="@dimen/dimen_12dp" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/dimen_40dp">
+        <TextView android:textColor="@android:color/white" android:layout_width="0.0dip" android:layout_height="wrap_content" android:text="@string/select_player" android:layout_weight="6.0" android:fontFamily="@font/roboto" />
+        <androidx.appcompat.widget.AppCompatSpinner android:id="@id/settings_spinner_player" android:layout_width="0.0dip" android:layout_height="wrap_content" android:layout_weight="4.0" app:backgroundTint="@color/white" app:layout_constraintBottom_toTopOf="@id/view2" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintTop_toTopOf="parent" />
+    </LinearLayout>
+</LinearLayout>

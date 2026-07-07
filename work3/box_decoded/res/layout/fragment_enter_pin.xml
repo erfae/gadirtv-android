@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:background="@color/colorPrimaryDark" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <androidx.appcompat.widget.Toolbar android:theme="?actionBarTheme" android:id="@id/enter_pin_toolbar" android:background="@color/colorPrimary" android:layout_width="fill_parent" android:layout_height="wrap_content" android:minHeight="?actionBarSize" app:navigationIcon="@drawable/baseline_arrow_back_24" app:title="@string/enter_pin" app:titleTextColor="@android:color/white" />
+    <LinearLayout android:gravity="center" android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent">
+        <com.google.android.material.textfield.TextInputLayout android:theme="@style/MagoEditTextTheme" android:id="@id/pin_input" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_margin="@dimen/dimen_24dp">
+            <androidx.appcompat.widget.AppCompatEditText android:textColor="@color/white" android:id="@id/pin_edittext" android:layout_width="fill_parent" android:layout_height="wrap_content" android:hint="@string/enter_pin" android:maxLines="1" android:singleLine="true" android:inputType="textPersonName" android:imeOptions="actionGo" />
+        </com.google.android.material.textfield.TextInputLayout>
+        <Button android:textColor="@color/white" android:id="@id/save_pin" android:background="@drawable/round_button_ok_login_selected" android:layout_width="200.0dip" android:layout_height="@dimen/dimen_40dp" android:minWidth="200.0dip" android:text="@string/save" />
+    </LinearLayout>
+</LinearLayout>
