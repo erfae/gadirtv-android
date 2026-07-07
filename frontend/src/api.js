@@ -19,10 +19,9 @@ export async function newSession() {
   _abortCtl = new AbortController();
   if (typeof window !== "undefined" && window.electronAPI) {
     try { await window.electronAPI.killMpv(); } catch (_) {}
-    try { await window.electronAPI.resetSession(); } catch (_) {}
   }
-  // Give gadir enough time to drop the previous account's session slot
-  await new Promise(r => setTimeout(r, 2000));
+  // Short settle so gadir can process the disconnect
+  await new Promise(r => setTimeout(r, 300));
 }
 function sig() { return _abortCtl.signal; }
 
