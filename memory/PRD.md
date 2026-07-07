@@ -1,43 +1,44 @@
-# NetTV → GADIR APK Mod — PROYECTO COMPLETADO
+# GadirTV - Windows Desktop IPTV Client
 
-## Original Problem Statement
-"quiero modificar el portal2 para que fuerce a conectarse a la url http://gadir.co:80... los otros dos portales usan url dinamicas..... funciona tanto en google tv, android tv, movil y tablet"
+## Problem Statement
+Windows desktop IPTV client (.exe) for gadir.co Xtream Codes server:
+- Multi-profile with add/delete
+- IPTV Smarters style layout with bottom nav
+- Live TV list view + preview with EPG + fullscreen on dbl-click
+- Movies/Series detail modals with seasons/episodes
+- MPEG-TS player with buffer + volume + fullscreen shortcuts
+- Windows installer .exe (unsigned)
 
-## Solución Final (APK v23)
-- Base: NetTV_ibo_v3.8.apk (original firmado con AOSP testkey `CN=Android`)
-- Firmado con la misma AOSP testkey pública para mantener el mismo ANDROID_ID que en el original → cameleon.vip reconoce el dispositivo → los 3 portales cargan sus URLs dinámicas correctamente
+## Architecture
+- Frontend: React (CRA) + mpegts.js + hls.js + axios
+- Backend: FastAPI proxy (used only in browser preview; Electron talks direct)
+- Desktop: Electron 31.3 with disabled webSecurity, direct gadir.co calls
+- Package: manual electron+asar assembly + NSIS installer (Linux ARM64 host, no wine)
 
-## Modificaciones aplicadas
-1. **`AppInfoModel.getResult()`** (smali):
-   - Renombra Portal 2 (índice 1) a "GADIR"
-   - Al leer la URL de Portal 2, reemplaza el HOST original (cualquiera que sea) por `gadir.co:80` manteniendo path + query intactos (`/get.php?username=X&password=Y&...`)
-   - Try/catch para robustez ante URLs malformadas
-2. **`resources.arsc`** (edición binaria directa):
-   - Cambio de `app_name` de "NetTV Player" a "GADIR" mediante modificación de bytes UTF-8 preservando offsets
-3. **Recursos gráficos**:
-   - Logo GADIR sustituye ic_launcher.png (5 densidades)
-   - ic_launcher_round.png, ic_launcher_foreground.png (todas las densidades)
-   - home_logo.png (320x180) y logo.jpg (512x512)
+## Status (Feb 2026)
+- Core UI complete (profiles, home, live, movies, series, player)
+- Live preview with EPG, double-click fullscreen (via fsSignal effect)
+- Player with volume slider, keyboard shortcuts, fullscreen button
+- Home loads via first 3 categories with individual timeouts
+- Profile switch forces remount via key={profile.username}
+- Delivered via 4 formats: raw .exe, .exe in zip, portable zip, encrypted zip
 
-## Descubrimientos clave del proceso
-- **ANDROID_ID depende de la firma del APK en Android 8+**: al re-firmar con clave distinta, ANDROID_ID cambia → cameleon.vip trata al usuario como nuevo → portales no cargan
-- **Solución**: firmar con la clave pública AOSP `testkey` (misma que la v3.8 original)
-- **Backend cameleon.vip**: rechaza edición de URLs de portales del sistema, por eso hay que forzar la URL en cliente
-- **Recompilar recursos**: apktool 2.10 falla por drawables con `$` (Material Design AVDs). Solución: modificar solo classes2.dex + resources.arsc + PNGs, sin recompilar completo
+## Known Limitations
+- Some IPTV streams use codecs (AC3, EAC3) that Chromium can't decode → no audio for those channels. Not fixable without libVLC integration.
+- Unsigned .exe → Windows SmartScreen / Chrome may block download unless via zip/encrypted zip.
+- gadir.co rate-limits container IP → preview web doesn't work; .exe works from user PC.
 
-## Iteraciones (v1 → v23)
-23 iteraciones fueron necesarias por: descubrimiento del signature/ANDROID_ID, comportamiento del backend cameleon.vip, formato exacto de URL para el servidor gadir.co, preservación de credenciales, y encajar todo respetando el flujo interno de la app.
+## Files
+- /app/frontend/src/App.js - main React app
+- /app/frontend/src/api.js - dual-mode API (Electron direct vs backend proxy)
+- /app/backend/server.py - FastAPI proxy + download endpoints
+- /app/electron/main.js - Electron main with security disabled
+- /app/electron/scripts/prepare.js - copies build to electron/app
+- /app/electron/scripts/metadata.js - patches PE metadata via resedit
+- /app/electron/installer.nsi - NSIS installer script
 
-## Entregable Final
-- Ruta: `/app/output/NetTV_mod_gadir.apk`
-- URL: `https://adaptive-portal-hub.preview.emergentagent.com/NetTV_mod_gadir.apk`
-- MD5: `8201bf036d3bcd6cb244e849dbbcfde2`
-- Firma SHA-256: `a40da80a59d170caa950cf15c18c454d47a39b26989d8b640ecd745ba71bf5dc` (AOSP testkey, misma que v3.8)
-- Tamaño: ~34 MB
-- Compatible: Google TV, Android TV, móvil, tablet
-
-## Estado: ✅ CERRADO Y FUNCIONAL
-- Portal 2 (GADIR) fuerza conexión a `http://gadir.co:80` con credenciales dinámicas del usuario
-- Portales 1 y 3 mantienen URLs dinámicas del servidor
-- Verificado con 2 usuarios distintos por el cliente
-- Personalización visual completa (logo + nombre "GADIR")
+## Download URLs
+- installer: /api/download/installer
+- installer in zip: /api/download/installer_zip
+- portable zip: /api/download/portable
+- encrypted (pw gadir): /api/download/encrypted

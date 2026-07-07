@@ -228,9 +228,10 @@ function CategorySection({ kind, profile, onSelect, livePreview }) {
                   <button
                     key={i}
                     onClick={()=>onSelect(it, kind)}
+                    onDoubleClick={()=>onSelect(it, "live_fs")}
                     data-testid={`card-${it.stream_id}`}
                     className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-white/5 transition-colors group"
-                    title="Clic: previsualizar canal"
+                    title="Clic: previsualizar · Doble clic: pantalla completa"
                   >
                     <div className="w-9 h-9 rounded bg-neutral-900 overflow-hidden flex-shrink-0 flex items-center justify-center">
                       <img src={api.proxyImg(it.stream_icon) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="w-full h-full object-contain" loading="lazy" alt=""/>
@@ -625,7 +626,7 @@ function fmtTime(ts) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function LivePreview({ channel, profile, onClose }) {
+function LivePreview({ channel, profile, fsSignal, onClose }) {
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const [err, setErr] = useState("");
@@ -693,8 +694,22 @@ function LivePreview({ channel, profile, onClose }) {
       document.exitFullscreen && document.exitFullscreen();
     }
     // Ensure video keeps playing
-    setTimeout(() => { const v = videoRef.current; if (v && v.paused) v.play().catch(()=>{}); }, 50);
+    setTimeout(() => { const v = videoRef.current; if (v && v.paused) v.play().catch(()=>{}); }, 100);
   };
+
+  // Auto-fullscreen when fsSignal changes (triggered by double-click on channel)
+  useEffect(() => {
+    if (!fsSignal || !channel) return;
+    // Wait for video to actually start rendering before going fullscreen
+    const t = setTimeout(() => {
+      const el = containerRef.current;
+      if (el && !document.fullscreenElement) {
+        el.requestFullscreen && el.requestFullscreen().catch(()=>{});
+        setTimeout(() => { const v = videoRef.current; if (v && v.paused) v.play().catch(()=>{}); }, 200);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [fsSignal, channel]);
 
   // Show current program name briefly whenever entering fullscreen or changing channel
   useEffect(() => {
@@ -785,9 +800,11 @@ function LivePreview({ channel, profile, onClose }) {
 function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }) {
   const [tab, setTab] = useState("home");
   const [liveChannel, setLiveChannel] = useState(null);
+  const [fsSignal, setFsSignal] = useState(0);
   const handleSelect = (item, kind) => {
     if (kind === "series") onOpenSeries(item);
     else if (kind === "movie") onOpenMovie(item);
+    else if (kind === "live_fs") { setLiveChannel(item); setFsSignal(Date.now()); }
     else if (kind === "live") setLiveChannel(item);
   };
   useEffect(() => { if (tab !== "live") setLiveChannel(null); }, [tab]);
@@ -798,7 +815,7 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
         <button onClick={onLogout} data-testid="logout-btn" className="w-10 h-10 rounded-lg bg-black/60 hover:bg-black/80 flex items-center justify-center text-neutral-400 hover:text-white backdrop-blur"><LogOut size={18}/></button>
       </div>
       {tab==="home" && <HomeTab profile={profile} onSelect={handleSelect}/>}
-      {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={handleSelect} livePreview={<LivePreview channel={liveChannel} profile={profile} onClose={()=>setLiveChannel(null)}/>}/>}
+      {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={handleSelect} livePreview={<LivePreview channel={liveChannel} profile={profile} fsSignal={fsSignal} onClose={()=>setLiveChannel(null)}/>}/>}
       {tab==="movies" && <CategorySection kind="movie" profile={profile} onSelect={handleSelect}/>}
       {tab==="series" && <CategorySection kind="series" profile={profile} onSelect={handleSelect}/>}
       <BottomNav tab={tab} setTab={setTab}/>
