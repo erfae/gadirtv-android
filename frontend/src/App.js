@@ -29,9 +29,6 @@ function Profiles({ onSelect, onAdd }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#050505]" data-testid="profile-screen">
       <div className="text-center w-full px-8">
-        <div className="flex justify-center mb-4">
-          <img src="./logo.png" alt="GadirTV" className="w-24 h-24 rounded-2xl shadow-2xl" onError={e=>e.target.style.display='none'}/>
-        </div>
         <h1 className="text-6xl font-medium tracking-tight text-white mb-4" style={{fontFamily:"'Outfit',sans-serif"}}>Gadir<span className="text-red-600">TV</span></h1>
         <p className="text-neutral-500 text-lg mb-12">{manage ? "Toca la papelera para eliminar" : "¿Quién está viendo?"}</p>
         <div className="flex flex-wrap gap-8 justify-center max-w-4xl mx-auto">

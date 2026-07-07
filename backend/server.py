@@ -49,6 +49,16 @@ async def download_portable():
         raise HTTPException(404, "portable zip not built yet")
     return FileResponse(path, filename="GadirTV-Windows-x64.zip", media_type="application/zip")
 
+
+@app.get("/api/download/encrypted")
+async def download_encrypted():
+    """Password-protected ZIP so Chrome cannot inspect the contents and
+    downgrade/block the download. Password: gadir"""
+    path = "/app/electron/GadirTV-portable-encrypted.zip"
+    if not os.path.exists(path):
+        raise HTTPException(404, "encrypted zip not built yet")
+    return FileResponse(path, filename="GadirTV-portable.zip", media_type="application/zip")
+
 @app.post("/api/login")
 async def login(body: LoginBody):
     try:
