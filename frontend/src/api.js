@@ -12,11 +12,21 @@ const PROXY = `${process.env.REACT_APP_BACKEND_URL}/api`;
 async function xtreamGet(username, password, action, extra = {}) {
   const params = { username, password, ...extra };
   if (action) params.action = action;
-  const { data } = await axios.get(`${XTREAM_HOST}/player_api.php`, {
-    params,
-    timeout: 25000,
-  });
-  return data;
+  try {
+    const { data } = await axios.get(`${XTREAM_HOST}/player_api.php`, {
+      params,
+      timeout: 30000,
+      transformResponse: [(txt) => {
+        if (!txt) return txt;
+        if (typeof txt !== "string") return txt;
+        try { return JSON.parse(txt); } catch (_) { return txt; }
+      }],
+    });
+    return data;
+  } catch (e) {
+    console.error(`[xtream] ${action || 'auth'} failed:`, e.message);
+    throw e;
+  }
 }
 
 export const api = {

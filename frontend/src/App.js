@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import mpegts from "mpegts.js";
 import Hls from "hls.js";
-import { Play, Search, Tv, Film, Clapperboard, LogOut, Plus, X, ChevronLeft, Home as HomeIcon, ChevronRight, Trash2, Settings } from "lucide-react";
+import { Play, Search, Tv, Film, Clapperboard, LogOut, Plus, X, ChevronLeft, Home as HomeIcon, ChevronRight, Trash2, Settings, Maximize2, RefreshCw } from "lucide-react";
 import { api, IS_ELECTRON } from "./api";
 import "./App.css";
 
@@ -258,21 +258,35 @@ function HomeTab({ profile, onSelect }) {
   const [recentSeries, setRS] = useState([]);
   const [heroIdx, setHeroIdx] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      setLoading(true);
-      try {
-        const [m, s] = await Promise.all([
-          api.vodStreams(profile).catch(()=>[]),
-          api.seriesList(profile).catch(()=>[]),
-        ]);
-        const sortByAdded = arr => Array.isArray(arr) ? [...arr].sort((a,b)=>(parseInt(b.added||b.last_modified||0))-(parseInt(a.added||a.last_modified||0))) : [];
-        setRM(sortByAdded(m).slice(0, 40));
-        setRS(sortByAdded(s).slice(0, 40));
-      } catch(e) { console.error(e); }
+      setLoading(true); setMsg("");
+      const sortByAdded = arr => Array.isArray(arr) ? [...arr].sort((a,b)=>(parseInt(b.added||b.last_modified||0))-(parseInt(a.added||a.last_modified||0))) : [];
+      const loadFromCategories = async (fetchCats, fetchStreams) => {
+        try {
+          const cats = await fetchCats(profile);
+          if (!Array.isArray(cats) || !cats.length) return [];
+          // Fetch first N categories in parallel and merge
+          const sample = cats.slice(0, 6);
+          const results = await Promise.all(sample.map(c => fetchStreams(profile, c.category_id).catch(()=>[])));
+          const flat = [].concat(...results.filter(Array.isArray));
+          return sortByAdded(flat);
+        } catch (_) { return []; }
+      };
+      const [movies, series] = await Promise.all([
+        loadFromCategories(api.vodCategories, api.vodStreams),
+        loadFromCategories(api.seriesCategories, api.seriesList),
+      ]);
+      if (cancelled) return;
+      setRM(movies.slice(0, 30));
+      setRS(series.slice(0, 30));
+      if (!movies.length && !series.length) setMsg("No se pudo cargar contenido. Comprueba tu conexión con el servidor IPTV.");
       setLoading(false);
     })();
+    return () => { cancelled = true; };
   }, [profile]);
 
   const heroList = [...recentMovies.slice(0,5), ...recentSeries.slice(0,5)];
@@ -300,7 +314,8 @@ function HomeTab({ profile, onSelect }) {
         </div>
       )}
       <div className="flex-1 min-h-0 overflow-hidden pt-3">
-        {loading && <div className="text-center text-neutral-500 py-10" data-testid="loading-home">Cargando...</div>}
+        {loading && <div className="text-center text-neutral-500 py-10" data-testid="loading-home">Cargando contenido reciente...</div>}
+        {!loading && msg && <div className="text-center text-red-400 py-10 text-sm px-8" data-testid="home-msg">{msg}</div>}
         <Rail title="Películas recientes" items={recentMovies} onSelect={i=>onSelect(i,"movie")} sm/>
         <Rail title="Series recientes" items={recentSeries} onSelect={i=>onSelect(i,"series")} sm/>
       </div>
@@ -397,7 +412,8 @@ function Player({ item, kind, profile, onClose }) {
 
   return (
     <div ref={containerRef} onDoubleClick={toggleFs} className="fixed inset-0 z-[100] bg-black" data-testid="player-screen">
-      <button onClick={onClose} data-testid="close-player-btn" className="absolute top-6 right-6 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white"><X size={24}/></button>
+      <button onClick={onClose} data-testid="close-player-btn" className="absolute top-6 right-6 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white transition-colors" title="Cerrar"><X size={22}/></button>
+      <button onClick={toggleFs} data-testid="fullscreen-btn" className="absolute top-6 right-20 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white transition-colors" title="Pantalla completa (doble clic)"><Maximize2 size={20}/></button>
       <div className="absolute top-6 left-6 z-10 text-white text-xl font-medium max-w-[70%] truncate">{item.name || item.title}</div>
       <video ref={videoRef} controls autoPlay playsInline className="w-full h-full object-contain bg-black" data-testid="video-player"/>
       {loading && !err && <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-neutral-400" data-testid="player-loading">Cargando stream...</div>}
@@ -611,7 +627,7 @@ function LivePreview({ channel, profile, onFullscreen, onClose }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="relative rounded-xl overflow-hidden bg-black border border-white/10" data-testid="live-preview">
-        <video ref={videoRef} controls autoPlay muted playsInline onDoubleClick={onFullscreen} className="w-full aspect-video object-contain bg-black cursor-pointer" data-testid="preview-video"/>
+        <video ref={videoRef} controls autoPlay playsInline onDoubleClick={onFullscreen} className="w-full aspect-video object-contain bg-black cursor-pointer" data-testid="preview-video"/>
         <div className="p-3 flex items-center justify-between bg-neutral-950/80 backdrop-blur">
           <div className="text-sm text-white truncate mr-3">{channel.name}</div>
           <div className="flex items-center gap-2 shrink-0">
