@@ -1,0 +1,386 @@
+.class public final Lokhttp3/internal/cache/CacheInterceptor$Companion;
+.super Ljava/lang/Object;
+.source "CacheInterceptor.kt"
+
+
+# annotations
+.annotation system Ldalvik/annotation/EnclosingClass;
+    value = Lokhttp3/internal/cache/CacheInterceptor;
+.end annotation
+
+.annotation system Ldalvik/annotation/InnerClass;
+    accessFlags = 0x19
+    name = "Companion"
+.end annotation
+
+.annotation runtime Lkotlin/Metadata;
+    bv = {
+        0x1,
+        0x0,
+        0x3
+    }
+    d1 = {
+        "\u0000*\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\u0008\u0002\n\u0002\u0018\u0002\n\u0002\u0008\u0003\n\u0002\u0010\u000b\n\u0000\n\u0002\u0010\u000e\n\u0002\u0008\u0002\n\u0002\u0018\u0002\n\u0002\u0008\u0002\u0008\u0086\u0003\u0018\u00002\u00020\u0001B\u0007\u0008\u0002\u00a2\u0006\u0002\u0010\u0002J\u0018\u0010\u0003\u001a\u00020\u00042\u0006\u0010\u0005\u001a\u00020\u00042\u0006\u0010\u0006\u001a\u00020\u0004H\u0002J\u0010\u0010\u0007\u001a\u00020\u00082\u0006\u0010\t\u001a\u00020\nH\u0002J\u0010\u0010\u000b\u001a\u00020\u00082\u0006\u0010\t\u001a\u00020\nH\u0002J\u0014\u0010\u000c\u001a\u0004\u0018\u00010\r2\u0008\u0010\u000e\u001a\u0004\u0018\u00010\rH\u0002\u00a8\u0006\u000f"
+    }
+    d2 = {
+        "Lokhttp3/internal/cache/CacheInterceptor$Companion;",
+        "",
+        "()V",
+        "combine",
+        "Lokhttp3/Headers;",
+        "cachedHeaders",
+        "networkHeaders",
+        "isContentSpecificHeader",
+        "",
+        "fieldName",
+        "",
+        "isEndToEnd",
+        "stripBody",
+        "Lokhttp3/Response;",
+        "response",
+        "okhttp"
+    }
+    k = 0x1
+    mv = {
+        0x1,
+        0x4,
+        0x1
+    }
+.end annotation
+
+
+# direct methods
+.method private constructor <init>()V
+    .registers 1
+
+    .line 1
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+
+    return-void
+.end method
+
+.method public synthetic constructor <init>(Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+    .registers 2
+
+    .line 2
+    invoke-direct {p0}, Lokhttp3/internal/cache/CacheInterceptor$Companion;-><init>()V
+
+    return-void
+.end method
+
+.method public static final synthetic access$combine(Lokhttp3/internal/cache/CacheInterceptor$Companion;Lokhttp3/Headers;Lokhttp3/Headers;)Lokhttp3/Headers;
+    .registers 3
+
+    invoke-direct {p0, p1, p2}, Lokhttp3/internal/cache/CacheInterceptor$Companion;->combine(Lokhttp3/Headers;Lokhttp3/Headers;)Lokhttp3/Headers;
+
+    move-result-object p0
+
+    return-object p0
+.end method
+
+.method public static final synthetic access$stripBody(Lokhttp3/internal/cache/CacheInterceptor$Companion;Lokhttp3/Response;)Lokhttp3/Response;
+    .registers 2
+
+    invoke-direct {p0, p1}, Lokhttp3/internal/cache/CacheInterceptor$Companion;->stripBody(Lokhttp3/Response;)Lokhttp3/Response;
+
+    move-result-object p0
+
+    return-object p0
+.end method
+
+.method private final combine(Lokhttp3/Headers;Lokhttp3/Headers;)Lokhttp3/Headers;
+    .registers 10
+
+    .line 1
+    new-instance v0, Lokhttp3/Headers$Builder;
+
+    invoke-direct {v0}, Lokhttp3/Headers$Builder;-><init>()V
+
+    .line 2
+    invoke-virtual {p1}, Lokhttp3/Headers;->size()I
+
+    move-result v1
+
+    const/4 v2, 0x0
+
+    const/4 v3, 0x0
+
+    :goto_b
+    if-ge v3, v1, :cond_3e
+
+    .line 3
+    invoke-virtual {p1, v3}, Lokhttp3/Headers;->name(I)Ljava/lang/String;
+
+    move-result-object v4
+
+    .line 4
+    invoke-virtual {p1, v3}, Lokhttp3/Headers;->value(I)Ljava/lang/String;
+
+    move-result-object v5
+
+    const-string v6, "Warning"
+
+    .line 5
+    invoke-static {v6, v4}, Lkotlin/text/StringsKt;->equals(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result v6
+
+    if-eqz v6, :cond_26
+
+    const-string v6, "1"
+
+    invoke-static {v5, v6}, Lkotlin/text/StringsKt;->startsWith$default(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result v6
+
+    if-eqz v6, :cond_26
+
+    goto :goto_3b
+
+    .line 6
+    :cond_26
+    invoke-direct {p0, v4}, Lokhttp3/internal/cache/CacheInterceptor$Companion;->isContentSpecificHeader(Ljava/lang/String;)Z
+
+    move-result v6
+
+    if-nez v6, :cond_38
+
+    .line 7
+    invoke-direct {p0, v4}, Lokhttp3/internal/cache/CacheInterceptor$Companion;->isEndToEnd(Ljava/lang/String;)Z
+
+    move-result v6
+
+    if-eqz v6, :cond_38
+
+    .line 8
+    invoke-virtual {p2, v4}, Lokhttp3/Headers;->get(Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object v6
+
+    if-nez v6, :cond_3b
+
+    .line 9
+    :cond_38
+    invoke-virtual {v0, v4, v5}, Lokhttp3/Headers$Builder;->addLenient$okhttp(Ljava/lang/String;Ljava/lang/String;)Lokhttp3/Headers$Builder;
+
+    :cond_3b
+    :goto_3b
+    add-int/lit8 v3, v3, 0x1
+
+    goto :goto_b
+
+    .line 10
+    :cond_3e
+    invoke-virtual {p2}, Lokhttp3/Headers;->size()I
+
+    move-result p1
+
+    :goto_42
+    if-ge v2, p1, :cond_5e
+
+    .line 11
+    invoke-virtual {p2, v2}, Lokhttp3/Headers;->name(I)Ljava/lang/String;
+
+    move-result-object v1
+
+    .line 12
+    invoke-direct {p0, v1}, Lokhttp3/internal/cache/CacheInterceptor$Companion;->isContentSpecificHeader(Ljava/lang/String;)Z
+
+    move-result v3
+
+    if-nez v3, :cond_5b
+
+    invoke-direct {p0, v1}, Lokhttp3/internal/cache/CacheInterceptor$Companion;->isEndToEnd(Ljava/lang/String;)Z
+
+    move-result v3
+
+    if-eqz v3, :cond_5b
+
+    .line 13
+    invoke-virtual {p2, v2}, Lokhttp3/Headers;->value(I)Ljava/lang/String;
+
+    move-result-object v3
+
+    invoke-virtual {v0, v1, v3}, Lokhttp3/Headers$Builder;->addLenient$okhttp(Ljava/lang/String;Ljava/lang/String;)Lokhttp3/Headers$Builder;
+
+    :cond_5b
+    add-int/lit8 v2, v2, 0x1
+
+    goto :goto_42
+
+    .line 14
+    :cond_5e
+    invoke-virtual {v0}, Lokhttp3/Headers$Builder;->build()Lokhttp3/Headers;
+
+    move-result-object p1
+
+    return-object p1
+.end method
+
+.method private final isContentSpecificHeader(Ljava/lang/String;)Z
+    .registers 3
+
+    const-string v0, "Content-Length"
+
+    .line 1
+    invoke-static {v0, p1}, Lkotlin/text/StringsKt;->equals(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result v0
+
+    if-nez v0, :cond_1b
+
+    const-string v0, "Content-Encoding"
+
+    .line 2
+    invoke-static {v0, p1}, Lkotlin/text/StringsKt;->equals(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result v0
+
+    if-nez v0, :cond_1b
+
+    const-string v0, "Content-Type"
+
+    .line 3
+    invoke-static {v0, p1}, Lkotlin/text/StringsKt;->equals(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result p1
+
+    if-eqz p1, :cond_19
+
+    goto :goto_1b
+
+    :cond_19
+    const/4 p1, 0x0
+
+    goto :goto_1c
+
+    :cond_1b
+    :goto_1b
+    const/4 p1, 0x1
+
+    :goto_1c
+    return p1
+.end method
+
+.method private final isEndToEnd(Ljava/lang/String;)Z
+    .registers 3
+
+    const-string v0, "Connection"
+
+    .line 1
+    invoke-static {v0, p1}, Lkotlin/text/StringsKt;->equals(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result v0
+
+    if-nez v0, :cond_42
+
+    const-string v0, "Keep-Alive"
+
+    .line 2
+    invoke-static {v0, p1}, Lkotlin/text/StringsKt;->equals(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result v0
+
+    if-nez v0, :cond_42
+
+    const-string v0, "Proxy-Authenticate"
+
+    .line 3
+    invoke-static {v0, p1}, Lkotlin/text/StringsKt;->equals(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result v0
+
+    if-nez v0, :cond_42
+
+    const-string v0, "Proxy-Authorization"
+
+    .line 4
+    invoke-static {v0, p1}, Lkotlin/text/StringsKt;->equals(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result v0
+
+    if-nez v0, :cond_42
+
+    const-string v0, "TE"
+
+    .line 5
+    invoke-static {v0, p1}, Lkotlin/text/StringsKt;->equals(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result v0
+
+    if-nez v0, :cond_42
+
+    const-string v0, "Trailers"
+
+    .line 6
+    invoke-static {v0, p1}, Lkotlin/text/StringsKt;->equals(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result v0
+
+    if-nez v0, :cond_42
+
+    const-string v0, "Transfer-Encoding"
+
+    .line 7
+    invoke-static {v0, p1}, Lkotlin/text/StringsKt;->equals(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result v0
+
+    if-nez v0, :cond_42
+
+    const-string v0, "Upgrade"
+
+    .line 8
+    invoke-static {v0, p1}, Lkotlin/text/StringsKt;->equals(Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result p1
+
+    if-nez p1, :cond_42
+
+    const/4 p1, 0x1
+
+    goto :goto_43
+
+    :cond_42
+    const/4 p1, 0x0
+
+    :goto_43
+    return p1
+.end method
+
+.method private final stripBody(Lokhttp3/Response;)Lokhttp3/Response;
+    .registers 4
+
+    const/4 v0, 0x0
+
+    if-eqz p1, :cond_8
+
+    .line 1
+    invoke-virtual {p1}, Lokhttp3/Response;->body()Lokhttp3/ResponseBody;
+
+    move-result-object v1
+
+    goto :goto_9
+
+    :cond_8
+    move-object v1, v0
+
+    :goto_9
+    if-eqz v1, :cond_17
+
+    .line 2
+    invoke-virtual {p1}, Lokhttp3/Response;->newBuilder()Lokhttp3/Response$Builder;
+
+    move-result-object p1
+
+    invoke-virtual {p1, v0}, Lokhttp3/Response$Builder;->body(Lokhttp3/ResponseBody;)Lokhttp3/Response$Builder;
+
+    move-result-object p1
+
+    invoke-virtual {p1}, Lokhttp3/Response$Builder;->build()Lokhttp3/Response;
+
+    move-result-object p1
+
+    :cond_17
+    return-object p1
+.end method

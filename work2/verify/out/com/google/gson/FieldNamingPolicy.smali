@@ -1,0 +1,326 @@
+.class public abstract enum Lcom/google/gson/FieldNamingPolicy;
+.super Ljava/lang/Enum;
+.source "FieldNamingPolicy.java"
+
+# interfaces
+.implements Lcom/google/gson/FieldNamingStrategy;
+
+
+# annotations
+.annotation system Ldalvik/annotation/Signature;
+    value = {
+        "Ljava/lang/Enum<",
+        "Lcom/google/gson/FieldNamingPolicy;",
+        ">;",
+        "Lcom/google/gson/FieldNamingStrategy;"
+    }
+.end annotation
+
+
+# static fields
+.field private static final synthetic $VALUES:[Lcom/google/gson/FieldNamingPolicy;
+
+.field public static final enum IDENTITY:Lcom/google/gson/FieldNamingPolicy;
+
+.field public static final enum LOWER_CASE_WITH_DASHES:Lcom/google/gson/FieldNamingPolicy;
+
+.field public static final enum LOWER_CASE_WITH_DOTS:Lcom/google/gson/FieldNamingPolicy;
+
+.field public static final enum LOWER_CASE_WITH_UNDERSCORES:Lcom/google/gson/FieldNamingPolicy;
+
+.field public static final enum UPPER_CAMEL_CASE:Lcom/google/gson/FieldNamingPolicy;
+
+.field public static final enum UPPER_CAMEL_CASE_WITH_SPACES:Lcom/google/gson/FieldNamingPolicy;
+
+
+# direct methods
+.method public static constructor <clinit>()V
+    .registers 8
+
+    .line 1
+    new-instance v0, Lcom/google/gson/FieldNamingPolicy$1;
+
+    invoke-direct {v0}, Lcom/google/gson/FieldNamingPolicy$1;-><init>()V
+
+    sput-object v0, Lcom/google/gson/FieldNamingPolicy;->IDENTITY:Lcom/google/gson/FieldNamingPolicy;
+
+    .line 2
+    new-instance v1, Lcom/google/gson/FieldNamingPolicy$2;
+
+    invoke-direct {v1}, Lcom/google/gson/FieldNamingPolicy$2;-><init>()V
+
+    sput-object v1, Lcom/google/gson/FieldNamingPolicy;->UPPER_CAMEL_CASE:Lcom/google/gson/FieldNamingPolicy;
+
+    .line 3
+    new-instance v2, Lcom/google/gson/FieldNamingPolicy$3;
+
+    invoke-direct {v2}, Lcom/google/gson/FieldNamingPolicy$3;-><init>()V
+
+    sput-object v2, Lcom/google/gson/FieldNamingPolicy;->UPPER_CAMEL_CASE_WITH_SPACES:Lcom/google/gson/FieldNamingPolicy;
+
+    .line 4
+    new-instance v3, Lcom/google/gson/FieldNamingPolicy$4;
+
+    invoke-direct {v3}, Lcom/google/gson/FieldNamingPolicy$4;-><init>()V
+
+    sput-object v3, Lcom/google/gson/FieldNamingPolicy;->LOWER_CASE_WITH_UNDERSCORES:Lcom/google/gson/FieldNamingPolicy;
+
+    .line 5
+    new-instance v4, Lcom/google/gson/FieldNamingPolicy$5;
+
+    invoke-direct {v4}, Lcom/google/gson/FieldNamingPolicy$5;-><init>()V
+
+    sput-object v4, Lcom/google/gson/FieldNamingPolicy;->LOWER_CASE_WITH_DASHES:Lcom/google/gson/FieldNamingPolicy;
+
+    .line 6
+    new-instance v5, Lcom/google/gson/FieldNamingPolicy$6;
+
+    invoke-direct {v5}, Lcom/google/gson/FieldNamingPolicy$6;-><init>()V
+
+    sput-object v5, Lcom/google/gson/FieldNamingPolicy;->LOWER_CASE_WITH_DOTS:Lcom/google/gson/FieldNamingPolicy;
+
+    const/4 v6, 0x6
+
+    new-array v6, v6, [Lcom/google/gson/FieldNamingPolicy;
+
+    const/4 v7, 0x0
+
+    aput-object v0, v6, v7
+
+    const/4 v0, 0x1
+
+    aput-object v1, v6, v0
+
+    const/4 v0, 0x2
+
+    aput-object v2, v6, v0
+
+    const/4 v0, 0x3
+
+    aput-object v3, v6, v0
+
+    const/4 v0, 0x4
+
+    aput-object v4, v6, v0
+
+    const/4 v0, 0x5
+
+    aput-object v5, v6, v0
+
+    .line 7
+    sput-object v6, Lcom/google/gson/FieldNamingPolicy;->$VALUES:[Lcom/google/gson/FieldNamingPolicy;
+
+    return-void
+.end method
+
+.method private constructor <init>(Ljava/lang/String;I)V
+    .registers 3
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "()V"
+        }
+    .end annotation
+
+    .line 1
+    invoke-direct {p0, p1, p2}, Ljava/lang/Enum;-><init>(Ljava/lang/String;I)V
+
+    return-void
+.end method
+
+.method public synthetic constructor <init>(Ljava/lang/String;ILcom/google/gson/FieldNamingPolicy$1;)V
+    .registers 4
+
+    .line 2
+    invoke-direct {p0, p1, p2}, Lcom/google/gson/FieldNamingPolicy;-><init>(Ljava/lang/String;I)V
+
+    return-void
+.end method
+
+.method public static separateCamelCase(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+    .registers 7
+
+    .line 1
+    new-instance v0, Ljava/lang/StringBuilder;
+
+    invoke-direct {v0}, Ljava/lang/StringBuilder;-><init>()V
+
+    .line 2
+    invoke-virtual {p0}, Ljava/lang/String;->length()I
+
+    move-result v1
+
+    const/4 v2, 0x0
+
+    :goto_a
+    if-ge v2, v1, :cond_25
+
+    .line 3
+    invoke-virtual {p0, v2}, Ljava/lang/String;->charAt(I)C
+
+    move-result v3
+
+    .line 4
+    invoke-static {v3}, Ljava/lang/Character;->isUpperCase(C)Z
+
+    move-result v4
+
+    if-eqz v4, :cond_1f
+
+    invoke-virtual {v0}, Ljava/lang/StringBuilder;->length()I
+
+    move-result v4
+
+    if-eqz v4, :cond_1f
+
+    .line 5
+    invoke-virtual {v0, p1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    .line 6
+    :cond_1f
+    invoke-virtual {v0, v3}, Ljava/lang/StringBuilder;->append(C)Ljava/lang/StringBuilder;
+
+    add-int/lit8 v2, v2, 0x1
+
+    goto :goto_a
+
+    .line 7
+    :cond_25
+    invoke-virtual {v0}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object p0
+
+    return-object p0
+.end method
+
+.method public static upperCaseFirstLetter(Ljava/lang/String;)Ljava/lang/String;
+    .registers 6
+
+    .line 1
+    invoke-virtual {p0}, Ljava/lang/String;->length()I
+
+    move-result v0
+
+    const/4 v1, 0x1
+
+    sub-int/2addr v0, v1
+
+    const/4 v2, 0x0
+
+    const/4 v3, 0x0
+
+    .line 2
+    :goto_8
+    invoke-virtual {p0, v3}, Ljava/lang/String;->charAt(I)C
+
+    move-result v4
+
+    invoke-static {v4}, Ljava/lang/Character;->isLetter(C)Z
+
+    move-result v4
+
+    if-nez v4, :cond_17
+
+    if-ge v3, v0, :cond_17
+
+    add-int/lit8 v3, v3, 0x1
+
+    goto :goto_8
+
+    .line 3
+    :cond_17
+    invoke-virtual {p0, v3}, Ljava/lang/String;->charAt(I)C
+
+    move-result v0
+
+    .line 4
+    invoke-static {v0}, Ljava/lang/Character;->isUpperCase(C)Z
+
+    move-result v4
+
+    if-eqz v4, :cond_22
+
+    return-object p0
+
+    .line 5
+    :cond_22
+    invoke-static {v0}, Ljava/lang/Character;->toUpperCase(C)C
+
+    move-result v0
+
+    if-nez v3, :cond_3c
+
+    .line 6
+    new-instance v2, Ljava/lang/StringBuilder;
+
+    invoke-direct {v2}, Ljava/lang/StringBuilder;-><init>()V
+
+    invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;->append(C)Ljava/lang/StringBuilder;
+
+    invoke-virtual {p0, v1}, Ljava/lang/String;->substring(I)Ljava/lang/String;
+
+    move-result-object p0
+
+    invoke-virtual {v2, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v2}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object p0
+
+    return-object p0
+
+    .line 7
+    :cond_3c
+    new-instance v4, Ljava/lang/StringBuilder;
+
+    invoke-direct {v4}, Ljava/lang/StringBuilder;-><init>()V
+
+    invoke-virtual {p0, v2, v3}, Ljava/lang/String;->substring(II)Ljava/lang/String;
+
+    move-result-object v2
+
+    invoke-virtual {v4, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v4, v0}, Ljava/lang/StringBuilder;->append(C)Ljava/lang/StringBuilder;
+
+    add-int/2addr v3, v1
+
+    invoke-virtual {p0, v3}, Ljava/lang/String;->substring(I)Ljava/lang/String;
+
+    move-result-object p0
+
+    invoke-virtual {v4, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v4}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object p0
+
+    return-object p0
+.end method
+
+.method public static valueOf(Ljava/lang/String;)Lcom/google/gson/FieldNamingPolicy;
+    .registers 2
+
+    const-class v0, Lcom/google/gson/FieldNamingPolicy;
+
+    invoke-static {v0, p0}, Ljava/lang/Enum;->valueOf(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum;
+
+    move-result-object p0
+
+    check-cast p0, Lcom/google/gson/FieldNamingPolicy;
+
+    return-object p0
+.end method
+
+.method public static values()[Lcom/google/gson/FieldNamingPolicy;
+    .registers 1
+
+    sget-object v0, Lcom/google/gson/FieldNamingPolicy;->$VALUES:[Lcom/google/gson/FieldNamingPolicy;
+
+    invoke-virtual {v0}, [Lcom/google/gson/FieldNamingPolicy;->clone()Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, [Lcom/google/gson/FieldNamingPolicy;
+
+    return-object v0
+.end method

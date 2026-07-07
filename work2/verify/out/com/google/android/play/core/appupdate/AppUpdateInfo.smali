@@ -1,0 +1,473 @@
+.class public Lcom/google/android/play/core/appupdate/AppUpdateInfo;
+.super Ljava/lang/Object;
+.source "com.google.android.play:core@@1.10.3"
+
+
+# instance fields
+.field private final zza:Ljava/lang/String;
+    .annotation build Landroidx/annotation/NonNull;
+    .end annotation
+.end field
+
+.field private final zzb:I
+
+.field private final zzc:I
+    .annotation build Lcom/google/android/play/core/install/model/UpdateAvailability;
+    .end annotation
+.end field
+
+.field private final zzd:I
+    .annotation build Lcom/google/android/play/core/install/model/InstallStatus;
+    .end annotation
+.end field
+
+.field private final zze:Ljava/lang/Integer;
+    .annotation build Landroidx/annotation/Nullable;
+    .end annotation
+.end field
+
+.field private final zzf:I
+
+.field private final zzg:J
+
+.field private final zzh:J
+
+.field private final zzi:J
+
+.field private final zzj:J
+
+.field private final zzk:Landroid/app/PendingIntent;
+    .annotation build Landroidx/annotation/Nullable;
+    .end annotation
+.end field
+
+.field private final zzl:Landroid/app/PendingIntent;
+    .annotation build Landroidx/annotation/Nullable;
+    .end annotation
+.end field
+
+.field private final zzm:Landroid/app/PendingIntent;
+    .annotation build Landroidx/annotation/Nullable;
+    .end annotation
+.end field
+
+.field private final zzn:Landroid/app/PendingIntent;
+    .annotation build Landroidx/annotation/Nullable;
+    .end annotation
+.end field
+
+.field private zzo:Z
+
+
+# direct methods
+.method private constructor <init>(Ljava/lang/String;IIILjava/lang/Integer;IJJJJLandroid/app/PendingIntent;Landroid/app/PendingIntent;Landroid/app/PendingIntent;Landroid/app/PendingIntent;)V
+    .registers 22
+    .param p1    # Ljava/lang/String;
+        .annotation build Landroidx/annotation/NonNull;
+        .end annotation
+    .end param
+    .param p3    # I
+        .annotation build Lcom/google/android/play/core/install/model/UpdateAvailability;
+        .end annotation
+    .end param
+    .param p4    # I
+        .annotation build Lcom/google/android/play/core/install/model/InstallStatus;
+        .end annotation
+    .end param
+    .param p5    # Ljava/lang/Integer;
+        .annotation build Landroidx/annotation/Nullable;
+        .end annotation
+    .end param
+    .param p15    # Landroid/app/PendingIntent;
+        .annotation build Landroidx/annotation/Nullable;
+        .end annotation
+    .end param
+    .param p16    # Landroid/app/PendingIntent;
+        .annotation build Landroidx/annotation/Nullable;
+        .end annotation
+    .end param
+    .param p17    # Landroid/app/PendingIntent;
+        .annotation build Landroidx/annotation/Nullable;
+        .end annotation
+    .end param
+    .param p18    # Landroid/app/PendingIntent;
+        .annotation build Landroidx/annotation/Nullable;
+        .end annotation
+    .end param
+
+    move-object v0, p0
+
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+
+    const/4 v1, 0x0
+
+    iput-boolean v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzo:Z
+
+    move-object v1, p1
+
+    iput-object v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zza:Ljava/lang/String;
+
+    move v1, p2
+
+    iput v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzb:I
+
+    move v1, p3
+
+    iput v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzc:I
+
+    move v1, p4
+
+    iput v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzd:I
+
+    move-object v1, p5
+
+    iput-object v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zze:Ljava/lang/Integer;
+
+    move v1, p6
+
+    iput v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzf:I
+
+    move-wide v1, p7
+
+    iput-wide v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzg:J
+
+    move-wide v1, p9
+
+    iput-wide v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzh:J
+
+    move-wide v1, p11
+
+    iput-wide v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzi:J
+
+    move-wide/from16 v1, p13
+
+    iput-wide v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzj:J
+
+    move-object/from16 v1, p15
+
+    iput-object v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzk:Landroid/app/PendingIntent;
+
+    move-object/from16 v1, p16
+
+    iput-object v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzl:Landroid/app/PendingIntent;
+
+    move-object/from16 v1, p17
+
+    iput-object v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzm:Landroid/app/PendingIntent;
+
+    move-object/from16 v1, p18
+
+    iput-object v1, v0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzn:Landroid/app/PendingIntent;
+
+    return-void
+.end method
+
+.method public static zzb(Ljava/lang/String;IIILjava/lang/Integer;IJJJJLandroid/app/PendingIntent;Landroid/app/PendingIntent;Landroid/app/PendingIntent;Landroid/app/PendingIntent;)Lcom/google/android/play/core/appupdate/AppUpdateInfo;
+    .registers 38
+    .param p0    # Ljava/lang/String;
+        .annotation build Landroidx/annotation/NonNull;
+        .end annotation
+    .end param
+    .param p2    # I
+        .annotation build Lcom/google/android/play/core/install/model/UpdateAvailability;
+        .end annotation
+    .end param
+    .param p3    # I
+        .annotation build Lcom/google/android/play/core/install/model/InstallStatus;
+        .end annotation
+    .end param
+    .param p4    # Ljava/lang/Integer;
+        .annotation build Landroidx/annotation/Nullable;
+        .end annotation
+    .end param
+    .param p14    # Landroid/app/PendingIntent;
+        .annotation build Landroidx/annotation/Nullable;
+        .end annotation
+    .end param
+    .param p15    # Landroid/app/PendingIntent;
+        .annotation build Landroidx/annotation/Nullable;
+        .end annotation
+    .end param
+    .param p16    # Landroid/app/PendingIntent;
+        .annotation build Landroidx/annotation/Nullable;
+        .end annotation
+    .end param
+    .param p17    # Landroid/app/PendingIntent;
+        .annotation build Landroidx/annotation/Nullable;
+        .end annotation
+    .end param
+
+    move-object/from16 v1, p0
+
+    move/from16 v2, p1
+
+    move/from16 v3, p2
+
+    move/from16 v4, p3
+
+    move-object/from16 v5, p4
+
+    move/from16 v6, p5
+
+    move-wide/from16 v7, p6
+
+    move-wide/from16 v9, p8
+
+    move-wide/from16 v11, p10
+
+    move-wide/from16 v13, p12
+
+    move-object/from16 v15, p14
+
+    move-object/from16 v16, p15
+
+    move-object/from16 v17, p16
+
+    move-object/from16 v18, p17
+
+    new-instance v19, Lcom/google/android/play/core/appupdate/AppUpdateInfo;
+
+    move-object/from16 v0, v19
+
+    invoke-direct/range {v0 .. v18}, Lcom/google/android/play/core/appupdate/AppUpdateInfo;-><init>(Ljava/lang/String;IIILjava/lang/Integer;IJJJJLandroid/app/PendingIntent;Landroid/app/PendingIntent;Landroid/app/PendingIntent;Landroid/app/PendingIntent;)V
+
+    return-object v19
+.end method
+
+.method private final zze(Lcom/google/android/play/core/appupdate/AppUpdateOptions;)Z
+    .registers 6
+
+    invoke-virtual {p1}, Lcom/google/android/play/core/appupdate/AppUpdateOptions;->allowAssetPackDeletion()Z
+
+    move-result p1
+
+    if-eqz p1, :cond_10
+
+    iget-wide v0, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzi:J
+
+    iget-wide v2, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzj:J
+
+    cmp-long p1, v0, v2
+
+    if-gtz p1, :cond_10
+
+    const/4 p1, 0x1
+
+    return p1
+
+    :cond_10
+    const/4 p1, 0x0
+
+    return p1
+.end method
+
+
+# virtual methods
+.method public availableVersionCode()I
+    .registers 2
+
+    iget v0, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzb:I
+
+    return v0
+.end method
+
+.method public bytesDownloaded()J
+    .registers 3
+
+    iget-wide v0, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzg:J
+
+    return-wide v0
+.end method
+
+.method public clientVersionStalenessDays()Ljava/lang/Integer;
+    .registers 2
+    .annotation build Landroidx/annotation/Nullable;
+    .end annotation
+
+    iget-object v0, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zze:Ljava/lang/Integer;
+
+    return-object v0
+.end method
+
+.method public installStatus()I
+    .registers 2
+    .annotation build Lcom/google/android/play/core/install/model/InstallStatus;
+    .end annotation
+
+    iget v0, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzd:I
+
+    return v0
+.end method
+
+.method public isUpdateTypeAllowed(I)Z
+    .registers 2
+    .param p1    # I
+        .annotation build Lcom/google/android/play/core/install/model/AppUpdateType;
+        .end annotation
+    .end param
+
+    .line 1
+    invoke-static {p1}, Lcom/google/android/play/core/appupdate/AppUpdateOptions;->defaultOptions(I)Lcom/google/android/play/core/appupdate/AppUpdateOptions;
+
+    move-result-object p1
+
+    invoke-virtual {p0, p1}, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zza(Lcom/google/android/play/core/appupdate/AppUpdateOptions;)Landroid/app/PendingIntent;
+
+    move-result-object p1
+
+    if-eqz p1, :cond_c
+
+    const/4 p1, 0x1
+
+    return p1
+
+    :cond_c
+    const/4 p1, 0x0
+
+    return p1
+.end method
+
+.method public isUpdateTypeAllowed(Lcom/google/android/play/core/appupdate/AppUpdateOptions;)Z
+    .registers 2
+    .param p1    # Lcom/google/android/play/core/appupdate/AppUpdateOptions;
+        .annotation build Landroidx/annotation/NonNull;
+        .end annotation
+    .end param
+
+    .line 2
+    invoke-virtual {p0, p1}, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zza(Lcom/google/android/play/core/appupdate/AppUpdateOptions;)Landroid/app/PendingIntent;
+
+    move-result-object p1
+
+    if-eqz p1, :cond_8
+
+    const/4 p1, 0x1
+
+    return p1
+
+    :cond_8
+    const/4 p1, 0x0
+
+    return p1
+.end method
+
+.method public packageName()Ljava/lang/String;
+    .registers 2
+    .annotation build Landroidx/annotation/NonNull;
+    .end annotation
+
+    iget-object v0, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zza:Ljava/lang/String;
+
+    return-object v0
+.end method
+
+.method public totalBytesToDownload()J
+    .registers 3
+
+    iget-wide v0, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzh:J
+
+    return-wide v0
+.end method
+
+.method public updateAvailability()I
+    .registers 2
+    .annotation build Lcom/google/android/play/core/install/model/UpdateAvailability;
+    .end annotation
+
+    iget v0, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzc:I
+
+    return v0
+.end method
+
+.method public updatePriority()I
+    .registers 2
+
+    iget v0, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzf:I
+
+    return v0
+.end method
+
+.method public final zza(Lcom/google/android/play/core/appupdate/AppUpdateOptions;)Landroid/app/PendingIntent;
+    .registers 5
+    .annotation build Landroidx/annotation/Nullable;
+    .end annotation
+
+    .line 1
+    invoke-virtual {p1}, Lcom/google/android/play/core/appupdate/AppUpdateOptions;->appUpdateType()I
+
+    move-result v0
+
+    const/4 v1, 0x0
+
+    if-nez v0, :cond_16
+
+    iget-object v0, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzl:Landroid/app/PendingIntent;
+
+    if-eqz v0, :cond_c
+
+    return-object v0
+
+    .line 2
+    :cond_c
+    invoke-direct {p0, p1}, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zze(Lcom/google/android/play/core/appupdate/AppUpdateOptions;)Z
+
+    move-result p1
+
+    if-eqz p1, :cond_15
+
+    iget-object p1, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzn:Landroid/app/PendingIntent;
+
+    return-object p1
+
+    :cond_15
+    return-object v1
+
+    .line 3
+    :cond_16
+    invoke-virtual {p1}, Lcom/google/android/play/core/appupdate/AppUpdateOptions;->appUpdateType()I
+
+    move-result v0
+
+    const/4 v2, 0x1
+
+    if-ne v0, v2, :cond_2b
+
+    iget-object v0, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzk:Landroid/app/PendingIntent;
+
+    if-eqz v0, :cond_22
+
+    return-object v0
+
+    .line 4
+    :cond_22
+    invoke-direct {p0, p1}, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zze(Lcom/google/android/play/core/appupdate/AppUpdateOptions;)Z
+
+    move-result p1
+
+    if-eqz p1, :cond_2b
+
+    iget-object p1, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzm:Landroid/app/PendingIntent;
+
+    return-object p1
+
+    :cond_2b
+    return-object v1
+.end method
+
+.method public final zzc()V
+    .registers 2
+
+    const/4 v0, 0x1
+
+    iput-boolean v0, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzo:Z
+
+    return-void
+.end method
+
+.method public final zzd()Z
+    .registers 2
+
+    iget-boolean v0, p0, Lcom/google/android/play/core/appupdate/AppUpdateInfo;->zzo:Z
+
+    return v0
+.end method

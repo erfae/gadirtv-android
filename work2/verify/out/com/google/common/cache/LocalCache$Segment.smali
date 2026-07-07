@@ -1,0 +1,3954 @@
+.class Lcom/google/common/cache/LocalCache$Segment;
+.super Ljava/util/concurrent/locks/ReentrantLock;
+.source "LocalCache.java"
+
+
+# annotations
+.annotation system Ldalvik/annotation/EnclosingClass;
+    value = Lcom/google/common/cache/LocalCache;
+.end annotation
+
+.annotation system Ldalvik/annotation/InnerClass;
+    accessFlags = 0x9
+    name = "Segment"
+.end annotation
+
+.annotation system Ldalvik/annotation/Signature;
+    value = {
+        "<K:",
+        "Ljava/lang/Object;",
+        "V:",
+        "Ljava/lang/Object;",
+        ">",
+        "Ljava/util/concurrent/locks/ReentrantLock;"
+    }
+.end annotation
+
+
+# instance fields
+.field public final accessQueue:Ljava/util/AbstractQueue;
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "Ljava/util/Queue<",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;>;"
+        }
+    .end annotation
+.end field
+
+.field public volatile count:I
+
+.field public final keyReferenceQueue:Ljava/lang/ref/ReferenceQueue;
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "Ljava/lang/ref/ReferenceQueue<",
+            "TK;>;"
+        }
+    .end annotation
+
+    .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+    .end annotation
+.end field
+
+.field public final map:Lcom/google/common/cache/LocalCache;
+    .annotation build Lcom/google/j2objc/annotations/Weak;
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "Lcom/google/common/cache/LocalCache<",
+            "TK;TV;>;"
+        }
+    .end annotation
+.end field
+
+.field public final maxSegmentWeight:J
+
+.field public modCount:I
+
+.field public final readCount:Ljava/util/concurrent/atomic/AtomicInteger;
+
+.field public final recencyQueue:Ljava/util/AbstractQueue;
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "Ljava/util/Queue<",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;>;"
+        }
+    .end annotation
+.end field
+
+.field public final statsCounter:Lcom/google/common/cache/AbstractCache$StatsCounter;
+
+.field public volatile table:Ljava/util/concurrent/atomic/AtomicReferenceArray;
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "Ljava/util/concurrent/atomic/AtomicReferenceArray<",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;>;"
+        }
+    .end annotation
+
+    .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+    .end annotation
+.end field
+
+.field public threshold:I
+
+.field public totalWeight:J
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+.end field
+
+.field public final valueReferenceQueue:Ljava/lang/ref/ReferenceQueue;
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "Ljava/lang/ref/ReferenceQueue<",
+            "TV;>;"
+        }
+    .end annotation
+
+    .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+    .end annotation
+.end field
+
+.field public final writeQueue:Ljava/util/AbstractQueue;
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "Ljava/util/Queue<",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;>;"
+        }
+    .end annotation
+.end field
+
+
+# direct methods
+.method public constructor <init>(Lcom/google/common/cache/LocalCache;IJLcom/google/common/cache/AbstractCache$StatsCounter;)V
+    .registers 10
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Lcom/google/common/cache/LocalCache<",
+            "TK;TV;>;IJ",
+            "Lcom/google/common/cache/AbstractCache$StatsCounter;",
+            ")V"
+        }
+    .end annotation
+
+    .line 1
+    invoke-direct {p0}, Ljava/util/concurrent/locks/ReentrantLock;-><init>()V
+
+    .line 2
+    new-instance v0, Ljava/util/concurrent/atomic/AtomicInteger;
+
+    invoke-direct {v0}, Ljava/util/concurrent/atomic/AtomicInteger;-><init>()V
+
+    iput-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->readCount:Ljava/util/concurrent/atomic/AtomicInteger;
+
+    .line 3
+    iput-object p1, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    .line 4
+    iput-wide p3, p0, Lcom/google/common/cache/LocalCache$Segment;->maxSegmentWeight:J
+
+    .line 5
+    invoke-static {p5}, Lcom/google/common/base/Preconditions;->checkNotNull(Ljava/lang/Object;)Ljava/lang/Object;
+
+    move-result-object p5
+
+    check-cast p5, Lcom/google/common/cache/AbstractCache$StatsCounter;
+
+    iput-object p5, p0, Lcom/google/common/cache/LocalCache$Segment;->statsCounter:Lcom/google/common/cache/AbstractCache$StatsCounter;
+
+    .line 6
+    new-instance p5, Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    invoke-direct {p5, p2}, Ljava/util/concurrent/atomic/AtomicReferenceArray;-><init>(I)V
+
+    .line 7
+    invoke-virtual {p5}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->length()I
+
+    move-result p2
+
+    mul-int/lit8 p2, p2, 0x3
+
+    div-int/lit8 p2, p2, 0x4
+
+    iput p2, p0, Lcom/google/common/cache/LocalCache$Segment;->threshold:I
+
+    .line 8
+    iget-object v0, p1, Lcom/google/common/cache/LocalCache;->weigher:Lcom/google/common/cache/Weigher;
+
+    sget-object v1, Lcom/google/common/cache/CacheBuilder$OneWeigher;->INSTANCE:Lcom/google/common/cache/CacheBuilder$OneWeigher;
+
+    const/4 v2, 0x1
+
+    if-eq v0, v1, :cond_2e
+
+    const/4 v0, 0x1
+
+    goto :goto_2f
+
+    :cond_2e
+    const/4 v0, 0x0
+
+    :goto_2f
+    if-nez v0, :cond_39
+
+    int-to-long v0, p2
+
+    cmp-long v3, v0, p3
+
+    if-nez v3, :cond_39
+
+    add-int/2addr p2, v2
+
+    .line 9
+    iput p2, p0, Lcom/google/common/cache/LocalCache$Segment;->threshold:I
+
+    .line 10
+    :cond_39
+    iput-object p5, p0, Lcom/google/common/cache/LocalCache$Segment;->table:Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    .line 11
+    invoke-virtual {p1}, Lcom/google/common/cache/LocalCache;->usesKeyReferences()Z
+
+    move-result p2
+
+    const/4 p3, 0x0
+
+    if-eqz p2, :cond_48
+
+    new-instance p2, Ljava/lang/ref/ReferenceQueue;
+
+    invoke-direct {p2}, Ljava/lang/ref/ReferenceQueue;-><init>()V
+
+    goto :goto_49
+
+    :cond_48
+    move-object p2, p3
+
+    :goto_49
+    iput-object p2, p0, Lcom/google/common/cache/LocalCache$Segment;->keyReferenceQueue:Ljava/lang/ref/ReferenceQueue;
+
+    .line 12
+    invoke-virtual {p1}, Lcom/google/common/cache/LocalCache;->usesValueReferences()Z
+
+    move-result p2
+
+    if-eqz p2, :cond_56
+
+    new-instance p3, Ljava/lang/ref/ReferenceQueue;
+
+    invoke-direct {p3}, Ljava/lang/ref/ReferenceQueue;-><init>()V
+
+    :cond_56
+    iput-object p3, p0, Lcom/google/common/cache/LocalCache$Segment;->valueReferenceQueue:Ljava/lang/ref/ReferenceQueue;
+
+    .line 13
+    invoke-virtual {p1}, Lcom/google/common/cache/LocalCache;->usesAccessQueue()Z
+
+    move-result p2
+
+    if-eqz p2, :cond_64
+
+    .line 14
+    new-instance p2, Ljava/util/concurrent/ConcurrentLinkedQueue;
+
+    invoke-direct {p2}, Ljava/util/concurrent/ConcurrentLinkedQueue;-><init>()V
+
+    goto :goto_66
+
+    .line 15
+    :cond_64
+    sget-object p2, Lcom/google/common/cache/LocalCache;->DISCARDING_QUEUE:Ljava/util/Queue;
+
+    .line 16
+    :goto_66
+    check-cast p2, Ljava/util/AbstractQueue;
+
+    iput-object p2, p0, Lcom/google/common/cache/LocalCache$Segment;->recencyQueue:Ljava/util/AbstractQueue;
+
+    .line 17
+    invoke-virtual {p1}, Lcom/google/common/cache/LocalCache;->expiresAfterWrite()Z
+
+    move-result p2
+
+    if-eqz p2, :cond_76
+
+    .line 18
+    new-instance p2, Lcom/google/common/cache/LocalCache$WriteQueue;
+
+    invoke-direct {p2}, Lcom/google/common/cache/LocalCache$WriteQueue;-><init>()V
+
+    goto :goto_78
+
+    .line 19
+    :cond_76
+    sget-object p2, Lcom/google/common/cache/LocalCache;->DISCARDING_QUEUE:Ljava/util/Queue;
+
+    .line 20
+    :goto_78
+    check-cast p2, Ljava/util/AbstractQueue;
+
+    iput-object p2, p0, Lcom/google/common/cache/LocalCache$Segment;->writeQueue:Ljava/util/AbstractQueue;
+
+    .line 21
+    invoke-virtual {p1}, Lcom/google/common/cache/LocalCache;->usesAccessQueue()Z
+
+    move-result p1
+
+    if-eqz p1, :cond_88
+
+    .line 22
+    new-instance p1, Lcom/google/common/cache/LocalCache$AccessQueue;
+
+    invoke-direct {p1}, Lcom/google/common/cache/LocalCache$AccessQueue;-><init>()V
+
+    goto :goto_8a
+
+    .line 23
+    :cond_88
+    sget-object p1, Lcom/google/common/cache/LocalCache;->DISCARDING_QUEUE:Ljava/util/Queue;
+
+    .line 24
+    :goto_8a
+    check-cast p1, Ljava/util/AbstractQueue;
+
+    iput-object p1, p0, Lcom/google/common/cache/LocalCache$Segment;->accessQueue:Ljava/util/AbstractQueue;
+
+    return-void
+.end method
+
+
+# virtual methods
+.method public final copyEntry(Lcom/google/common/cache/ReferenceEntry;Lcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+    .registers 7
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;)",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;"
+        }
+    .end annotation
+
+    .line 1
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v0
+
+    const/4 v1, 0x0
+
+    if-nez v0, :cond_8
+
+    return-object v1
+
+    .line 2
+    :cond_8
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v0
+
+    .line 3
+    invoke-interface {v0}, Lcom/google/common/cache/LocalCache$ValueReference;->get()Ljava/lang/Object;
+
+    move-result-object v2
+
+    if-nez v2, :cond_19
+
+    .line 4
+    invoke-interface {v0}, Lcom/google/common/cache/LocalCache$ValueReference;->isActive()Z
+
+    move-result v3
+
+    if-eqz v3, :cond_19
+
+    return-object v1
+
+    .line 5
+    :cond_19
+    iget-object v1, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v1, v1, Lcom/google/common/cache/LocalCache;->entryFactory:Lcom/google/common/cache/LocalCache$EntryFactory;
+
+    invoke-virtual {v1, p0, p1, p2}, Lcom/google/common/cache/LocalCache$EntryFactory;->copyEntry(Lcom/google/common/cache/LocalCache$Segment;Lcom/google/common/cache/ReferenceEntry;Lcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object p1
+
+    .line 6
+    iget-object p2, p0, Lcom/google/common/cache/LocalCache$Segment;->valueReferenceQueue:Ljava/lang/ref/ReferenceQueue;
+
+    invoke-interface {v0, p2, v2, p1}, Lcom/google/common/cache/LocalCache$ValueReference;->copyFor(Ljava/lang/ref/ReferenceQueue;Ljava/lang/Object;Lcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object p2
+
+    invoke-interface {p1, p2}, Lcom/google/common/cache/ReferenceEntry;->setValueReference(Lcom/google/common/cache/LocalCache$ValueReference;)V
+
+    return-object p1
+.end method
+
+.method public final drainRecencyQueue()V
+    .registers 3
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .line 1
+    :cond_0
+    :goto_0
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->recencyQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {v0}, Ljava/util/Queue;->poll()Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Lcom/google/common/cache/ReferenceEntry;
+
+    if-eqz v0, :cond_18
+
+    .line 2
+    iget-object v1, p0, Lcom/google/common/cache/LocalCache$Segment;->accessQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {v1, v0}, Ljava/util/Collection;->contains(Ljava/lang/Object;)Z
+
+    move-result v1
+
+    if-eqz v1, :cond_0
+
+    .line 3
+    iget-object v1, p0, Lcom/google/common/cache/LocalCache$Segment;->accessQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {v1, v0}, Ljava/util/Queue;->add(Ljava/lang/Object;)Z
+
+    goto :goto_0
+
+    :cond_18
+    return-void
+.end method
+
+.method public final drainReferenceQueues()V
+    .registers 16
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .line 1
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    invoke-virtual {v0}, Lcom/google/common/cache/LocalCache;->usesKeyReferences()Z
+
+    move-result v0
+
+    const/16 v1, 0x10
+
+    const/4 v2, 0x0
+
+    if-eqz v0, :cond_7b
+
+    const/4 v0, 0x0
+
+    .line 2
+    :cond_c
+    iget-object v3, p0, Lcom/google/common/cache/LocalCache$Segment;->keyReferenceQueue:Ljava/lang/ref/ReferenceQueue;
+
+    invoke-virtual {v3}, Ljava/lang/ref/ReferenceQueue;->poll()Ljava/lang/ref/Reference;
+
+    move-result-object v3
+
+    if-eqz v3, :cond_7b
+
+    .line 3
+    check-cast v3, Lcom/google/common/cache/ReferenceEntry;
+
+    .line 4
+    iget-object v4, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    invoke-static {v4}, Ljava/util/Objects;->requireNonNull(Ljava/lang/Object;)Ljava/lang/Object;
+
+    .line 5
+    invoke-interface {v3}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v9
+
+    .line 6
+    invoke-virtual {v4, v9}, Lcom/google/common/cache/LocalCache;->segmentFor(I)Lcom/google/common/cache/LocalCache$Segment;
+
+    move-result-object v4
+
+    .line 7
+    invoke-virtual {v4}, Ljava/util/concurrent/locks/ReentrantLock;->lock()V
+
+    .line 8
+    :try_start_26
+    iget-object v13, v4, Lcom/google/common/cache/LocalCache$Segment;->table:Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    .line 9
+    invoke-virtual {v13}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->length()I
+
+    move-result v5
+
+    add-int/lit8 v5, v5, -0x1
+
+    and-int v14, v5, v9
+
+    .line 10
+    invoke-virtual {v13, v14}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->get(I)Ljava/lang/Object;
+
+    move-result-object v5
+
+    move-object v6, v5
+
+    check-cast v6, Lcom/google/common/cache/ReferenceEntry;
+
+    move-object v7, v6
+
+    :goto_38
+    if-eqz v7, :cond_68
+
+    if-ne v7, v3, :cond_63
+
+    .line 11
+    iget v3, v4, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    add-int/lit8 v3, v3, 0x1
+
+    iput v3, v4, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    .line 12
+    invoke-interface {v7}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v8
+
+    .line 13
+    invoke-interface {v7}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v3
+
+    invoke-interface {v3}, Lcom/google/common/cache/LocalCache$ValueReference;->get()Ljava/lang/Object;
+
+    move-result-object v10
+
+    .line 14
+    invoke-interface {v7}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v11
+
+    sget-object v12, Lcom/google/common/cache/RemovalCause;->COLLECTED:Lcom/google/common/cache/RemovalCause;
+
+    move-object v5, v4
+
+    .line 15
+    invoke-virtual/range {v5 .. v12}, Lcom/google/common/cache/LocalCache$Segment;->removeValueFromChain(Lcom/google/common/cache/ReferenceEntry;Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;ILjava/lang/Object;Lcom/google/common/cache/LocalCache$ValueReference;Lcom/google/common/cache/RemovalCause;)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v3
+
+    .line 16
+    iget v5, v4, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    add-int/lit8 v5, v5, -0x1
+
+    .line 17
+    invoke-virtual {v13, v14, v3}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->set(ILjava/lang/Object;)V
+
+    .line 18
+    iput v5, v4, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    goto :goto_68
+
+    .line 19
+    :cond_63
+    invoke-interface {v7}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v7
+    :try_end_67
+    .catchall {:try_start_26 .. :try_end_67} :catchall_73
+
+    goto :goto_38
+
+    .line 20
+    :cond_68
+    :goto_68
+    invoke-virtual {v4}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 21
+    invoke-virtual {v4}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    add-int/lit8 v0, v0, 0x1
+
+    if-ne v0, v1, :cond_c
+
+    goto :goto_7b
+
+    :catchall_73
+    move-exception v0
+
+    .line 22
+    invoke-virtual {v4}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 23
+    invoke-virtual {v4}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    .line 24
+    throw v0
+
+    .line 25
+    :cond_7b
+    :goto_7b
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    invoke-virtual {v0}, Lcom/google/common/cache/LocalCache;->usesValueReferences()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_127
+
+    .line 26
+    :cond_83
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->valueReferenceQueue:Ljava/lang/ref/ReferenceQueue;
+
+    invoke-virtual {v0}, Ljava/lang/ref/ReferenceQueue;->poll()Ljava/lang/ref/Reference;
+
+    move-result-object v0
+
+    if-eqz v0, :cond_127
+
+    .line 27
+    move-object v9, v0
+
+    check-cast v9, Lcom/google/common/cache/LocalCache$ValueReference;
+
+    .line 28
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    invoke-static {v0}, Ljava/util/Objects;->requireNonNull(Ljava/lang/Object;)Ljava/lang/Object;
+
+    .line 29
+    invoke-interface {v9}, Lcom/google/common/cache/LocalCache$ValueReference;->getEntry()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v3
+
+    .line 30
+    invoke-interface {v3}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v7
+
+    .line 31
+    invoke-virtual {v0, v7}, Lcom/google/common/cache/LocalCache;->segmentFor(I)Lcom/google/common/cache/LocalCache$Segment;
+
+    move-result-object v0
+
+    invoke-interface {v3}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v3
+
+    .line 32
+    invoke-virtual {v0}, Ljava/util/concurrent/locks/ReentrantLock;->lock()V
+
+    .line 33
+    :try_start_a6
+    iget-object v11, v0, Lcom/google/common/cache/LocalCache$Segment;->table:Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    .line 34
+    invoke-virtual {v11}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->length()I
+
+    move-result v4
+
+    add-int/lit8 v4, v4, -0x1
+
+    and-int v12, v4, v7
+
+    .line 35
+    invoke-virtual {v11, v12}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->get(I)Ljava/lang/Object;
+
+    move-result-object v4
+
+    check-cast v4, Lcom/google/common/cache/ReferenceEntry;
+
+    move-object v5, v4
+
+    :goto_b7
+    if-eqz v5, :cond_108
+
+    .line 36
+    invoke-interface {v5}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v6
+
+    .line 37
+    invoke-interface {v5}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v8
+
+    if-ne v8, v7, :cond_103
+
+    if-eqz v6, :cond_103
+
+    iget-object v8, v0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v8, v8, Lcom/google/common/cache/LocalCache;->keyEquivalence:Lcom/google/common/base/Equivalence;
+
+    .line 38
+    invoke-virtual {v8, v3, v6}, Lcom/google/common/base/Equivalence;->equivalent(Ljava/lang/Object;Ljava/lang/Object;)Z
+
+    move-result v8
+
+    if-eqz v8, :cond_103
+
+    .line 39
+    invoke-interface {v5}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v3
+
+    if-ne v3, v9, :cond_f9
+
+    .line 40
+    iget v3, v0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    add-int/lit8 v3, v3, 0x1
+
+    iput v3, v0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    .line 41
+    invoke-interface {v9}, Lcom/google/common/cache/LocalCache$ValueReference;->get()Ljava/lang/Object;
+
+    move-result-object v8
+
+    sget-object v10, Lcom/google/common/cache/RemovalCause;->COLLECTED:Lcom/google/common/cache/RemovalCause;
+
+    move-object v3, v0
+
+    .line 42
+    invoke-virtual/range {v3 .. v10}, Lcom/google/common/cache/LocalCache$Segment;->removeValueFromChain(Lcom/google/common/cache/ReferenceEntry;Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;ILjava/lang/Object;Lcom/google/common/cache/LocalCache$ValueReference;Lcom/google/common/cache/RemovalCause;)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v3
+
+    .line 43
+    iget v4, v0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    add-int/lit8 v4, v4, -0x1
+
+    .line 44
+    invoke-virtual {v11, v12, v3}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->set(ILjava/lang/Object;)V
+
+    .line 45
+    iput v4, v0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+    :try_end_ef
+    .catchall {:try_start_a6 .. :try_end_ef} :catchall_119
+
+    .line 46
+    invoke-virtual {v0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 47
+    invoke-virtual {v0}, Ljava/util/concurrent/locks/ReentrantLock;->isHeldByCurrentThread()Z
+
+    move-result v3
+
+    if-nez v3, :cond_114
+
+    goto :goto_111
+
+    .line 48
+    :cond_f9
+    invoke-virtual {v0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 49
+    invoke-virtual {v0}, Ljava/util/concurrent/locks/ReentrantLock;->isHeldByCurrentThread()Z
+
+    move-result v3
+
+    if-nez v3, :cond_114
+
+    goto :goto_111
+
+    .line 50
+    :cond_103
+    :try_start_103
+    invoke-interface {v5}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v5
+    :try_end_107
+    .catchall {:try_start_103 .. :try_end_107} :catchall_119
+
+    goto :goto_b7
+
+    .line 51
+    :cond_108
+    invoke-virtual {v0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 52
+    invoke-virtual {v0}, Ljava/util/concurrent/locks/ReentrantLock;->isHeldByCurrentThread()Z
+
+    move-result v3
+
+    if-nez v3, :cond_114
+
+    .line 53
+    :goto_111
+    invoke-virtual {v0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    :cond_114
+    add-int/lit8 v2, v2, 0x1
+
+    if-ne v2, v1, :cond_83
+
+    goto :goto_127
+
+    :catchall_119
+    move-exception v1
+
+    .line 54
+    invoke-virtual {v0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 55
+    invoke-virtual {v0}, Ljava/util/concurrent/locks/ReentrantLock;->isHeldByCurrentThread()Z
+
+    move-result v2
+
+    if-nez v2, :cond_126
+
+    .line 56
+    invoke-virtual {v0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    .line 57
+    :cond_126
+    throw v1
+
+    :cond_127
+    :goto_127
+    return-void
+.end method
+
+.method public final enqueueNotification(Ljava/lang/Object;Ljava/lang/Object;ILcom/google/common/cache/RemovalCause;)V
+    .registers 9
+    .param p1    # Ljava/lang/Object;
+        .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+        .end annotation
+    .end param
+    .param p2    # Ljava/lang/Object;
+        .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+        .end annotation
+    .end param
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(TK;ITV;I",
+            "Lcom/google/common/cache/RemovalCause;",
+            ")V"
+        }
+    .end annotation
+
+    .line 1
+    iget-wide v0, p0, Lcom/google/common/cache/LocalCache$Segment;->totalWeight:J
+
+    int-to-long v2, p3
+
+    sub-long/2addr v0, v2
+
+    iput-wide v0, p0, Lcom/google/common/cache/LocalCache$Segment;->totalWeight:J
+
+    .line 2
+    invoke-virtual {p4}, Lcom/google/common/cache/RemovalCause;->wasEvicted()Z
+
+    move-result p3
+
+    if-eqz p3, :cond_11
+
+    .line 3
+    iget-object p3, p0, Lcom/google/common/cache/LocalCache$Segment;->statsCounter:Lcom/google/common/cache/AbstractCache$StatsCounter;
+
+    invoke-interface {p3}, Lcom/google/common/cache/AbstractCache$StatsCounter;->recordEviction()V
+
+    .line 4
+    :cond_11
+    iget-object p3, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object p3, p3, Lcom/google/common/cache/LocalCache;->removalNotificationQueue:Ljava/util/AbstractQueue;
+
+    sget-object v0, Lcom/google/common/cache/LocalCache;->DISCARDING_QUEUE:Ljava/util/Queue;
+
+    if-eq p3, v0, :cond_24
+
+    .line 5
+    invoke-static {p1, p2, p4}, Lcom/google/common/cache/RemovalNotification;->create(Ljava/lang/Object;Ljava/lang/Object;Lcom/google/common/cache/RemovalCause;)Lcom/google/common/cache/RemovalNotification;
+
+    move-result-object p1
+
+    .line 6
+    iget-object p2, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object p2, p2, Lcom/google/common/cache/LocalCache;->removalNotificationQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {p2, p1}, Ljava/util/Queue;->offer(Ljava/lang/Object;)Z
+
+    :cond_24
+    return-void
+.end method
+
+.method public final evictEntries(Lcom/google/common/cache/ReferenceEntry;)V
+    .registers 7
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;)V"
+        }
+    .end annotation
+
+    .line 1
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    invoke-virtual {v0}, Lcom/google/common/cache/LocalCache;->evictsBySize()Z
+
+    move-result v0
+
+    if-nez v0, :cond_9
+
+    return-void
+
+    .line 2
+    :cond_9
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->drainRecencyQueue()V
+
+    .line 3
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v0
+
+    invoke-interface {v0}, Lcom/google/common/cache/LocalCache$ValueReference;->getWeight()I
+
+    move-result v0
+
+    int-to-long v0, v0
+
+    iget-wide v2, p0, Lcom/google/common/cache/LocalCache$Segment;->maxSegmentWeight:J
+
+    cmp-long v4, v0, v2
+
+    if-lez v4, :cond_2e
+
+    .line 4
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v0
+
+    sget-object v1, Lcom/google/common/cache/RemovalCause;->SIZE:Lcom/google/common/cache/RemovalCause;
+
+    invoke-virtual {p0, p1, v0, v1}, Lcom/google/common/cache/LocalCache$Segment;->removeEntry(Lcom/google/common/cache/ReferenceEntry;ILcom/google/common/cache/RemovalCause;)Z
+
+    move-result p1
+
+    if-eqz p1, :cond_28
+
+    goto :goto_2e
+
+    .line 5
+    :cond_28
+    new-instance p1, Ljava/lang/AssertionError;
+
+    invoke-direct {p1}, Ljava/lang/AssertionError;-><init>()V
+
+    throw p1
+
+    .line 6
+    :cond_2e
+    :goto_2e
+    iget-wide v0, p0, Lcom/google/common/cache/LocalCache$Segment;->totalWeight:J
+
+    iget-wide v2, p0, Lcom/google/common/cache/LocalCache$Segment;->maxSegmentWeight:J
+
+    cmp-long p1, v0, v2
+
+    if-lez p1, :cond_6b
+
+    .line 7
+    iget-object p1, p0, Lcom/google/common/cache/LocalCache$Segment;->accessQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {p1}, Ljava/util/Collection;->iterator()Ljava/util/Iterator;
+
+    move-result-object p1
+
+    :cond_3c
+    invoke-interface {p1}, Ljava/util/Iterator;->hasNext()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_65
+
+    invoke-interface {p1}, Ljava/util/Iterator;->next()Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Lcom/google/common/cache/ReferenceEntry;
+
+    .line 8
+    invoke-interface {v0}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v1
+
+    invoke-interface {v1}, Lcom/google/common/cache/LocalCache$ValueReference;->getWeight()I
+
+    move-result v1
+
+    if-lez v1, :cond_3c
+
+    .line 9
+    invoke-interface {v0}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result p1
+
+    sget-object v1, Lcom/google/common/cache/RemovalCause;->SIZE:Lcom/google/common/cache/RemovalCause;
+
+    invoke-virtual {p0, v0, p1, v1}, Lcom/google/common/cache/LocalCache$Segment;->removeEntry(Lcom/google/common/cache/ReferenceEntry;ILcom/google/common/cache/RemovalCause;)Z
+
+    move-result p1
+
+    if-eqz p1, :cond_5f
+
+    goto :goto_2e
+
+    .line 10
+    :cond_5f
+    new-instance p1, Ljava/lang/AssertionError;
+
+    invoke-direct {p1}, Ljava/lang/AssertionError;-><init>()V
+
+    throw p1
+
+    .line 11
+    :cond_65
+    new-instance p1, Ljava/lang/AssertionError;
+
+    invoke-direct {p1}, Ljava/lang/AssertionError;-><init>()V
+
+    throw p1
+
+    :cond_6b
+    return-void
+.end method
+
+.method public final expand()V
+    .registers 12
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .line 1
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->table:Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    .line 2
+    invoke-virtual {v0}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->length()I
+
+    move-result v1
+
+    const/high16 v2, 0x40000000    # 2.0f
+
+    if-lt v1, v2, :cond_b
+
+    return-void
+
+    .line 3
+    :cond_b
+    iget v2, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    shl-int/lit8 v3, v1, 0x1
+
+    .line 4
+    new-instance v4, Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    invoke-direct {v4, v3}, Ljava/util/concurrent/atomic/AtomicReferenceArray;-><init>(I)V
+
+    .line 5
+    invoke-virtual {v4}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->length()I
+
+    move-result v3
+
+    mul-int/lit8 v3, v3, 0x3
+
+    div-int/lit8 v3, v3, 0x4
+
+    iput v3, p0, Lcom/google/common/cache/LocalCache$Segment;->threshold:I
+
+    .line 6
+    invoke-virtual {v4}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->length()I
+
+    move-result v3
+
+    add-int/lit8 v3, v3, -0x1
+
+    const/4 v5, 0x0
+
+    :goto_25
+    if-ge v5, v1, :cond_76
+
+    .line 7
+    invoke-virtual {v0, v5}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->get(I)Ljava/lang/Object;
+
+    move-result-object v6
+
+    check-cast v6, Lcom/google/common/cache/ReferenceEntry;
+
+    if-eqz v6, :cond_73
+
+    .line 8
+    invoke-interface {v6}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v7
+
+    .line 9
+    invoke-interface {v6}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v8
+
+    and-int/2addr v8, v3
+
+    if-nez v7, :cond_3e
+
+    .line 10
+    invoke-virtual {v4, v8, v6}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->set(ILjava/lang/Object;)V
+
+    goto :goto_73
+
+    :cond_3e
+    move-object v9, v6
+
+    :goto_3f
+    if-eqz v7, :cond_4f
+
+    .line 11
+    invoke-interface {v7}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v10
+
+    and-int/2addr v10, v3
+
+    if-eq v10, v8, :cond_4a
+
+    move-object v9, v7
+
+    move v8, v10
+
+    .line 12
+    :cond_4a
+    invoke-interface {v7}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v7
+
+    goto :goto_3f
+
+    .line 13
+    :cond_4f
+    invoke-virtual {v4, v8, v9}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->set(ILjava/lang/Object;)V
+
+    :goto_52
+    if-eq v6, v9, :cond_73
+
+    .line 14
+    invoke-interface {v6}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v7
+
+    and-int/2addr v7, v3
+
+    .line 15
+    invoke-virtual {v4, v7}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->get(I)Ljava/lang/Object;
+
+    move-result-object v8
+
+    check-cast v8, Lcom/google/common/cache/ReferenceEntry;
+
+    .line 16
+    invoke-virtual {p0, v6, v8}, Lcom/google/common/cache/LocalCache$Segment;->copyEntry(Lcom/google/common/cache/ReferenceEntry;Lcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v8
+
+    if-eqz v8, :cond_69
+
+    .line 17
+    invoke-virtual {v4, v7, v8}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->set(ILjava/lang/Object;)V
+
+    goto :goto_6e
+
+    .line 18
+    :cond_69
+    invoke-virtual {p0, v6}, Lcom/google/common/cache/LocalCache$Segment;->removeCollectedEntry(Lcom/google/common/cache/ReferenceEntry;)V
+
+    add-int/lit8 v2, v2, -0x1
+
+    .line 19
+    :goto_6e
+    invoke-interface {v6}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v6
+
+    goto :goto_52
+
+    :cond_73
+    :goto_73
+    add-int/lit8 v5, v5, 0x1
+
+    goto :goto_25
+
+    .line 20
+    :cond_76
+    iput-object v4, p0, Lcom/google/common/cache/LocalCache$Segment;->table:Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    .line 21
+    iput v2, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    return-void
+.end method
+
+.method public final expireEntries(J)V
+    .registers 6
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .line 1
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->drainRecencyQueue()V
+
+    .line 2
+    :goto_3
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->writeQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {v0}, Ljava/util/Queue;->peek()Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Lcom/google/common/cache/ReferenceEntry;
+
+    if-eqz v0, :cond_28
+
+    iget-object v1, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    invoke-virtual {v1, v0, p1, p2}, Lcom/google/common/cache/LocalCache;->isExpired(Lcom/google/common/cache/ReferenceEntry;J)Z
+
+    move-result v1
+
+    if-eqz v1, :cond_28
+
+    .line 3
+    invoke-interface {v0}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v1
+
+    sget-object v2, Lcom/google/common/cache/RemovalCause;->EXPIRED:Lcom/google/common/cache/RemovalCause;
+
+    invoke-virtual {p0, v0, v1, v2}, Lcom/google/common/cache/LocalCache$Segment;->removeEntry(Lcom/google/common/cache/ReferenceEntry;ILcom/google/common/cache/RemovalCause;)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_22
+
+    goto :goto_3
+
+    .line 4
+    :cond_22
+    new-instance p1, Ljava/lang/AssertionError;
+
+    invoke-direct {p1}, Ljava/lang/AssertionError;-><init>()V
+
+    throw p1
+
+    .line 5
+    :cond_28
+    :goto_28
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->accessQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {v0}, Ljava/util/Queue;->peek()Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Lcom/google/common/cache/ReferenceEntry;
+
+    if-eqz v0, :cond_4d
+
+    iget-object v1, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    invoke-virtual {v1, v0, p1, p2}, Lcom/google/common/cache/LocalCache;->isExpired(Lcom/google/common/cache/ReferenceEntry;J)Z
+
+    move-result v1
+
+    if-eqz v1, :cond_4d
+
+    .line 6
+    invoke-interface {v0}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v1
+
+    sget-object v2, Lcom/google/common/cache/RemovalCause;->EXPIRED:Lcom/google/common/cache/RemovalCause;
+
+    invoke-virtual {p0, v0, v1, v2}, Lcom/google/common/cache/LocalCache$Segment;->removeEntry(Lcom/google/common/cache/ReferenceEntry;ILcom/google/common/cache/RemovalCause;)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_47
+
+    goto :goto_28
+
+    .line 7
+    :cond_47
+    new-instance p1, Ljava/lang/AssertionError;
+
+    invoke-direct {p1}, Ljava/lang/AssertionError;-><init>()V
+
+    throw p1
+
+    :cond_4d
+    return-void
+.end method
+
+.method public final get(Ljava/lang/Object;I)Ljava/lang/Object;
+    .registers 13
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Ljava/lang/Object;",
+            "I)TV;"
+        }
+    .end annotation
+
+    .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+    .end annotation
+
+    .line 1
+    :try_start_0
+    iget v0, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    const/4 v1, 0x0
+
+    if-eqz v0, :cond_39
+
+    .line 2
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v0, v0, Lcom/google/common/cache/LocalCache;->ticker:Lcom/google/common/base/Ticker;
+
+    invoke-virtual {v0}, Lcom/google/common/base/Ticker;->read()J
+
+    move-result-wide v7
+
+    .line 3
+    invoke-virtual {p0, p1, p2, v7, v8}, Lcom/google/common/cache/LocalCache$Segment;->getLiveEntry(Ljava/lang/Object;IJ)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v3
+    :try_end_11
+    .catchall {:try_start_0 .. :try_end_11} :catchall_3d
+
+    if-nez v3, :cond_17
+
+    .line 4
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->postReadCleanup()V
+
+    return-object v1
+
+    .line 5
+    :cond_17
+    :try_start_17
+    invoke-interface {v3}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object p1
+
+    invoke-interface {p1}, Lcom/google/common/cache/LocalCache$ValueReference;->get()Ljava/lang/Object;
+
+    move-result-object v6
+
+    if-eqz v6, :cond_36
+
+    .line 6
+    invoke-virtual {p0, v3, v7, v8}, Lcom/google/common/cache/LocalCache$Segment;->recordRead(Lcom/google/common/cache/ReferenceEntry;J)V
+
+    .line 7
+    invoke-interface {v3}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v4
+
+    iget-object p1, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v9, p1, Lcom/google/common/cache/LocalCache;->defaultLoader:Lcom/google/common/cache/CacheLoader;
+
+    move-object v2, p0
+
+    move v5, p2
+
+    invoke-virtual/range {v2 .. v9}, Lcom/google/common/cache/LocalCache$Segment;->scheduleRefresh(Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;ILjava/lang/Object;JLcom/google/common/cache/CacheLoader;)Ljava/lang/Object;
+
+    move-result-object p1
+    :try_end_32
+    .catchall {:try_start_17 .. :try_end_32} :catchall_3d
+
+    .line 8
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->postReadCleanup()V
+
+    return-object p1
+
+    .line 9
+    :cond_36
+    :try_start_36
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->tryDrainReferenceQueues()V
+    :try_end_39
+    .catchall {:try_start_36 .. :try_end_39} :catchall_3d
+
+    .line 10
+    :cond_39
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->postReadCleanup()V
+
+    return-object v1
+
+    :catchall_3d
+    move-exception p1
+
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->postReadCleanup()V
+
+    .line 11
+    throw p1
+.end method
+
+.method public final getAndRecordStats(Ljava/lang/Object;ILcom/google/common/cache/LocalCache$LoadingValueReference;Lcom/google/common/util/concurrent/ListenableFuture;)Ljava/lang/Object;
+    .registers 9
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(TK;I",
+            "Lcom/google/common/cache/LocalCache$LoadingValueReference<",
+            "TK;TV;>;",
+            "Lcom/google/common/util/concurrent/ListenableFuture<",
+            "TV;>;)TV;"
+        }
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Throws;
+        value = {
+            Ljava/util/concurrent/ExecutionException;
+        }
+    .end annotation
+
+    .line 1
+    :try_start_0
+    invoke-static {p4}, Lcom/google/common/util/concurrent/Uninterruptibles;->getUninterruptibly(Ljava/util/concurrent/Future;)Ljava/lang/Object;
+
+    move-result-object p4
+    :try_end_4
+    .catchall {:try_start_0 .. :try_end_4} :catchall_3b
+
+    if-eqz p4, :cond_15
+
+    .line 2
+    :try_start_6
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->statsCounter:Lcom/google/common/cache/AbstractCache$StatsCounter;
+
+    invoke-virtual {p3}, Lcom/google/common/cache/LocalCache$LoadingValueReference;->elapsedNanos()J
+
+    move-result-wide v1
+
+    invoke-interface {v0, v1, v2}, Lcom/google/common/cache/AbstractCache$StatsCounter;->recordLoadSuccess(J)V
+
+    .line 3
+    invoke-virtual {p0, p1, p2, p3, p4}, Lcom/google/common/cache/LocalCache$Segment;->storeLoadedValue(Ljava/lang/Object;ILcom/google/common/cache/LocalCache$LoadingValueReference;Ljava/lang/Object;)Z
+
+    return-object p4
+
+    :catchall_13
+    move-exception v0
+
+    goto :goto_3d
+
+    .line 4
+    :cond_15
+    new-instance v0, Lcom/google/common/cache/CacheLoader$InvalidCacheLoadException;
+
+    invoke-static {p1}, Ljava/lang/String;->valueOf(Ljava/lang/Object;)Ljava/lang/String;
+
+    move-result-object v1
+
+    invoke-virtual {v1}, Ljava/lang/String;->length()I
+
+    move-result v2
+
+    add-int/lit8 v2, v2, 0x23
+
+    new-instance v3, Ljava/lang/StringBuilder;
+
+    invoke-direct {v3, v2}, Ljava/lang/StringBuilder;-><init>(I)V
+
+    const-string v2, "CacheLoader returned null for key "
+
+    invoke-virtual {v3, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v3, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string v1, "."
+
+    invoke-virtual {v3, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v3}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object v1
+
+    invoke-direct {v0, v1}, Lcom/google/common/cache/CacheLoader$InvalidCacheLoadException;-><init>(Ljava/lang/String;)V
+
+    throw v0
+    :try_end_3b
+    .catchall {:try_start_6 .. :try_end_3b} :catchall_13
+
+    :catchall_3b
+    move-exception v0
+
+    const/4 p4, 0x0
+
+    :goto_3d
+    if-nez p4, :cond_4b
+
+    .line 5
+    iget-object p4, p0, Lcom/google/common/cache/LocalCache$Segment;->statsCounter:Lcom/google/common/cache/AbstractCache$StatsCounter;
+
+    invoke-virtual {p3}, Lcom/google/common/cache/LocalCache$LoadingValueReference;->elapsedNanos()J
+
+    move-result-wide v1
+
+    invoke-interface {p4, v1, v2}, Lcom/google/common/cache/AbstractCache$StatsCounter;->recordLoadException(J)V
+
+    .line 6
+    invoke-virtual {p0, p1, p2, p3}, Lcom/google/common/cache/LocalCache$Segment;->removeLoadingValue(Ljava/lang/Object;ILcom/google/common/cache/LocalCache$LoadingValueReference;)Z
+
+    .line 7
+    :cond_4b
+    throw v0
+.end method
+
+.method public final getEntry(Ljava/lang/Object;I)Lcom/google/common/cache/ReferenceEntry;
+    .registers 6
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Ljava/lang/Object;",
+            "I)",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;"
+        }
+    .end annotation
+
+    .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+    .end annotation
+
+    .line 1
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->table:Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    .line 2
+    invoke-virtual {v0}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->length()I
+
+    move-result v1
+
+    add-int/lit8 v1, v1, -0x1
+
+    and-int/2addr v1, p2
+
+    invoke-virtual {v0, v1}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->get(I)Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Lcom/google/common/cache/ReferenceEntry;
+
+    :goto_f
+    if-eqz v0, :cond_32
+
+    .line 3
+    invoke-interface {v0}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v1
+
+    if-eq v1, p2, :cond_18
+
+    goto :goto_2d
+
+    .line 4
+    :cond_18
+    invoke-interface {v0}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v1
+
+    if-nez v1, :cond_22
+
+    .line 5
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->tryDrainReferenceQueues()V
+
+    goto :goto_2d
+
+    .line 6
+    :cond_22
+    iget-object v2, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v2, v2, Lcom/google/common/cache/LocalCache;->keyEquivalence:Lcom/google/common/base/Equivalence;
+
+    invoke-virtual {v2, p1, v1}, Lcom/google/common/base/Equivalence;->equivalent(Ljava/lang/Object;Ljava/lang/Object;)Z
+
+    move-result v1
+
+    if-eqz v1, :cond_2d
+
+    return-object v0
+
+    .line 7
+    :cond_2d
+    :goto_2d
+    invoke-interface {v0}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v0
+
+    goto :goto_f
+
+    :cond_32
+    const/4 p1, 0x0
+
+    return-object p1
+.end method
+
+.method public final getLiveEntry(Ljava/lang/Object;IJ)Lcom/google/common/cache/ReferenceEntry;
+    .registers 6
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Ljava/lang/Object;",
+            "IJ)",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;"
+        }
+    .end annotation
+
+    .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+    .end annotation
+
+    .line 1
+    invoke-virtual {p0, p1, p2}, Lcom/google/common/cache/LocalCache$Segment;->getEntry(Ljava/lang/Object;I)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object p1
+
+    const/4 p2, 0x0
+
+    if-nez p1, :cond_8
+
+    return-object p2
+
+    .line 2
+    :cond_8
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    invoke-virtual {v0, p1, p3, p4}, Lcom/google/common/cache/LocalCache;->isExpired(Lcom/google/common/cache/ReferenceEntry;J)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_23
+
+    .line 3
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->tryLock()Z
+
+    move-result p1
+
+    if-eqz p1, :cond_22
+
+    .line 4
+    :try_start_16
+    invoke-virtual {p0, p3, p4}, Lcom/google/common/cache/LocalCache$Segment;->expireEntries(J)V
+    :try_end_19
+    .catchall {:try_start_16 .. :try_end_19} :catchall_1d
+
+    .line 5
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    goto :goto_22
+
+    :catchall_1d
+    move-exception p1
+
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 6
+    throw p1
+
+    :cond_22
+    :goto_22
+    return-object p2
+
+    :cond_23
+    return-object p1
+.end method
+
+.method public final getLiveValue(Lcom/google/common/cache/ReferenceEntry;J)Ljava/lang/Object;
+    .registers 7
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;J)TV;"
+        }
+    .end annotation
+
+    .line 1
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v0
+
+    const/4 v1, 0x0
+
+    if-nez v0, :cond_b
+
+    .line 2
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->tryDrainReferenceQueues()V
+
+    return-object v1
+
+    .line 3
+    :cond_b
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v0
+
+    invoke-interface {v0}, Lcom/google/common/cache/LocalCache$ValueReference;->get()Ljava/lang/Object;
+
+    move-result-object v0
+
+    if-nez v0, :cond_19
+
+    .line 4
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->tryDrainReferenceQueues()V
+
+    return-object v1
+
+    .line 5
+    :cond_19
+    iget-object v2, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    invoke-virtual {v2, p1, p2, p3}, Lcom/google/common/cache/LocalCache;->isExpired(Lcom/google/common/cache/ReferenceEntry;J)Z
+
+    move-result p1
+
+    if-eqz p1, :cond_34
+
+    .line 6
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->tryLock()Z
+
+    move-result p1
+
+    if-eqz p1, :cond_33
+
+    .line 7
+    :try_start_27
+    invoke-virtual {p0, p2, p3}, Lcom/google/common/cache/LocalCache$Segment;->expireEntries(J)V
+    :try_end_2a
+    .catchall {:try_start_27 .. :try_end_2a} :catchall_2e
+
+    .line 8
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    goto :goto_33
+
+    :catchall_2e
+    move-exception p1
+
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 9
+    throw p1
+
+    :cond_33
+    :goto_33
+    return-object v1
+
+    :cond_34
+    return-object v0
+.end method
+
+.method public final lockedGetOrLoad(Ljava/lang/Object;ILcom/google/common/cache/CacheLoader;)Ljava/lang/Object;
+    .registers 20
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(TK;I",
+            "Lcom/google/common/cache/CacheLoader<",
+            "-TK;TV;>;)TV;"
+        }
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Throws;
+        value = {
+            Ljava/util/concurrent/ExecutionException;
+        }
+    .end annotation
+
+    move-object/from16 v1, p0
+
+    move-object/from16 v0, p1
+
+    move/from16 v2, p2
+
+    .line 1
+    invoke-virtual/range {p0 .. p0}, Ljava/util/concurrent/locks/ReentrantLock;->lock()V
+
+    .line 2
+    :try_start_9
+    iget-object v3, v1, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v3, v3, Lcom/google/common/cache/LocalCache;->ticker:Lcom/google/common/base/Ticker;
+
+    invoke-virtual {v3}, Lcom/google/common/base/Ticker;->read()J
+
+    move-result-wide v3
+
+    .line 3
+    invoke-virtual {v1, v3, v4}, Lcom/google/common/cache/LocalCache$Segment;->runLockedCleanup(J)V
+
+    .line 4
+    iget v5, v1, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    add-int/lit8 v5, v5, -0x1
+
+    .line 5
+    iget-object v6, v1, Lcom/google/common/cache/LocalCache$Segment;->table:Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    .line 6
+    invoke-virtual {v6}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->length()I
+
+    move-result v7
+
+    const/4 v8, 0x1
+
+    sub-int/2addr v7, v8
+
+    and-int/2addr v7, v2
+
+    .line 7
+    invoke-virtual {v6, v7}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->get(I)Ljava/lang/Object;
+
+    move-result-object v9
+
+    check-cast v9, Lcom/google/common/cache/ReferenceEntry;
+
+    move-object v10, v9
+
+    :goto_28
+    const/4 v11, 0x0
+
+    if-eqz v10, :cond_8f
+
+    .line 8
+    invoke-interface {v10}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v12
+
+    .line 9
+    invoke-interface {v10}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v13
+
+    if-ne v13, v2, :cond_8a
+
+    if-eqz v12, :cond_8a
+
+    iget-object v13, v1, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v13, v13, Lcom/google/common/cache/LocalCache;->keyEquivalence:Lcom/google/common/base/Equivalence;
+
+    .line 10
+    invoke-virtual {v13, v0, v12}, Lcom/google/common/base/Equivalence;->equivalent(Ljava/lang/Object;Ljava/lang/Object;)Z
+
+    move-result v13
+
+    if-eqz v13, :cond_8a
+
+    .line 11
+    invoke-interface {v10}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v13
+
+    .line 12
+    invoke-interface {v13}, Lcom/google/common/cache/LocalCache$ValueReference;->isLoading()Z
+
+    move-result v14
+
+    if-eqz v14, :cond_4d
+
+    const/4 v3, 0x0
+
+    goto :goto_91
+
+    .line 13
+    :cond_4d
+    invoke-interface {v13}, Lcom/google/common/cache/LocalCache$ValueReference;->get()Ljava/lang/Object;
+
+    move-result-object v14
+
+    if-nez v14, :cond_5d
+
+    .line 14
+    invoke-interface {v13}, Lcom/google/common/cache/LocalCache$ValueReference;->getWeight()I
+
+    move-result v3
+
+    sget-object v4, Lcom/google/common/cache/RemovalCause;->COLLECTED:Lcom/google/common/cache/RemovalCause;
+
+    .line 15
+    invoke-virtual {v1, v12, v14, v3, v4}, Lcom/google/common/cache/LocalCache$Segment;->enqueueNotification(Ljava/lang/Object;Ljava/lang/Object;ILcom/google/common/cache/RemovalCause;)V
+
+    goto :goto_6e
+
+    .line 16
+    :cond_5d
+    iget-object v15, v1, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    invoke-virtual {v15, v10, v3, v4}, Lcom/google/common/cache/LocalCache;->isExpired(Lcom/google/common/cache/ReferenceEntry;J)Z
+
+    move-result v15
+
+    if-eqz v15, :cond_7b
+
+    .line 17
+    invoke-interface {v13}, Lcom/google/common/cache/LocalCache$ValueReference;->getWeight()I
+
+    move-result v3
+
+    sget-object v4, Lcom/google/common/cache/RemovalCause;->EXPIRED:Lcom/google/common/cache/RemovalCause;
+
+    .line 18
+    invoke-virtual {v1, v12, v14, v3, v4}, Lcom/google/common/cache/LocalCache$Segment;->enqueueNotification(Ljava/lang/Object;Ljava/lang/Object;ILcom/google/common/cache/RemovalCause;)V
+
+    .line 19
+    :goto_6e
+    iget-object v3, v1, Lcom/google/common/cache/LocalCache$Segment;->writeQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {v3, v10}, Ljava/util/Collection;->remove(Ljava/lang/Object;)Z
+
+    .line 20
+    iget-object v3, v1, Lcom/google/common/cache/LocalCache$Segment;->accessQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {v3, v10}, Ljava/util/Collection;->remove(Ljava/lang/Object;)Z
+
+    .line 21
+    iput v5, v1, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    goto :goto_90
+
+    .line 22
+    :cond_7b
+    invoke-virtual {v1, v10, v3, v4}, Lcom/google/common/cache/LocalCache$Segment;->recordLockedRead(Lcom/google/common/cache/ReferenceEntry;J)V
+
+    .line 23
+    iget-object v0, v1, Lcom/google/common/cache/LocalCache$Segment;->statsCounter:Lcom/google/common/cache/AbstractCache$StatsCounter;
+
+    invoke-interface {v0, v8}, Lcom/google/common/cache/AbstractCache$StatsCounter;->recordHits(I)V
+    :try_end_83
+    .catchall {:try_start_9 .. :try_end_83} :catchall_d1
+
+    .line 24
+    invoke-virtual/range {p0 .. p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 25
+    invoke-virtual/range {p0 .. p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    return-object v14
+
+    .line 26
+    :cond_8a
+    :try_start_8a
+    invoke-interface {v10}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v10
+
+    goto :goto_28
+
+    :cond_8f
+    move-object v13, v11
+
+    :goto_90
+    const/4 v3, 0x1
+
+    :goto_91
+    if-eqz v3, :cond_a8
+
+    .line 27
+    new-instance v11, Lcom/google/common/cache/LocalCache$LoadingValueReference;
+
+    invoke-direct {v11}, Lcom/google/common/cache/LocalCache$LoadingValueReference;-><init>()V
+
+    if-nez v10, :cond_a5
+
+    .line 28
+    invoke-virtual {v1, v0, v2, v9}, Lcom/google/common/cache/LocalCache$Segment;->newEntry(Ljava/lang/Object;ILcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v10
+
+    .line 29
+    invoke-interface {v10, v11}, Lcom/google/common/cache/ReferenceEntry;->setValueReference(Lcom/google/common/cache/LocalCache$ValueReference;)V
+
+    .line 30
+    invoke-virtual {v6, v7, v10}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->set(ILjava/lang/Object;)V
+
+    goto :goto_a8
+
+    .line 31
+    :cond_a5
+    invoke-interface {v10, v11}, Lcom/google/common/cache/ReferenceEntry;->setValueReference(Lcom/google/common/cache/LocalCache$ValueReference;)V
+    :try_end_a8
+    .catchall {:try_start_8a .. :try_end_a8} :catchall_d1
+
+    .line 32
+    :cond_a8
+    :goto_a8
+    invoke-virtual/range {p0 .. p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 33
+    invoke-virtual/range {p0 .. p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    if-eqz v3, :cond_cc
+
+    .line 34
+    :try_start_b0
+    monitor-enter v10
+    :try_end_b1
+    .catchall {:try_start_b0 .. :try_end_b1} :catchall_c5
+
+    move-object/from16 v3, p3
+
+    .line 35
+    :try_start_b3
+    invoke-virtual {v11, v0, v3}, Lcom/google/common/cache/LocalCache$LoadingValueReference;->loadFuture(Ljava/lang/Object;Lcom/google/common/cache/CacheLoader;)Lcom/google/common/util/concurrent/ListenableFuture;
+
+    move-result-object v3
+
+    .line 36
+    invoke-virtual {v1, v0, v2, v11, v3}, Lcom/google/common/cache/LocalCache$Segment;->getAndRecordStats(Ljava/lang/Object;ILcom/google/common/cache/LocalCache$LoadingValueReference;Lcom/google/common/util/concurrent/ListenableFuture;)Ljava/lang/Object;
+
+    move-result-object v0
+
+    .line 37
+    monitor-exit v10
+    :try_end_bc
+    .catchall {:try_start_b3 .. :try_end_bc} :catchall_c2
+
+    .line 38
+    iget-object v2, v1, Lcom/google/common/cache/LocalCache$Segment;->statsCounter:Lcom/google/common/cache/AbstractCache$StatsCounter;
+
+    invoke-interface {v2, v8}, Lcom/google/common/cache/AbstractCache$StatsCounter;->recordMisses(I)V
+
+    return-object v0
+
+    :catchall_c2
+    move-exception v0
+
+    .line 39
+    :try_start_c3
+    monitor-exit v10
+    :try_end_c4
+    .catchall {:try_start_c3 .. :try_end_c4} :catchall_c2
+
+    :try_start_c4
+    throw v0
+    :try_end_c5
+    .catchall {:try_start_c4 .. :try_end_c5} :catchall_c5
+
+    :catchall_c5
+    move-exception v0
+
+    .line 40
+    iget-object v2, v1, Lcom/google/common/cache/LocalCache$Segment;->statsCounter:Lcom/google/common/cache/AbstractCache$StatsCounter;
+
+    invoke-interface {v2, v8}, Lcom/google/common/cache/AbstractCache$StatsCounter;->recordMisses(I)V
+
+    .line 41
+    throw v0
+
+    .line 42
+    :cond_cc
+    invoke-virtual {v1, v10, v0, v13}, Lcom/google/common/cache/LocalCache$Segment;->waitForLoadingValue(Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;Lcom/google/common/cache/LocalCache$ValueReference;)Ljava/lang/Object;
+
+    move-result-object v0
+
+    return-object v0
+
+    :catchall_d1
+    move-exception v0
+
+    .line 43
+    invoke-virtual/range {p0 .. p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 44
+    invoke-virtual/range {p0 .. p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    .line 45
+    throw v0
+.end method
+
+.method public final newEntry(Ljava/lang/Object;ILcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+    .registers 5
+    .param p3    # Lcom/google/common/cache/ReferenceEntry;
+        .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+        .end annotation
+    .end param
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(TK;I",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;)",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;"
+        }
+    .end annotation
+
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v0, v0, Lcom/google/common/cache/LocalCache;->entryFactory:Lcom/google/common/cache/LocalCache$EntryFactory;
+
+    invoke-static {p1}, Lcom/google/common/base/Preconditions;->checkNotNull(Ljava/lang/Object;)Ljava/lang/Object;
+
+    move-result-object p1
+
+    invoke-virtual {v0, p0, p1, p2, p3}, Lcom/google/common/cache/LocalCache$EntryFactory;->newEntry(Lcom/google/common/cache/LocalCache$Segment;Ljava/lang/Object;ILcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object p1
+
+    return-object p1
+.end method
+
+.method public final postReadCleanup()V
+    .registers 3
+
+    .line 1
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->readCount:Ljava/util/concurrent/atomic/AtomicInteger;
+
+    invoke-virtual {v0}, Ljava/util/concurrent/atomic/AtomicInteger;->incrementAndGet()I
+
+    move-result v0
+
+    and-int/lit8 v0, v0, 0x3f
+
+    if-nez v0, :cond_18
+
+    .line 2
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v0, v0, Lcom/google/common/cache/LocalCache;->ticker:Lcom/google/common/base/Ticker;
+
+    invoke-virtual {v0}, Lcom/google/common/base/Ticker;->read()J
+
+    move-result-wide v0
+
+    .line 3
+    invoke-virtual {p0, v0, v1}, Lcom/google/common/cache/LocalCache$Segment;->runLockedCleanup(J)V
+
+    .line 4
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    :cond_18
+    return-void
+.end method
+
+.method public final put(Ljava/lang/Object;ILjava/lang/Object;Z)Ljava/lang/Object;
+    .registers 15
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(TK;ITV;Z)TV;"
+        }
+    .end annotation
+
+    .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+    .end annotation
+
+    .line 1
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->lock()V
+
+    .line 2
+    :try_start_3
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v0, v0, Lcom/google/common/cache/LocalCache;->ticker:Lcom/google/common/base/Ticker;
+
+    invoke-virtual {v0}, Lcom/google/common/base/Ticker;->read()J
+
+    move-result-wide v5
+
+    .line 3
+    invoke-virtual {p0, v5, v6}, Lcom/google/common/cache/LocalCache$Segment;->runLockedCleanup(J)V
+
+    .line 4
+    iget v0, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    add-int/lit8 v0, v0, 0x1
+
+    .line 5
+    iget v1, p0, Lcom/google/common/cache/LocalCache$Segment;->threshold:I
+
+    if-le v0, v1, :cond_19
+
+    .line 6
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->expand()V
+
+    .line 7
+    :cond_19
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->table:Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    .line 8
+    invoke-virtual {v0}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->length()I
+
+    move-result v1
+
+    add-int/lit8 v1, v1, -0x1
+
+    and-int v7, p2, v1
+
+    .line 9
+    invoke-virtual {v0, v7}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->get(I)Ljava/lang/Object;
+
+    move-result-object v1
+
+    check-cast v1, Lcom/google/common/cache/ReferenceEntry;
+
+    move-object v8, v1
+
+    :goto_2a
+    const/4 v9, 0x0
+
+    if-eqz v8, :cond_af
+
+    .line 10
+    invoke-interface {v8}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v2
+
+    .line 11
+    invoke-interface {v8}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v3
+
+    if-ne v3, p2, :cond_a9
+
+    if-eqz v2, :cond_a9
+
+    iget-object v3, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v3, v3, Lcom/google/common/cache/LocalCache;->keyEquivalence:Lcom/google/common/base/Equivalence;
+
+    .line 12
+    invoke-virtual {v3, p1, v2}, Lcom/google/common/base/Equivalence;->equivalent(Ljava/lang/Object;Ljava/lang/Object;)Z
+
+    move-result v2
+
+    if-eqz v2, :cond_a9
+
+    .line 13
+    invoke-interface {v8}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object p2
+
+    .line 14
+    invoke-interface {p2}, Lcom/google/common/cache/LocalCache$ValueReference;->get()Ljava/lang/Object;
+
+    move-result-object v0
+
+    if-nez v0, :cond_83
+
+    .line 15
+    iget p4, p0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    add-int/lit8 p4, p4, 0x1
+
+    iput p4, p0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    .line 16
+    invoke-interface {p2}, Lcom/google/common/cache/LocalCache$ValueReference;->isActive()Z
+
+    move-result p4
+
+    if-eqz p4, :cond_6c
+
+    .line 17
+    invoke-interface {p2}, Lcom/google/common/cache/LocalCache$ValueReference;->getWeight()I
+
+    move-result p2
+
+    sget-object p4, Lcom/google/common/cache/RemovalCause;->COLLECTED:Lcom/google/common/cache/RemovalCause;
+
+    .line 18
+    invoke-virtual {p0, p1, v0, p2, p4}, Lcom/google/common/cache/LocalCache$Segment;->enqueueNotification(Ljava/lang/Object;Ljava/lang/Object;ILcom/google/common/cache/RemovalCause;)V
+
+    move-object v1, p0
+
+    move-object v2, v8
+
+    move-object v3, p1
+
+    move-object v4, p3
+
+    .line 19
+    invoke-virtual/range {v1 .. v6}, Lcom/google/common/cache/LocalCache$Segment;->setValue(Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;Ljava/lang/Object;J)V
+
+    .line 20
+    iget p1, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    goto :goto_77
+
+    :cond_6c
+    move-object v1, p0
+
+    move-object v2, v8
+
+    move-object v3, p1
+
+    move-object v4, p3
+
+    .line 21
+    invoke-virtual/range {v1 .. v6}, Lcom/google/common/cache/LocalCache$Segment;->setValue(Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;Ljava/lang/Object;J)V
+
+    .line 22
+    iget p1, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    add-int/lit8 p1, p1, 0x1
+
+    .line 23
+    :goto_77
+    iput p1, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    .line 24
+    invoke-virtual {p0, v8}, Lcom/google/common/cache/LocalCache$Segment;->evictEntries(Lcom/google/common/cache/ReferenceEntry;)V
+    :try_end_7c
+    .catchall {:try_start_3 .. :try_end_7c} :catchall_cd
+
+    .line 25
+    :goto_7c
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 26
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    return-object v9
+
+    :cond_83
+    if-eqz p4, :cond_8f
+
+    .line 27
+    :try_start_85
+    invoke-virtual {p0, v8, v5, v6}, Lcom/google/common/cache/LocalCache$Segment;->recordLockedRead(Lcom/google/common/cache/ReferenceEntry;J)V
+    :try_end_88
+    .catchall {:try_start_85 .. :try_end_88} :catchall_cd
+
+    .line 28
+    :goto_88
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 29
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    return-object v0
+
+    .line 30
+    :cond_8f
+    :try_start_8f
+    iget p4, p0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    add-int/lit8 p4, p4, 0x1
+
+    iput p4, p0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    .line 31
+    invoke-interface {p2}, Lcom/google/common/cache/LocalCache$ValueReference;->getWeight()I
+
+    move-result p2
+
+    sget-object p4, Lcom/google/common/cache/RemovalCause;->REPLACED:Lcom/google/common/cache/RemovalCause;
+
+    .line 32
+    invoke-virtual {p0, p1, v0, p2, p4}, Lcom/google/common/cache/LocalCache$Segment;->enqueueNotification(Ljava/lang/Object;Ljava/lang/Object;ILcom/google/common/cache/RemovalCause;)V
+
+    move-object v1, p0
+
+    move-object v2, v8
+
+    move-object v3, p1
+
+    move-object v4, p3
+
+    .line 33
+    invoke-virtual/range {v1 .. v6}, Lcom/google/common/cache/LocalCache$Segment;->setValue(Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;Ljava/lang/Object;J)V
+
+    .line 34
+    invoke-virtual {p0, v8}, Lcom/google/common/cache/LocalCache$Segment;->evictEntries(Lcom/google/common/cache/ReferenceEntry;)V
+
+    goto :goto_88
+
+    .line 35
+    :cond_a9
+    invoke-interface {v8}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v8
+
+    goto/16 :goto_2a
+
+    .line 36
+    :cond_af
+    iget p4, p0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    add-int/lit8 p4, p4, 0x1
+
+    iput p4, p0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    .line 37
+    invoke-virtual {p0, p1, p2, v1}, Lcom/google/common/cache/LocalCache$Segment;->newEntry(Ljava/lang/Object;ILcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object p2
+
+    move-object v1, p0
+
+    move-object v2, p2
+
+    move-object v3, p1
+
+    move-object v4, p3
+
+    .line 38
+    invoke-virtual/range {v1 .. v6}, Lcom/google/common/cache/LocalCache$Segment;->setValue(Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;Ljava/lang/Object;J)V
+
+    .line 39
+    invoke-virtual {v0, v7, p2}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->set(ILjava/lang/Object;)V
+
+    .line 40
+    iget p1, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    add-int/lit8 p1, p1, 0x1
+
+    .line 41
+    iput p1, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    .line 42
+    invoke-virtual {p0, p2}, Lcom/google/common/cache/LocalCache$Segment;->evictEntries(Lcom/google/common/cache/ReferenceEntry;)V
+    :try_end_cc
+    .catchall {:try_start_8f .. :try_end_cc} :catchall_cd
+
+    goto :goto_7c
+
+    :catchall_cd
+    move-exception p1
+
+    .line 43
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 44
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    .line 45
+    throw p1
+.end method
+
+.method public final recordLockedRead(Lcom/google/common/cache/ReferenceEntry;J)V
+    .registers 5
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;J)V"
+        }
+    .end annotation
+
+    .line 1
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    .line 2
+    invoke-virtual {v0}, Lcom/google/common/cache/LocalCache;->expiresAfterAccess()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_b
+
+    .line 3
+    invoke-interface {p1, p2, p3}, Lcom/google/common/cache/ReferenceEntry;->setAccessTime(J)V
+
+    .line 4
+    :cond_b
+    iget-object p2, p0, Lcom/google/common/cache/LocalCache$Segment;->accessQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {p2, p1}, Ljava/util/Queue;->add(Ljava/lang/Object;)Z
+
+    return-void
+.end method
+
+.method public final recordRead(Lcom/google/common/cache/ReferenceEntry;J)V
+    .registers 5
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;J)V"
+        }
+    .end annotation
+
+    .line 1
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    .line 2
+    invoke-virtual {v0}, Lcom/google/common/cache/LocalCache;->expiresAfterAccess()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_b
+
+    .line 3
+    invoke-interface {p1, p2, p3}, Lcom/google/common/cache/ReferenceEntry;->setAccessTime(J)V
+
+    .line 4
+    :cond_b
+    iget-object p2, p0, Lcom/google/common/cache/LocalCache$Segment;->recencyQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {p2, p1}, Ljava/util/Queue;->add(Ljava/lang/Object;)Z
+
+    return-void
+.end method
+
+.method public final refresh(Ljava/lang/Object;ILcom/google/common/cache/CacheLoader;Z)Ljava/lang/Object;
+    .registers 17
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(TK;I",
+            "Lcom/google/common/cache/CacheLoader<",
+            "-TK;TV;>;Z)TV;"
+        }
+    .end annotation
+
+    .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+    .end annotation
+
+    move-object v7, p0
+
+    move-object v0, p1
+
+    move v4, p2
+
+    .line 1
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->lock()V
+
+    .line 2
+    :try_start_6
+    iget-object v1, v7, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v1, v1, Lcom/google/common/cache/LocalCache;->ticker:Lcom/google/common/base/Ticker;
+
+    invoke-virtual {v1}, Lcom/google/common/base/Ticker;->read()J
+
+    move-result-wide v1
+
+    .line 3
+    invoke-virtual {p0, v1, v2}, Lcom/google/common/cache/LocalCache$Segment;->runLockedCleanup(J)V
+
+    .line 4
+    iget-object v3, v7, Lcom/google/common/cache/LocalCache$Segment;->table:Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    .line 5
+    invoke-virtual {v3}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->length()I
+
+    move-result v5
+
+    add-int/lit8 v5, v5, -0x1
+
+    and-int/2addr v5, v4
+
+    .line 6
+    invoke-virtual {v3, v5}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->get(I)Ljava/lang/Object;
+
+    move-result-object v6
+
+    check-cast v6, Lcom/google/common/cache/ReferenceEntry;
+
+    move-object v8, v6
+
+    :goto_21
+    const/4 v9, 0x0
+
+    if-eqz v8, :cond_70
+
+    .line 7
+    invoke-interface {v8}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v10
+
+    .line 8
+    invoke-interface {v8}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v11
+
+    if-ne v11, v4, :cond_6b
+
+    if-eqz v10, :cond_6b
+
+    iget-object v11, v7, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v11, v11, Lcom/google/common/cache/LocalCache;->keyEquivalence:Lcom/google/common/base/Equivalence;
+
+    .line 9
+    invoke-virtual {v11, p1, v10}, Lcom/google/common/base/Equivalence;->equivalent(Ljava/lang/Object;Ljava/lang/Object;)Z
+
+    move-result v10
+
+    if-eqz v10, :cond_6b
+
+    .line 10
+    invoke-interface {v8}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v3
+
+    .line 11
+    invoke-interface {v3}, Lcom/google/common/cache/LocalCache$ValueReference;->isLoading()Z
+
+    move-result v5
+
+    if-nez v5, :cond_63
+
+    if-eqz p4, :cond_54
+
+    .line 12
+    invoke-interface {v8}, Lcom/google/common/cache/ReferenceEntry;->getWriteTime()J
+
+    move-result-wide v5
+
+    sub-long/2addr v1, v5
+
+    iget-object v5, v7, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-wide v5, v5, Lcom/google/common/cache/LocalCache;->refreshNanos:J
+
+    cmp-long v10, v1, v5
+
+    if-gez v10, :cond_54
+
+    goto :goto_63
+
+    .line 13
+    :cond_54
+    iget v1, v7, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    add-int/lit8 v1, v1, 0x1
+
+    iput v1, v7, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    .line 14
+    new-instance v1, Lcom/google/common/cache/LocalCache$LoadingValueReference;
+
+    invoke-direct {v1, v3}, Lcom/google/common/cache/LocalCache$LoadingValueReference;-><init>(Lcom/google/common/cache/LocalCache$ValueReference;)V
+
+    .line 15
+    invoke-interface {v8, v1}, Lcom/google/common/cache/ReferenceEntry;->setValueReference(Lcom/google/common/cache/LocalCache$ValueReference;)V
+    :try_end_62
+    .catchall {:try_start_6 .. :try_end_62} :catchall_b1
+
+    goto :goto_85
+
+    .line 16
+    :cond_63
+    :goto_63
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 17
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    move-object v5, v9
+
+    goto :goto_8c
+
+    .line 18
+    :cond_6b
+    :try_start_6b
+    invoke-interface {v8}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v8
+
+    goto :goto_21
+
+    .line 19
+    :cond_70
+    iget v1, v7, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    add-int/lit8 v1, v1, 0x1
+
+    iput v1, v7, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    .line 20
+    new-instance v1, Lcom/google/common/cache/LocalCache$LoadingValueReference;
+
+    invoke-direct {v1}, Lcom/google/common/cache/LocalCache$LoadingValueReference;-><init>()V
+
+    .line 21
+    invoke-virtual {p0, p1, p2, v6}, Lcom/google/common/cache/LocalCache$Segment;->newEntry(Ljava/lang/Object;ILcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v2
+
+    .line 22
+    invoke-interface {v2, v1}, Lcom/google/common/cache/ReferenceEntry;->setValueReference(Lcom/google/common/cache/LocalCache$ValueReference;)V
+
+    .line 23
+    invoke-virtual {v3, v5, v2}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->set(ILjava/lang/Object;)V
+    :try_end_85
+    .catchall {:try_start_6b .. :try_end_85} :catchall_b1
+
+    .line 24
+    :goto_85
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 25
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    move-object v5, v1
+
+    :goto_8c
+    if-nez v5, :cond_8f
+
+    return-object v9
+
+    :cond_8f
+    move-object v1, p3
+
+    .line 26
+    invoke-virtual {v5, p1, p3}, Lcom/google/common/cache/LocalCache$LoadingValueReference;->loadFuture(Ljava/lang/Object;Lcom/google/common/cache/CacheLoader;)Lcom/google/common/util/concurrent/ListenableFuture;
+
+    move-result-object v8
+
+    .line 27
+    new-instance v10, Lcom/google/common/cache/LocalCache$Segment$1;
+
+    move-object v1, v10
+
+    move-object v2, p0
+
+    move-object v3, p1
+
+    move v4, p2
+
+    move-object v6, v8
+
+    invoke-direct/range {v1 .. v6}, Lcom/google/common/cache/LocalCache$Segment$1;-><init>(Lcom/google/common/cache/LocalCache$Segment;Ljava/lang/Object;ILcom/google/common/cache/LocalCache$LoadingValueReference;Lcom/google/common/util/concurrent/ListenableFuture;)V
+
+    .line 28
+    invoke-static {}, Lcom/google/common/util/concurrent/MoreExecutors;->directExecutor()Ljava/util/concurrent/Executor;
+
+    move-result-object v0
+
+    .line 29
+    invoke-interface {v8, v10, v0}, Lcom/google/common/util/concurrent/ListenableFuture;->addListener(Ljava/lang/Runnable;Ljava/util/concurrent/Executor;)V
+
+    .line 30
+    invoke-interface {v8}, Ljava/util/concurrent/Future;->isDone()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_b0
+
+    .line 31
+    :try_start_ab
+    invoke-static {v8}, Lcom/google/common/util/concurrent/Uninterruptibles;->getUninterruptibly(Ljava/util/concurrent/Future;)Ljava/lang/Object;
+
+    move-result-object v0
+    :try_end_af
+    .catchall {:try_start_ab .. :try_end_af} :catchall_b0
+
+    return-object v0
+
+    :catchall_b0
+    :cond_b0
+    return-object v9
+
+    :catchall_b1
+    move-exception v0
+
+    .line 32
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 33
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    .line 34
+    throw v0
+.end method
+
+.method public final removeCollectedEntry(Lcom/google/common/cache/ReferenceEntry;)V
+    .registers 6
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;)V"
+        }
+    .end annotation
+
+    .line 1
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v0
+
+    .line 2
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    .line 3
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v1
+
+    invoke-interface {v1}, Lcom/google/common/cache/LocalCache$ValueReference;->get()Ljava/lang/Object;
+
+    move-result-object v1
+
+    .line 4
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v2
+
+    invoke-interface {v2}, Lcom/google/common/cache/LocalCache$ValueReference;->getWeight()I
+
+    move-result v2
+
+    sget-object v3, Lcom/google/common/cache/RemovalCause;->COLLECTED:Lcom/google/common/cache/RemovalCause;
+
+    .line 5
+    invoke-virtual {p0, v0, v1, v2, v3}, Lcom/google/common/cache/LocalCache$Segment;->enqueueNotification(Ljava/lang/Object;Ljava/lang/Object;ILcom/google/common/cache/RemovalCause;)V
+
+    .line 6
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->writeQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {v0, p1}, Ljava/util/Collection;->remove(Ljava/lang/Object;)Z
+
+    .line 7
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->accessQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {v0, p1}, Ljava/util/Collection;->remove(Ljava/lang/Object;)Z
+
+    return-void
+.end method
+
+.method public final removeEntry(Lcom/google/common/cache/ReferenceEntry;ILcom/google/common/cache/RemovalCause;)Z
+    .registers 16
+    .annotation build Lcom/google/common/annotations/VisibleForTesting;
+    .end annotation
+
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;I",
+            "Lcom/google/common/cache/RemovalCause;",
+            ")Z"
+        }
+    .end annotation
+
+    .line 1
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->table:Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    .line 2
+    invoke-virtual {v0}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->length()I
+
+    move-result v1
+
+    const/4 v2, 0x1
+
+    sub-int/2addr v1, v2
+
+    and-int/2addr v1, p2
+
+    .line 3
+    invoke-virtual {v0, v1}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->get(I)Ljava/lang/Object;
+
+    move-result-object v3
+
+    move-object v5, v3
+
+    check-cast v5, Lcom/google/common/cache/ReferenceEntry;
+
+    move-object v6, v5
+
+    :goto_11
+    if-eqz v6, :cond_3f
+
+    if-ne v6, p1, :cond_3a
+
+    .line 4
+    iget p1, p0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    add-int/2addr p1, v2
+
+    iput p1, p0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    .line 5
+    invoke-interface {v6}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v7
+
+    .line 6
+    invoke-interface {v6}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object p1
+
+    invoke-interface {p1}, Lcom/google/common/cache/LocalCache$ValueReference;->get()Ljava/lang/Object;
+
+    move-result-object v9
+
+    .line 7
+    invoke-interface {v6}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v10
+
+    move-object v4, p0
+
+    move v8, p2
+
+    move-object v11, p3
+
+    .line 8
+    invoke-virtual/range {v4 .. v11}, Lcom/google/common/cache/LocalCache$Segment;->removeValueFromChain(Lcom/google/common/cache/ReferenceEntry;Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;ILjava/lang/Object;Lcom/google/common/cache/LocalCache$ValueReference;Lcom/google/common/cache/RemovalCause;)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object p1
+
+    .line 9
+    iget p2, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    sub-int/2addr p2, v2
+
+    .line 10
+    invoke-virtual {v0, v1, p1}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->set(ILjava/lang/Object;)V
+
+    .line 11
+    iput p2, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    return v2
+
+    .line 12
+    :cond_3a
+    invoke-interface {v6}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v6
+
+    goto :goto_11
+
+    :cond_3f
+    const/4 p1, 0x0
+
+    return p1
+.end method
+
+.method public final removeEntryFromChain(Lcom/google/common/cache/ReferenceEntry;Lcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+    .registers 6
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;)",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;"
+        }
+    .end annotation
+
+    .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+    .end annotation
+
+    .line 1
+    iget v0, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    .line 2
+    invoke-interface {p2}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v1
+
+    :goto_6
+    if-eq p1, p2, :cond_1a
+
+    .line 3
+    invoke-virtual {p0, p1, v1}, Lcom/google/common/cache/LocalCache$Segment;->copyEntry(Lcom/google/common/cache/ReferenceEntry;Lcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v2
+
+    if-eqz v2, :cond_10
+
+    move-object v1, v2
+
+    goto :goto_15
+
+    .line 4
+    :cond_10
+    invoke-virtual {p0, p1}, Lcom/google/common/cache/LocalCache$Segment;->removeCollectedEntry(Lcom/google/common/cache/ReferenceEntry;)V
+
+    add-int/lit8 v0, v0, -0x1
+
+    .line 5
+    :goto_15
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object p1
+
+    goto :goto_6
+
+    .line 6
+    :cond_1a
+    iput v0, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    return-object v1
+.end method
+
+.method public final removeLoadingValue(Ljava/lang/Object;ILcom/google/common/cache/LocalCache$LoadingValueReference;)Z
+    .registers 12
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(TK;I",
+            "Lcom/google/common/cache/LocalCache$LoadingValueReference<",
+            "TK;TV;>;)Z"
+        }
+    .end annotation
+
+    .line 1
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->lock()V
+
+    .line 2
+    :try_start_3
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->table:Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    .line 3
+    invoke-virtual {v0}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->length()I
+
+    move-result v1
+
+    const/4 v2, 0x1
+
+    sub-int/2addr v1, v2
+
+    and-int/2addr v1, p2
+
+    .line 4
+    invoke-virtual {v0, v1}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->get(I)Ljava/lang/Object;
+
+    move-result-object v3
+
+    check-cast v3, Lcom/google/common/cache/ReferenceEntry;
+
+    move-object v4, v3
+
+    :goto_13
+    const/4 v5, 0x0
+
+    if-eqz v4, :cond_5a
+
+    .line 5
+    invoke-interface {v4}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v6
+
+    .line 6
+    invoke-interface {v4}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v7
+
+    if-ne v7, p2, :cond_55
+
+    if-eqz v6, :cond_55
+
+    iget-object v7, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v7, v7, Lcom/google/common/cache/LocalCache;->keyEquivalence:Lcom/google/common/base/Equivalence;
+
+    .line 7
+    invoke-virtual {v7, p1, v6}, Lcom/google/common/base/Equivalence;->equivalent(Ljava/lang/Object;Ljava/lang/Object;)Z
+
+    move-result v6
+
+    if-eqz v6, :cond_55
+
+    .line 8
+    invoke-interface {v4}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object p1
+
+    if-ne p1, p3, :cond_4e
+
+    .line 9
+    invoke-virtual {p3}, Lcom/google/common/cache/LocalCache$LoadingValueReference;->isActive()Z
+
+    move-result p1
+
+    if-eqz p1, :cond_40
+
+    .line 10
+    invoke-virtual {p3}, Lcom/google/common/cache/LocalCache$LoadingValueReference;->getOldValue()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object p1
+
+    invoke-interface {v4, p1}, Lcom/google/common/cache/ReferenceEntry;->setValueReference(Lcom/google/common/cache/LocalCache$ValueReference;)V
+
+    goto :goto_47
+
+    .line 11
+    :cond_40
+    invoke-virtual {p0, v3, v4}, Lcom/google/common/cache/LocalCache$Segment;->removeEntryFromChain(Lcom/google/common/cache/ReferenceEntry;Lcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object p1
+
+    .line 12
+    invoke-virtual {v0, v1, p1}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->set(ILjava/lang/Object;)V
+    :try_end_47
+    .catchall {:try_start_3 .. :try_end_47} :catchall_61
+
+    .line 13
+    :goto_47
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 14
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    return v2
+
+    .line 15
+    :cond_4e
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 16
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    return v5
+
+    .line 17
+    :cond_55
+    :try_start_55
+    invoke-interface {v4}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v4
+    :try_end_59
+    .catchall {:try_start_55 .. :try_end_59} :catchall_61
+
+    goto :goto_13
+
+    .line 18
+    :cond_5a
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 19
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    return v5
+
+    :catchall_61
+    move-exception p1
+
+    .line 20
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 21
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    .line 22
+    throw p1
+.end method
+
+.method public final removeValueFromChain(Lcom/google/common/cache/ReferenceEntry;Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;ILjava/lang/Object;Lcom/google/common/cache/LocalCache$ValueReference;Lcom/google/common/cache/RemovalCause;)Lcom/google/common/cache/ReferenceEntry;
+    .registers 8
+    .param p3    # Ljava/lang/Object;
+        .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+        .end annotation
+    .end param
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;TK;ITV;",
+            "Lcom/google/common/cache/LocalCache$ValueReference<",
+            "TK;TV;>;",
+            "Lcom/google/common/cache/RemovalCause;",
+            ")",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;"
+        }
+    .end annotation
+
+    .annotation runtime Lorg/checkerframework/checker/nullness/compatqual/NullableDecl;
+    .end annotation
+
+    .line 1
+    invoke-interface {p6}, Lcom/google/common/cache/LocalCache$ValueReference;->getWeight()I
+
+    move-result p4
+
+    invoke-virtual {p0, p3, p5, p4, p7}, Lcom/google/common/cache/LocalCache$Segment;->enqueueNotification(Ljava/lang/Object;Ljava/lang/Object;ILcom/google/common/cache/RemovalCause;)V
+
+    .line 2
+    iget-object p3, p0, Lcom/google/common/cache/LocalCache$Segment;->writeQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {p3, p2}, Ljava/util/Collection;->remove(Ljava/lang/Object;)Z
+
+    .line 3
+    iget-object p3, p0, Lcom/google/common/cache/LocalCache$Segment;->accessQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {p3, p2}, Ljava/util/Collection;->remove(Ljava/lang/Object;)Z
+
+    .line 4
+    invoke-interface {p6}, Lcom/google/common/cache/LocalCache$ValueReference;->isLoading()Z
+
+    move-result p3
+
+    if-eqz p3, :cond_1c
+
+    const/4 p2, 0x0
+
+    .line 5
+    invoke-interface {p6, p2}, Lcom/google/common/cache/LocalCache$ValueReference;->notifyNewValue(Ljava/lang/Object;)V
+
+    return-object p1
+
+    .line 6
+    :cond_1c
+    invoke-virtual {p0, p1, p2}, Lcom/google/common/cache/LocalCache$Segment;->removeEntryFromChain(Lcom/google/common/cache/ReferenceEntry;Lcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object p1
+
+    return-object p1
+.end method
+
+.method public final runLockedCleanup(J)V
+    .registers 4
+
+    .line 1
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->tryLock()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_1b
+
+    .line 2
+    :try_start_6
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->drainReferenceQueues()V
+
+    .line 3
+    invoke-virtual {p0, p1, p2}, Lcom/google/common/cache/LocalCache$Segment;->expireEntries(J)V
+
+    .line 4
+    iget-object p1, p0, Lcom/google/common/cache/LocalCache$Segment;->readCount:Ljava/util/concurrent/atomic/AtomicInteger;
+
+    const/4 p2, 0x0
+
+    invoke-virtual {p1, p2}, Ljava/util/concurrent/atomic/AtomicInteger;->set(I)V
+    :try_end_12
+    .catchall {:try_start_6 .. :try_end_12} :catchall_16
+
+    .line 5
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    goto :goto_1b
+
+    :catchall_16
+    move-exception p1
+
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 6
+    throw p1
+
+    :cond_1b
+    :goto_1b
+    return-void
+.end method
+
+.method public final runUnlockedCleanup()V
+    .registers 6
+
+    .line 1
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->isHeldByCurrentThread()Z
+
+    move-result v0
+
+    if-nez v0, :cond_23
+
+    .line 2
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    .line 3
+    :goto_8
+    iget-object v1, v0, Lcom/google/common/cache/LocalCache;->removalNotificationQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {v1}, Ljava/util/Queue;->poll()Ljava/lang/Object;
+
+    move-result-object v1
+
+    check-cast v1, Lcom/google/common/cache/RemovalNotification;
+
+    if-eqz v1, :cond_23
+
+    .line 4
+    :try_start_12
+    iget-object v2, v0, Lcom/google/common/cache/LocalCache;->removalListener:Lcom/google/common/cache/RemovalListener;
+
+    invoke-interface {v2, v1}, Lcom/google/common/cache/RemovalListener;->onRemoval(Lcom/google/common/cache/RemovalNotification;)V
+    :try_end_17
+    .catchall {:try_start_12 .. :try_end_17} :catchall_18
+
+    goto :goto_8
+
+    :catchall_18
+    move-exception v1
+
+    .line 5
+    sget-object v2, Lcom/google/common/cache/LocalCache;->logger:Ljava/util/logging/Logger;
+
+    sget-object v3, Ljava/util/logging/Level;->WARNING:Ljava/util/logging/Level;
+
+    const-string v4, "Exception thrown by removal listener"
+
+    invoke-virtual {v2, v3, v4, v1}, Ljava/util/logging/Logger;->log(Ljava/util/logging/Level;Ljava/lang/String;Ljava/lang/Throwable;)V
+
+    goto :goto_8
+
+    :cond_23
+    return-void
+.end method
+
+.method public final scheduleRefresh(Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;ILjava/lang/Object;JLcom/google/common/cache/CacheLoader;)Ljava/lang/Object;
+    .registers 14
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;TK;ITV;J",
+            "Lcom/google/common/cache/CacheLoader<",
+            "-TK;TV;>;)TV;"
+        }
+    .end annotation
+
+    .line 1
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    .line 2
+    iget-wide v0, v0, Lcom/google/common/cache/LocalCache;->refreshNanos:J
+
+    const/4 v2, 0x1
+
+    const-wide/16 v3, 0x0
+
+    cmp-long v5, v0, v3
+
+    if-lez v5, :cond_d
+
+    const/4 v0, 0x1
+
+    goto :goto_e
+
+    :cond_d
+    const/4 v0, 0x0
+
+    :goto_e
+    if-eqz v0, :cond_2e
+
+    .line 3
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getWriteTime()J
+
+    move-result-wide v0
+
+    sub-long/2addr p5, v0
+
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-wide v0, v0, Lcom/google/common/cache/LocalCache;->refreshNanos:J
+
+    cmp-long v3, p5, v0
+
+    if-lez v3, :cond_2e
+
+    .line 4
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object p1
+
+    invoke-interface {p1}, Lcom/google/common/cache/LocalCache$ValueReference;->isLoading()Z
+
+    move-result p1
+
+    if-nez p1, :cond_2e
+
+    .line 5
+    invoke-virtual {p0, p2, p3, p7, v2}, Lcom/google/common/cache/LocalCache$Segment;->refresh(Ljava/lang/Object;ILcom/google/common/cache/CacheLoader;Z)Ljava/lang/Object;
+
+    move-result-object p1
+
+    if-eqz p1, :cond_2e
+
+    return-object p1
+
+    :cond_2e
+    return-object p4
+.end method
+
+.method public final setValue(Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;Ljava/lang/Object;J)V
+    .registers 11
+    .annotation build Lcom/google/errorprone/annotations/concurrent/GuardedBy;
+        value = "this"
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;TK;TV;J)V"
+        }
+    .end annotation
+
+    .line 1
+    invoke-interface {p1}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v0
+
+    .line 2
+    iget-object v1, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v1, v1, Lcom/google/common/cache/LocalCache;->weigher:Lcom/google/common/cache/Weigher;
+
+    invoke-interface {v1, p2, p3}, Lcom/google/common/cache/Weigher;->weigh(Ljava/lang/Object;Ljava/lang/Object;)I
+
+    move-result p2
+
+    if-ltz p2, :cond_10
+
+    const/4 v1, 0x1
+
+    goto :goto_11
+
+    :cond_10
+    const/4 v1, 0x0
+
+    :goto_11
+    const-string v2, "Weights must be non-negative"
+
+    .line 3
+    invoke-static {v1, v2}, Lcom/google/common/base/Preconditions;->checkState(ZLjava/lang/Object;)V
+
+    .line 4
+    iget-object v1, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v1, v1, Lcom/google/common/cache/LocalCache;->valueStrength:Lcom/google/common/cache/LocalCache$Strength;
+
+    .line 5
+    invoke-virtual {v1, p0, p1, p3, p2}, Lcom/google/common/cache/LocalCache$Strength;->referenceValue(Lcom/google/common/cache/LocalCache$Segment;Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;I)Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object v1
+
+    .line 6
+    invoke-interface {p1, v1}, Lcom/google/common/cache/ReferenceEntry;->setValueReference(Lcom/google/common/cache/LocalCache$ValueReference;)V
+
+    .line 7
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->drainRecencyQueue()V
+
+    .line 8
+    iget-wide v1, p0, Lcom/google/common/cache/LocalCache$Segment;->totalWeight:J
+
+    int-to-long v3, p2
+
+    add-long/2addr v1, v3
+
+    iput-wide v1, p0, Lcom/google/common/cache/LocalCache$Segment;->totalWeight:J
+
+    .line 9
+    iget-object p2, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    .line 10
+    invoke-virtual {p2}, Lcom/google/common/cache/LocalCache;->expiresAfterAccess()Z
+
+    move-result p2
+
+    if-eqz p2, :cond_35
+
+    .line 11
+    invoke-interface {p1, p4, p5}, Lcom/google/common/cache/ReferenceEntry;->setAccessTime(J)V
+
+    .line 12
+    :cond_35
+    iget-object p2, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    invoke-virtual {p2}, Lcom/google/common/cache/LocalCache;->recordsWrite()Z
+
+    move-result p2
+
+    if-eqz p2, :cond_40
+
+    .line 13
+    invoke-interface {p1, p4, p5}, Lcom/google/common/cache/ReferenceEntry;->setWriteTime(J)V
+
+    .line 14
+    :cond_40
+    iget-object p2, p0, Lcom/google/common/cache/LocalCache$Segment;->accessQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {p2, p1}, Ljava/util/Queue;->add(Ljava/lang/Object;)Z
+
+    .line 15
+    iget-object p2, p0, Lcom/google/common/cache/LocalCache$Segment;->writeQueue:Ljava/util/AbstractQueue;
+
+    invoke-interface {p2, p1}, Ljava/util/Queue;->add(Ljava/lang/Object;)Z
+
+    .line 16
+    invoke-interface {v0, p3}, Lcom/google/common/cache/LocalCache$ValueReference;->notifyNewValue(Ljava/lang/Object;)V
+
+    return-void
+.end method
+
+.method public final storeLoadedValue(Ljava/lang/Object;ILcom/google/common/cache/LocalCache$LoadingValueReference;Ljava/lang/Object;)Z
+    .registers 16
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(TK;I",
+            "Lcom/google/common/cache/LocalCache$LoadingValueReference<",
+            "TK;TV;>;TV;)Z"
+        }
+    .end annotation
+
+    .line 1
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->lock()V
+
+    .line 2
+    :try_start_3
+    iget-object v0, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v0, v0, Lcom/google/common/cache/LocalCache;->ticker:Lcom/google/common/base/Ticker;
+
+    invoke-virtual {v0}, Lcom/google/common/base/Ticker;->read()J
+
+    move-result-wide v5
+
+    .line 3
+    invoke-virtual {p0, v5, v6}, Lcom/google/common/cache/LocalCache$Segment;->runLockedCleanup(J)V
+
+    .line 4
+    iget v0, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    const/4 v7, 0x1
+
+    add-int/2addr v0, v7
+
+    .line 5
+    iget v1, p0, Lcom/google/common/cache/LocalCache$Segment;->threshold:I
+
+    if-le v0, v1, :cond_1c
+
+    .line 6
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->expand()V
+
+    .line 7
+    iget v0, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    add-int/2addr v0, v7
+
+    .line 8
+    :cond_1c
+    iget-object v8, p0, Lcom/google/common/cache/LocalCache$Segment;->table:Ljava/util/concurrent/atomic/AtomicReferenceArray;
+
+    .line 9
+    invoke-virtual {v8}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->length()I
+
+    move-result v1
+
+    sub-int/2addr v1, v7
+
+    and-int v9, p2, v1
+
+    .line 10
+    invoke-virtual {v8, v9}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->get(I)Ljava/lang/Object;
+
+    move-result-object v1
+
+    check-cast v1, Lcom/google/common/cache/ReferenceEntry;
+
+    move-object v10, v1
+
+    :goto_2c
+    if-eqz v10, :cond_95
+
+    .line 11
+    invoke-interface {v10}, Lcom/google/common/cache/ReferenceEntry;->getKey()Ljava/lang/Object;
+
+    move-result-object v2
+
+    .line 12
+    invoke-interface {v10}, Lcom/google/common/cache/ReferenceEntry;->getHash()I
+
+    move-result v3
+
+    if-ne v3, p2, :cond_90
+
+    if-eqz v2, :cond_90
+
+    iget-object v3, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object v3, v3, Lcom/google/common/cache/LocalCache;->keyEquivalence:Lcom/google/common/base/Equivalence;
+
+    .line 13
+    invoke-virtual {v3, p1, v2}, Lcom/google/common/base/Equivalence;->equivalent(Ljava/lang/Object;Ljava/lang/Object;)Z
+
+    move-result v2
+
+    if-eqz v2, :cond_90
+
+    .line 14
+    invoke-interface {v10}, Lcom/google/common/cache/ReferenceEntry;->getValueReference()Lcom/google/common/cache/LocalCache$ValueReference;
+
+    move-result-object p2
+
+    .line 15
+    invoke-interface {p2}, Lcom/google/common/cache/LocalCache$ValueReference;->get()Ljava/lang/Object;
+
+    move-result-object v1
+
+    if-eq p3, p2, :cond_62
+
+    if-nez v1, :cond_55
+
+    .line 16
+    sget-object v2, Lcom/google/common/cache/LocalCache;->UNSET:Lcom/google/common/cache/LocalCache$1;
+
+    if-eq p2, v2, :cond_55
+
+    goto :goto_62
+
+    .line 17
+    :cond_55
+    sget-object p2, Lcom/google/common/cache/RemovalCause;->REPLACED:Lcom/google/common/cache/RemovalCause;
+
+    const/4 p3, 0x0
+
+    invoke-virtual {p0, p1, p4, p3, p2}, Lcom/google/common/cache/LocalCache$Segment;->enqueueNotification(Ljava/lang/Object;Ljava/lang/Object;ILcom/google/common/cache/RemovalCause;)V
+    :try_end_5b
+    .catchall {:try_start_3 .. :try_end_5b} :catchall_ae
+
+    .line 18
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 19
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    return p3
+
+    .line 20
+    :cond_62
+    :goto_62
+    :try_start_62
+    iget p2, p0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    add-int/2addr p2, v7
+
+    iput p2, p0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    .line 21
+    invoke-virtual {p3}, Lcom/google/common/cache/LocalCache$LoadingValueReference;->isActive()Z
+
+    move-result p2
+
+    if-eqz p2, :cond_7d
+
+    if-nez v1, :cond_72
+
+    .line 22
+    sget-object p2, Lcom/google/common/cache/RemovalCause;->COLLECTED:Lcom/google/common/cache/RemovalCause;
+
+    goto :goto_74
+
+    :cond_72
+    sget-object p2, Lcom/google/common/cache/RemovalCause;->REPLACED:Lcom/google/common/cache/RemovalCause;
+
+    .line 23
+    :goto_74
+    invoke-virtual {p3}, Lcom/google/common/cache/LocalCache$LoadingValueReference;->getWeight()I
+
+    move-result p3
+
+    invoke-virtual {p0, p1, v1, p3, p2}, Lcom/google/common/cache/LocalCache$Segment;->enqueueNotification(Ljava/lang/Object;Ljava/lang/Object;ILcom/google/common/cache/RemovalCause;)V
+
+    add-int/lit8 v0, v0, -0x1
+
+    :cond_7d
+    move-object v1, p0
+
+    move-object v2, v10
+
+    move-object v3, p1
+
+    move-object v4, p4
+
+    .line 24
+    invoke-virtual/range {v1 .. v6}, Lcom/google/common/cache/LocalCache$Segment;->setValue(Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;Ljava/lang/Object;J)V
+
+    .line 25
+    iput v0, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    .line 26
+    invoke-virtual {p0, v10}, Lcom/google/common/cache/LocalCache$Segment;->evictEntries(Lcom/google/common/cache/ReferenceEntry;)V
+    :try_end_89
+    .catchall {:try_start_62 .. :try_end_89} :catchall_ae
+
+    .line 27
+    :goto_89
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 28
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    return v7
+
+    .line 29
+    :cond_90
+    :try_start_90
+    invoke-interface {v10}, Lcom/google/common/cache/ReferenceEntry;->getNext()Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object v10
+
+    goto :goto_2c
+
+    .line 30
+    :cond_95
+    iget p3, p0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    add-int/2addr p3, v7
+
+    iput p3, p0, Lcom/google/common/cache/LocalCache$Segment;->modCount:I
+
+    .line 31
+    invoke-virtual {p0, p1, p2, v1}, Lcom/google/common/cache/LocalCache$Segment;->newEntry(Ljava/lang/Object;ILcom/google/common/cache/ReferenceEntry;)Lcom/google/common/cache/ReferenceEntry;
+
+    move-result-object p2
+
+    move-object v1, p0
+
+    move-object v2, p2
+
+    move-object v3, p1
+
+    move-object v4, p4
+
+    .line 32
+    invoke-virtual/range {v1 .. v6}, Lcom/google/common/cache/LocalCache$Segment;->setValue(Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;Ljava/lang/Object;J)V
+
+    .line 33
+    invoke-virtual {v8, v9, p2}, Ljava/util/concurrent/atomic/AtomicReferenceArray;->set(ILjava/lang/Object;)V
+
+    .line 34
+    iput v0, p0, Lcom/google/common/cache/LocalCache$Segment;->count:I
+
+    .line 35
+    invoke-virtual {p0, p2}, Lcom/google/common/cache/LocalCache$Segment;->evictEntries(Lcom/google/common/cache/ReferenceEntry;)V
+    :try_end_ad
+    .catchall {:try_start_90 .. :try_end_ad} :catchall_ae
+
+    goto :goto_89
+
+    :catchall_ae
+    move-exception p1
+
+    .line 36
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 37
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->runUnlockedCleanup()V
+
+    .line 38
+    throw p1
+.end method
+
+.method public final tryDrainReferenceQueues()V
+    .registers 2
+
+    .line 1
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->tryLock()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_12
+
+    .line 2
+    :try_start_6
+    invoke-virtual {p0}, Lcom/google/common/cache/LocalCache$Segment;->drainReferenceQueues()V
+    :try_end_9
+    .catchall {:try_start_6 .. :try_end_9} :catchall_d
+
+    .line 3
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    goto :goto_12
+
+    :catchall_d
+    move-exception v0
+
+    invoke-virtual {p0}, Ljava/util/concurrent/locks/ReentrantLock;->unlock()V
+
+    .line 4
+    throw v0
+
+    :cond_12
+    :goto_12
+    return-void
+.end method
+
+.method public final waitForLoadingValue(Lcom/google/common/cache/ReferenceEntry;Ljava/lang/Object;Lcom/google/common/cache/LocalCache$ValueReference;)Ljava/lang/Object;
+    .registers 8
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(",
+            "Lcom/google/common/cache/ReferenceEntry<",
+            "TK;TV;>;TK;",
+            "Lcom/google/common/cache/LocalCache$ValueReference<",
+            "TK;TV;>;)TV;"
+        }
+    .end annotation
+
+    .annotation system Ldalvik/annotation/Throws;
+        value = {
+            Ljava/util/concurrent/ExecutionException;
+        }
+    .end annotation
+
+    .line 1
+    invoke-interface {p3}, Lcom/google/common/cache/LocalCache$ValueReference;->isLoading()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_55
+
+    .line 2
+    invoke-static {p1}, Ljava/lang/Thread;->holdsLock(Ljava/lang/Object;)Z
+
+    move-result v0
+
+    const/4 v1, 0x1
+
+    xor-int/2addr v0, v1
+
+    const-string v2, "Recursive load of: %s"
+
+    invoke-static {v0, v2, p2}, Lcom/google/common/base/Preconditions;->checkState(ZLjava/lang/String;Ljava/lang/Object;)V
+
+    .line 3
+    :try_start_11
+    invoke-interface {p3}, Lcom/google/common/cache/LocalCache$ValueReference;->waitForValue()Ljava/lang/Object;
+
+    move-result-object p3
+
+    if-eqz p3, :cond_28
+
+    .line 4
+    iget-object p2, p0, Lcom/google/common/cache/LocalCache$Segment;->map:Lcom/google/common/cache/LocalCache;
+
+    iget-object p2, p2, Lcom/google/common/cache/LocalCache;->ticker:Lcom/google/common/base/Ticker;
+
+    invoke-virtual {p2}, Lcom/google/common/base/Ticker;->read()J
+
+    move-result-wide v2
+
+    .line 5
+    invoke-virtual {p0, p1, v2, v3}, Lcom/google/common/cache/LocalCache$Segment;->recordRead(Lcom/google/common/cache/ReferenceEntry;J)V
+    :try_end_22
+    .catchall {:try_start_11 .. :try_end_22} :catchall_4e
+
+    .line 6
+    iget-object p1, p0, Lcom/google/common/cache/LocalCache$Segment;->statsCounter:Lcom/google/common/cache/AbstractCache$StatsCounter;
+
+    invoke-interface {p1, v1}, Lcom/google/common/cache/AbstractCache$StatsCounter;->recordMisses(I)V
+
+    return-object p3
+
+    .line 7
+    :cond_28
+    :try_start_28
+    new-instance p1, Lcom/google/common/cache/CacheLoader$InvalidCacheLoadException;
+
+    invoke-static {p2}, Ljava/lang/String;->valueOf(Ljava/lang/Object;)Ljava/lang/String;
+
+    move-result-object p2
+
+    invoke-virtual {p2}, Ljava/lang/String;->length()I
+
+    move-result p3
+
+    add-int/lit8 p3, p3, 0x23
+
+    new-instance v0, Ljava/lang/StringBuilder;
+
+    invoke-direct {v0, p3}, Ljava/lang/StringBuilder;-><init>(I)V
+
+    const-string p3, "CacheLoader returned null for key "
+
+    invoke-virtual {v0, p3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v0, p2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string p2, "."
+
+    invoke-virtual {v0, p2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v0}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object p2
+
+    invoke-direct {p1, p2}, Lcom/google/common/cache/CacheLoader$InvalidCacheLoadException;-><init>(Ljava/lang/String;)V
+
+    throw p1
+    :try_end_4e
+    .catchall {:try_start_28 .. :try_end_4e} :catchall_4e
+
+    :catchall_4e
+    move-exception p1
+
+    .line 8
+    iget-object p2, p0, Lcom/google/common/cache/LocalCache$Segment;->statsCounter:Lcom/google/common/cache/AbstractCache$StatsCounter;
+
+    invoke-interface {p2, v1}, Lcom/google/common/cache/AbstractCache$StatsCounter;->recordMisses(I)V
+
+    .line 9
+    throw p1
+
+    .line 10
+    :cond_55
+    new-instance p1, Ljava/lang/AssertionError;
+
+    invoke-direct {p1}, Ljava/lang/AssertionError;-><init>()V
+
+    throw p1
+.end method
