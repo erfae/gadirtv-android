@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import mpegts from "mpegts.js";
 import Hls from "hls.js";
-import { Play, Search, Tv, Film, Clapperboard, LogOut, Plus, X, ChevronLeft, Home as HomeIcon, ChevronRight, Trash2, Settings, Maximize2, RefreshCw } from "lucide-react";
+import { Play, Search, Tv, Film, Clapperboard, LogOut, Plus, X, ChevronLeft, Home as HomeIcon, ChevronRight, Trash2, Settings, Maximize2, RefreshCw, Volume2, VolumeX } from "lucide-react";
 import { api, IS_ELECTRON } from "./api";
 import "./App.css";
 
@@ -29,6 +29,9 @@ function Profiles({ onSelect, onAdd }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#050505]" data-testid="profile-screen">
       <div className="text-center w-full px-8">
+        <div className="flex justify-center mb-4">
+          <img src="./logo.png" alt="GadirTV" className="w-24 h-24 rounded-2xl shadow-2xl" onError={e=>e.target.style.display='none'}/>
+        </div>
         <h1 className="text-6xl font-medium tracking-tight text-white mb-4" style={{fontFamily:"'Outfit',sans-serif"}}>Gadir<span className="text-red-600">TV</span></h1>
         <p className="text-neutral-500 text-lg mb-12">{manage ? "Toca la papelera para eliminar" : "¿Quién está viendo?"}</p>
         <div className="flex flex-wrap gap-8 justify-center max-w-4xl mx-auto">
@@ -160,30 +163,36 @@ function CategorySection({ kind, profile, onSelect, livePreview }) {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       setLoading(true); setActive(null); setSearch(""); setByCat({}); setErr("");
       try {
         const fn = kind==="live"?api.liveCategories:kind==="movie"?api.vodCategories:api.seriesCategories;
         const data = await fn(profile);
+        if (cancelled) return;
         const c = Array.isArray(data) ? data : [];
         c.sort((a,b)=>String(a.category_name||"").localeCompare(String(b.category_name||""), "es", { numeric: true, sensitivity: "base" }));
         setCats(c);
         if (c.length) setActive(c[0]);
         else setErr("El servidor no devolvió grupos. Comprueba tus credenciales o conexión.");
-      } catch(e) { setErr("No se pudo conectar con el servidor IPTV."); }
-      setLoading(false);
+      } catch(e) { if (!cancelled) setErr("No se pudo conectar con el servidor IPTV."); }
+      if (!cancelled) setLoading(false);
     })();
+    return () => { cancelled = true; };
   }, [kind, profile]);
 
   useEffect(() => {
     if (!active || byCat[active.category_id]) return;
+    let cancelled = false;
     (async () => {
       try {
         const fn = kind==="live"?api.liveStreams:kind==="movie"?api.vodStreams:api.seriesList;
         const data = await fn(profile, active.category_id);
+        if (cancelled) return;
         setByCat(prev => ({ ...prev, [active.category_id]: Array.isArray(data)?data:[] }));
       } catch(e) { console.error(e); }
     })();
+    return () => { cancelled = true; };
   }, [active, kind, profile]);
 
   const items = active ? (byCat[active.category_id]||[]) : [];
@@ -330,6 +339,11 @@ function Player({ item, kind, profile, onClose }) {
   const [loading, setLoading] = useState(true);
   const [currentProgram, setCurrentProgram] = useState(null);
   const [showProgram, setShowProgram] = useState(false);
+  const [volume, setVolume] = useState(() => {
+    const v = parseFloat(localStorage.getItem("gv") || "1");
+    return isNaN(v) ? 1 : v;
+  });
+  const [muted, setMuted] = useState(false);
 
   useEffect(() => {
     if (kind !== "live" || !item.stream_id) return;
@@ -410,12 +424,51 @@ function Player({ item, kind, profile, onClose }) {
     else document.exitFullscreen && document.exitFullscreen();
   };
 
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.volume = volume;
+    v.muted = muted;
+    localStorage.setItem("gv", String(volume));
+  }, [volume, muted]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "ArrowUp") { e.preventDefault(); setVolume(v => Math.min(1, +(v + 0.05).toFixed(2))); setMuted(false); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); setVolume(v => Math.max(0, +(v - 0.05).toFixed(2))); }
+      else if (e.key === "m" || e.key === "M") { setMuted(m => !m); }
+      else if (e.key === "f" || e.key === "F") { toggleFs(); }
+      else if (e.key === "Escape") { if (!document.fullscreenElement) onClose(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <div ref={containerRef} onDoubleClick={toggleFs} className="fixed inset-0 z-[100] bg-black" data-testid="player-screen">
-      <button onClick={onClose} data-testid="close-player-btn" className="absolute top-6 right-6 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white transition-colors" title="Cerrar"><X size={22}/></button>
-      <button onClick={toggleFs} data-testid="fullscreen-btn" className="absolute top-6 right-20 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white transition-colors" title="Pantalla completa (doble clic)"><Maximize2 size={20}/></button>
+      <button onClick={onClose} data-testid="close-player-btn" className="absolute top-6 right-6 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white transition-colors" title="Cerrar (Esc)"><X size={22}/></button>
+      <button onClick={toggleFs} data-testid="fullscreen-btn" className="absolute top-6 right-20 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white transition-colors" title="Pantalla completa (F / doble clic)"><Maximize2 size={20}/></button>
       <div className="absolute top-6 left-6 z-10 text-white text-xl font-medium max-w-[70%] truncate">{item.name || item.title}</div>
       <video ref={videoRef} controls autoPlay playsInline className="w-full h-full object-contain bg-black" data-testid="video-player"/>
+
+      {/* Custom volume slider (bottom-right) */}
+      <div className="absolute bottom-6 right-6 z-10 flex items-center gap-3 px-4 py-2.5 rounded-full bg-black/70 backdrop-blur border border-white/10" data-testid="volume-panel">
+        <button onClick={()=>setMuted(m=>!m)} data-testid="mute-btn" className="text-white hover:text-red-400 transition-colors" title="Silenciar (M)">
+          {muted || volume === 0 ? <VolumeX size={20}/> : <Volume2 size={20}/>}
+        </button>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.02"
+          value={muted ? 0 : volume}
+          onChange={e=>{ setMuted(false); setVolume(parseFloat(e.target.value)); }}
+          data-testid="volume-slider"
+          className="w-32 accent-red-600 cursor-pointer"
+        />
+        <span className="text-xs text-neutral-400 w-8 text-right tabular-nums">{Math.round((muted?0:volume)*100)}%</span>
+      </div>
+
       {loading && !err && <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-neutral-400" data-testid="player-loading">Cargando stream...</div>}
       {err && <div className="absolute bottom-24 left-1/2 -translate-x-1/2 text-red-400 bg-black/85 border border-red-500/30 px-5 py-3 rounded-lg max-w-lg text-center text-sm" data-testid="player-error">{err}</div>}
       {currentProgram && showProgram && (
@@ -709,9 +762,10 @@ function App() {
       {screen==="login" && <Login onLogin={p=>{store.setActive(p);setProfile(p);setScreen("main");}} onCancel={()=>setScreen("profiles")}/>}
       {screen==="main" && profile && (
         <Main
+          key={profile.username}
           profile={profile}
-          onLogout={()=>{store.setActive(null);setProfile(null);setScreen("profiles");}}
-          onSwitch={()=>setScreen("profiles")}
+          onLogout={()=>{store.setActive(null);setProfile(null);setPlaying(null);setSeriesOpen(null);setMovieOpen(null);setScreen("profiles");}}
+          onSwitch={()=>{setPlaying(null);setSeriesOpen(null);setMovieOpen(null);setScreen("profiles");}}
           onPlay={(i,k)=>setPlaying({item:i,kind:k})}
           onOpenSeries={s=>setSeriesOpen(s)}
           onOpenMovie={m=>setMovieOpen(m)}
