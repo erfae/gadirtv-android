@@ -153,18 +153,8 @@
 
     invoke-direct {v0, v2}, Ljava/net/URL;-><init>(Ljava/lang/String;)V
 
-    invoke-virtual {v0}, Ljava/net/URL;->openConnection()Ljava/net/URLConnection;
-
-    move-result-object v0
-
-    const-string v2, "User-Agent"
-
-    const-string v3, "VLC/3.0.20 LibVLC/3.0.20"
-
-    invoke-virtual {v0, v2, v3}, Ljava/net/URLConnection;->setRequestProperty(Ljava/lang/String;Ljava/lang/String;)V
-
     .line 9
-    invoke-virtual {v0}, Ljava/net/URLConnection;->getInputStream()Ljava/io/InputStream;
+    invoke-virtual {v0}, Ljava/net/URL;->openStream()Ljava/io/InputStream;
 
     move-result-object v0
 

@@ -398,7 +398,7 @@
 
     if-eqz v3, :cond_1
 
-    const-string v4, "gadir.co:80/get.php"
+    const-string v4, "gadir.co"
 
     invoke-virtual {v3, v4}, Ljava/lang/String;->contains(Ljava/lang/CharSequence;)Z
 
@@ -407,7 +407,7 @@
     if-nez v4, :cond_2
 
     :cond_1
-    const-string v3, "http://gadir.co:80/get.php?username=&password=&type=m3u_plus&output=mpegts"
+    const-string v3, "http://gadir.co:80/get.php?username=&password=&output=ts&type=m3u_plus"
 
     invoke-virtual {v2, v3}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->setUrl(Ljava/lang/String;)V
 

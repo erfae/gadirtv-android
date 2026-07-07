@@ -1140,30 +1140,11 @@
 
     invoke-virtual {v0, v1}, Landroid/view/View;->setVisibility(I)V
 
+    .line 2
     invoke-virtual {p1}, Lcom/nettv/livestore/models/AppInfoModel$UrlModel;->getUrl()Ljava/lang/String;
 
     move-result-object v0
 
-    iget v2, p0, Lcom/nettv/livestore/activities/ChangePlaylistActivity;->playlist_position:I
-
-    const/4 v1, 0x1
-
-    if-ne v2, v1, :cond_normal_flow
-
-    iget-object v2, p0, Lcom/nettv/livestore/activities/ChangePlaylistActivity;->preferenceHelper:Lcom/nettv/livestore/helper/PreferenceHelper;
-
-    invoke-virtual {v2, v1}, Lcom/nettv/livestore/helper/PreferenceHelper;->setSharedPreferenceISM3U(Z)V
-
-    iget-object v1, p0, Lcom/nettv/livestore/activities/ChangePlaylistActivity;->wordModels:Lcom/nettv/livestore/models/WordModels;
-
-    invoke-virtual {p0, v0, v1}, Lcom/nettv/livestore/apps/BaseActivity;->reloadM3UData(Ljava/lang/String;Lcom/nettv/livestore/models/WordModels;)V
-
-    return-void
-
-    :cond_normal_flow
-    const/4 v1, 0x0
-
-    .line 2
     const-string v2, "username"
 
     invoke-virtual {v0, v2}, Ljava/lang/String;->contains(Ljava/lang/CharSequence;)Z
