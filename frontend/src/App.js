@@ -88,6 +88,57 @@ function Profiles({ onSelect, onAdd }) {
 function Login({ onLogin, onCancel }) {
   const [name, setName] = useState(""), [u, setU] = useState(""), [p, setP] = useState("");
   const [loading, setLoading] = useState(false), [warn, setWarn] = useState("");
+  const [diag, setDiag] = useState(null), [diagLoading, setDiagLoading] = useState(false);
+  const runDiag = async () => {
+    setDiag(null); setDiagLoading(true);
+    const lines = [];
+    lines.push(`IS_ELECTRON = ${IS_ELECTRON}`);
+    lines.push(`window.electronAPI present = ${!!(typeof window !== 'undefined' && window.electronAPI)}`);
+    lines.push(`window.electronAPI.xtreamGet present = ${!!(typeof window !== 'undefined' && window.electronAPI && window.electronAPI.xtreamGet)}`);
+    lines.push('');
+    const testU = u || 'seismeses01';
+    const testP = p || '3d13zxs5oz';
+    // 1) IPC / Node.js path
+    if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.xtreamGet) {
+      lines.push('--- [1] Node.js IPC path (main process) ---');
+      try {
+        const t0 = Date.now();
+        const res = await window.electronAPI.xtreamGet({
+          baseUrl: 'http://gadir.co:80', username: testU, password: testP,
+        });
+        const ms = Date.now() - t0;
+        lines.push(`ok=${res && res.ok} status=${res && res.status} time=${ms}ms`);
+        if (res && res.error) lines.push(`error: ${res.error}`);
+        if (res && res.data) {
+          const snippet = typeof res.data === 'string'
+            ? res.data.slice(0, 200)
+            : JSON.stringify(res.data).slice(0, 200);
+          lines.push(`data: ${snippet}`);
+        }
+      } catch (e) {
+        lines.push(`EXCEPTION: ${e.message}`);
+      }
+    } else {
+      lines.push('--- [1] Node.js IPC path: NOT AVAILABLE (this is the bug!) ---');
+    }
+    lines.push('');
+    // 2) Renderer axios path (baseline)
+    lines.push('--- [2] Renderer axios path (Chromium) ---');
+    try {
+      const t0 = Date.now();
+      const r = await axios.get('http://gadir.co:80/player_api.php', {
+        params: { username: testU, password: testP },
+        timeout: 10000,
+      });
+      lines.push(`ok status=${r.status} time=${Date.now()-t0}ms`);
+      const snippet = typeof r.data === 'string' ? r.data.slice(0, 200) : JSON.stringify(r.data).slice(0, 200);
+      lines.push(`data: ${snippet}`);
+    } catch (e) {
+      lines.push(`FAIL: ${e.message}${e.code ? ' code=' + e.code : ''}`);
+    }
+    setDiag(lines.join('\n'));
+    setDiagLoading(false);
+  };
   const submit = async (e) => {
     e.preventDefault(); setWarn(""); setLoading(true);
     const prof = { name: name || u, username: u, password: p };
@@ -109,7 +160,7 @@ function Login({ onLogin, onCancel }) {
     onLogin(prof);
   };
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#050505]" style={{backgroundImage:"linear-gradient(rgba(0,0,0,0.75),rgba(5,5,5,1)),url(https://images.unsplash.com/photo-1489599328109-c6b8b7cfd3aa?w=1920)",backgroundSize:"cover"}} data-testid="login-screen">
+    <div className="min-h-screen flex items-center justify-center bg-[#050505] py-10" style={{backgroundImage:"linear-gradient(rgba(0,0,0,0.75),rgba(5,5,5,1)),url(https://images.unsplash.com/photo-1489599328109-c6b8b7cfd3aa?w=1920)",backgroundSize:"cover"}} data-testid="login-screen">
       <div className="w-full max-w-md p-10 rounded-3xl backdrop-blur-2xl bg-black/60 border border-white/10">
         <button onClick={onCancel} className="text-neutral-500 hover:text-white mb-6 flex items-center gap-2" data-testid="back-btn"><ChevronLeft size={20}/>Volver</button>
         <img src="./gadir-logo.png" alt="GadirTV" className="w-48 h-auto mb-6 drop-shadow-xl" style={{filter:"drop-shadow(0 0 20px rgba(220,38,38,0.5))"}} onError={e=>e.target.style.display='none'}/>
@@ -117,10 +168,16 @@ function Login({ onLogin, onCancel }) {
           <input placeholder="Nombre perfil (opcional)" value={name} onChange={e=>setName(e.target.value)} className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600" data-testid="profile-name-input"/>
           <input placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="username-input"/>
           <input type="password" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="password-input"/>
-          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span></div>
+          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.0.1</div>
           {warn && <div className="text-amber-400 text-xs text-center" data-testid="warn-msg">{warn}</div>}
           <button type="submit" disabled={loading} className="w-full py-4 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium transition-colors disabled:opacity-50" data-testid="login-btn">{loading?"Guardando...":"Entrar"}</button>
         </form>
+        <button type="button" onClick={runDiag} disabled={diagLoading} className="mt-4 w-full py-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm transition-colors disabled:opacity-50" data-testid="diag-btn">
+          {diagLoading ? "Probando..." : "Diagnóstico de conexión con gadir.co"}
+        </button>
+        {diag && (
+          <pre data-testid="diag-output" className="mt-3 p-3 text-[11px] leading-relaxed bg-black/80 border border-red-800/40 rounded-xl text-green-300 whitespace-pre-wrap break-all max-h-72 overflow-auto">{diag}</pre>
+        )}
       </div>
     </div>
   );
