@@ -151,7 +151,7 @@ function Rail({ title, items, onSelect, big, sm }) {
   );
 }
 
-function CategorySection({ kind, profile, onSelect }) {
+function CategorySection({ kind, profile, onSelect, livePreview }) {
   const [cats, setCats] = useState([]);
   const [byCat, setByCat] = useState({});
   const [active, setActive] = useState(null);
@@ -202,14 +202,14 @@ function CategorySection({ kind, profile, onSelect }) {
       {loading && <div className="text-neutral-500 py-20" data-testid="loading">Cargando...</div>}
       {!loading && err && <div className="text-red-400 py-20 text-center" data-testid="cat-error">{err}</div>}
       {!loading && !err && (
-        <div className="grid grid-cols-[220px_1fr] gap-6">
+        <div className={"grid gap-6 " + (kind==="live" ? "grid-cols-[200px_1fr_480px]" : "grid-cols-[220px_1fr]")}>
           <aside className="max-h-[calc(100vh-220px)] overflow-y-auto pr-2 scrollbar-thin">
             <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-3">Grupos ({cats.length})</h3>
             <div className="space-y-1">
               {cats.map(c => (
-                <button key={c.category_id} onClick={()=>setActive(c)} data-testid={`cat-${c.category_id}`} className={"w-full text-left px-4 py-2.5 rounded-lg text-sm transition-all flex items-center justify-between group " + (active?.category_id===c.category_id?"bg-red-600 text-white":"text-neutral-400 hover:bg-white/5 hover:text-white")}>
+                <button key={c.category_id} onClick={()=>setActive(c)} data-testid={`cat-${c.category_id}`} className={"w-full text-left px-3 py-2 rounded-lg text-xs transition-all flex items-center justify-between group " + (active?.category_id===c.category_id?"bg-red-600 text-white":"text-neutral-400 hover:bg-white/5 hover:text-white")}>
                   <span className="truncate">{c.category_name}</span>
-                  <ChevronRight size={14} className="opacity-0 group-hover:opacity-60"/>
+                  <ChevronRight size={12} className="opacity-0 group-hover:opacity-60"/>
                 </button>
               ))}
             </div>
@@ -217,14 +217,21 @@ function CategorySection({ kind, profile, onSelect }) {
           <main>
             {active && <h2 className="text-base text-neutral-400 mb-3">{active.category_name} <span className="text-neutral-600">· {filtered.length}</span></h2>}
             {kind === "live" ? (
-              <div className="space-y-1 max-h-[calc(100vh-200px)] overflow-y-auto pr-2 scrollbar-thin">
+              <div className="space-y-0.5 max-h-[calc(100vh-200px)] overflow-y-auto pr-2 scrollbar-thin">
                 {filtered.map((it, i) => (
-                  <button key={i} onClick={()=>onSelect(it, kind)} data-testid={`card-${it.stream_id}`} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-white/5 transition-colors group">
-                    <div className="w-10 h-10 rounded bg-neutral-900 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                  <button
+                    key={i}
+                    onClick={()=>onSelect(it, kind)}
+                    onDoubleClick={()=>onSelect(it, "live_fs")}
+                    data-testid={`card-${it.stream_id}`}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-white/5 transition-colors group"
+                    title="Clic: previsualizar · Doble clic: pantalla completa"
+                  >
+                    <div className="w-9 h-9 rounded bg-neutral-900 overflow-hidden flex-shrink-0 flex items-center justify-center">
                       <img src={api.proxyImg(it.stream_icon) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="w-full h-full object-contain" loading="lazy" alt=""/>
                     </div>
                     <span className="text-neutral-300 group-hover:text-white text-sm truncate flex-1">{it.name}</span>
-                    <Play size={14} className="text-neutral-600 group-hover:text-red-500 flex-shrink-0"/>
+                    <Play size={13} className="text-neutral-600 group-hover:text-red-500 flex-shrink-0"/>
                   </button>
                 ))}
               </div>
@@ -235,6 +242,11 @@ function CategorySection({ kind, profile, onSelect }) {
             )}
             {!filtered.length && active && <p className="text-neutral-500">No hay contenido en este grupo</p>}
           </main>
+          {kind === "live" && (
+            <aside className="sticky top-4 self-start">
+              {livePreview}
+            </aside>
+          )}
         </div>
       )}
     </div>
@@ -274,15 +286,15 @@ function HomeTab({ profile, onSelect }) {
   return (
     <div className="flex flex-col h-screen pb-24 overflow-hidden" data-testid="home-tab">
       {hero && (
-        <div className="relative flex-shrink-0" style={{height:"38vh"}}>
-          <img src={api.proxyImg(hero.stream_icon||hero.cover) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover" alt=""/>
+        <div className="relative flex-shrink-0" style={{height:"50vh"}}>
+          <img src={api.proxyImg(hero.stream_icon||hero.cover) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover animate-slow-zoom" alt=""/>
           <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/50 to-transparent"/>
           <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent"/>
           <div className="absolute bottom-6 left-8 max-w-2xl">
             <p className="text-red-500 text-xs font-medium tracking-widest uppercase mb-2">{hero.series_id?"Serie":"Película"} · Reciente</p>
             <h1 className="text-3xl md:text-4xl font-medium tracking-tight mb-3" style={{fontFamily:"'Outfit',sans-serif"}}>{hero.name}</h1>
             <button onClick={()=>onSelect(hero, hero.series_id?"series":"movie")} data-testid="hero-play-btn" className="flex items-center gap-2 bg-white text-black px-6 py-2 rounded-full font-medium hover:bg-neutral-200 transition-colors text-sm">
-              <Play size={16} fill="black"/>Reproducir
+              <Play size={16} fill="black"/>Ver detalles
             </button>
           </div>
         </div>
@@ -298,8 +310,37 @@ function HomeTab({ profile, onSelect }) {
 
 function Player({ item, kind, profile, onClose }) {
   const videoRef = useRef(null);
+  const containerRef = useRef(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
+  const [currentProgram, setCurrentProgram] = useState(null);
+  const [showProgram, setShowProgram] = useState(false);
+
+  useEffect(() => {
+    if (kind !== "live" || !item.stream_id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.shortEpg(profile, item.stream_id, 4);
+        const list = Array.isArray(data) ? data : (data && Array.isArray(data.epg_listings) ? data.epg_listings : []);
+        const now = Date.now() / 1000;
+        const cur = list.find(e => {
+          const s = parseInt(e.start_timestamp || 0), t = parseInt(e.stop_timestamp || 0);
+          return s <= now && now < t;
+        }) || list[0];
+        if (cancelled || !cur) return;
+        setCurrentProgram({
+          title: decodeB64(cur.title) || "",
+          start: fmtTime(cur.start_timestamp),
+          end: fmtTime(cur.stop_timestamp),
+        });
+        setShowProgram(true);
+        setTimeout(() => !cancelled && setShowProgram(false), 6000);
+      } catch (_) {}
+    })();
+    return () => { cancelled = true; };
+  }, [item, kind, profile]);
+
   useEffect(() => {
     let mp, hlsInst;
     (async () => {
@@ -315,17 +356,17 @@ function Player({ item, kind, profile, onClose }) {
           mp = mpegts.createPlayer(
             { type: "mpegts", isLive: true, url },
             {
-              enableStashBuffer: false,
-              stashInitialSize: 128,
-              liveBufferLatencyChasing: true,
-              liveBufferLatencyMaxLatency: 3.0,
-              liveBufferLatencyMinRemain: 0.5,
+              enableStashBuffer: true,
+              stashInitialSize: 1024,
               lazyLoad: false,
+              lazyLoadMaxDuration: 3 * 60,
               autoCleanupSourceBuffer: true,
-              fixAudioTimestampGap: false,
+              autoCleanupMaxBackwardDuration: 30,
+              autoCleanupMinBackwardDuration: 15,
+              seekType: "range",
             }
           );
-          mp.on(mpegts.Events.ERROR, (type, detail, info) => {
+          mp.on(mpegts.Events.ERROR, (type, detail) => {
             setErr(`Error de reproducción: ${type} ${detail}`);
           });
           mp.attachMediaElement(v);
@@ -338,7 +379,7 @@ function Player({ item, kind, profile, onClose }) {
           v.play().catch(()=>{}); setLoading(false);
         } else {
           v.src = url;
-          try { await v.play(); } catch(e) { /* user gesture may be needed */ }
+          try { await v.play(); } catch (e) { /* user gesture may be needed */ }
           setLoading(false);
         }
       } catch (e) {
@@ -347,13 +388,29 @@ function Player({ item, kind, profile, onClose }) {
     })();
     return () => { try { if (mp) mp.destroy(); } catch (_) {} try { if (hlsInst) hlsInst.destroy(); } catch (_) {} };
   }, [item, kind, profile]);
+
+  const toggleFs = () => {
+    const el = containerRef.current;
+    if (!document.fullscreenElement) el && el.requestFullscreen && el.requestFullscreen().catch(()=>{});
+    else document.exitFullscreen && document.exitFullscreen();
+  };
+
   return (
-    <div className="fixed inset-0 z-[100] bg-black" data-testid="player-screen">
+    <div ref={containerRef} onDoubleClick={toggleFs} className="fixed inset-0 z-[100] bg-black" data-testid="player-screen">
       <button onClick={onClose} data-testid="close-player-btn" className="absolute top-6 right-6 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center text-white"><X size={24}/></button>
-      <div className="absolute top-6 left-6 z-10 text-white text-xl font-medium max-w-[70%] truncate">{item.name}</div>
+      <div className="absolute top-6 left-6 z-10 text-white text-xl font-medium max-w-[70%] truncate">{item.name || item.title}</div>
       <video ref={videoRef} controls autoPlay playsInline className="w-full h-full object-contain bg-black" data-testid="video-player"/>
       {loading && !err && <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-neutral-400" data-testid="player-loading">Cargando stream...</div>}
       {err && <div className="absolute bottom-24 left-1/2 -translate-x-1/2 text-red-400 bg-black/85 border border-red-500/30 px-5 py-3 rounded-lg max-w-lg text-center text-sm" data-testid="player-error">{err}</div>}
+      {currentProgram && showProgram && (
+        <div className={"absolute bottom-24 left-6 z-10 max-w-lg px-5 py-3 rounded-xl bg-black/85 backdrop-blur border border-white/10 shadow-2xl transition-opacity duration-500 " + (showProgram ? "opacity-100" : "opacity-0")} data-testid="current-program-toast">
+          <div className="text-[10px] uppercase tracking-widest text-red-500 font-medium mb-1">Ahora en emisión</div>
+          <div className="text-white font-medium text-base truncate">{currentProgram.title}</div>
+          {(currentProgram.start || currentProgram.end) && (
+            <div className="text-neutral-400 text-xs mt-0.5">{currentProgram.start} → {currentProgram.end}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -439,22 +496,182 @@ function SeriesDetail({ series, profile, onClose, onPlay }) {
   );
 }
 
-function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries }) {
+function MovieDetail({ movie, profile, onClose, onPlay }) {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = IS_ELECTRON
+          ? await api.vodStreams(profile).then(()=>null).catch(()=>null)
+          : null;
+        // richer info requires extra endpoint; skip if fails
+        setInfo(data);
+      } catch(_) {}
+    })();
+  }, [movie, profile]);
+  const cover = api.proxyImg(movie.stream_icon || movie.cover) || IMG_FB;
+  const meta = movie || {};
+  return (
+    <div className="fixed inset-0 z-[95] bg-black/95 backdrop-blur-xl overflow-y-auto" data-testid="movie-detail" onClick={onClose}>
+      <div className="min-h-screen flex items-center justify-center p-8" onClick={e=>e.stopPropagation()}>
+        <div className="relative w-full max-w-5xl bg-[#0a0a0a] rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+          <button onClick={onClose} data-testid="close-movie-btn" className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-black/70 hover:bg-black/90 flex items-center justify-center text-white border border-white/10"><X size={18}/></button>
+          <div className="grid md:grid-cols-[300px_1fr] gap-0">
+            <div className="relative aspect-[2/3] overflow-hidden bg-neutral-900">
+              <img src={cover} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover animate-slow-zoom" alt=""/>
+            </div>
+            <div className="p-8 flex flex-col">
+              <h1 className="text-3xl font-medium tracking-tight mb-3" style={{fontFamily:"'Outfit',sans-serif"}}>{meta.name}</h1>
+              <div className="text-sm text-neutral-500 mb-6">Película</div>
+              <button onClick={()=>onPlay(movie, "movie")} data-testid="detail-play-btn" className="self-start flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-full font-medium transition-colors mb-6">
+                <Play size={18} fill="white"/>Reproducir
+              </button>
+              <p className="text-neutral-400 text-sm">Pulsa reproducir para ver la película. Se abrirá el reproductor en pantalla completa. Doble clic para alternar pantalla completa.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function decodeB64(s) {
+  if (!s) return "";
+  try { return decodeURIComponent(escape(atob(s))); } catch (_) { try { return atob(s); } catch (_) { return s; } }
+}
+
+function fmtTime(ts) {
+  if (!ts) return "";
+  const d = typeof ts === "number" ? new Date(ts * 1000) : new Date(String(ts).replace(" ", "T"));
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function LivePreview({ channel, profile, onFullscreen, onClose }) {
+  const videoRef = useRef(null);
+  const [err, setErr] = useState("");
+  const [epg, setEpg] = useState([]);
+  const [epgLoading, setEpgLoading] = useState(false);
+
+  useEffect(() => {
+    let mp;
+    setErr("");
+    if (!channel) return;
+    const url = api.streamUrl(profile, { stream_id: channel.stream_id, kind: "live", ext: "ts" });
+    const v = videoRef.current;
+    if (!v) return;
+    try {
+      if (mpegts && mpegts.isSupported && mpegts.isSupported()) {
+        mp = mpegts.createPlayer(
+          { type: "mpegts", isLive: true, url },
+          { enableStashBuffer: true, stashInitialSize: 512, lazyLoad: false, autoCleanupSourceBuffer: true }
+        );
+        mp.on(mpegts.Events.ERROR, (type, detail) => setErr(`${type}: ${detail}`));
+        mp.attachMediaElement(v);
+        mp.load();
+        mp.play().catch(e => setErr(e.message));
+      } else {
+        v.src = url;
+        v.play().catch(()=>{});
+      }
+    } catch (e) { setErr(e.message); }
+    return () => { try { if (mp) mp.destroy(); } catch (_) {} };
+  }, [channel, profile]);
+
+  useEffect(() => {
+    if (!channel) { setEpg([]); return; }
+    let cancelled = false;
+    (async () => {
+      setEpgLoading(true);
+      try {
+        const data = await api.shortEpg(profile, channel.stream_id, 8);
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : (data && Array.isArray(data.epg_listings) ? data.epg_listings : []);
+        setEpg(list);
+      } catch (_) { if (!cancelled) setEpg([]); }
+      setEpgLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [channel, profile]);
+
+  if (!channel) {
+    return (
+      <div className="rounded-xl bg-neutral-900/50 border border-white/5 aspect-video flex items-center justify-center text-neutral-600 text-sm" data-testid="live-preview-empty">
+        Selecciona un canal para previsualizar
+      </div>
+    );
+  }
+
+  const now = Date.now() / 1000;
+  const current = epg.find(e => {
+    const s = parseInt(e.start_timestamp || 0), t = parseInt(e.stop_timestamp || 0);
+    return s <= now && now < t;
+  }) || epg[0];
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="relative rounded-xl overflow-hidden bg-black border border-white/10" data-testid="live-preview">
+        <video ref={videoRef} controls autoPlay muted playsInline onDoubleClick={onFullscreen} className="w-full aspect-video object-contain bg-black cursor-pointer" data-testid="preview-video"/>
+        <div className="p-3 flex items-center justify-between bg-neutral-950/80 backdrop-blur">
+          <div className="text-sm text-white truncate mr-3">{channel.name}</div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={onFullscreen} data-testid="preview-fs-btn" className="px-3 py-1.5 rounded-full bg-red-600 hover:bg-red-500 text-white text-xs font-medium flex items-center gap-1.5">
+              <Play size={12} fill="white"/>Pantalla completa
+            </button>
+            <button onClick={onClose} data-testid="preview-close-btn" className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"><X size={13}/></button>
+          </div>
+        </div>
+        {err && <div className="absolute top-2 left-2 text-red-400 bg-black/80 px-2 py-1 rounded text-xs">{err}</div>}
+      </div>
+
+      <div className="rounded-xl bg-neutral-900/40 border border-white/5 p-3" data-testid="epg-panel">
+        <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-2 px-1">Guía de programación</h3>
+        {epgLoading && <div className="text-neutral-500 text-xs p-2">Cargando EPG...</div>}
+        {!epgLoading && epg.length === 0 && <div className="text-neutral-600 text-xs p-2">Sin información de programación</div>}
+        {!epgLoading && epg.length > 0 && (
+          <div className="max-h-[35vh] overflow-y-auto scrollbar-thin space-y-1 pr-1">
+            {epg.map((e, i) => {
+              const isCurrent = current && (current.id === e.id || (current.start_timestamp === e.start_timestamp));
+              return (
+                <div key={i} data-testid={`epg-${i}`} className={"px-3 py-2 rounded-lg text-xs " + (isCurrent ? "bg-red-600/15 border border-red-600/30" : "hover:bg-white/5")}>
+                  <div className="flex items-baseline gap-2 mb-0.5">
+                    <span className={"font-medium " + (isCurrent ? "text-red-400" : "text-neutral-400")}>{fmtTime(e.start_timestamp) || fmtTime(e.start)}</span>
+                    <span className="text-neutral-600">→</span>
+                    <span className="text-neutral-500">{fmtTime(e.stop_timestamp) || fmtTime(e.end)}</span>
+                    {isCurrent && <span className="ml-auto text-[10px] uppercase tracking-widest text-red-500">Ahora</span>}
+                  </div>
+                  <div className={isCurrent ? "text-white font-medium" : "text-neutral-300"}>{decodeB64(e.title) || "Programa"}</div>
+                  {isCurrent && e.description && <div className="text-neutral-500 text-[11px] mt-1 line-clamp-2">{decodeB64(e.description)}</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }) {
   const [tab, setTab] = useState("home");
-  const handle = (item, kind) => {
+  const [liveChannel, setLiveChannel] = useState(null);
+  const handleSelect = (item, kind) => {
     if (kind === "series") onOpenSeries(item);
-    else onPlay(item, kind);
+    else if (kind === "movie") onOpenMovie(item);
+    else if (kind === "live_fs") onPlay(item, "live");
+    else if (kind === "live") setLiveChannel(item);
   };
+  useEffect(() => { if (tab !== "live") setLiveChannel(null); }, [tab]);
   return (
     <div className="min-h-screen bg-[#050505] text-white">
       <div className="fixed top-4 right-6 z-30 flex items-center gap-3">
         <button onClick={onSwitch} data-testid="switch-profile-btn" className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center font-medium text-white shadow-lg">{profile.name.charAt(0).toUpperCase()}</button>
         <button onClick={onLogout} data-testid="logout-btn" className="w-10 h-10 rounded-lg bg-black/60 hover:bg-black/80 flex items-center justify-center text-neutral-400 hover:text-white backdrop-blur"><LogOut size={18}/></button>
       </div>
-      {tab==="home" && <HomeTab profile={profile} onSelect={handle}/>}
-      {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={handle}/>}
-      {tab==="movies" && <CategorySection kind="movie" profile={profile} onSelect={handle}/>}
-      {tab==="series" && <CategorySection kind="series" profile={profile} onSelect={handle}/>}
+      {tab==="home" && <HomeTab profile={profile} onSelect={handleSelect}/>}
+      {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={handleSelect} livePreview={<LivePreview channel={liveChannel} profile={profile} onFullscreen={()=>liveChannel && onPlay(liveChannel, "live")} onClose={()=>setLiveChannel(null)}/>}/>}
+      {tab==="movies" && <CategorySection kind="movie" profile={profile} onSelect={handleSelect}/>}
+      {tab==="series" && <CategorySection kind="series" profile={profile} onSelect={handleSelect}/>}
       <BottomNav tab={tab} setTab={setTab}/>
     </div>
   );
@@ -465,6 +682,7 @@ function App() {
   const [profile, setProfile] = useState(null);
   const [playing, setPlaying] = useState(null);
   const [seriesOpen, setSeriesOpen] = useState(null);
+  const [movieOpen, setMovieOpen] = useState(null);
   useEffect(() => {
     const a = store.getActive();
     if (a) { setProfile(a); setScreen("main"); }
@@ -473,8 +691,18 @@ function App() {
     <div className="App">
       {screen==="profiles" && <Profiles onSelect={p=>{store.setActive(p);setProfile(p);setScreen("main");}} onAdd={()=>setScreen("login")}/>}
       {screen==="login" && <Login onLogin={p=>{store.setActive(p);setProfile(p);setScreen("main");}} onCancel={()=>setScreen("profiles")}/>}
-      {screen==="main" && profile && <Main profile={profile} onLogout={()=>{store.setActive(null);setProfile(null);setScreen("profiles");}} onSwitch={()=>setScreen("profiles")} onPlay={(i,k)=>setPlaying({item:i,kind:k})} onOpenSeries={s=>setSeriesOpen(s)}/>}
-      {seriesOpen && profile && <SeriesDetail series={seriesOpen} profile={profile} onClose={()=>setSeriesOpen(null)} onPlay={(ep,k)=>{setPlaying({item:ep,kind:k});}}/>}
+      {screen==="main" && profile && (
+        <Main
+          profile={profile}
+          onLogout={()=>{store.setActive(null);setProfile(null);setScreen("profiles");}}
+          onSwitch={()=>setScreen("profiles")}
+          onPlay={(i,k)=>setPlaying({item:i,kind:k})}
+          onOpenSeries={s=>setSeriesOpen(s)}
+          onOpenMovie={m=>setMovieOpen(m)}
+        />
+      )}
+      {movieOpen && profile && <MovieDetail movie={movieOpen} profile={profile} onClose={()=>setMovieOpen(null)} onPlay={(m,k)=>{setMovieOpen(null); setPlaying({item:m,kind:k});}}/>}
+      {seriesOpen && profile && <SeriesDetail series={seriesOpen} profile={profile} onClose={()=>setSeriesOpen(null)} onPlay={(ep,k)=>{setSeriesOpen(null); setPlaying({item:ep,kind:k});}}/>}
       {playing && profile && <Player item={playing.item} kind={playing.kind} profile={profile} onClose={()=>setPlaying(null)}/>}
     </div>
   );

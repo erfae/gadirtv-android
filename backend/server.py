@@ -1,8 +1,9 @@
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
+import os
 from urllib.parse import quote
 
 app = FastAPI()
@@ -31,6 +32,14 @@ async def xtream_get(action: str, username: str, password: str, extra: dict | No
 @app.get("/api/")
 async def root():
     return {"service": "GadirTV proxy", "host": XTREAM_HOST}
+
+
+@app.get("/api/download/installer")
+async def download_installer():
+    path = "/app/electron/GadirTV-Setup-1.0.0.exe"
+    if not os.path.exists(path):
+        raise HTTPException(404, "installer not built yet")
+    return FileResponse(path, filename="GadirTV-Setup-1.0.0.exe", media_type="application/octet-stream")
 
 @app.post("/api/login")
 async def login(body: LoginBody):
@@ -73,6 +82,10 @@ async def series_list(username: str, password: str, category_id: str | None = No
 @app.get("/api/series/info")
 async def series_info(username: str, password: str, series_id: str):
     return await xtream_get("get_series_info", username, password, {"series_id": series_id})
+
+@app.get("/api/epg/short")
+async def epg_short(username: str, password: str, stream_id: str, limit: int = 10):
+    return await xtream_get("get_short_epg", username, password, {"stream_id": stream_id, "limit": limit})
 
 @app.get("/api/stream_url")
 async def stream_url(username: str, password: str, stream_id: str, kind: str = "live", ext: str = "ts"):

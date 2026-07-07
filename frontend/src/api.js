@@ -88,6 +88,12 @@ export const api = {
       : (await axios.get(`${PROXY}/series/info`, { params: { ...profile, series_id } })).data;
   },
 
+  async shortEpg(profile, stream_id, limit = 10) {
+    return IS_ELECTRON
+      ? xtreamGet(profile.username, profile.password, "get_short_epg", { stream_id, limit })
+      : (await axios.get(`${PROXY}/epg/short`, { params: { ...profile, stream_id, limit } })).data;
+  },
+
   // Returns the actual playable URL for a stream. In Electron this is
   // gadir.co direct (no CORS/Mixed-Content issues). In browser we use the
   // backend streaming proxy.
