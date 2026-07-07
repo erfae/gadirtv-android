@@ -228,10 +228,9 @@ function CategorySection({ kind, profile, onSelect, livePreview }) {
                   <button
                     key={i}
                     onClick={()=>onSelect(it, kind)}
-                    onDoubleClick={()=>onSelect(it, "live_fs")}
                     data-testid={`card-${it.stream_id}`}
                     className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-white/5 transition-colors group"
-                    title="Clic: previsualizar · Doble clic: pantalla completa"
+                    title="Clic: previsualizar canal"
                   >
                     <div className="w-9 h-9 rounded bg-neutral-900 overflow-hidden flex-shrink-0 flex items-center justify-center">
                       <img src={api.proxyImg(it.stream_icon) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="w-full h-full object-contain" loading="lazy" alt=""/>
@@ -613,11 +612,14 @@ function fmtTime(ts) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function LivePreview({ channel, profile, onFullscreen, onClose }) {
+function LivePreview({ channel, profile, onClose }) {
   const videoRef = useRef(null);
+  const containerRef = useRef(null);
   const [err, setErr] = useState("");
   const [epg, setEpg] = useState([]);
   const [epgLoading, setEpgLoading] = useState(false);
+  const [currentTitle, setCurrentTitle] = useState("");
+  const [showTitle, setShowTitle] = useState(false);
 
   useEffect(() => {
     let mp;
@@ -630,7 +632,16 @@ function LivePreview({ channel, profile, onFullscreen, onClose }) {
       if (mpegts && mpegts.isSupported && mpegts.isSupported()) {
         mp = mpegts.createPlayer(
           { type: "mpegts", isLive: true, url },
-          { enableStashBuffer: true, stashInitialSize: 512, lazyLoad: false, autoCleanupSourceBuffer: true }
+          {
+            enableStashBuffer: true,
+            stashInitialSize: 1024,
+            enableWorker: true,
+            fixAudioTimestampGap: true,
+            lazyLoad: false,
+            autoCleanupSourceBuffer: true,
+            autoCleanupMaxBackwardDuration: 30,
+            autoCleanupMinBackwardDuration: 15,
+          }
         );
         mp.on(mpegts.Events.ERROR, (type, detail) => setErr(`${type}: ${detail}`));
         mp.attachMediaElement(v);
@@ -660,6 +671,33 @@ function LivePreview({ channel, profile, onFullscreen, onClose }) {
     return () => { cancelled = true; };
   }, [channel, profile]);
 
+  const goFullscreen = () => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen && el.requestFullscreen().catch(()=>{});
+    } else {
+      document.exitFullscreen && document.exitFullscreen();
+    }
+    // Ensure video keeps playing
+    setTimeout(() => { const v = videoRef.current; if (v && v.paused) v.play().catch(()=>{}); }, 50);
+  };
+
+  // Show current program name briefly whenever entering fullscreen or changing channel
+  useEffect(() => {
+    const now = Date.now() / 1000;
+    const current = epg.find(e => {
+      const s = parseInt(e.start_timestamp || 0), t = parseInt(e.stop_timestamp || 0);
+      return s <= now && now < t;
+    });
+    if (current) {
+      setCurrentTitle(decodeB64(current.title) || "");
+      setShowTitle(true);
+      const timer = setTimeout(() => setShowTitle(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [epg, channel]);
+
   if (!channel) {
     return (
       <div className="rounded-xl bg-neutral-900/50 border border-white/5 aspect-video flex items-center justify-center text-neutral-600 text-sm" data-testid="live-preview-empty">
@@ -676,13 +714,25 @@ function LivePreview({ channel, profile, onFullscreen, onClose }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative rounded-xl overflow-hidden bg-black border border-white/10" data-testid="live-preview">
-        <video ref={videoRef} controls autoPlay playsInline onDoubleClick={onFullscreen} className="w-full aspect-video object-contain bg-black cursor-pointer" data-testid="preview-video"/>
+      <div ref={containerRef} className="relative rounded-xl overflow-hidden bg-black border border-white/10 group/preview" data-testid="live-preview">
+        <video ref={videoRef} controls autoPlay playsInline className="w-full aspect-video object-contain bg-black" data-testid="preview-video"/>
+        {/* Transparent overlay to catch double-click for fullscreen without letting native <video> intercept it */}
+        <div
+          onDoubleClick={goFullscreen}
+          onClick={e => e.stopPropagation()}
+          className="absolute inset-0 bottom-14 cursor-pointer"
+          title="Doble clic para pantalla completa"
+        />
+        {showTitle && currentTitle && (
+          <div className="absolute top-3 left-3 px-3 py-1.5 rounded-lg bg-black/80 backdrop-blur text-white text-xs font-medium border border-white/10 pointer-events-none animate-fade-out">
+            <span className="text-red-400 mr-2">EN VIVO</span>{currentTitle}
+          </div>
+        )}
         <div className="p-3 flex items-center justify-between bg-neutral-950/80 backdrop-blur">
           <div className="text-sm text-white truncate mr-3">{channel.name}</div>
           <div className="flex items-center gap-2 shrink-0">
-            <button onClick={onFullscreen} data-testid="preview-fs-btn" className="px-3 py-1.5 rounded-full bg-red-600 hover:bg-red-500 text-white text-xs font-medium flex items-center gap-1.5">
-              <Play size={12} fill="white"/>Pantalla completa
+            <button onClick={goFullscreen} data-testid="preview-fs-btn" className="px-3 py-1.5 rounded-full bg-red-600 hover:bg-red-500 text-white text-xs font-medium flex items-center gap-1.5">
+              <Maximize2 size={12}/>Pantalla completa
             </button>
             <button onClick={onClose} data-testid="preview-close-btn" className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"><X size={13}/></button>
           </div>
@@ -724,7 +774,6 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
   const handleSelect = (item, kind) => {
     if (kind === "series") onOpenSeries(item);
     else if (kind === "movie") onOpenMovie(item);
-    else if (kind === "live_fs") onPlay(item, "live");
     else if (kind === "live") setLiveChannel(item);
   };
   useEffect(() => { if (tab !== "live") setLiveChannel(null); }, [tab]);
@@ -735,7 +784,7 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
         <button onClick={onLogout} data-testid="logout-btn" className="w-10 h-10 rounded-lg bg-black/60 hover:bg-black/80 flex items-center justify-center text-neutral-400 hover:text-white backdrop-blur"><LogOut size={18}/></button>
       </div>
       {tab==="home" && <HomeTab profile={profile} onSelect={handleSelect}/>}
-      {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={handleSelect} livePreview={<LivePreview channel={liveChannel} profile={profile} onFullscreen={()=>liveChannel && onPlay(liveChannel, "live")} onClose={()=>setLiveChannel(null)}/>}/>}
+      {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={handleSelect} livePreview={<LivePreview channel={liveChannel} profile={profile} onClose={()=>setLiveChannel(null)}/>}/>}
       {tab==="movies" && <CategorySection kind="movie" profile={profile} onSelect={handleSelect}/>}
       {tab==="series" && <CategorySection kind="series" profile={profile} onSelect={handleSelect}/>}
       <BottomNav tab={tab} setTab={setTab}/>

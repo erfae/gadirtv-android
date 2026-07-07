@@ -42,6 +42,15 @@ async def download_installer():
     return FileResponse(path, filename="GadirTV-Setup-1.0.0.exe", media_type="application/octet-stream")
 
 
+@app.get("/api/download/installer_zip")
+async def download_installer_zip():
+    """Installer .exe wrapped in a ZIP so Chrome/Edge do not block download."""
+    path = "/app/electron/GadirTV-Installer.zip"
+    if not os.path.exists(path):
+        raise HTTPException(404, "installer zip not built yet")
+    return FileResponse(path, filename="GadirTV-Installer.zip", media_type="application/zip")
+
+
 @app.get("/api/download/portable")
 async def download_portable():
     path = "/app/electron/GadirTV-Windows-x64.zip"

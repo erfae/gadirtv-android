@@ -15,3 +15,11 @@ body { margin: 0; font-family: 'Manrope', sans-serif; background: #050505; color
   100% { transform: scale(1.08); }
 }
 .animate-slow-zoom { animation: slowZoom 18s ease-out infinite alternate; }
+
+@keyframes fadeOut {
+  0% { opacity: 0; transform: translateY(-8px); }
+  10% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.animate-fade-out { animation: fadeOut 5s ease-out forwards; }
