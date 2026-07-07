@@ -1,0 +1,156 @@
+{
+  "theme": {
+    "name": "Cinematic Void",
+    "mode": "dark",
+    "archetype": "5 (Luxury - Cinematic, moody, expensive)",
+    "description": "A premium, dark-mode-exclusive streaming interface for Windows desktop. Focuses on immersive, large-scale imagery, auto-hiding controls, and deep, textured shadows rather than flat colors. Content is the hero."
+  },
+  "colors": {
+    "background": {
+      "app": "#050505",
+      "player": "#000000",
+      "surface": "#0F0F0F",
+      "surface_hover": "#1A1A1A",
+      "glass": "rgba(10, 10, 10, 0.6)"
+    },
+    "brand": {
+      "primary": "#D91627",
+      "primary_hover": "#F01E30",
+      "accent": "#FFFFFF"
+    },
+    "text": {
+      "primary": "#EDEDED",
+      "secondary": "#A3A3A3",
+      "muted": "#525252",
+      "inverse": "#050505"
+    },
+    "border": {
+      "subtle": "rgba(255, 255, 255, 0.05)",
+      "focus": "rgba(217, 22, 39, 0.8)",
+      "divider": "rgba(255, 255, 255, 0.1)"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "'Outfit', sans-serif",
+      "body": "'Manrope', sans-serif"
+    },
+    "scales": {
+      "h1": "text-5xl md:text-6xl font-medium tracking-tight",
+      "h2": "text-2xl md:text-3xl font-medium tracking-tight",
+      "h3": "text-xl font-medium tracking-tight",
+      "body": "text-base font-normal tracking-normal leading-relaxed",
+      "small": "text-sm font-medium tracking-wide uppercase text-muted"
+    }
+  },
+  "layout": {
+    "spacing": {
+      "page_padding": "p-8 md:p-12",
+      "section_gap": "gap-12 md:gap-16",
+      "rail_gap": "gap-4 md:gap-6"
+    },
+    "containers": {
+      "hero": "h-[70vh] min-h-[500px] w-full relative",
+      "rail": "w-full flex overflow-x-auto snap-x snap-mandatory scrollbar-hide py-4",
+      "poster": "aspect-[2/3] w-40 md:w-48 lg:w-56 shrink-0 relative rounded-md overflow-hidden bg-surface transition-transform duration-300"
+    },
+    "surfaces": {
+      "glass_panel": "backdrop-blur-2xl bg-black/60 border border-white/5",
+      "card_flat": "bg-[#0F0F0F] border border-white/5"
+    }
+  },
+  "components": {
+    "login_screen": {
+      "style": "cinematic and minimal",
+      "rules": [
+        "Full screen hero background with heavy vignette (bg-black/80 to transparent).",
+        "Center aligned glassmorphism login card (backdrop-blur-2xl bg-black/40 border border-white/10).",
+        "Inputs must be pill-shaped or have large rounded corners, dark filled (bg-white/5), no standard borders, subtle focus ring.",
+        "Server input defaults to 'gadir.co:80' and should ideally be visually distinct or pre-filled."
+      ]
+    },
+    "hero_banner": {
+      "style": "immersive backdrop",
+      "rules": [
+        "Image must take 70vh, with a bottom gradient (from-app bg to transparent) to blend perfectly into the page.",
+        "Gradient overlay on the left to ensure text legibility (bg-gradient-to-r from-black/80 via-black/40 to-transparent).",
+        "Title uses H1 scale, description truncated to 3 lines.",
+        "Buttons: Primary 'Play' (solid white, black text), Secondary 'Info' (glass or dark translucent)."
+      ]
+    },
+    "horizontal_rails": {
+      "style": "Netflix-style hover scale",
+      "rules": [
+        "Posters must scale up on hover (scale-105 or scale-110) with z-index elevation.",
+        "On hover, show a subtle metadata overlay (year, duration, HD badge) at the bottom of the poster.",
+        "Hide native scrollbars using CSS ('::-webkit-scrollbar { display: none; }').",
+        "Add smooth left/right scroll buttons that appear only on row hover."
+      ]
+    },
+    "video_player": {
+      "style": "auto-hiding, distraction-free",
+      "rules": [
+        "Fullscreen layout by default inside the app window.",
+        "Controls must auto-hide after 3 seconds of inactivity.",
+        "Control bar: pill-shaped, floating at the bottom with glassmorphism (backdrop-blur-xl bg-black/60).",
+        "Progress bar: thin white line, turns brand red on hover.",
+        "Icons for Subtitles, Quality, and Fullscreen on the bottom right."
+      ]
+    },
+    "sidebar_navigation": {
+      "style": "collapsible icon-first",
+      "rules": [
+        "Fixed to the left, dark translucent background.",
+        "Icons only by default, expands on hover to show labels.",
+        "Active state: bright white text/icon with a left accent border (brand red)."
+      ]
+    }
+  },
+  "motion": {
+    "hover": "transition-all duration-300 ease-out",
+    "enter": "animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out",
+    "rail_scroll": "scroll-smooth"
+  },
+  "icons": {
+    "library": "lucide-react",
+    "sizing": "w-6 h-6 for nav, w-8 h-8 for player controls",
+    "stroke": "stroke-[1.5]"
+  },
+  "media": {
+    "hero_backgrounds": [
+      {
+        "url": "https://images.unsplash.com/photo-1475070929565-c985b496cb9f",
+        "description": "Moody, cinematic sci-fi landscape. Perfect for Series/Movies hero backdrop."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2OTV8MHwxfHNlYXJjaHwzfHxzdGFkaXVtJTIwbGlnaHRzJTIwbmlnaHQlMjBzcG9ydHMlMjBldmVudHxlbnwwfHx8fDE3ODIxMDEyMjl8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Stadium lights at night. Perfect for Live TV / Sports hero backdrop."
+      }
+    ],
+    "posters": [
+      {
+        "url": "https://images.pexels.com/photos/30229234/pexels-photo-30229234.jpeg",
+        "description": "Dramatic portrait for movie/series placeholder."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1591037912384-19a432aafb95",
+        "description": "Moody cinematic character shot for movie placeholder."
+      },
+      {
+        "url": "https://images.pexels.com/photos/11592363/pexels-photo-11592363.jpeg",
+        "description": "Urban cinema atmosphere for category placeholders."
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "DO NOT USE INTER OR ROBOTO. Use 'Outfit' for headings and 'Manrope' for body. Inject them via Google Fonts.",
+    "Ensure the Electron application is configured for a frameless window with custom close/minimize buttons if possible, or standard dark titlebar, to maintain the premium feel.",
+    "Implement an Auth context to handle the login to gadir.co. The Xtream Codes API uses HTTP GET requests for authentication and fetching categories/streams.",
+    "For the Live TV player, integrate 'mpegts.js' (or hls.js depending on stream format) in a clean wrapper component.",
+    "Always apply 'data-testid' to interactive elements (e.g., 'login-submit-button', 'movie-poster-card', 'player-play-pause').",
+    "Never use pure black (#000000) for the UI background, use the specified #050505.",
+    "Ensure 'scrollbar-hide' class is implemented in the global css or tailwind config to keep horizontal rails clean.",
+    "Use standard 'div's and custom CSS for layout; avoid Shadcn Card if it forces padding, as cinematic posters must go edge-to-edge.",
+    "For the login screen, use a Shadcn Form but heavily customize the inputs to be dark and pill-shaped."
+  ]
+}
