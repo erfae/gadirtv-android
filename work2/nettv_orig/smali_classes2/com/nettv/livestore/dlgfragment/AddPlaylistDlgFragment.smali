@@ -396,17 +396,6 @@
     move-result-object v0
 
     .line 19
-    iget v1, p0, Lcom/nettv/livestore/dlgfragment/AddPlaylistDlgFragment;->playlist_position:I
-
-    const/4 v3, 0x1
-
-    if-ne v1, v3, :cond_url_normal
-
-    const-string v1, "http://gadir.co:80"
-
-    iput-object v1, p0, Lcom/nettv/livestore/dlgfragment/AddPlaylistDlgFragment;->playlistUrl:Ljava/lang/String;
-
-    :cond_url_normal
     iget-object v1, p0, Lcom/nettv/livestore/dlgfragment/AddPlaylistDlgFragment;->playlistUrl:Ljava/lang/String;
 
     iget-object v2, p0, Lcom/nettv/livestore/dlgfragment/AddPlaylistDlgFragment;->username:Ljava/lang/String;
