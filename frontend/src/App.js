@@ -182,7 +182,7 @@ function Login({ onLogin, onCancel }) {
           <input placeholder="Nombre perfil (opcional)" value={name} onChange={e=>setName(e.target.value)} className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600" data-testid="profile-name-input"/>
           <input placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="username-input"/>
           <input type="password" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="password-input"/>
-          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.7</div>
+          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.8</div>
           {warn && <div className="text-amber-400 text-xs text-center" data-testid="warn-msg">{warn}</div>}
           <button type="submit" disabled={loading} className="w-full py-4 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium transition-colors disabled:opacity-50" data-testid="login-btn">{loading?"Guardando...":"Entrar"}</button>
         </form>
@@ -229,7 +229,7 @@ function ItemCard({ item, onSelect, big, sm, xl, onHover }) {
     : big
       ? "w-40"
       : sm
-        ? "w-28 md:w-32"
+        ? "w-20 sm:w-24 md:w-24 lg:w-28"
         : "w-32 md:w-40 lg:w-44";
   return (
     <button
@@ -256,15 +256,15 @@ function Rail({ title, items, onSelect, big, sm, xl, onHover }) {
     el.scrollBy({ left: dir * (el.clientWidth * 0.85), behavior: 'smooth' });
   };
   return (
-    <section className="mb-6 group/rail relative">
-      <h2 className="text-base md:text-lg font-medium text-white mb-2 tracking-tight px-8" style={{fontFamily:"'Outfit',sans-serif"}}>{title}</h2>
+    <section className="mb-2 group/rail relative">
+      <h2 className="text-sm md:text-base font-medium text-white mb-1.5 tracking-tight px-8" style={{fontFamily:"'Outfit',sans-serif"}}>{title}</h2>
       <button onClick={()=>scroll(-1)} className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-10 h-16 rounded-r-lg bg-black/70 hover:bg-black/90 text-white opacity-0 group-hover/rail:opacity-100 transition-opacity flex items-center justify-center" data-testid="rail-scroll-left">
         <ChevronLeft size={22}/>
       </button>
       <button onClick={()=>scroll(1)} className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-10 h-16 rounded-l-lg bg-black/70 hover:bg-black/90 text-white opacity-0 group-hover/rail:opacity-100 transition-opacity flex items-center justify-center" data-testid="rail-scroll-right">
         <ChevronRight size={22}/>
       </button>
-      <div ref={scrollRef} className="flex gap-3 overflow-x-auto overflow-y-visible scrollbar-hide px-8 pb-6 pt-2 scroll-smooth">
+      <div ref={scrollRef} className="flex gap-2 overflow-x-auto overflow-y-visible scrollbar-hide px-8 pb-3 pt-1 scroll-smooth">
         {items.slice(0, 30).map((it, i) => <ItemCard key={i} item={it} big={big} sm={sm} xl={xl} onHover={onHover} onSelect={()=>onSelect(it)}/>)}
       </div>
     </section>
@@ -382,7 +382,6 @@ function CategorySection({ kind, profile, onSelect, livePreview, onHover }) {
 function HomeTab({ profile, onSelect, onHover }) {
   const [recentMovies, setRM] = useState([]);
   const [recentSeries, setRS] = useState([]);
-  const [featuredCats, setFeaturedCats] = useState([]); // [{category_name, items[]}]
   const [heroIdx, setHeroIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
@@ -403,35 +402,20 @@ function HomeTab({ profile, onSelect, onHover }) {
               withTimeout(fetchStreams(profile, c.category_id), 8000).catch(()=>[])
             ));
             const flat = [].concat(...results.filter(Array.isArray));
-            if (flat.length) return { flat: sortByAdded(flat), cats: catList };
+            if (flat.length) return sortByAdded(flat);
           }
           const all = await withTimeout(fetchStreams(profile), 15000).catch(()=>[]);
-          return { flat: sortByAdded(Array.isArray(all) ? all : []), cats: catList };
-        } catch (e) { console.error(`[home] ${tag} failed:`, e.message); return { flat: [], cats: [] }; }
+          return sortByAdded(Array.isArray(all) ? all : []);
+        } catch (e) { console.error(`[home] ${tag} failed:`, e.message); return []; }
       };
       const [vod, ser] = await Promise.all([
         loadFromCategories(api.vodCategories, api.vodStreams, "vod"),
         loadFromCategories(api.seriesCategories, api.seriesList, "series"),
       ]);
       if (cancelled) return;
-      setRM(vod.flat.slice(0, 30));
-      setRS(ser.flat.slice(0, 30));
-      // Build featured category rails from VOD categories that look interesting
-      // (skip adult categories and anything with 0 items). Grab up to 5 categories.
-      const bad = /(adult|xxx|erotic|\+18|foradults)/i;
-      const goodCats = (vod.cats || []).filter(c => !bad.test(String(c.category_name||''))).slice(0, 6);
-      const featured = [];
-      for (const c of goodCats) {
-        try {
-          const items = await withTimeout(api.vodStreams(profile, c.category_id), 6000).catch(()=>[]);
-          if (Array.isArray(items) && items.length) {
-            featured.push({ name: c.category_name, items: sortByAdded(items).slice(0, 20) });
-          }
-          if (featured.length >= 4) break;
-        } catch (_) {}
-      }
-      if (!cancelled) setFeaturedCats(featured);
-      if (!vod.flat.length && !ser.flat.length) setMsg("No se pudo cargar contenido reciente. Comprueba conexión con gadir.co o si tu cuenta tiene VOD/Series.");
+      setRM(vod.slice(0, 24));
+      setRS(ser.slice(0, 24));
+      if (!vod.length && !ser.length) setMsg("No se pudo cargar contenido reciente. Comprueba conexión con gadir.co o si tu cuenta tiene VOD/Series.");
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -448,25 +432,24 @@ function HomeTab({ profile, onSelect, onHover }) {
   return (
     <div className="flex flex-col h-screen pb-24 overflow-hidden" data-testid="home-tab">
       {hero && (
-        <div className="relative flex-shrink-0" style={{minHeight:"260px"}} data-testid="hero-banner">
-          <div className="h-[30vh] sm:h-[34vh] md:h-[36vh] lg:h-[38vh] xl:h-[40vh] relative">
+        <div className="relative flex-shrink-0" style={{minHeight:"220px"}} data-testid="hero-banner">
+          <div className="h-[24vh] sm:h-[26vh] md:h-[28vh] lg:h-[30vh] xl:h-[32vh] relative">
           <img src={api.proxyImg(hero.stream_icon||hero.cover) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover animate-slow-zoom" alt=""/>
           <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/60 to-transparent"/>
           <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent"/>
-          {/* Dots indicator */}
           <div className="absolute bottom-3 right-4 md:right-8 flex gap-2 z-10">
             {heroList.map((_, i) => (
               <button key={i} onClick={()=>setHeroIdx(i)} className={"h-1 rounded-full transition-all " + (i===heroIdx?"w-8 bg-red-600":"w-4 bg-white/30 hover:bg-white/60")} data-testid={`hero-dot-${i}`}/>
             ))}
           </div>
-          <div className="absolute bottom-6 md:bottom-8 left-4 md:left-8 max-w-2xl z-10 pr-4">
-            <p className="text-red-500 text-[10px] md:text-[11px] font-medium tracking-[0.3em] uppercase mb-2 md:mb-3">{hero.series_id?"Serie":"Película"} · Reciente en GadirTV</p>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-medium tracking-tight mb-3 md:mb-4 drop-shadow-2xl" style={{fontFamily:"'Outfit',sans-serif"}}>{hero.name}</h1>
+          <div className="absolute bottom-4 md:bottom-6 left-4 md:left-8 max-w-2xl z-10 pr-4">
+            <p className="text-red-500 text-[10px] md:text-[11px] font-medium tracking-[0.3em] uppercase mb-1.5 md:mb-2">{hero.series_id?"Serie":"Película"} · Reciente en GadirTV</p>
+            <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-medium tracking-tight mb-2 md:mb-3 drop-shadow-2xl" style={{fontFamily:"'Outfit',sans-serif"}}>{hero.name}</h1>
             <div className="flex items-center gap-2 md:gap-3 flex-wrap">
-              <button onClick={()=>onSelect(hero, hero.series_id?"series":"movie")} data-testid="hero-play-btn" className="flex items-center gap-2 bg-white text-black px-5 md:px-7 py-2.5 md:py-3 rounded-full font-medium hover:bg-neutral-200 transition-all text-xs md:text-sm shadow-2xl">
-                <Play size={16} fill="black"/>Reproducir
+              <button onClick={()=>onSelect(hero, hero.series_id?"series":"movie")} data-testid="hero-play-btn" className="flex items-center gap-2 bg-white text-black px-4 md:px-6 py-2 md:py-2.5 rounded-full font-medium hover:bg-neutral-200 transition-all text-xs md:text-sm shadow-2xl">
+                <Play size={14} fill="black"/>Reproducir
               </button>
-              <button onClick={()=>onSelect(hero, hero.series_id?"series":"movie")} data-testid="hero-info-btn" className="flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-full font-medium hover:bg-white/20 transition-all text-xs md:text-sm">
+              <button onClick={()=>onSelect(hero, hero.series_id?"series":"movie")} data-testid="hero-info-btn" className="flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-full font-medium hover:bg-white/20 transition-all text-xs md:text-sm">
                 Más información
               </button>
             </div>
@@ -474,14 +457,15 @@ function HomeTab({ profile, onSelect, onHover }) {
           </div>
         </div>
       )}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-4 scrollbar-hide">
-        {loading && <div className="text-center text-neutral-500 py-10" data-testid="loading-home">Cargando contenido…</div>}
-        {!loading && msg && <div className="text-center text-red-400 py-10 text-sm px-8" data-testid="home-msg">{msg}</div>}
-        <Rail title="Añadidos recientemente · Películas" items={recentMovies} onSelect={i=>onSelect(i,"movie")} onHover={onHover}/>
-        <Rail title="Añadidas recientemente · Series" items={recentSeries} onSelect={i=>onSelect(i,"series")} onHover={onHover}/>
-        {featuredCats.map((fc, i) => (
-          <Rail key={i} title={fc.name} items={fc.items} onSelect={it=>onSelect(it,"movie")} onHover={onHover}/>
-        ))}
+      <div className="flex-1 min-h-0 flex flex-col justify-start overflow-hidden pt-3">
+        {loading && <div className="text-center text-neutral-500 py-6 text-sm" data-testid="loading-home">Cargando contenido…</div>}
+        {!loading && msg && <div className="text-center text-red-400 py-6 text-sm px-8" data-testid="home-msg">{msg}</div>}
+        {!loading && !msg && (
+          <>
+            <Rail title="Añadidos recientemente · Películas" items={recentMovies} onSelect={i=>onSelect(i,"movie")} onHover={onHover} sm/>
+            <Rail title="Añadidas recientemente · Series"   items={recentSeries} onSelect={i=>onSelect(i,"series")} onHover={onHover} sm/>
+          </>
+        )}
       </div>
     </div>
   );

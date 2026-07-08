@@ -9,10 +9,8 @@
       margin: 0; padding: 0; height: 100%; width: 100%;
       background: transparent;
       overflow: hidden;
-      cursor: none;
       user-select: none;
     }
-    body.show-ui { cursor: default; }
 
     #back {
       position: fixed;
@@ -54,7 +52,6 @@
       font-family: "Outfit", -apple-system, "Segoe UI", Roboto, sans-serif;
       font-size: 12px;
       background: rgba(0, 0, 0, 0.5);
-      backdrop-filter: blur(6px);
       padding: 6px 12px;
       border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -85,16 +82,44 @@
     const body = document.body;
     const btn = document.getElementById('back');
     let hideTimer = null;
+    let currentlyBlocked = null; // null | true | false
 
     function showUi() {
       body.classList.add('show-ui');
       clearTimeout(hideTimer);
-      hideTimer = setTimeout(() => body.classList.remove('show-ui'), 2800);
+      hideTimer = setTimeout(() => body.classList.remove('show-ui'), 3000);
     }
 
-    // Reveal on any pointer activity, first frame or key press.
+    // Detect if a screen coordinate falls inside the visible back button.
+    // If yes → we must intercept mouse (setIgnoreMouseEvents false).
+    // If not → let mpv OSC receive the click (setIgnoreMouseEvents true).
+    function isInsideBackButton(x, y) {
+      if (!body.classList.contains('show-ui')) return false;
+      const r = btn.getBoundingClientRect();
+      // Grow the hit-box a bit so users don't have to be pixel-perfect.
+      const pad = 8;
+      return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
+    }
+
+    function setBlocking(shouldBlock) {
+      if (currentlyBlocked === shouldBlock) return;
+      currentlyBlocked = shouldBlock;
+      if (window.gadirPlayer && window.gadirPlayer.setIgnoreMouse) {
+        // ignore=true → mouse events pass through to mpv (OSC works).
+        // ignore=false → this overlay window intercepts (button clickable).
+        window.gadirPlayer.setIgnoreMouse(!shouldBlock);
+      }
+    }
+
+    // Reveal button on any movement / key press.
     showUi();
-    window.addEventListener('mousemove', showUi, { passive: true });
+    setBlocking(false);
+
+    window.addEventListener('mousemove', (e) => {
+      showUi();
+      setBlocking(isInsideBackButton(e.clientX, e.clientY));
+    }, { passive: true });
+
     window.addEventListener('keydown', (e) => {
       showUi();
       if (e.key === 'Escape' || e.key === 'Backspace') {

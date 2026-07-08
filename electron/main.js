@@ -267,6 +267,15 @@ function updatePlayerBounds() {
 // Renderer of the overlay (Back button) → hide the player.
 ipcMain.on('player:back', () => { try { hideEmbeddedPlayer(); } catch (_) {} });
 
+// Toggle mouse-event pass-through for the overlay window. When true, the
+// overlay is click-through and mpv's on-screen controller (OSC) reacts
+// to user clicks. When false, the overlay intercepts clicks (used only
+// for the tiny Back-button area).
+ipcMain.on('player:ignore-mouse', (_e, ignore) => {
+  if (!playerWin || playerWin.isDestroyed()) return;
+  try { playerWin.setIgnoreMouseEvents(!!ignore, { forward: true }); } catch (_) {}
+});
+
 ipcMain.handle('player:show', async (_evt, { url, name }) => {
   try {
     if (!mainWinRef || mainWinRef.isDestroyed()) return { ok: false, error: 'main window missing' };
@@ -279,6 +288,10 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
     // Force above taskbar level so mpv covers the whole screen (fixes
     // "video plays but Windows taskbar still visible").
     try { pw.setAlwaysOnTop(true, 'screen-saver'); } catch (_) {}
+    // Start in click-through mode so mpv's OSC receives mouse events.
+    // The overlay page will toggle this off when the cursor enters the
+    // Back-button hit-box, and back on when it leaves.
+    try { pw.setIgnoreMouseEvents(true, { forward: true }); } catch (_) {}
     updatePlayerBounds();
     // Focus AFTER show so mpv gets keyboard input.
     setTimeout(() => { try { pw.focus(); } catch (_) {} }, 50);
