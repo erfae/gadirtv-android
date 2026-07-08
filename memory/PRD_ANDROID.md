@@ -84,7 +84,10 @@ The Emergent container is 1.5 GB free; Flutter SDK + Android SDK would need ~12 
 - ✅ **Phase 4 — Detalles + Resume** *(Feb 2026)* — MovieDetail + SeriesDetail (temporadas/episodios), ResumeStore JSON, rail "Continuar viendo" en Home, botones REPRODUCIR / CONTINUAR / Empezar de nuevo
 - ✅ **Phase 5 — Android TV D-pad** *(Feb 2026)* — FocusTraversalGroup en shell, FocusableActionDetector en cada botón, arrow keys → seek/volume en player
 - ✅ **Phase 6 — Release APK** *(Feb 2026)* — build.gradle con keystore condicional, ABI splits (armeabi-v7a + arm64-v8a + x86_64 + universal), SIGNING.md con instrucciones para Play Store
-- ✅ **Extra — Favoritos** *(Feb 2026)* — FavoritesStore + chip "★ Favoritos" en Live TV + estrella tocable sobre cada canal (amarilla si activo)
+- ✅ **Extra — Favoritos** *(Feb 2026)* — FavoritesStore multi-tipo (live/movie/series) + chip "★ Favoritos" en las 3 pestañas + estrella tocable amarilla en cada poster
+- ✅ **Extra — EPG "Ahora / Después"** *(Feb 2026)* — el player fetch `get_short_epg` al abrir un canal en directo y muestra programa actual + siguiente en la barra superior
+- ✅ **Extra — Buscador global** *(Feb 2026)* — botón lupa en top-bar → pantalla con input + resultados en 3 secciones (Canales / Películas / Series), debounce 250 ms, filtrado client-side
+- ✅ **Extra — Backup / Restore** *(Feb 2026)* — botón nube en top-bar exporta perfiles + favoritos + resume al portapapeles como JSON; se restaura pegando en otro dispositivo
 
 ---
 

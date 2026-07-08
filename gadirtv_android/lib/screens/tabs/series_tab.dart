@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 import '../../models/media.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
+import '../../services/favorites_store.dart';
 import '../../theme.dart';
 import '../../widgets/category_strip.dart';
 import '../../widgets/poster_card.dart';
 
 /// Series tab — categories on top, portrait cover grid below.
+///
+/// Adds "★ Favoritos" chip and a star toggle on every poster (same UX
+/// as Live TV and Películas).
 class SeriesTab extends StatefulWidget {
   const SeriesTab({
     super.key,
@@ -23,11 +27,18 @@ class SeriesTab extends StatefulWidget {
 }
 
 class _SeriesTabState extends State<SeriesTab> {
+  static const _favoritesId = '__favorites__';
+  static const _allId = '__all__';
+
   final _api = ApiService();
+  final _favs = FavoritesStore();
 
   List<Category> _categories = const [];
   List<Series> _series = const [];
-  String _selected = '__all__';
+  List<Series> _allSeries = const [];
+  Set<int> _favoriteIds = <int>{};
+
+  String _selected = _allId;
   bool _loadingCats = true;
   bool _loading = false;
   String? _error;
@@ -35,18 +46,24 @@ class _SeriesTabState extends State<SeriesTab> {
   @override
   void initState() {
     super.initState();
-    _loadCategories();
+    _boot();
   }
 
-  Future<void> _loadCategories() async {
+  Future<void> _boot() async {
     try {
-      final raw = await _api.seriesCategories(widget.profile);
+      final results = await Future.wait([
+        _api.seriesCategories(widget.profile),
+        _favs.loadAll(FavoritesStore.kindSeries),
+      ]);
       if (!mounted) return;
       setState(() {
-        _categories = raw.map(Category.fromJson).toList();
+        _categories = (results[0] as List)
+            .map((e) => Category.fromJson(e as Map<String, dynamic>))
+            .toList();
+        _favoriteIds = results[1] as Set<int>;
         _loadingCats = false;
       });
-      await _load('__all__');
+      await _load(_allId);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -62,10 +79,21 @@ class _SeriesTabState extends State<SeriesTab> {
       _loading = true;
       _error = null;
     });
+
+    if (id == _favoritesId) {
+      final list = _allSeries.where((s) => _favoriteIds.contains(s.seriesId)).toList();
+      if (!mounted) return;
+      setState(() {
+        _series = list;
+        _loading = false;
+      });
+      return;
+    }
+
     try {
       final raw = await _api.seriesList(
         widget.profile,
-        categoryId: id == '__all__' ? null : id,
+        categoryId: id == _allId ? null : id,
       );
       if (!mounted) return;
       final list = raw.map(Series.fromJson).toList()
@@ -73,6 +101,7 @@ class _SeriesTabState extends State<SeriesTab> {
       setState(() {
         _series = list;
         _loading = false;
+        if (id == _allId) _allSeries = list;
       });
     } catch (_) {
       if (!mounted) return;
@@ -83,6 +112,21 @@ class _SeriesTabState extends State<SeriesTab> {
     }
   }
 
+  Future<void> _toggleFavorite(Series s) async {
+    final nowFav = await _favs.toggle(FavoritesStore.kindSeries, s.seriesId);
+    if (!mounted) return;
+    setState(() {
+      if (nowFav) {
+        _favoriteIds.add(s.seriesId);
+      } else {
+        _favoriteIds.remove(s.seriesId);
+        if (_selected == _favoritesId) {
+          _series = _series.where((x) => x.seriesId != s.seriesId).toList();
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loadingCats) {
@@ -90,7 +134,8 @@ class _SeriesTabState extends State<SeriesTab> {
     }
 
     final chips = <(String, String)>[
-      ('__all__', 'Todas'),
+      (_allId, 'Todas'),
+      (_favoritesId, '★ Favoritos'),
       ..._categories.map((c) => (c.id, c.name)),
     ];
 
@@ -112,10 +157,17 @@ class _SeriesTabState extends State<SeriesTab> {
       return Center(child: Text(_error!, style: const TextStyle(color: GtvTheme.textDim)));
     }
     if (_series.isEmpty) {
-      return const Center(
-        child: Text('No hay series en esta categoría', style: TextStyle(color: GtvTheme.textDim)),
+      final msg = _selected == _favoritesId
+          ? 'Todavía no has marcado ninguna serie como favorita.\nToca la estrella de una serie para añadirla.'
+          : 'No hay series en esta categoría';
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(msg, textAlign: TextAlign.center, style: const TextStyle(color: GtvTheme.textDim, height: 1.5)),
+        ),
       );
     }
+
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -133,6 +185,8 @@ class _SeriesTabState extends State<SeriesTab> {
           rating: s.rating,
           onTap: () => widget.onOpen(s),
           autofocus: i == 0,
+          isFavorite: _favoriteIds.contains(s.seriesId),
+          onToggleFavorite: () => _toggleFavorite(s),
         );
       },
     );

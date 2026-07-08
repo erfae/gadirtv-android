@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +8,8 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../models/playable.dart';
+import '../models/profile.dart';
+import '../services/api_service.dart';
 import '../services/resume_store.dart';
 import '../theme.dart';
 
@@ -18,9 +21,14 @@ import '../theme.dart';
 ///    "Continuar viendo" next time.
 ///  - Screen stays awake for the whole session and is released on dispose.
 class PlayerScreen extends StatefulWidget {
-  const PlayerScreen({super.key, required this.playable});
+  const PlayerScreen({super.key, required this.playable, this.liveProfile, this.liveStreamId});
 
   final Playable playable;
+
+  /// When [playable.isLive] and both are supplied, the top bar fetches
+  /// `get_short_epg` and shows the current programme name under the title.
+  final Profile? liveProfile;
+  final int? liveStreamId;
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -30,11 +38,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
   late final Player _player;
   late final VideoController _controller;
   final _resume = ResumeStore();
+  final _api = ApiService();
 
   bool _showOverlay = true;
   bool _buffering = false;
   bool _ended = false;
   String? _fatalError;
+  String? _epgNow;    // current programme name
+  String? _epgNext;   // next programme name
 
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
@@ -265,6 +276,43 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: GtvTheme.textDim, fontSize: 12),
                 ),
+              if (_epgNow != null) ...[
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: GtvTheme.red,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: const Text(
+                        'AHORA',
+                        style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.6),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _epgNow!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_epgNext != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      'Después: ${_epgNext!}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: GtvTheme.textDim, fontSize: 11),
+                    ),
+                  ),
+              ],
             ],
           ),
         ),

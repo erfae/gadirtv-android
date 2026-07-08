@@ -9,7 +9,9 @@ import '../services/profile_store.dart';
 import '../theme.dart';
 import 'movie_detail_screen.dart';
 import 'player_screen.dart';
+import 'search_screen.dart';
 import 'series_detail_screen.dart';
+import '../services/backup_service.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/live_tab.dart';
 import 'tabs/movies_tab.dart';
@@ -28,6 +30,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _store = ProfileStore();
   final _api = ApiService();
+  final _backup = BackupService();
   Profile? _profile;
   int _tab = 0;
 
@@ -76,9 +79,106 @@ class _HomeScreenState extends State<HomeScreen> {
             title: c.name,
             url: url,
           ),
+          liveProfile: _profile,
+          liveStreamId: c.streamId,
         ),
       ),
     );
+  }
+
+  void _openSearch() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SearchScreen(
+          profile: _profile!,
+          onChannel: (c) {
+            Navigator.of(context).pop();
+            _playChannel(c);
+          },
+          onMovie: (m) {
+            Navigator.of(context).pop();
+            _openMovie(m);
+          },
+          onSeries: (s) {
+            Navigator.of(context).pop();
+            _openSeries(s);
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openBackup() async {
+    final exported = await _backup.exportAll();
+    if (!mounted) return;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: GtvTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Copia de seguridad', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 6),
+            const Text(
+              'Guarda tus perfiles, favoritos y progreso, o restáuralos en otro dispositivo.',
+              style: TextStyle(color: GtvTheme.textDim, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.of(context).pop('export'),
+              icon: const Icon(Icons.upload_rounded, size: 18),
+              label: const Text('COPIAR AL PORTAPAPELES'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).pop('import'),
+              icon: const Icon(Icons.download_rounded, size: 18, color: Colors.white),
+              label: const Text('Restaurar desde portapapeles', style: TextStyle(color: Colors.white)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: GtvTheme.border),
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                shape: const StadiumBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (action == 'export') {
+      await _backup.copyToClipboard(exported);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Backup copiado al portapapeles')),
+      );
+    } else if (action == 'import') {
+      final raw = await _backup.readFromClipboard();
+      if (!mounted) return;
+      final ok = raw != null ? await _backup.importAll(raw) : false;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ok ? 'Restaurado. Volviendo al inicio…' : 'El portapapeles no contiene un backup válido')),
+      );
+      if (ok) {
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (!mounted) return;
+        // ignore: use_build_context_synchronously
+        context.go('/');
+      }
+    }
   }
 
   @override
@@ -129,6 +229,34 @@ class _HomeScreenState extends State<HomeScreen> {
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: GtvTheme.red, letterSpacing: 0.5),
           ),
           const Spacer(),
+          InkWell(
+            onTap: _openSearch,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: GtvTheme.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: GtvTheme.border),
+              ),
+              child: const Icon(Icons.search_rounded, color: Colors.white, size: 18),
+            ),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: _openBackup,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: GtvTheme.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: GtvTheme.border),
+              ),
+              child: const Icon(Icons.backup_rounded, color: Colors.white, size: 18),
+            ),
+          ),
+          const SizedBox(width: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(

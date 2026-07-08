@@ -60,7 +60,7 @@ User's preferred language: Spanish.
 - ✅ Phase 4 — Detalles VOD/Series + ResumeStore + "Continuar viendo"
 - ✅ Phase 5 — D-pad Android TV (FocusTraversalGroup + arrow-key player)
 - ✅ Phase 6 — Release APK con ABI splits + doc SIGNING.md para keystore Play Store
-- ✅ Extra — Favoritos en Live TV (chip "★ Favoritos" + estrella amarilla por canal)
+- ✅ Extra — Favoritos multi-tipo (Live + Películas + Series), EPG "Ahora/Después", Buscador global, Backup/Restore
 - ⬜ Phase 4 — Detalles VOD/Series + resume
 - ⬜ Phase 5 — Android TV D-pad focus
 - ⬜ Phase 6 — Release APK firmado

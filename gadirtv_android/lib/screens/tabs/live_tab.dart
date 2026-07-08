@@ -54,7 +54,7 @@ class _LiveTabState extends State<LiveTab> {
     try {
       final results = await Future.wait([
         _api.liveCategories(widget.profile),
-        _favs.loadAll(),
+        _favs.loadAll(FavoritesStore.kindLive),
       ]);
       if (!mounted) return;
       setState(() {
@@ -114,7 +114,7 @@ class _LiveTabState extends State<LiveTab> {
   }
 
   Future<void> _toggleFavorite(LiveChannel c) async {
-    final nowFav = await _favs.toggle(c.streamId);
+    final nowFav = await _favs.toggle(FavoritesStore.kindLive, c.streamId);
     if (!mounted) return;
     setState(() {
       if (nowFav) {
