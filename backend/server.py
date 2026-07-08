@@ -93,6 +93,30 @@ async def download_docs():
         raise HTTPException(404, "docs not found")
     return FileResponse(path, filename="GadirTV-Documentation.md", media_type="text/markdown", headers=NO_CACHE_HEADERS)
 
+
+@app.get("/api/download/android-source")
+async def download_android_source():
+    """Complete Flutter Android project + GitHub Actions workflow as a ZIP.
+
+    Upload this ZIP contents to a GitHub repo and the Actions workflow will
+    build the APK automatically (release + debug + per-ABI splits)."""
+    path = "/app/electron/GadirTV-Android-Source-v0.1.zip"
+    if not os.path.exists(path):
+        raise HTTPException(404, "android source zip not built yet")
+    return FileResponse(path, filename="GadirTV-Android-Source-v0.1.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
+
+
+@app.get("/api/download/android-apk")
+async def download_android_apk():
+    """Pre-built Android APK (when available). Currently only produced by the
+    GitHub Actions workflow shipped inside the Android source ZIP — this
+    Emergent container cannot compile it (ARM64 Linux, missing gen_snapshot).
+    """
+    path = "/app/electron/GadirTV-debug.apk"
+    if not os.path.exists(path):
+        raise HTTPException(404, "APK not built in this environment — use the workflow from /api/download/android-source")
+    return FileResponse(path, filename="GadirTV-debug.apk", media_type="application/vnd.android.package-archive", headers=NO_CACHE_HEADERS)
+
 @app.post("/api/login")
 async def login(body: LoginBody):
     try:
