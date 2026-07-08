@@ -30,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _passVisible = false;
   String? _error;
   String? _progress;
+  String? _diagnostic;
 
   @override
   void dispose() {
@@ -61,6 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _busy = true;
       _error = null;
+      _diagnostic = null;
       _progress = 'Conectando…';
     });
 
@@ -90,6 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _busy = false;
         _progress = null;
         _error = res.error ?? 'No se pudo iniciar sesión';
+        _diagnostic = res.diagnostic;
       });
       return;
     }
@@ -185,6 +188,38 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: const TextStyle(color: GtvTheme.redHi, fontSize: 13),
                     ),
                   ),
+                  if (_diagnostic != null) ...[
+                    const SizedBox(height: 10),
+                    ExpansionTile(
+                      title: const Text(
+                        'Detalles técnicos (comparte esto para diagnosticar)',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                      tilePadding: EdgeInsets.zero,
+                      collapsedIconColor: Colors.white54,
+                      iconColor: Colors.white70,
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.5),
+                            border: Border.all(color: Colors.white24),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: SelectableText(
+                            _diagnostic!,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                              fontFamily: 'monospace',
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
                 const SizedBox(height: 24),
                 ElevatedButton(

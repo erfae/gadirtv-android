@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 
 import '../models/profile.dart';
@@ -113,27 +117,155 @@ class ApiService {
     return h;
   }
 
-  /// Xtream login: fires the base `player_api.php?username=&password=` call.
-  /// Returns `true` if `user_info.auth == 1`. Retries are handled by [_get].
+  /// Xtream login — uses raw `dart:io HttpClient` (bypasses Dio) with hard
+  /// timeouts on each phase (DNS, connect, headers, body). This works around
+  /// a known Android bug where Dio's `receiveTimeout` never fires when the
+  /// server keeps the socket open but never sends a response.
+  ///
+  /// Also captures full diagnostic info (URL, HTTP status, response snippet,
+  /// exception class) into [LoginResult.diagnostic] so the UI can show it.
   Future<LoginResult> login(Profile p) async {
-    try {
-      final data = await _get(p, '');
-      final ok = data is Map &&
-          data['user_info'] is Map &&
-          (data['user_info']['auth'] == 1 || data['user_info']['auth'] == '1');
-      return LoginResult(
-        ok: ok,
-        userInfo: ok ? Map<String, dynamic>.from(data['user_info'] as Map) : null,
-        serverInfo: (data is Map && data['server_info'] is Map)
-            ? Map<String, dynamic>.from(data['server_info'] as Map)
-            : null,
-        error: ok ? null : 'Credenciales inválidas o servidor rechazó la conexión',
-      );
-    } on DioException catch (e) {
-      return LoginResult(ok: false, error: '${_dioMsg(e)} [${e.type.name}${e.response?.statusCode != null ? " ${e.response!.statusCode}" : ""}]');
-    } catch (e) {
-      return LoginResult(ok: false, error: 'Error: ${e.runtimeType}: $e');
+    final host = _normalizeHost(p.host);
+    final url =
+        '$host/player_api.php?username=${Uri.encodeQueryComponent(p.username)}&password=${Uri.encodeQueryComponent(p.password)}';
+    const totalAttempts = 3;
+    String? lastDiag;
+
+    for (var attempt = 1; attempt <= totalAttempts; attempt++) {
+      onProgress?.call(attempt, totalAttempts, null);
+      final diag = StringBuffer('URL: $url\nIntento: $attempt/$totalAttempts\n');
+      HttpClient? client;
+      try {
+        client = HttpClient()
+          ..connectionTimeout = const Duration(seconds: 6)
+          ..idleTimeout = const Duration(seconds: 5)
+          ..userAgent = 'VLC/3.0.20 LibVLC/3.0.20'
+          ..autoUncompress = false;
+
+        final uri = Uri.parse(url);
+        final req = await client.getUrl(uri).timeout(const Duration(seconds: 8));
+        req.headers.set('Accept', 'application/json, text/plain, */*');
+        req.headers.set('Accept-Encoding', 'identity');
+        req.headers.set('Connection', 'keep-alive');
+
+        final res = await req.close().timeout(const Duration(seconds: 10));
+        diag.writeln('HTTP status: ${res.statusCode}');
+        diag.writeln('Content-Type: ${res.headers.contentType}');
+
+        final body = await res
+            .transform(utf8.decoder)
+            .join()
+            .timeout(const Duration(seconds: 10));
+        final snippet = body.length > 400 ? '${body.substring(0, 400)}…' : body;
+        diag.writeln('Body (${body.length} bytes): $snippet');
+
+        if (res.statusCode >= 500) {
+          lastDiag = diag.toString();
+          if (attempt < totalAttempts) {
+            await Future.delayed(Duration(milliseconds: 400 * attempt));
+            continue;
+          }
+          return LoginResult(
+            ok: false,
+            error: 'Servidor no disponible (${res.statusCode}). Intenta de nuevo en unos segundos.',
+            diagnostic: lastDiag,
+          );
+        }
+        if (res.statusCode == 401 || res.statusCode == 403) {
+          return LoginResult(
+            ok: false,
+            error: 'Credenciales incorrectas (${res.statusCode})',
+            diagnostic: diag.toString(),
+          );
+        }
+        if (res.statusCode != 200) {
+          return LoginResult(
+            ok: false,
+            error: 'El servidor devolvió ${res.statusCode}',
+            diagnostic: diag.toString(),
+          );
+        }
+
+        dynamic data;
+        try {
+          data = jsonDecode(body);
+        } catch (e) {
+          return LoginResult(
+            ok: false,
+            error: 'El servidor devolvió una respuesta no JSON (posible bloqueo por proxy).',
+            diagnostic: diag.toString(),
+          );
+        }
+
+        final ok = data is Map &&
+            data['user_info'] is Map &&
+            (data['user_info']['auth'] == 1 || data['user_info']['auth'] == '1');
+        return LoginResult(
+          ok: ok,
+          userInfo: ok ? Map<String, dynamic>.from(data['user_info'] as Map) : null,
+          serverInfo: (data is Map && data['server_info'] is Map)
+              ? Map<String, dynamic>.from(data['server_info'] as Map)
+              : null,
+          error: ok ? null : 'Credenciales inválidas o servidor rechazó la conexión',
+          diagnostic: ok ? null : diag.toString(),
+        );
+      } on TimeoutException catch (e) {
+        diag.writeln('Excepción: TimeoutException — ${e.message}');
+        lastDiag = diag.toString();
+        if (attempt < totalAttempts) {
+          await Future.delayed(Duration(milliseconds: 400 * attempt));
+          continue;
+        }
+        return LoginResult(
+          ok: false,
+          error: 'Tiempo agotado — el servidor no responde. Comprueba tu conexión y que gadir.co esté online.',
+          diagnostic: lastDiag,
+        );
+      } on SocketException catch (e) {
+        diag.writeln('Excepción: SocketException — ${e.message}');
+        if (e.osError != null) {
+          diag.writeln('OSError: ${e.osError!.errorCode} ${e.osError!.message}');
+        }
+        lastDiag = diag.toString();
+        if (attempt < totalAttempts) {
+          await Future.delayed(Duration(milliseconds: 400 * attempt));
+          continue;
+        }
+        return LoginResult(
+          ok: false,
+          error: 'No se pudo conectar a $host. Comprueba la URL del servidor y tu conexión.',
+          diagnostic: lastDiag,
+        );
+      } on HttpException catch (e) {
+        diag.writeln('Excepción: HttpException — ${e.message}');
+        lastDiag = diag.toString();
+        if (attempt < totalAttempts) {
+          await Future.delayed(Duration(milliseconds: 400 * attempt));
+          continue;
+        }
+        return LoginResult(
+          ok: false,
+          error: 'Error HTTP al contactar con el servidor.',
+          diagnostic: lastDiag,
+        );
+      } catch (e, st) {
+        diag.writeln('Excepción: ${e.runtimeType} — $e');
+        diag.writeln('Stack (top): ${st.toString().split('\n').take(2).join(' | ')}');
+        return LoginResult(
+          ok: false,
+          error: 'Error inesperado: ${e.runtimeType}',
+          diagnostic: diag.toString(),
+        );
+      } finally {
+        client?.close(force: true);
+      }
     }
+
+    return LoginResult(
+      ok: false,
+      error: 'No se pudo iniciar sesión tras $totalAttempts intentos',
+      diagnostic: lastDiag,
+    );
   }
 
   Future<List<Map<String, dynamic>>> liveCategories(Profile p) =>
@@ -237,6 +369,13 @@ class LoginResult {
   final String? error;
   final Map<String, dynamic>? userInfo;
   final Map<String, dynamic>? serverInfo;
+  final String? diagnostic;
 
-  const LoginResult({required this.ok, this.error, this.userInfo, this.serverInfo});
+  const LoginResult({
+    required this.ok,
+    this.error,
+    this.userInfo,
+    this.serverInfo,
+    this.diagnostic,
+  });
 }
