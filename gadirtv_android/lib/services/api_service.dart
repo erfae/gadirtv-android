@@ -53,7 +53,19 @@ class ApiService {
     for (var attempt = 1; attempt <= totalAttempts; attempt++) {
       onProgress?.call(attempt, totalAttempts, null);
       try {
-        final res = await _dio.get(url, queryParameters: query);
+        // Hard app-level timeout — bypasses the dart:io HttpClient bug where
+        // Dio's internal `receiveTimeout` sometimes doesn't fire on Android
+        // when the socket is open but the server never sends a full response.
+        final res = await _dio
+            .get(url, queryParameters: query)
+            .timeout(
+              const Duration(seconds: 12),
+              onTimeout: () => throw DioException(
+                requestOptions: RequestOptions(path: url),
+                type: DioExceptionType.receiveTimeout,
+                message: 'App-level timeout (12s)',
+              ),
+            );
         final data = res.data;
         // Server sometimes returns 200 with an empty body under load — retry.
         final isEmpty = data == null ||
@@ -118,9 +130,9 @@ class ApiService {
         error: ok ? null : 'Credenciales inválidas o servidor rechazó la conexión',
       );
     } on DioException catch (e) {
-      return LoginResult(ok: false, error: _dioMsg(e));
+      return LoginResult(ok: false, error: '${_dioMsg(e)} [${e.type.name}${e.response?.statusCode != null ? " ${e.response!.statusCode}" : ""}]');
     } catch (e) {
-      return LoginResult(ok: false, error: e.toString());
+      return LoginResult(ok: false, error: 'Error: ${e.runtimeType}: $e');
     }
   }
 
