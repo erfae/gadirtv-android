@@ -38,6 +38,29 @@ User's preferred language: Spanish.
 - Recording.
 - Cast to TV / remote control.
 
+---
+
+## Companion project — GadirTV Android (Flutter)
+
+**Started:** Feb 2026. Migration of the Windows client to Android
+(Móvil + Tablet + Android TV / TV Box / Fire TV).
+
+- **Location:** `/app/gadirtv_android/`
+- **PRD:** `/app/memory/PRD_ANDROID.md`
+- **Stack:** Flutter · `media_kit` (libmpv) · `dio` · `shared_preferences` · `go_router`
+- **Build:** GitHub Actions (`.github/workflows/build-apk.yml`) — Emergent
+  container is too small (<1.5 GB free) to install Flutter+Android SDK,
+  so APKs are compiled by CI on push. User downloads the artifact.
+
+### Phases
+- ✅ Phase 0 — Scaffold + CI
+- ✅ Phase 1 — Login + Multi-perfil (shared_preferences, same `gp`/`ga` schema as Windows)
+- 🟡 Phase 2 — Listas & categorías (Live/Movies/Series)
+- ⬜ Phase 3 — Player media_kit + controles custom
+- ⬜ Phase 4 — Detalles VOD/Series + resume
+- ⬜ Phase 5 — Android TV D-pad focus
+- ⬜ Phase 6 — Release APK firmado
+
 ## Backend endpoints
 - `GET /api/download/installer`     → `.exe` installer
 - `GET /api/download/installer_zip` → `.exe` wrapped in ZIP
