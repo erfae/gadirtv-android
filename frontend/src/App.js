@@ -158,7 +158,7 @@ function Login({ onLogin, onCancel }) {
           <input placeholder="Nombre perfil (opcional)" value={name} onChange={e=>setName(e.target.value)} className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600" data-testid="profile-name-input"/>
           <input placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="username-input"/>
           <input type="password" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="password-input"/>
-          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.3 (embed+video)</div>
+          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.4</div>
           {warn && <div className="text-amber-400 text-xs text-center" data-testid="warn-msg">{warn}</div>}
           <button type="submit" disabled={loading} className="w-full py-4 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium transition-colors disabled:opacity-50" data-testid="login-btn">{loading?"Guardando...":"Entrar"}</button>
         </form>
@@ -983,13 +983,13 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
       )}
 
       {/* Top-left logo (all screens except player) */}
-      <div className="fixed top-4 left-6 z-30 flex items-center gap-3">
-        <img src="./gadir-logo.png" alt="GadirTV" className="h-10 w-auto drop-shadow-lg" onError={e=>e.target.style.display='none'}/>
+      <div className="fixed top-11 left-6 z-30 flex items-center gap-3">
+        <img src="./gadir-logo.png" alt="GadirTV" className="h-9 w-auto drop-shadow-lg" onError={e=>e.target.style.display='none'}/>
       </div>
 
-      <div className="fixed top-4 right-6 z-30 flex items-center gap-3">
-        <button onClick={onSwitch} data-testid="switch-profile-btn" title="Cambiar perfil" className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center font-medium text-white shadow-lg">{profile.name.charAt(0).toUpperCase()}</button>
-        <button onClick={onLogout} data-testid="logout-btn" title="Cerrar sesión" className="w-10 h-10 rounded-lg bg-black/60 hover:bg-black/80 flex items-center justify-center text-neutral-400 hover:text-white backdrop-blur"><LogOut size={18}/></button>
+      <div className="fixed top-11 right-6 z-30 flex items-center gap-3">
+        <button onClick={onSwitch} data-testid="switch-profile-btn" title="Cambiar perfil" className="w-9 h-9 rounded-lg bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center font-medium text-white shadow-lg">{profile.name.charAt(0).toUpperCase()}</button>
+        <button onClick={onLogout} data-testid="logout-btn" title="Cerrar sesión" className="w-9 h-9 rounded-lg bg-black/60 hover:bg-black/80 flex items-center justify-center text-neutral-400 hover:text-white backdrop-blur"><LogOut size={16}/></button>
       </div>
 
       <div className="relative" style={{zIndex: 1}}>
@@ -1022,6 +1022,19 @@ function App() {
       if (!visible) setPlayerName("");
     });
   }, []);
+
+  // Keyboard: Esc / Backspace to close the embedded player from renderer.
+  useEffect(() => {
+    if (!playerVisible) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape' || e.key === 'Backspace') {
+        e.preventDefault();
+        hideEmbeddedPlayer();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [playerVisible]);
 
   const hideEmbeddedPlayer = async () => {
     if (window.electronAPI && window.electronAPI.hidePlayer) {
@@ -1093,26 +1106,29 @@ function App() {
   return (
     <div className="App">
       <TitleBar/>
-      {/* Shaded "Volver" bar shown when the embedded player is visible.
-          Lives inside the 48px top strip that mpv does not cover. Semi-
-          transparent by default, fully opaque on hover. */}
+      {/* Prominent "Volver" bar shown when the embedded player is
+          visible. Lives inside the 48px top strip that mpv does not
+          cover. Fully visible so users spot it immediately. */}
       {playerVisible && (
         <div
-          className="fixed top-0 left-0 right-0 h-12 z-[250] flex items-center gap-3 px-4 opacity-30 hover:opacity-100 transition-opacity duration-200 bg-gradient-to-b from-black/90 via-black/70 to-transparent"
+          className="fixed top-0 left-0 right-0 h-12 z-[250] flex items-center gap-3 px-4 bg-gradient-to-b from-black via-black/90 to-black/50"
           data-testid="player-topbar"
           style={{ WebkitAppRegion: "drag" }}
         >
           <button
             onClick={hideEmbeddedPlayer}
             data-testid="player-back-btn"
-            title="Volver (Esc)"
-            className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/70 hover:bg-red-600 text-white text-sm font-medium border border-white/20 backdrop-blur transition-colors"
+            title="Volver (Esc / Retroceso)"
+            className="flex items-center gap-2 px-5 py-2 rounded-full bg-red-600 hover:bg-red-500 text-white text-sm font-semibold shadow-lg transition-colors"
             style={{ WebkitAppRegion: "no-drag" }}
           >
-            <ChevronLeft size={18}/> Volver
+            <ChevronLeft size={20}/> Volver
           </button>
-          <div className="text-white/90 text-sm font-medium truncate flex-1" style={{ WebkitAppRegion: "no-drag" }}>
+          <div className="text-white/95 text-sm font-medium truncate flex-1" style={{ WebkitAppRegion: "no-drag" }}>
             {playerName}
+          </div>
+          <div className="text-white/50 text-[11px] hidden sm:block" style={{ WebkitAppRegion: "no-drag" }}>
+            Pulsa <kbd className="px-1.5 py-0.5 bg-white/10 rounded border border-white/20 mx-0.5">Esc</kbd> para volver
           </div>
         </div>
       )}

@@ -217,8 +217,9 @@ function ensurePlayerWin(parent) {
   playerWin = new BrowserWindow({
     parent,
     frame: false,
-    transparent: false,
-    backgroundColor: '#000000',
+    // Transparent + no content = Chromium does not paint over mpv's frames.
+    transparent: true,
+    backgroundColor: '#00000000',
     show: false,
     skipTaskbar: true,
     resizable: false,
@@ -230,9 +231,15 @@ function ensurePlayerWin(parent) {
     hasShadow: false,
     thickFrame: false,
     autoHideMenuBar: true,
-    webPreferences: { contextIsolation: true, sandbox: true },
+    webPreferences: {
+      contextIsolation: true,
+      sandbox: true,
+      backgroundThrottling: false,
+      offscreen: false,
+    },
   });
-  playerWin.loadURL('data:text/html,<html style="background:#000;height:100%"><body style="margin:0;background:#000"></body></html>');
+  // Fully transparent empty page. No content = no Chromium repaint on the HWND.
+  playerWin.loadURL('data:text/html,<html><body style="margin:0;background:transparent"></body></html>');
   playerWin.on('closed', () => { playerWin = null; killMpv(); });
   playerWin.setMenuBarVisibility(false);
   return playerWin;
@@ -276,18 +283,16 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
     const args = [
       url,
       `--wid=${hwnd}`,
-      // Direct3D VO is the most reliable video-output backend for --wid on
-      // Windows (works over an Electron BrowserWindow's HWND without the
-      // Chromium compositor overpainting mpv's frames).
-      '--vo=gpu',
-      '--gpu-context=d3d11',
-      '--gpu-api=d3d11',
+      // Direct3D VO. Deprecated but the most compatible with --wid on
+      // Windows over an Electron BrowserWindow (works when d3d11 / gpu
+      // silently drops frames due to compositor conflict).
+      '--vo=direct3d',
       '--force-window=yes',
       '--keep-open=no',
       '--idle=no',
       '--osc=yes',
       '--volume=100',
-      '--hwdec=auto-safe',
+      '--hwdec=no',
       '--vd-lavc-software-fallback=yes',
       '--cache=yes',
       '--cache-secs=10',
@@ -314,10 +319,15 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
     }
     // Broadcast that the embedded player is now visible.
     try { mainWinRef.webContents.send('player:visibility', { visible: true, name }); } catch (_) {}
+    // Register Escape / Backspace as global "hide player" while playing.
+    try { globalShortcut.register('Escape', () => hideEmbeddedPlayer()); } catch (_) {}
+    try { globalShortcut.register('Backspace', () => hideEmbeddedPlayer()); } catch (_) {}
     mpvProc.on('exit', (code) => {
       mpvProc = null;
       if (playerWin && !playerWin.isDestroyed()) { try { playerWin.hide(); } catch (_) {} }
       if (playerBoundsTracker) { clearInterval(playerBoundsTracker); playerBoundsTracker = null; }
+      try { globalShortcut.unregister('Escape'); } catch (_) {}
+      try { globalShortcut.unregister('Backspace'); } catch (_) {}
       BrowserWindow.getAllWindows().forEach(w => {
         try { w.webContents.send('mpv:exited', { code, stderr: stderr.slice(-1000) }); } catch (_) {}
         try { w.webContents.send('player:visibility', { visible: false }); } catch (_) {}
@@ -329,13 +339,20 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
   }
 });
 
-ipcMain.handle('player:hide', () => {
+function hideEmbeddedPlayer() {
   killMpv();
   if (playerBoundsTracker) { clearInterval(playerBoundsTracker); playerBoundsTracker = null; }
   if (playerWin && !playerWin.isDestroyed()) { try { playerWin.hide(); } catch (_) {} }
+  try { globalShortcut.unregister('Escape'); } catch (_) {}
+  try { globalShortcut.unregister('Backspace'); } catch (_) {}
   if (mainWinRef && !mainWinRef.isDestroyed()) {
     try { mainWinRef.webContents.send('player:visibility', { visible: false }); } catch (_) {}
+    try { mainWinRef.focus(); } catch (_) {}
   }
+}
+
+ipcMain.handle('player:hide', () => {
+  hideEmbeddedPlayer();
   return { ok: true };
 });
 
@@ -343,14 +360,16 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
-    minWidth: 1024,
-    minHeight: 700,
+    minWidth: 900,
+    minHeight: 600,
     frame: false,
+    fullscreen: true,
     titleBarStyle: 'hidden',
     backgroundColor: '#050505',
     icon: path.join(__dirname, 'icon.png'),
     title: 'GadirTV',
     autoHideMenuBar: true,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -361,6 +380,14 @@ function createWindow() {
   });
   mainWinRef = win;
   Menu.setApplicationMenu(null);
+
+  // Start in true full-screen (covers the Windows taskbar) so the app
+  // looks like a proper IPTV client. User can still close via the custom
+  // title-bar X button (or minimise/restore controls).
+  win.once('ready-to-show', () => {
+    try { win.setFullScreen(true); } catch (_) {}
+    win.show();
+  });
 
   // Keep embedded player window aligned with main window
   const syncBounds = () => updatePlayerBounds();
