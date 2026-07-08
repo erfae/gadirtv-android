@@ -55,7 +55,7 @@ User's preferred language: Spanish.
 ### Phases
 - ✅ Phase 0 — Scaffold + CI
 - ✅ Phase 1 — Login + Multi-perfil (shared_preferences, same `gp`/`ga` schema as Windows)
-- 🟡 Phase 2 — Listas & categorías (Live/Movies/Series)
+- ✅ Phase 2 — Listas & categorías (Live/Movies/Series) — bottom nav shell + hero banner + category chips + posters con focus
 - ⬜ Phase 3 — Player media_kit + controles custom
 - ⬜ Phase 4 — Detalles VOD/Series + resume
 - ⬜ Phase 5 — Android TV D-pad focus

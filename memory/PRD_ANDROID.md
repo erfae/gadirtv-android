@@ -27,10 +27,10 @@ User decisions confirmed:
 | Multi-profile picker (Netflix-style) | ✅ v1.0 | ✅ Phase 1 |
 | Xtream login (host / user / pass) | ✅ | ✅ Phase 1 |
 | Auto-login last active profile | ✅ | ✅ Phase 1 |
-| Live TV categories + channel grid | ✅ | 🟡 Phase 2 |
-| Movies (VOD) categories + grid | ✅ | 🟡 Phase 2 |
-| Series categories + seasons/episodes | ✅ | 🟡 Phase 2 |
-| Top banner: recently-added movies/series | ✅ | 🟡 Phase 2 |
+| Live TV categories + channel grid | ✅ | ✅ Phase 2 |
+| Movies (VOD) categories + grid | ✅ | ✅ Phase 2 |
+| Series categories + seasons/episodes | ✅ | 🟡 Ph2 (list) / Ph4 (episodes) |
+| Top banner: recently-added movies/series | ✅ | ✅ Phase 2 |
 | Video player (MPEG-TS, AC3, EAC3, HEVC) | ✅ mpv | ⬜ Phase 3 (media_kit / libmpv) |
 | Custom player controls overlay | ✅ | ⬜ Phase 3 |
 | Global hotkeys | ✅ (kb) | ⬜ Phase 3 (D-pad) |
@@ -79,8 +79,8 @@ The Emergent container is 1.5 GB free; Flutter SDK + Android SDK would need ~12 
 
 - ✅ **Phase 0 — Setup** *(Feb 2026)*
 - ✅ **Phase 1 — Login + Perfiles** *(Feb 2026)*
-- 🟡 **Phase 2 — Listas & categorías** (Live / Movies / Series grids, top banner, category chips)
-- ⬜ **Phase 3 — Player (media_kit)** with custom overlay controls (play/pause, seek, volume, EPG side panel)
+- ✅ **Phase 2 — Listas & categorías** *(Feb 2026)* — bottom-nav shell (Inicio / TV / Películas / Series), Home con hero rotativo + rails de "Recientes", category chips + grids infinitos con posters (cached_network_image). Focus D-pad básico ya cableado en PosterCard y CategoryChip.
+- 🟡 **Phase 3 — Player (media_kit)** with custom overlay controls (play/pause, seek, volume, EPG side panel)
 - ⬜ **Phase 4 — Detalles + Resume** (sinopsis, cast, star rating, per-episode resume position)
 - ⬜ **Phase 5 — Android TV / Fire TV** (D-pad focus rings, leanback launcher optimization)
 - ⬜ **Phase 6 — Release signed APK** (keystore setup, versionCode bump automation)
