@@ -7,6 +7,7 @@ import '../models/profile.dart';
 import '../services/api_service.dart';
 import '../services/profile_store.dart';
 import '../theme.dart';
+import '../widgets/quick_actions_sheet.dart';
 import 'movie_detail_screen.dart';
 import 'player_screen.dart';
 import 'search_screen.dart';
@@ -57,14 +58,111 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openMovie(Movie m) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => MovieDetailScreen(profile: _profile!, movie: m)),
+    showQuickActions(
+      context,
+      title: m.name,
+      imageUrl: m.icon,
+      kindLabel: 'PELÍCULA',
+      rating: m.rating,
+      onPlay: () {
+        Navigator.of(context).pop(); // close sheet
+        _playMovie(m);
+      },
+      onInfo: () {
+        Navigator.of(context).pop(); // close sheet
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => MovieDetailScreen(profile: _profile!, movie: m)),
+        );
+      },
     );
   }
 
   void _openSeries(Series s) {
+    showQuickActions(
+      context,
+      title: s.name,
+      imageUrl: s.cover,
+      kindLabel: 'SERIE',
+      rating: s.rating,
+      onPlay: () async {
+        // Series play needs an episode: fetch info and pick the first
+        // resumable one, or fall back to S01E01.
+        final navigator = Navigator.of(context);
+        try {
+          final info = await _api.seriesInfo(_profile!, s.seriesId);
+          if (!mounted) return;
+          navigator.pop(); // close sheet
+          _playFirstEpisode(s, info);
+        } catch (_) {
+          if (!mounted) return;
+          navigator.pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo cargar los episodios')),
+          );
+        }
+      },
+      onInfo: () {
+        Navigator.of(context).pop();
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => SeriesDetailScreen(profile: _profile!, series: s)),
+        );
+      },
+    );
+  }
+
+  /// Direct movie play — used both by the quick-actions sheet and the
+  /// hero "VER AHORA" button which skip the detail screen.
+  void _playMovie(Movie m) {
+    final ext = m.containerExt.isEmpty ? 'mp4' : m.containerExt;
+    final url = _api.streamUrl(_profile!, kind: 'movie', streamId: m.streamId, ext: ext);
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => SeriesDetailScreen(profile: _profile!, series: s)),
+      MaterialPageRoute(
+        builder: (_) => PlayerScreen(
+          playable: Playable(
+            kind: 'movie',
+            id: m.streamId.toString(),
+            title: m.name,
+            url: url,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Pick the first episode (season 1, ep 1) of a series and play it. This
+  /// is the Netflix behaviour when the user hits PLAY on a series poster.
+  void _playFirstEpisode(Series s, Map<String, dynamic> info) {
+    final episodes = info['episodes'];
+    if (episodes is! Map || episodes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Esta serie no tiene episodios disponibles')),
+      );
+      return;
+    }
+    // Sort seasons numerically to get "season 1" reliably.
+    final seasons = episodes.keys.cast<String>().toList()
+      ..sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
+    final firstSeason = seasons.first;
+    final list = episodes[firstSeason];
+    if (list is! List || list.isEmpty) return;
+    final ep = Map<String, dynamic>.from(list.first as Map);
+
+    final id = (ep['id'] ?? '').toString();
+    final ext = (ep['container_extension'] ?? 'mp4').toString();
+    final epNum = (ep['episode_num'] ?? '1').toString();
+    final url = _api.streamUrl(_profile!, kind: 'series', streamId: id, ext: ext);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PlayerScreen(
+          playable: Playable(
+            kind: 'series',
+            id: id,
+            title: '${s.name} · T$firstSeason E$epNum',
+            subtitle: (ep['title'] ?? '').toString(),
+            url: url,
+          ),
+        ),
+      ),
     );
   }
 
