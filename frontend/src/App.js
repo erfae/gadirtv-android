@@ -8,6 +8,21 @@ import "./App.css";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const IMG_FB = "https://images.unsplash.com/photo-1489599328109-c6b8b7cfd3aa?w=400";
+
+// Silence noisy but harmless media errors that bubble to the console
+// ("play() request was interrupted by pause()", "MediaError:", etc.).
+if (typeof window !== "undefined" && !window.__gadirConsoleSilenced) {
+  window.__gadirConsoleSilenced = true;
+  const origErr = console.error.bind(console);
+  const origWarn = console.warn.bind(console);
+  const noise = /interrupted by a call to pause|mediamse|mediaerror|goo\.gl\/ldlk22|the play\(\) request/i;
+  console.error = (...a) => { const s = a.map(x => (x && x.message) || String(x)).join(' '); if (!noise.test(s)) origErr(...a); };
+  console.warn  = (...a) => { const s = a.map(x => (x && x.message) || String(x)).join(' '); if (!noise.test(s)) origWarn(...a); };
+  window.addEventListener('unhandledrejection', (e) => {
+    const s = (e.reason && (e.reason.message || String(e.reason))) || '';
+    if (noise.test(s)) e.preventDefault();
+  });
+}
 const store = {
   getProfiles: () => JSON.parse(localStorage.getItem("gp") || "[]"),
   saveProfiles: (p) => localStorage.setItem("gp", JSON.stringify(p)),
@@ -167,7 +182,7 @@ function Login({ onLogin, onCancel }) {
           <input placeholder="Nombre perfil (opcional)" value={name} onChange={e=>setName(e.target.value)} className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600" data-testid="profile-name-input"/>
           <input placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="username-input"/>
           <input type="password" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="password-input"/>
-          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.6</div>
+          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.7</div>
           {warn && <div className="text-amber-400 text-xs text-center" data-testid="warn-msg">{warn}</div>}
           <button type="submit" disabled={loading} className="w-full py-4 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium transition-colors disabled:opacity-50" data-testid="login-btn">{loading?"Guardando...":"Entrar"}</button>
         </form>
@@ -462,10 +477,10 @@ function HomeTab({ profile, onSelect, onHover }) {
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-4 scrollbar-hide">
         {loading && <div className="text-center text-neutral-500 py-10" data-testid="loading-home">Cargando contenido…</div>}
         {!loading && msg && <div className="text-center text-red-400 py-10 text-sm px-8" data-testid="home-msg">{msg}</div>}
-        <Rail title="Añadidos recientemente · Películas" items={recentMovies} onSelect={i=>onSelect(i,"movie")} onHover={onHover} xl/>
-        <Rail title="Añadidas recientemente · Series" items={recentSeries} onSelect={i=>onSelect(i,"series")} onHover={onHover} xl/>
+        <Rail title="Añadidos recientemente · Películas" items={recentMovies} onSelect={i=>onSelect(i,"movie")} onHover={onHover}/>
+        <Rail title="Añadidas recientemente · Series" items={recentSeries} onSelect={i=>onSelect(i,"series")} onHover={onHover}/>
         {featuredCats.map((fc, i) => (
-          <Rail key={i} title={fc.name} items={fc.items} onSelect={it=>onSelect(it,"movie")} onHover={onHover} xl/>
+          <Rail key={i} title={fc.name} items={fc.items} onSelect={it=>onSelect(it,"movie")} onHover={onHover}/>
         ))}
       </div>
     </div>
@@ -844,22 +859,69 @@ function LivePreview({ channel, profile, fsSignal, onClose, onFullscreen }) {
     const v = videoRef.current;
     if (!v) return;
     v.muted = false; v.volume = 1;
+    // Silence noisy but harmless media errors ("play() interrupted by pause()",
+    // "MediaError", etc.) — they are not actionable for the user, we surface
+    // them as "Sin señal" only when playback truly fails.
+    const isNoiseError = (msg) => {
+      if (!msg) return true;
+      const m = String(msg).toLowerCase();
+      return (
+        m.includes("interrupted by a call to pause") ||
+        m.includes("was aborted") ||
+        m.includes("mediaerror") ||
+        m.includes("mediamse") ||
+        m.includes("goo.gl") ||
+        m.includes("networkerror") ||
+        m.includes("notsupported")
+      );
+    };
+    const showNoSignal = () => setErr("Sin señal");
+    // Also, "Sin señal" is only shown if playback never gets going. We
+    // arm a delayed check that clears itself if canplay/playing fire.
+    let noSignalArmed = false;
+    const armNoSignal = () => { noSignalArmed = true; };
     try {
       if (mpegts && mpegts.isSupported && mpegts.isSupported()) {
         const mp = mpegts.createPlayer(
           { type: "mpegts", isLive: true, url },
           { enableStashBuffer: true, stashInitialSize: 1024, enableWorker: false, fixAudioTimestampGap: true, lazyLoad: false, autoCleanupSourceBuffer: true }
         );
-        mp.on(mpegts.Events.ERROR, (type, detail) => setErr(`${type}: ${detail}`));
+        mp.on(mpegts.Events.ERROR, () => armNoSignal());
         mp.attachMediaElement(v);
         mp.load();
-        mp.play().catch(e => setErr(e.message));
+        mp.play().catch((e) => { if (!isNoiseError(e && e.message)) armNoSignal(); });
         mpRef.current = mp;
       } else {
         v.src = url;
-        v.play().catch(()=>{});
+        v.play().catch((e) => { if (!isNoiseError(e && e.message)) armNoSignal(); });
       }
-    } catch (e) { setErr(e.message); }
+      // Native <video> element error handler → "Sin señal" only if the
+      // video never manages to play. If we start receiving frames, clear
+      // any transient error that may have been logged in the meantime.
+      let noSignalTimer = null;
+      const scheduleNoSignal = () => {
+        clearTimeout(noSignalTimer);
+        noSignalTimer = setTimeout(() => {
+          if (!v.paused && v.readyState >= 2 && v.currentTime > 0) return;
+          if (noSignalArmed || (v.readyState < 2 && !v.currentTime)) showNoSignal();
+        }, 6000);
+      };
+      const clearErr = () => { clearTimeout(noSignalTimer); noSignalArmed = false; setErr(""); };
+      const onVidErr = () => { armNoSignal(); scheduleNoSignal(); };
+      const onCanPlay = () => clearErr();
+      const onPlaying = () => clearErr();
+      v.addEventListener('error', onVidErr);
+      v.addEventListener('canplay', onCanPlay);
+      v.addEventListener('playing', onPlaying);
+      scheduleNoSignal();
+      return () => {
+        clearTimeout(noSignalTimer);
+        v.removeEventListener('error', onVidErr);
+        v.removeEventListener('canplay', onCanPlay);
+        v.removeEventListener('playing', onPlaying);
+        teardown();
+      };
+    } catch (e) { if (!isNoiseError(e && e.message)) showNoSignal(); }
     return teardown;
   }, [channel, profile, paused]);
 
@@ -965,7 +1027,12 @@ function LivePreview({ channel, profile, fsSignal, onClose, onFullscreen }) {
             <button onClick={onClose} data-testid="preview-close-btn" className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center"><X size={13}/></button>
           </div>
         </div>
-        {err && <div className="absolute top-2 left-2 text-red-400 bg-black/80 px-2 py-1 rounded text-xs">{err}</div>}
+        {err && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 pointer-events-none" data-testid="preview-no-signal">
+            <div className="text-neutral-300 text-lg font-semibold tracking-widest uppercase mb-1">Sin señal</div>
+            <div className="text-neutral-500 text-xs">Este canal no responde ahora mismo</div>
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl bg-neutral-900/40 border border-white/5 p-3" data-testid="epg-panel">

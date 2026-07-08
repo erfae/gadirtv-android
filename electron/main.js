@@ -217,7 +217,8 @@ function ensurePlayerWin(parent) {
   playerWin = new BrowserWindow({
     parent,
     frame: false,
-    // Transparent + no content = Chromium does not paint over mpv's frames.
+    // Transparent + tiny opaque button = Chromium paints ONLY the button
+    // and lets mpv show through everywhere else via the transparent HWND.
     transparent: true,
     backgroundColor: '#00000000',
     show: false,
@@ -232,26 +233,25 @@ function ensurePlayerWin(parent) {
     thickFrame: false,
     autoHideMenuBar: true,
     webPreferences: {
+      preload: path.join(__dirname, 'player_preload.js'),
       contextIsolation: true,
-      sandbox: true,
+      sandbox: false,
       backgroundThrottling: false,
       offscreen: false,
     },
   });
-  // Fully transparent empty page. No content = no Chromium repaint on the HWND.
-  playerWin.loadURL('data:text/html,<html><body style="margin:0;background:transparent"></body></html>');
+  // Overlay page with the Back button. Rest of the body is transparent so
+  // the mpv-rendered frames are visible through the BrowserWindow HWND.
+  playerWin.loadFile(path.join(__dirname, 'player_overlay.html'));
   playerWin.on('closed', () => { playerWin = null; killMpv(); });
   playerWin.setMenuBarVisibility(false);
   return playerWin;
 }
 
-// 48px top strip stays uncovered so the app's "Volver" button and title
-// bar remain interactive above the embedded mpv.
-const PLAYER_TOP_STRIP = 48;
+// mpv covers the FULL primary display (no top strip). The Back button
+// lives inside the overlay HTML loaded in the player window itself.
 function updatePlayerBounds() {
   if (!playerWin || playerWin.isDestroyed()) return;
-  // Use the full primary-display bounds (not just main content) so mpv
-  // covers the taskbar even if the main window doesn't quite touch it.
   let x, y, w, h;
   try {
     const d = screen.getPrimaryDisplay();
@@ -261,15 +261,11 @@ function updatePlayerBounds() {
     const b = mainWinRef.getContentBounds();
     x = b.x; y = b.y; w = b.width; h = b.height;
   }
-  try {
-    playerWin.setBounds({
-      x,
-      y: y + PLAYER_TOP_STRIP,
-      width: w,
-      height: Math.max(1, h - PLAYER_TOP_STRIP),
-    });
-  } catch (_) {}
+  try { playerWin.setBounds({ x, y, width: w, height: Math.max(1, h) }); } catch (_) {}
 }
+
+// Renderer of the overlay (Back button) → hide the player.
+ipcMain.on('player:back', () => { try { hideEmbeddedPlayer(); } catch (_) {} });
 
 ipcMain.handle('player:show', async (_evt, { url, name }) => {
   try {
