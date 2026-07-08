@@ -158,7 +158,7 @@ function Login({ onLogin, onCancel }) {
           <input placeholder="Nombre perfil (opcional)" value={name} onChange={e=>setName(e.target.value)} className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600" data-testid="profile-name-input"/>
           <input placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="username-input"/>
           <input type="password" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="password-input"/>
-          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.2 (embed)</div>
+          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.3 (embed+video)</div>
           {warn && <div className="text-amber-400 text-xs text-center" data-testid="warn-msg">{warn}</div>}
           <button type="submit" disabled={loading} className="w-full py-4 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium transition-colors disabled:opacity-50" data-testid="login-btn">{loading?"Guardando...":"Entrar"}</button>
         </form>
@@ -424,27 +424,29 @@ function HomeTab({ profile, onSelect, onHover }) {
   return (
     <div className="flex flex-col h-screen pb-24 overflow-hidden" data-testid="home-tab">
       {hero && (
-        <div className="relative flex-shrink-0" style={{height:"55vh"}}>
+        <div className="relative flex-shrink-0" style={{minHeight:"260px"}} data-testid="hero-banner">
+          <div className="h-[38vh] sm:h-[45vh] md:h-[50vh] lg:h-[55vh] relative">
           <img src={api.proxyImg(hero.stream_icon||hero.cover) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover animate-slow-zoom" alt=""/>
           <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/60 to-transparent"/>
           <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent"/>
           {/* Dots indicator */}
-          <div className="absolute bottom-4 right-8 flex gap-2 z-10">
+          <div className="absolute bottom-3 right-4 md:right-8 flex gap-2 z-10">
             {heroList.map((_, i) => (
               <button key={i} onClick={()=>setHeroIdx(i)} className={"h-1 rounded-full transition-all " + (i===heroIdx?"w-8 bg-red-600":"w-4 bg-white/30 hover:bg-white/60")} data-testid={`hero-dot-${i}`}/>
             ))}
           </div>
-          <div className="absolute bottom-8 left-8 max-w-2xl z-10">
-            <p className="text-red-500 text-[11px] font-medium tracking-[0.3em] uppercase mb-3">{hero.series_id?"Serie":"Película"} · Reciente en GadirTV</p>
-            <h1 className="text-3xl md:text-5xl lg:text-6xl font-medium tracking-tight mb-4 drop-shadow-2xl" style={{fontFamily:"'Outfit',sans-serif"}}>{hero.name}</h1>
-            <div className="flex items-center gap-3">
-              <button onClick={()=>onSelect(hero, hero.series_id?"series":"movie")} data-testid="hero-play-btn" className="flex items-center gap-2 bg-white text-black px-7 py-3 rounded-full font-medium hover:bg-neutral-200 transition-all text-sm shadow-2xl">
-                <Play size={18} fill="black"/>Reproducir
+          <div className="absolute bottom-6 md:bottom-8 left-4 md:left-8 max-w-2xl z-10 pr-4">
+            <p className="text-red-500 text-[10px] md:text-[11px] font-medium tracking-[0.3em] uppercase mb-2 md:mb-3">{hero.series_id?"Serie":"Película"} · Reciente en GadirTV</p>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-medium tracking-tight mb-3 md:mb-4 drop-shadow-2xl" style={{fontFamily:"'Outfit',sans-serif"}}>{hero.name}</h1>
+            <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+              <button onClick={()=>onSelect(hero, hero.series_id?"series":"movie")} data-testid="hero-play-btn" className="flex items-center gap-2 bg-white text-black px-5 md:px-7 py-2.5 md:py-3 rounded-full font-medium hover:bg-neutral-200 transition-all text-xs md:text-sm shadow-2xl">
+                <Play size={16} fill="black"/>Reproducir
               </button>
-              <button onClick={()=>onSelect(hero, hero.series_id?"series":"movie")} data-testid="hero-info-btn" className="flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 text-white px-6 py-3 rounded-full font-medium hover:bg-white/20 transition-all text-sm">
+              <button onClick={()=>onSelect(hero, hero.series_id?"series":"movie")} data-testid="hero-info-btn" className="flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-full font-medium hover:bg-white/20 transition-all text-xs md:text-sm">
                 Más información
               </button>
             </div>
+          </div>
           </div>
         </div>
       )}
@@ -1009,6 +1011,24 @@ function App() {
   const [seriesOpen, setSeriesOpen] = useState(null);
   const [movieOpen, setMovieOpen] = useState(null);
   const [switching, setSwitching] = useState(false);
+  const [playerVisible, setPlayerVisible] = useState(false);
+  const [playerName, setPlayerName] = useState("");
+
+  useEffect(() => {
+    if (!window.electronAPI || !window.electronAPI.onPlayerVisibility) return;
+    return window.electronAPI.onPlayerVisibility(({ visible, name }) => {
+      setPlayerVisible(!!visible);
+      if (name) setPlayerName(name);
+      if (!visible) setPlayerName("");
+    });
+  }, []);
+
+  const hideEmbeddedPlayer = async () => {
+    if (window.electronAPI && window.electronAPI.hidePlayer) {
+      try { await window.electronAPI.hidePlayer(); } catch (_) {}
+    }
+    setPlayerVisible(false);
+  };
 
   const activateProfile = async (p) => {
     setSwitching(true);
@@ -1073,6 +1093,29 @@ function App() {
   return (
     <div className="App">
       <TitleBar/>
+      {/* Shaded "Volver" bar shown when the embedded player is visible.
+          Lives inside the 48px top strip that mpv does not cover. Semi-
+          transparent by default, fully opaque on hover. */}
+      {playerVisible && (
+        <div
+          className="fixed top-0 left-0 right-0 h-12 z-[250] flex items-center gap-3 px-4 opacity-30 hover:opacity-100 transition-opacity duration-200 bg-gradient-to-b from-black/90 via-black/70 to-transparent"
+          data-testid="player-topbar"
+          style={{ WebkitAppRegion: "drag" }}
+        >
+          <button
+            onClick={hideEmbeddedPlayer}
+            data-testid="player-back-btn"
+            title="Volver (Esc)"
+            className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/70 hover:bg-red-600 text-white text-sm font-medium border border-white/20 backdrop-blur transition-colors"
+            style={{ WebkitAppRegion: "no-drag" }}
+          >
+            <ChevronLeft size={18}/> Volver
+          </button>
+          <div className="text-white/90 text-sm font-medium truncate flex-1" style={{ WebkitAppRegion: "no-drag" }}>
+            {playerName}
+          </div>
+        </div>
+      )}
       {switching && (
         <div className="fixed inset-0 z-[300] bg-black/90 backdrop-blur flex flex-col items-center justify-center gap-4" data-testid="switching-overlay">
           <div className="w-12 h-12 rounded-full border-4 border-red-600/30 border-t-red-600 animate-spin"/>

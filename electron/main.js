@@ -238,10 +238,20 @@ function ensurePlayerWin(parent) {
   return playerWin;
 }
 
+// 48px top strip stays uncovered so the app's "Volver" button and title
+// bar remain interactive above the embedded mpv.
+const PLAYER_TOP_STRIP = 48;
 function updatePlayerBounds() {
   if (!playerWin || playerWin.isDestroyed() || !mainWinRef || mainWinRef.isDestroyed()) return;
   const b = mainWinRef.getContentBounds();
-  try { playerWin.setBounds({ x: b.x, y: b.y, width: b.width, height: b.height }); } catch (_) {}
+  try {
+    playerWin.setBounds({
+      x: b.x,
+      y: b.y + PLAYER_TOP_STRIP,
+      width: b.width,
+      height: Math.max(1, b.height - PLAYER_TOP_STRIP),
+    });
+  } catch (_) {}
 }
 
 ipcMain.handle('player:show', async (_evt, { url, name }) => {
@@ -266,6 +276,12 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
     const args = [
       url,
       `--wid=${hwnd}`,
+      // Direct3D VO is the most reliable video-output backend for --wid on
+      // Windows (works over an Electron BrowserWindow's HWND without the
+      // Chromium compositor overpainting mpv's frames).
+      '--vo=gpu',
+      '--gpu-context=d3d11',
+      '--gpu-api=d3d11',
       '--force-window=yes',
       '--keep-open=no',
       '--idle=no',
@@ -296,12 +312,15 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
       mpvProc.stderr.setEncoding('utf8');
       mpvProc.stderr.on('data', d => { stderr += d; if (stderr.length > 2000) stderr = stderr.slice(-2000); });
     }
+    // Broadcast that the embedded player is now visible.
+    try { mainWinRef.webContents.send('player:visibility', { visible: true, name }); } catch (_) {}
     mpvProc.on('exit', (code) => {
       mpvProc = null;
       if (playerWin && !playerWin.isDestroyed()) { try { playerWin.hide(); } catch (_) {} }
       if (playerBoundsTracker) { clearInterval(playerBoundsTracker); playerBoundsTracker = null; }
       BrowserWindow.getAllWindows().forEach(w => {
         try { w.webContents.send('mpv:exited', { code, stderr: stderr.slice(-1000) }); } catch (_) {}
+        try { w.webContents.send('player:visibility', { visible: false }); } catch (_) {}
       });
     });
     return { ok: true };
@@ -314,6 +333,9 @@ ipcMain.handle('player:hide', () => {
   killMpv();
   if (playerBoundsTracker) { clearInterval(playerBoundsTracker); playerBoundsTracker = null; }
   if (playerWin && !playerWin.isDestroyed()) { try { playerWin.hide(); } catch (_) {} }
+  if (mainWinRef && !mainWinRef.isDestroyed()) {
+    try { mainWinRef.webContents.send('player:visibility', { visible: false }); } catch (_) {}
+  }
   return { ok: true };
 });
 
