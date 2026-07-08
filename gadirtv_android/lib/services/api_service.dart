@@ -12,8 +12,10 @@ import '../models/profile.dart';
 /// security config already allows cleartext to gadir.co).
 class ApiService {
   ApiService() : _dio = Dio(BaseOptions(
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 30),
+          // Fail fast so users get feedback in <20 s instead of hanging.
+          connectTimeout: const Duration(seconds: 6),
+          receiveTimeout: const Duration(seconds: 10),
+          sendTimeout: const Duration(seconds: 6),
           // Match the exact headers used by the working Windows client — gadir.co
           // is picky under load and returns 503 to requests missing these.
           // In particular `Accept-Encoding: identity` disables gzip (server
@@ -30,6 +32,10 @@ class ApiService {
 
   final Dio _dio;
 
+  /// Optional live progress hook — the login screen sets this to display
+  /// "Intento 2/3…" while the retry loop is running.
+  void Function(int attempt, int total, String? message)? onProgress;
+
   /// GET `player_api.php` with automatic retries on transient failures
   /// (503, empty body, network errors). Mirrors the Windows client's
   /// 3-attempt strategy against gadir.co's anti-abuse throttling.
@@ -43,7 +49,9 @@ class ApiService {
     };
 
     Object? lastError;
-    for (var attempt = 1; attempt <= 3; attempt++) {
+    const totalAttempts = 3;
+    for (var attempt = 1; attempt <= totalAttempts; attempt++) {
+      onProgress?.call(attempt, totalAttempts, null);
       try {
         final res = await _dio.get(url, queryParameters: query);
         final data = res.data;
@@ -67,7 +75,7 @@ class ApiService {
         if (!retryable) rethrow;
       }
       // Back-off before next attempt (0.4s, 0.8s).
-      if (attempt < 3) {
+      if (attempt < totalAttempts) {
         await Future.delayed(Duration(milliseconds: 400 * attempt));
       }
     }

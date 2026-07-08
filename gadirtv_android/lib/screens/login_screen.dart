@@ -29,6 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _busy = false;
   bool _passVisible = false;
   String? _error;
+  String? _progress;
 
   @override
   void dispose() {
@@ -60,6 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _busy = true;
       _error = null;
+      _progress = 'Conectando…';
     });
 
     final all = await _store.loadAll();
@@ -71,13 +73,22 @@ class _LoginScreenState extends State<LoginScreen> {
       avatarSeed: all.length,
     );
 
+    _api.onProgress = (attempt, total, msg) {
+      if (!mounted) return;
+      setState(() => _progress = attempt == 1
+          ? 'Conectando…'
+          : 'Reintentando ($attempt/$total)…');
+    };
+
     final res = await _api.login(profile);
+    _api.onProgress = null;
 
     if (!mounted) return;
 
     if (!res.ok) {
       setState(() {
         _busy = false;
+        _progress = null;
         _error = res.error ?? 'No se pudo iniciar sesión';
       });
       return;
@@ -179,10 +190,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 ElevatedButton(
                   onPressed: _busy ? null : _connect,
                   child: _busy
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _progress ?? 'Conectando…',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                            ),
+                          ],
                         )
                       : const Text('CONECTAR'),
                 ),
