@@ -55,13 +55,15 @@ class ApiService {
         lastError = 'empty-body';
       } on DioException catch (e) {
         lastError = e;
-        // Only retry on transient errors: 503, timeouts, connection errors.
-        final code = e.response?.statusCode;
-        final retryable = code == 503 ||
+        // Retry on transient errors: any 5xx / custom Xtream codes (512, 520...),
+        // timeouts, connection errors. Windows client retries 3× on ANY failure.
+        final code = e.response?.statusCode ?? 0;
+        final retryable = code >= 500 ||
             e.type == DioExceptionType.connectionTimeout ||
             e.type == DioExceptionType.receiveTimeout ||
             e.type == DioExceptionType.sendTimeout ||
-            e.type == DioExceptionType.connectionError;
+            e.type == DioExceptionType.connectionError ||
+            e.type == DioExceptionType.unknown;
         if (!retryable) rethrow;
       }
       // Back-off before next attempt (0.4s, 0.8s).
@@ -190,9 +192,15 @@ class ApiService {
         final code = e.response?.statusCode;
         if (code == 503) {
           return 'El servidor no está disponible (503). '
-              'Suele ocurrir si tu cuenta ya está en uso en otro dispositivo '
-              'o el servidor está saturado. Cierra sesión en el otro '
-              'dispositivo y espera unos segundos antes de reintentar.';
+              'Intenta de nuevo en unos segundos.';
+        }
+        if (code == 512) {
+          return 'El servidor rechazó la conexión (512). '
+              'Suele ser un bloqueo temporal antiabuso de gadir.co. '
+              'Espera 30-60 segundos y vuelve a intentarlo.';
+        }
+        if (code != null && code >= 500) {
+          return 'Servidor no disponible ($code). Reintenta en unos segundos.';
         }
         if (code == 401 || code == 403) {
           return 'Credenciales incorrectas o cuenta expirada ($code).';
