@@ -158,7 +158,7 @@ function Login({ onLogin, onCancel }) {
           <input placeholder="Nombre perfil (opcional)" value={name} onChange={e=>setName(e.target.value)} className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600" data-testid="profile-name-input"/>
           <input placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="username-input"/>
           <input type="password" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="password-input"/>
-          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.1</div>
+          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.2 (embed)</div>
           {warn && <div className="text-amber-400 text-xs text-center" data-testid="warn-msg">{warn}</div>}
           <button type="submit" disabled={loading} className="w-full py-4 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium transition-colors disabled:opacity-50" data-testid="login-btn">{loading?"Guardando...":"Entrar"}</button>
         </form>
@@ -304,7 +304,7 @@ function CategorySection({ kind, profile, onSelect, livePreview, onHover }) {
       {loading && <div className="text-neutral-500 py-20" data-testid="loading">Cargando...</div>}
       {!loading && err && <div className="text-red-400 py-20 text-center" data-testid="cat-error">{err}</div>}
       {!loading && !err && (
-        <div className={"grid gap-4 md:gap-6 " + (kind==="live" ? "grid-cols-1 lg:grid-cols-[180px_1fr] xl:grid-cols-[200px_1fr_480px]" : "grid-cols-[160px_1fr] md:grid-cols-[200px_1fr] lg:grid-cols-[220px_1fr]")}>
+        <div className={"grid gap-3 md:gap-4 lg:gap-5 " + (kind==="live" ? "grid-cols-[140px_1fr] md:grid-cols-[170px_1fr_260px] lg:grid-cols-[190px_1fr_360px] xl:grid-cols-[210px_1fr_460px]" : "grid-cols-[140px_1fr] md:grid-cols-[180px_1fr] lg:grid-cols-[220px_1fr]")}>
           <aside className="max-h-[calc(100vh-220px)] overflow-y-auto pr-2 scrollbar-thin">
             <h3 className="text-xs uppercase tracking-widest text-neutral-500 mb-3">Grupos ({cats.length})</h3>
             <div className="space-y-1">
@@ -345,7 +345,7 @@ function CategorySection({ kind, profile, onSelect, livePreview, onHover }) {
             {!filtered.length && active && <p className="text-neutral-500">No hay contenido en este grupo</p>}
           </main>
           {kind === "live" && (
-            <aside className="sticky top-4 self-start hidden xl:block">
+            <aside className="sticky top-4 self-start hidden md:block">
               {livePreview}
             </aside>
           )}
@@ -939,9 +939,22 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
   const [fsSignal, setFsSignal] = useState(0);
   const [hoverBg, setHoverBg] = useState(null);
 
+  const stopInAppMedia = () => {
+    try {
+      document.querySelectorAll('video, audio').forEach(v => {
+        try { v.pause(); v.muted = true; v.src = ''; v.load && v.load(); } catch (_) {}
+      });
+      window.dispatchEvent(new Event('gadir:media:stop'));
+    } catch (_) {}
+  };
+
   const playLiveInMpv = async (item, fullscreen) => {
     const url = api.streamUrl(profile, { stream_id: item.stream_id, kind: "live", ext: "ts" });
-    if (window.electronAPI && window.electronAPI.playInMpv) {
+    stopInAppMedia();
+    if (window.electronAPI && window.electronAPI.showPlayer) {
+      const res = await window.electronAPI.showPlayer({ url, name: item.name });
+      if (!res || !res.ok) alert("No se pudo lanzar el reproductor: " + (res && res.error));
+    } else if (window.electronAPI && window.electronAPI.playInMpv) {
       const res = await window.electronAPI.playInMpv({ url, name: item.name, fullscreen });
       if (!res || !res.ok) alert("No se pudo lanzar mpv: " + (res && res.error));
     } else {
@@ -1029,7 +1042,20 @@ function App() {
     const streamId = item.stream_id || item.id || item.series_id;
     const ext = kind === "live" ? "ts" : (item.container_extension || "mp4");
     const url = api.streamUrl(profile, { stream_id: streamId, kind, ext });
-    if (window.electronAPI && window.electronAPI.playInMpv) {
+    // Stop every in-app <video>/<audio> to prevent audio mixing with mpv.
+    try {
+      document.querySelectorAll('video, audio').forEach(v => {
+        try { v.pause(); v.muted = true; v.src = ''; v.load && v.load(); } catch (_) {}
+      });
+      window.dispatchEvent(new Event('gadir:media:stop'));
+    } catch (_) {}
+    if (window.electronAPI && window.electronAPI.showPlayer) {
+      const res = await window.electronAPI.showPlayer({ url, name: item.name || item.title });
+      if (!res || !res.ok) {
+        alert("Error de reproductor: " + (res && res.error) + "\nUsando reproductor interno.");
+        setPlaying({ item, kind });
+      }
+    } else if (window.electronAPI && window.electronAPI.playInMpv) {
       const res = await window.electronAPI.playInMpv({ url, name: item.name || item.title, fullscreen: true });
       if (!res || !res.ok) {
         alert("Error de mpv: " + (res && res.error) + "\nUsando reproductor interno.");

@@ -7,7 +7,7 @@
 !define INSTALLSIZE 300000
 
 Name "${APPNAME}"
-OutFile "GadirTV-Setup-1.1.exe"
+OutFile "GadirTV-Setup-1.2.exe"
 Icon "icon.ico"
 Unicode true
 SetCompressor /SOLID lzma

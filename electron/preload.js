@@ -12,4 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Native HTTP call to the Xtream server, routed through Node.js (main
   // process) to bypass any Chromium networking restrictions on plain HTTP.
   xtreamGet: (opts) => ipcRenderer.invoke('xtream:get', opts),
+  // Embedded player (mpv rendering into a child BrowserWindow attached
+  // to main). No separate taskbar entry, closes with the app.
+  showPlayer: (opts) => ipcRenderer.invoke('player:show', opts),
+  hidePlayer: () => ipcRenderer.invoke('player:hide'),
 });

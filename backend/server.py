@@ -43,37 +43,37 @@ NO_CACHE_HEADERS = {
 
 @app.get("/api/download/installer")
 async def download_installer():
-    path = "/app/electron/GadirTV-Setup-1.1.exe"
+    path = "/app/electron/GadirTV-Setup-1.2.exe"
     if not os.path.exists(path):
         raise HTTPException(404, "installer not built yet")
-    return FileResponse(path, filename="GadirTV-Setup-1.1.exe", media_type="application/octet-stream", headers=NO_CACHE_HEADERS)
+    return FileResponse(path, filename="GadirTV-Setup-1.2.exe", media_type="application/octet-stream", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/api/download/installer_zip")
 async def download_installer_zip():
     """Installer .exe wrapped in a ZIP so Chrome/Edge do not block download."""
-    path = "/app/electron/GadirTV-Installer-v1.1.zip"
+    path = "/app/electron/GadirTV-Installer-v1.2.zip"
     if not os.path.exists(path):
         raise HTTPException(404, "installer zip not built yet")
-    return FileResponse(path, filename="GadirTV-Installer-v1.1.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
+    return FileResponse(path, filename="GadirTV-Installer-v1.2.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/api/download/portable")
 async def download_portable():
-    path = "/app/electron/GadirTV-Portable-v1.1.zip"
+    path = "/app/electron/GadirTV-Portable-v1.2.zip"
     if not os.path.exists(path):
         raise HTTPException(404, "portable zip not built yet")
-    return FileResponse(path, filename="GadirTV-Portable-v1.1.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
+    return FileResponse(path, filename="GadirTV-Portable-v1.2.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/api/download/encrypted")
 async def download_encrypted():
     """Password-protected ZIP so Chrome cannot inspect the contents and
     downgrade/block the download. Password: gadir"""
-    path = "/app/electron/GadirTV-Portable-v1.1-encrypted.zip"
+    path = "/app/electron/GadirTV-Portable-v1.2-encrypted.zip"
     if not os.path.exists(path):
         raise HTTPException(404, "encrypted zip not built yet")
-    return FileResponse(path, filename="GadirTV-Portable-v1.1-encrypted.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
+    return FileResponse(path, filename="GadirTV-Portable-v1.2-encrypted.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
 
 @app.post("/api/login")
 async def login(body: LoginBody):

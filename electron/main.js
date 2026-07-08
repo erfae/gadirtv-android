@@ -151,7 +151,7 @@ ipcMain.handle('mpv:play', async (evt, { url, name, fullscreen }) => {
   const mpv = resolveMpv();
   if (!mpv) return { ok: false, error: 'mpv.exe no encontrado en el paquete' };
   // Kill any prior mpv AND wait so audio never overlaps.
-  await killMpvAndWait(250);
+  await killMpvAndWait(500);
   const args = [
     url,
     '--force-window=immediate',
@@ -199,6 +199,124 @@ ipcMain.handle('mpv:play', async (evt, { url, name, fullscreen }) => {
   }
 });
 
+// ─── Embedded player (child BrowserWindow attached to main + mpv --wid) ───
+let playerWin = null;
+let mainWinRef = null;
+let playerBoundsTracker = null;
+
+function destroyPlayerWin() {
+  if (playerBoundsTracker) { clearInterval(playerBoundsTracker); playerBoundsTracker = null; }
+  if (playerWin && !playerWin.isDestroyed()) {
+    try { playerWin.destroy(); } catch (_) {}
+  }
+  playerWin = null;
+}
+
+function ensurePlayerWin(parent) {
+  if (playerWin && !playerWin.isDestroyed()) return playerWin;
+  playerWin = new BrowserWindow({
+    parent,
+    frame: false,
+    transparent: false,
+    backgroundColor: '#000000',
+    show: false,
+    skipTaskbar: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    focusable: true,
+    fullscreenable: false,
+    hasShadow: false,
+    thickFrame: false,
+    autoHideMenuBar: true,
+    webPreferences: { contextIsolation: true, sandbox: true },
+  });
+  playerWin.loadURL('data:text/html,<html style="background:#000;height:100%"><body style="margin:0;background:#000"></body></html>');
+  playerWin.on('closed', () => { playerWin = null; killMpv(); });
+  playerWin.setMenuBarVisibility(false);
+  return playerWin;
+}
+
+function updatePlayerBounds() {
+  if (!playerWin || playerWin.isDestroyed() || !mainWinRef || mainWinRef.isDestroyed()) return;
+  const b = mainWinRef.getContentBounds();
+  try { playerWin.setBounds({ x: b.x, y: b.y, width: b.width, height: b.height }); } catch (_) {}
+}
+
+ipcMain.handle('player:show', async (_evt, { url, name }) => {
+  try {
+    if (!mainWinRef || mainWinRef.isDestroyed()) return { ok: false, error: 'main window missing' };
+    const mpv = resolveMpv();
+    if (!mpv) return { ok: false, error: 'mpv.exe no encontrado' };
+    await killMpvAndWait(500);
+    const pw = ensurePlayerWin(mainWinRef);
+    updatePlayerBounds();
+    pw.showInactive();
+    updatePlayerBounds();
+    // Focus AFTER show so mpv gets keyboard input.
+    setTimeout(() => { try { pw.focus(); } catch (_) {} }, 50);
+    // Track main-window bounds and mirror them.
+    if (playerBoundsTracker) clearInterval(playerBoundsTracker);
+    playerBoundsTracker = setInterval(updatePlayerBounds, 300);
+    // Read native HWND
+    const hwndBuf = pw.getNativeWindowHandle();
+    // On Windows x64 HWND fits in 32 bits.
+    const hwnd = hwndBuf.readInt32LE(0);
+    const args = [
+      url,
+      `--wid=${hwnd}`,
+      '--force-window=yes',
+      '--keep-open=no',
+      '--idle=no',
+      '--osc=yes',
+      '--volume=100',
+      '--hwdec=auto-safe',
+      '--vd-lavc-software-fallback=yes',
+      '--cache=yes',
+      '--cache-secs=10',
+      '--demuxer-max-bytes=100M',
+      '--demuxer-readahead-secs=10',
+      '--network-timeout=20',
+      '--stream-lavf-o=reconnect=1,reconnect_streamed=1,reconnect_delay_max=5,reconnect_on_network_error=1',
+      '--force-seekable=yes',
+      '--audio-fallback-to-null=yes',
+      '--ytdl=no',
+      '--user-agent=VLC/3.0.20 LibVLC/3.0.20',
+      '--msg-level=all=warn',
+      '--vd-lavc-fast=yes',
+      '--demuxer-lavf-probe-info=yes',
+      '--demuxer-lavf-analyzeduration=5',
+      '--demuxer-lavf-probesize=10000000',
+    ];
+    if (name) args.push(`--title=GadirTV — ${name}`);
+    mpvProc = spawn(mpv, args, { detached: false, stdio: ['ignore', 'ignore', 'pipe'], cwd: path.dirname(mpv) });
+    let stderr = '';
+    if (mpvProc.stderr) {
+      mpvProc.stderr.setEncoding('utf8');
+      mpvProc.stderr.on('data', d => { stderr += d; if (stderr.length > 2000) stderr = stderr.slice(-2000); });
+    }
+    mpvProc.on('exit', (code) => {
+      mpvProc = null;
+      if (playerWin && !playerWin.isDestroyed()) { try { playerWin.hide(); } catch (_) {} }
+      if (playerBoundsTracker) { clearInterval(playerBoundsTracker); playerBoundsTracker = null; }
+      BrowserWindow.getAllWindows().forEach(w => {
+        try { w.webContents.send('mpv:exited', { code, stderr: stderr.slice(-1000) }); } catch (_) {}
+      });
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('player:hide', () => {
+  killMpv();
+  if (playerBoundsTracker) { clearInterval(playerBoundsTracker); playerBoundsTracker = null; }
+  if (playerWin && !playerWin.isDestroyed()) { try { playerWin.hide(); } catch (_) {} }
+  return { ok: true };
+});
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
@@ -219,7 +337,16 @@ function createWindow() {
       allowRunningInsecureContent: true,
     },
   });
+  mainWinRef = win;
   Menu.setApplicationMenu(null);
+
+  // Keep embedded player window aligned with main window
+  const syncBounds = () => updatePlayerBounds();
+  win.on('move', syncBounds);
+  win.on('resize', syncBounds);
+  win.on('maximize', syncBounds);
+  win.on('unmaximize', syncBounds);
+  win.on('restore', syncBounds);
 
   // Expose window control IPCs
   ipcMain.handle('win:min', () => win.minimize());
@@ -259,8 +386,8 @@ function createWindow() {
     if ((input.control || input.meta) && input.shift && k === 'r') { event.preventDefault(); return; }
   });
   win.webContents.on('did-fail-load', () => win.webContents.openDevTools({ mode: 'right' }));
-  win.on('close', () => killMpv());
-  win.on('closed', () => killMpv());
+  win.on('close', () => { killMpv(); destroyPlayerWin(); });
+  win.on('closed', () => { killMpv(); destroyPlayerWin(); mainWinRef = null; });
 }
 
 app.whenReady().then(createWindow);
