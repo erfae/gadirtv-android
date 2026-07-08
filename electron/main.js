@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, session, globalShortcut, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, session, globalShortcut, ipcMain, screen } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -364,6 +364,7 @@ function createWindow() {
     minHeight: 600,
     frame: false,
     fullscreen: true,
+    kiosk: true,
     titleBarStyle: 'hidden',
     backgroundColor: '#050505',
     icon: path.join(__dirname, 'icon.png'),
@@ -381,11 +382,16 @@ function createWindow() {
   mainWinRef = win;
   Menu.setApplicationMenu(null);
 
-  // Start in true full-screen (covers the Windows taskbar) so the app
-  // looks like a proper IPTV client. User can still close via the custom
-  // title-bar X button (or minimise/restore controls).
+  // True full-screen that covers the Windows taskbar. Kiosk mode + always
+  // on top + primary-display bounds together guarantee we occupy the
+  // entire monitor at any resolution.
   win.once('ready-to-show', () => {
-    try { win.setFullScreen(true); } catch (_) {}
+    try {
+      const d = screen.getPrimaryDisplay();
+      win.setBounds({ x: d.bounds.x, y: d.bounds.y, width: d.bounds.width, height: d.bounds.height });
+      win.setAlwaysOnTop(true, 'screen-saver');
+      win.setFullScreen(true);
+    } catch (_) {}
     win.show();
   });
 

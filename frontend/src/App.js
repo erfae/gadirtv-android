@@ -80,6 +80,15 @@ function Profiles({ onSelect, onAdd }) {
             {manage ? <><X size={16}/>Hecho</> : <><Settings size={16}/>Gestionar perfiles</>}
           </button>
         )}
+        <div className="mt-6">
+          <button
+            onClick={()=>window.electronAPI && window.electronAPI.winClose && window.electronAPI.winClose()}
+            data-testid="quit-app-btn"
+            className="text-neutral-600 hover:text-red-400 flex items-center gap-2 mx-auto text-xs transition-colors"
+          >
+            <LogOut size={14}/>Salir de la aplicación
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -158,7 +167,7 @@ function Login({ onLogin, onCancel }) {
           <input placeholder="Nombre perfil (opcional)" value={name} onChange={e=>setName(e.target.value)} className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600" data-testid="profile-name-input"/>
           <input placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="username-input"/>
           <input type="password" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="password-input"/>
-          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.4</div>
+          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.5</div>
           {warn && <div className="text-amber-400 text-xs text-center" data-testid="warn-msg">{warn}</div>}
           <button type="submit" disabled={loading} className="w-full py-4 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium transition-colors disabled:opacity-50" data-testid="login-btn">{loading?"Guardando...":"Entrar"}</button>
         </form>
@@ -425,7 +434,7 @@ function HomeTab({ profile, onSelect, onHover }) {
     <div className="flex flex-col h-screen pb-24 overflow-hidden" data-testid="home-tab">
       {hero && (
         <div className="relative flex-shrink-0" style={{minHeight:"260px"}} data-testid="hero-banner">
-          <div className="h-[38vh] sm:h-[45vh] md:h-[50vh] lg:h-[55vh] relative">
+          <div className="h-[36vh] sm:h-[40vh] md:h-[42vh] lg:h-[45vh] xl:h-[48vh] relative">
           <img src={api.proxyImg(hero.stream_icon||hero.cover) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover animate-slow-zoom" alt=""/>
           <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/60 to-transparent"/>
           <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent"/>
