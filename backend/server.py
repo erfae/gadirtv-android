@@ -43,10 +43,10 @@ NO_CACHE_HEADERS = {
 
 @app.get("/api/download/installer")
 async def download_installer():
-    path = "/app/electron/GadirTV-Setup-1.6.exe"
+    path = "/app/electron/GadirTV-Setup-1.13.exe"
     if not os.path.exists(path):
         raise HTTPException(404, "installer not built yet")
-    return FileResponse(path, filename="GadirTV-Setup-1.6.exe", media_type="application/octet-stream", headers=NO_CACHE_HEADERS)
+    return FileResponse(path, filename="GadirTV-Setup-1.13.exe", media_type="application/octet-stream", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/api/download/installer_zip")
