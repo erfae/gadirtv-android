@@ -12,19 +12,29 @@ import '../models/profile.dart';
 /// security config already allows cleartext to gadir.co).
 class ApiService {
   ApiService() : _dio = Dio(BaseOptions(
-          connectTimeout: const Duration(seconds: 12),
-          receiveTimeout: const Duration(seconds: 25),
-          // Xtream servers occasionally sniff the UA; VLC is universally allowed.
-          headers: {'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20'},
+          connectTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 30),
+          // Match the exact headers used by the working Windows client — gadir.co
+          // is picky under load and returns 503 to requests missing these.
+          // In particular `Accept-Encoding: identity` disables gzip (server
+          // refuses gzipped Xtream responses on some routes).
+          headers: {
+            'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Encoding': 'identity',
+            'Connection': 'keep-alive',
+          },
           responseType: ResponseType.json,
           validateStatus: (s) => s != null && s < 500,
         ));
 
   final Dio _dio;
 
-  /// GET `player_api.php` with the given [action] (empty string = auth ping).
+  /// GET `player_api.php` with automatic retries on transient failures
+  /// (503, empty body, network errors). Mirrors the Windows client's
+  /// 3-attempt strategy against gadir.co's anti-abuse throttling.
   Future<dynamic> _get(Profile p, String action, [Map<String, dynamic>? extra]) async {
-    final url = '${p.host}/player_api.php';
+    final url = '${_normalizeHost(p.host)}/player_api.php';
     final query = <String, dynamic>{
       'username': p.username,
       'password': p.password,
@@ -32,12 +42,57 @@ class ApiService {
       ...?extra,
     };
 
-    final res = await _dio.get(url, queryParameters: query);
-    return res.data;
+    Object? lastError;
+    for (var attempt = 1; attempt <= 3; attempt++) {
+      try {
+        final res = await _dio.get(url, queryParameters: query);
+        final data = res.data;
+        // Server sometimes returns 200 with an empty body under load — retry.
+        final isEmpty = data == null ||
+            (data is String && data.trim().isEmpty) ||
+            (data is List && data.isEmpty && action.isNotEmpty);
+        if (!isEmpty) return data;
+        lastError = 'empty-body';
+      } on DioException catch (e) {
+        lastError = e;
+        // Only retry on transient errors: 503, timeouts, connection errors.
+        final code = e.response?.statusCode;
+        final retryable = code == 503 ||
+            e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            e.type == DioExceptionType.connectionError;
+        if (!retryable) rethrow;
+      }
+      // Back-off before next attempt (0.4s, 0.8s).
+      if (attempt < 3) {
+        await Future.delayed(Duration(milliseconds: 400 * attempt));
+      }
+    }
+    if (lastError is DioException) throw lastError;
+    throw DioException(
+      requestOptions: RequestOptions(path: url),
+      message: 'Sin respuesta tras 3 intentos',
+    );
+  }
+
+  /// Normalizes user-typed hosts:
+  ///  * strips whitespace and trailing slashes
+  ///  * adds `http://` when no scheme is present (Xtream Codes doesn't use HTTPS
+  ///    for gadir.co and typing the scheme is error-prone on mobile).
+  static String _normalizeHost(String raw) {
+    var h = raw.trim();
+    while (h.endsWith('/')) {
+      h = h.substring(0, h.length - 1);
+    }
+    if (!h.startsWith('http://') && !h.startsWith('https://')) {
+      h = 'http://$h';
+    }
+    return h;
   }
 
   /// Xtream login: fires the base `player_api.php?username=&password=` call.
-  /// Returns `true` if `user_info.auth == 1`.
+  /// Returns `true` if `user_info.auth == 1`. Retries are handled by [_get].
   Future<LoginResult> login(Profile p) async {
     try {
       final data = await _get(p, '');
@@ -110,7 +165,7 @@ class ApiService {
     };
     final u = Uri.encodeComponent(p.username);
     final pw = Uri.encodeComponent(p.password);
-    return '${p.host}/$path/$u/$pw/$streamId.$ext';
+    return '${_normalizeHost(p.host)}/$path/$u/$pw/$streamId.$ext';
   }
 
   Future<List<Map<String, dynamic>>> _list(
@@ -132,7 +187,17 @@ class ApiService {
       case DioExceptionType.connectionError:
         return 'No se pudo conectar al servidor.';
       case DioExceptionType.badResponse:
-        return 'El servidor devolvió ${e.response?.statusCode}.';
+        final code = e.response?.statusCode;
+        if (code == 503) {
+          return 'El servidor no está disponible (503). '
+              'Suele ocurrir si tu cuenta ya está en uso en otro dispositivo '
+              'o el servidor está saturado. Cierra sesión en el otro '
+              'dispositivo y espera unos segundos antes de reintentar.';
+        }
+        if (code == 401 || code == 403) {
+          return 'Credenciales incorrectas o cuenta expirada ($code).';
+        }
+        return 'El servidor devolvió $code.';
       default:
         return e.message ?? 'Error de red';
     }

@@ -88,6 +88,13 @@ The Emergent container is 1.5 GB free; Flutter SDK + Android SDK would need ~12 
 - ✅ **Extra — EPG "Ahora / Después"** *(Feb 2026)* — el player fetch `get_short_epg` al abrir un canal en directo y muestra programa actual + siguiente en la barra superior
 - ✅ **Extra — Buscador global** *(Feb 2026)* — botón lupa en top-bar → pantalla con input + resultados en 3 secciones (Canales / Películas / Series), debounce 250 ms, filtrado client-side
 - ✅ **Extra — Backup / Restore** *(Feb 2026)* — botón nube en top-bar exporta perfiles + favoritos + resume al portapapeles como JSON; se restaura pegando en otro dispositivo
+- ✅ **v0.2.0 — Fix login 503 + UX** *(Feb 2026)*
+  - **Login 503 fix:** ApiService ahora envía cabeceras idénticas al cliente Windows (`Accept: application/json, text/plain, */*`, `Accept-Encoding: identity`, `Connection: keep-alive`) y reintenta hasta 3 veces con backoff (400 ms, 800 ms) ante 503 / timeout / body vacío. Diagnóstico: gadir.co devuelve 503 a peticiones gzipped bajo carga; el header `Accept-Encoding: identity` desactiva gzip y replica el comportamiento del backend Electron.
+  - **URL normalization:** el host se limpia (trim, strip trailing slash, add `http://` si falta) tanto al conectar como en cada request y stream URL.
+  - **Show/hide password toggle:** botón de ojo en el input de contraseña del login.
+  - **Icono GadirTV:** launcher icons regenerados en las 5 densidades desde `/app/electron/icon.png`, más `ic_launcher_round`, adaptive icon (foreground + background `#0B0C0F`) y `tv_banner` 320×180. Nombre app ya era "GadirTV".
+  - **Build:** `pubspec.yaml` version 0.2.0+2.
+
 
 ---
 

@@ -27,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _store = ProfileStore();
 
   bool _busy = false;
+  bool _passVisible = false;
   String? _error;
 
   @override
@@ -40,7 +41,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _connect() async {
     if (_busy) return;
-    final host = _host.text.trim();
+    var host = _host.text.trim();
+    // Strip trailing slashes and add http:// if missing
+    while (host.endsWith('/')) {
+      host = host.substring(0, host.length - 1);
+    }
+    if (host.isNotEmpty && !host.startsWith('http://') && !host.startsWith('https://')) {
+      host = 'http://$host';
+    }
     final user = _user.text.trim();
     final pass = _pass.text.trim();
 
@@ -130,11 +138,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 14),
                 TextField(
                   controller: _pass,
-                  obscureText: true,
+                  obscureText: !_passVisible,
                   autocorrect: false,
                   enableSuggestions: false,
                   style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(hintText: 'Contraseña'),
+                  decoration: InputDecoration(
+                    hintText: 'Contraseña',
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _passVisible ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                        color: GtvTheme.textDim,
+                      ),
+                      tooltip: _passVisible ? 'Ocultar contraseña' : 'Mostrar contraseña',
+                      onPressed: () => setState(() => _passVisible = !_passVisible),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 TextField(
