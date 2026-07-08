@@ -326,23 +326,6 @@ class _HomeTabState extends State<HomeTab> {
                     ),
                     const SizedBox(height: 4),
                     ClipRRect(
-
-/// Materialized resume entry — pairs a resume position with poster metadata
-/// we already loaded from `vodStreams` so we can render without extra fetches.
-class _ResumeItem {
-  const _ResumeItem({
-    required this.title,
-    required this.image,
-    required this.progress,
-    required this.onTap,
-  });
-
-  final String title;
-  final String image;
-  final double progress;
-  final VoidCallback onTap;
-}
-
                       borderRadius: BorderRadius.circular(2),
                       child: LinearProgressIndicator(
                         value: r.progress,
@@ -396,3 +379,20 @@ class _ResumeItem {
     );
   }
 }
+
+/// Materialized resume entry — pairs a resume position with poster metadata
+/// we already loaded from `vodStreams` so we can render without extra fetches.
+class _ResumeItem {
+  const _ResumeItem({
+    required this.title,
+    required this.image,
+    required this.progress,
+    required this.onTap,
+  });
+
+  final String title;
+  final String image;
+  final double progress;
+  final VoidCallback onTap;
+}
+

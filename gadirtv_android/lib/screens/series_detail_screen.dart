@@ -101,7 +101,7 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator(color: GtvTheme.red)));
     }
 
-    final info = _info['info'] is Map ? Map<String, dynamic>.from(_info['info'] as Map) : {};
+    final info = _info['info'] is Map ? Map<String, dynamic>.from(_info['info'] as Map) : <String, dynamic>{};
     final plot = (info['plot'] ?? widget.series.plot).toString();
     final cast = (info['cast'] ?? '').toString();
     final director = (info['director'] ?? '').toString();
@@ -267,7 +267,7 @@ class _EpisodeTileState extends State<_EpisodeTile> {
     final e = widget.episode;
     final num = (e['episode_num'] ?? '').toString();
     final title = (e['title'] ?? e['name'] ?? 'Episodio $num').toString();
-    final info = e['info'] is Map ? Map<String, dynamic>.from(e['info'] as Map) : {};
+    final info = e['info'] is Map ? Map<String, dynamic>.from(e['info'] as Map) : <String, dynamic>{};
     final plot = (info['plot'] ?? info['overview'] ?? '').toString();
     final progress = widget.resume?.progress ?? 0;
 

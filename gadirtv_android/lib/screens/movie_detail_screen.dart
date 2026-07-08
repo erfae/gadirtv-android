@@ -45,14 +45,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final info = results[0] as Map<String, dynamic>;
     setState(() {
       _info = info;
-      _mvInfo = (info['movie_data'] is Map ? Map<String, dynamic>.from(info['movie_data'] as Map) : {});
+      _mvInfo = (info['movie_data'] is Map ? Map<String, dynamic>.from(info['movie_data'] as Map) : <String, dynamic>{});
       _resumeEntry = results[1] as ResumeEntry?;
       _loading = false;
     });
   }
 
   void _play({bool fromStart = false}) {
-    final meta = _info['info'] is Map ? Map<String, dynamic>.from(_info['info'] as Map) : {};
+    final meta = _info['info'] is Map ? Map<String, dynamic>.from(_info['info'] as Map) : <String, dynamic>{};
     final ext = (_mvInfo['container_extension'] ?? widget.movie.containerExt).toString();
     final url = _api.streamUrl(
       widget.profile,
@@ -82,7 +82,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator(color: GtvTheme.red)));
     }
 
-    final info = _info['info'] is Map ? Map<String, dynamic>.from(_info['info'] as Map) : {};
+    final info = _info['info'] is Map
+        ? Map<String, dynamic>.from(_info['info'] as Map)
+        : <String, dynamic>{};
     final plot = (info['plot'] ?? info['description'] ?? '').toString();
     final cast = (info['cast'] ?? '').toString();
     final director = (info['director'] ?? '').toString();

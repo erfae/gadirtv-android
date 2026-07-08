@@ -3,9 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:media_kit/media_kit.dart';
+import 'package:media_kit/media_kit.dart' hide Playable;
 import 'package:media_kit_video/media_kit_video.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../models/playable.dart';
 import '../models/profile.dart';
@@ -61,7 +60,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     super.initState();
     _initPlayer();
     _armAutoHide();
-    WakelockPlus.enable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
   }
 
@@ -120,7 +118,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       s.cancel();
     }
     _player.dispose();
-    WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     super.dispose();
   }
