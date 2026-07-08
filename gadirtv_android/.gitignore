@@ -22,8 +22,11 @@ android/**/gradle-wrapper.jar
 android/**/gradlew
 android/**/gradlew.bat
 android/app/release/
-android/key.properties
-*.jks
+# NOTE: key.properties and gadirtv-release.jks ARE committed intentionally so
+# every CI build signs with the same certificate (allows OTA updates on device
+# without "package conflict" errors). Only real production keys should be kept
+# out of the repo.
+# android/key.properties
 *.keystore
 
 # iOS (not used but ignored)
