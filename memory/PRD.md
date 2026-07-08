@@ -54,9 +54,13 @@ User's preferred language: Spanish.
 
 ### Phases
 - ✅ Phase 0 — Scaffold + CI
-- ✅ Phase 1 — Login + Multi-perfil (shared_preferences, same `gp`/`ga` schema as Windows)
-- ✅ Phase 2 — Listas & categorías (Live/Movies/Series) — bottom nav shell + hero banner + category chips + posters con focus
-- ⬜ Phase 3 — Player media_kit + controles custom
+- ✅ Phase 1 — Login + Multi-perfil
+- ✅ Phase 2 — Listas & categorías (Live/Movies/Series) + Home hero
+- ✅ Phase 3 — Player media_kit + controles overlay + wakelock
+- ✅ Phase 4 — Detalles VOD/Series + ResumeStore + "Continuar viendo"
+- ✅ Phase 5 — D-pad Android TV (FocusTraversalGroup + arrow-key player)
+- ✅ Phase 6 — Release APK con ABI splits + doc SIGNING.md para keystore Play Store
+- ✅ Extra — Favoritos en Live TV (chip "★ Favoritos" + estrella amarilla por canal)
 - ⬜ Phase 4 — Detalles VOD/Series + resume
 - ⬜ Phase 5 — Android TV D-pad focus
 - ⬜ Phase 6 — Release APK firmado

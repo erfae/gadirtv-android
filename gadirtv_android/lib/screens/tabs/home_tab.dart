@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../models/media.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
+import '../../services/resume_store.dart';
 import '../../theme.dart';
 import '../../widgets/poster_card.dart';
 
@@ -31,9 +32,11 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   final _api = ApiService();
+  final _resumeStore = ResumeStore();
 
   List<Movie> _recentMovies = const [];
   List<Series> _recentSeries = const [];
+  List<_ResumeItem> _resume = const [];
   bool _loading = true;
   String? _error;
 
@@ -62,17 +65,45 @@ class _HomeTabState extends State<HomeTab> {
       final results = await Future.wait([
         _api.vodStreams(widget.profile),
         _api.seriesList(widget.profile),
+        _resumeStore.loadAll(),
       ]);
 
-      final movies = results[0].map(Movie.fromJson).toList()
+      final movies = (results[0] as List).map((e) => Movie.fromJson(e as Map<String, dynamic>)).toList()
         ..sort((a, b) => b.addedTs.compareTo(a.addedTs));
-      final series = results[1].map(Series.fromJson).toList()
+      final series = (results[1] as List).map((e) => Series.fromJson(e as Map<String, dynamic>)).toList()
         ..sort((a, b) => b.lastModifiedTs.compareTo(a.lastModifiedTs));
+      final resumeMap = results[2] as Map<String, ResumeEntry>;
+
+      // Match resume entries against known items so we can render posters.
+      final movieById = {for (final m in movies) m.streamId.toString(): m};
+      final seriesResumeIds = <String>{};
+      for (final e in resumeMap.keys) {
+        if (e.startsWith('series:')) seriesResumeIds.add(e.substring(7));
+      }
+
+      final resumeItems = <_ResumeItem>[];
+      final entries = resumeMap.entries.toList()
+        ..sort((a, b) => b.value.updatedAt.compareTo(a.value.updatedAt));
+      for (final e in entries) {
+        if (e.key.startsWith('movie:')) {
+          final id = e.key.substring(6);
+          final m = movieById[id];
+          if (m != null) {
+            resumeItems.add(_ResumeItem(
+              title: m.name,
+              image: m.icon,
+              progress: e.value.progress.clamp(0, 1),
+              onTap: () => widget.onOpenMovie(m),
+            ));
+          }
+        }
+      }
 
       if (!mounted) return;
       setState(() {
         _recentMovies = movies.take(24).toList();
         _recentSeries = series.take(24).toList();
+        _resume = resumeItems.take(12).toList();
         _loading = false;
       });
 
@@ -115,6 +146,10 @@ class _HomeTabState extends State<HomeTab> {
       children: [
         _buildHero(),
         const SizedBox(height: 28),
+        if (_resume.isNotEmpty) ...[
+          _buildResumeRail(),
+          const SizedBox(height: 24),
+        ],
         _buildRail(
           title: 'Recientes Películas',
           count: _recentMovies.length,
@@ -253,6 +288,76 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildResumeRail() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            'Continuar viendo',
+            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 200,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            itemCount: _resume.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            itemBuilder: (_, i) {
+              final r = _resume[i];
+              return SizedBox(
+                width: 130,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: PosterCard(
+                        title: r.title,
+                        imageUrl: r.image,
+                        onTap: r.onTap,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+
+/// Materialized resume entry — pairs a resume position with poster metadata
+/// we already loaded from `vodStreams` so we can render without extra fetches.
+class _ResumeItem {
+  const _ResumeItem({
+    required this.title,
+    required this.image,
+    required this.progress,
+    required this.onTap,
+  });
+
+  final String title;
+  final String image;
+  final double progress;
+  final VoidCallback onTap;
+}
+
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: r.progress,
+                        minHeight: 3,
+                        backgroundColor: Colors.white12,
+                        color: GtvTheme.red,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 

@@ -18,6 +18,8 @@ class PosterCard extends StatefulWidget {
     this.rating,
     this.badge,
     this.autofocus = false,
+    this.isFavorite,
+    this.onToggleFavorite,
   });
 
   /// 2/3 → portrait poster (VOD, Series). Use 16/9 for landscape logos.
@@ -28,6 +30,13 @@ class PosterCard extends StatefulWidget {
   final double? rating;
   final String? badge;
   final bool autofocus;
+
+  /// When both [isFavorite] and [onToggleFavorite] are provided, a star
+  /// button is drawn in the top-left corner. Filled yellow = favorite;
+  /// outlined white = not. Tapping the star fires the callback without
+  /// triggering the main [onTap].
+  final bool? isFavorite;
+  final VoidCallback? onToggleFavorite;
 
   @override
   State<PosterCard> createState() => _PosterCardState();
@@ -130,6 +139,15 @@ class _PosterCardState extends State<PosterCard> {
                             ),
                           ),
                         ),
+                      if (widget.onToggleFavorite != null && widget.isFavorite != null)
+                        Positioned(
+                          top: 6,
+                          left: 6,
+                          child: _FavoriteStar(
+                            active: widget.isFavorite!,
+                            onTap: widget.onToggleFavorite!,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -171,4 +189,39 @@ class _PosterCardState extends State<PosterCard> {
           child: Icon(Icons.movie_outlined, color: GtvTheme.textDim, size: 32),
         ),
       );
+}
+
+/// Tappable star used as the favorite toggle on the poster's top-left.
+///
+/// A dedicated widget so its tap event doesn't bubble up to the poster's
+/// main [GestureDetector] (that would open the channel instead of starring
+/// it). Uses [Material.transparency] + [InkWell] to swallow the hit.
+class _FavoriteStar extends StatelessWidget {
+  const _FavoriteStar({required this.active, required this.onTap});
+
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.55),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            active ? Icons.star_rounded : Icons.star_outline_rounded,
+            color: active ? const Color(0xFFFACC15) : Colors.white,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/media.dart';
+import '../models/playable.dart';
 import '../models/profile.dart';
+import '../services/api_service.dart';
 import '../services/profile_store.dart';
 import '../theme.dart';
+import 'movie_detail_screen.dart';
+import 'player_screen.dart';
+import 'series_detail_screen.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/live_tab.dart';
 import 'tabs/movies_tab.dart';
@@ -13,9 +18,6 @@ import 'tabs/series_tab.dart';
 /// Main shell after login — top bar + 4 tabs (Inicio / TV / Películas / Series)
 /// with a bottom navigation, matching the IPTV Smarters layout the user
 /// requested for the Windows client.
-///
-/// Detail screens and the player still live outside this shell (they push
-/// full-screen routes on top). Phase 3 will wire the player.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -25,6 +27,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _store = ProfileStore();
+  final _api = ApiService();
   Profile? _profile;
   int _tab = 0;
 
@@ -51,49 +54,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openMovie(Movie m) {
-    _openPlaceholder('Película', m.name);
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => MovieDetailScreen(profile: _profile!, movie: m)),
+    );
   }
 
   void _openSeries(Series s) {
-    _openPlaceholder('Serie', s.name);
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => SeriesDetailScreen(profile: _profile!, series: s)),
+    );
   }
 
   void _playChannel(LiveChannel c) {
-    _openPlaceholder('Canal en directo', c.name);
-  }
-
-  /// Placeholder until Phase 3 (Player) lands.
-  void _openPlaceholder(String kind, String title) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: GtvTheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(kind.toUpperCase(),
-                style: const TextStyle(color: GtvTheme.red, fontSize: 11, letterSpacing: 1.4, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 16),
-            const Text(
-              'El reproductor llegará en la Fase 3. Este toque confirma que la lista y las categorías funcionan correctamente.',
-              style: TextStyle(color: GtvTheme.textDim, fontSize: 13),
-            ),
-            const SizedBox(height: 24),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('CERRAR'),
-              ),
-            ),
-          ],
+    final url = _api.streamUrl(_profile!, kind: 'live', streamId: c.streamId, ext: 'ts');
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PlayerScreen(
+          playable: Playable(
+            kind: 'live',
+            id: c.streamId.toString(),
+            title: c.name,
+            url: url,
+          ),
         ),
       ),
     );
@@ -113,16 +95,20 @@ class _HomeScreenState extends State<HomeScreen> {
       SeriesTab(profile: p, onOpen: _openSeries),
     ];
 
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(p),
-            Expanded(
-              child: IndexedStack(index: _tab, children: tabs),
-            ),
-            _buildBottomNav(),
-          ],
+    // Wrapping the shell in a FocusTraversalGroup gives predictable
+    // left/right/up/down navigation across the top-bar, content and
+    // bottom-nav — critical for the Android TV remote experience.
+    return FocusTraversalGroup(
+      policy: OrderedTraversalPolicy(),
+      child: Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildTopBar(p),
+              Expanded(child: IndexedStack(index: _tab, children: tabs)),
+              _buildBottomNav(),
+            ],
+          ),
         ),
       ),
     );
@@ -140,12 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           const Text(
             'GadirTV',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: GtvTheme.red,
-              letterSpacing: 0.5,
-            ),
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: GtvTheme.red, letterSpacing: 0.5),
           ),
           const Spacer(),
           Container(
@@ -160,10 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 const Icon(Icons.person_rounded, size: 14, color: Colors.white),
                 const SizedBox(width: 8),
-                Text(
-                  p.name.isEmpty ? p.username : p.name,
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                ),
+                Text(p.name.isEmpty ? p.username : p.name, style: const TextStyle(color: Colors.white, fontSize: 12)),
                 const SizedBox(width: 8),
                 InkWell(
                   onTap: _switchProfile,
@@ -253,19 +231,12 @@ class _NavButtonState extends State<_NavButton> {
           decoration: BoxDecoration(
             color: on ? GtvTheme.red.withOpacity(0.15) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _focused ? GtvTheme.red : Colors.transparent,
-              width: 2,
-            ),
+            border: Border.all(color: _focused ? GtvTheme.red : Colors.transparent, width: 2),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                widget.item.icon,
-                color: on ? GtvTheme.red : GtvTheme.textDim,
-                size: 20,
-              ),
+              Icon(widget.item.icon, color: on ? GtvTheme.red : GtvTheme.textDim, size: 20),
               const SizedBox(width: 8),
               Text(
                 widget.item.label,

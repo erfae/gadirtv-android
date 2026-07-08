@@ -79,11 +79,12 @@ The Emergent container is 1.5 GB free; Flutter SDK + Android SDK would need ~12 
 
 - ✅ **Phase 0 — Setup** *(Feb 2026)*
 - ✅ **Phase 1 — Login + Perfiles** *(Feb 2026)*
-- ✅ **Phase 2 — Listas & categorías** *(Feb 2026)* — bottom-nav shell (Inicio / TV / Películas / Series), Home con hero rotativo + rails de "Recientes", category chips + grids infinitos con posters (cached_network_image). Focus D-pad básico ya cableado en PosterCard y CategoryChip.
-- 🟡 **Phase 3 — Player (media_kit)** with custom overlay controls (play/pause, seek, volume, EPG side panel)
-- ⬜ **Phase 4 — Detalles + Resume** (sinopsis, cast, star rating, per-episode resume position)
-- ⬜ **Phase 5 — Android TV / Fire TV** (D-pad focus rings, leanback launcher optimization)
-- ⬜ **Phase 6 — Release signed APK** (keystore setup, versionCode bump automation)
+- ✅ **Phase 2 — Listas & categorías** *(Feb 2026)* — bottom-nav shell, Home con hero + rails, chips + grids
+- ✅ **Phase 3 — Player (media_kit)** *(Feb 2026)* — full-screen mpv player, overlay auto-hide 3.5s, seek/volume/play-pause con D-pad, wakelock, error "SIN SEÑAL"
+- ✅ **Phase 4 — Detalles + Resume** *(Feb 2026)* — MovieDetail + SeriesDetail (temporadas/episodios), ResumeStore JSON, rail "Continuar viendo" en Home, botones REPRODUCIR / CONTINUAR / Empezar de nuevo
+- ✅ **Phase 5 — Android TV D-pad** *(Feb 2026)* — FocusTraversalGroup en shell, FocusableActionDetector en cada botón, arrow keys → seek/volume en player
+- ✅ **Phase 6 — Release APK** *(Feb 2026)* — build.gradle con keystore condicional, ABI splits (armeabi-v7a + arm64-v8a + x86_64 + universal), SIGNING.md con instrucciones para Play Store
+- ✅ **Extra — Favoritos** *(Feb 2026)* — FavoritesStore + chip "★ Favoritos" en Live TV + estrella tocable sobre cada canal (amarilla si activo)
 
 ---
 

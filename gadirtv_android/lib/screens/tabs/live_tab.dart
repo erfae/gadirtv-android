@@ -3,13 +3,16 @@ import 'package:flutter/material.dart';
 import '../../models/media.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
+import '../../services/favorites_store.dart';
 import '../../theme.dart';
 import '../../widgets/category_strip.dart';
 import '../../widgets/poster_card.dart';
 
 /// Live TV tab — category chips on top, grid of channel logos below.
 ///
-/// Uses 16/9 tiles because channel logos are typically landscape.
+/// Adds a "★ Favoritos" chip pinned right after "Todos". Every channel poster
+/// carries a small star: tap it to move the channel in and out of favorites.
+/// When the Favoritos chip is selected, only starred channels are shown.
 class LiveTab extends StatefulWidget {
   const LiveTab({
     super.key,
@@ -25,11 +28,18 @@ class LiveTab extends StatefulWidget {
 }
 
 class _LiveTabState extends State<LiveTab> {
+  static const _favoritesId = '__favorites__';
+  static const _allId = '__all__';
+
   final _api = ApiService();
+  final _favs = FavoritesStore();
 
   List<Category> _categories = const [];
-  List<LiveChannel> _channels = const [];
-  String _selected = '__all__';
+  List<LiveChannel> _channels = const []; // channels in current view
+  List<LiveChannel> _allChannels = const []; // full unfiltered cache
+  Set<int> _favoriteIds = <int>{};
+
+  String _selected = _allId;
   bool _loadingCats = true;
   bool _loadingChans = false;
   String? _error;
@@ -37,19 +47,25 @@ class _LiveTabState extends State<LiveTab> {
   @override
   void initState() {
     super.initState();
-    _loadCategories();
+    _boot();
   }
 
-  Future<void> _loadCategories() async {
+  Future<void> _boot() async {
     try {
-      final raw = await _api.liveCategories(widget.profile);
+      final results = await Future.wait([
+        _api.liveCategories(widget.profile),
+        _favs.loadAll(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _categories = raw.map(Category.fromJson).toList();
+        _categories = (results[0] as List)
+            .map((e) => Category.fromJson(e as Map<String, dynamic>))
+            .toList();
+        _favoriteIds = results[1] as Set<int>;
         _loadingCats = false;
       });
-      await _loadChannels('__all__');
-    } catch (e) {
+      await _loadChannels(_allId);
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _loadingCats = false;
@@ -65,23 +81,52 @@ class _LiveTabState extends State<LiveTab> {
       _error = null;
     });
 
+    // Favoritos view: filter the in-memory `_allChannels` — no network hit.
+    if (id == _favoritesId) {
+      final list = _allChannels.where((c) => _favoriteIds.contains(c.streamId)).toList();
+      if (!mounted) return;
+      setState(() {
+        _channels = list;
+        _loadingChans = false;
+      });
+      return;
+    }
+
     try {
       final raw = await _api.liveStreams(
         widget.profile,
-        categoryId: id == '__all__' ? null : id,
+        categoryId: id == _allId ? null : id,
       );
       if (!mounted) return;
+      final parsed = raw.map(LiveChannel.fromJson).toList();
       setState(() {
-        _channels = raw.map(LiveChannel.fromJson).toList();
+        _channels = parsed;
         _loadingChans = false;
+        if (id == _allId) _allChannels = parsed;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _loadingChans = false;
         _error = 'No se pudieron cargar los canales';
       });
     }
+  }
+
+  Future<void> _toggleFavorite(LiveChannel c) async {
+    final nowFav = await _favs.toggle(c.streamId);
+    if (!mounted) return;
+    setState(() {
+      if (nowFav) {
+        _favoriteIds.add(c.streamId);
+      } else {
+        _favoriteIds.remove(c.streamId);
+        // If we're inside Favoritos and just unstarred, drop the tile too.
+        if (_selected == _favoritesId) {
+          _channels = _channels.where((x) => x.streamId != c.streamId).toList();
+        }
+      }
+    });
   }
 
   @override
@@ -91,7 +136,8 @@ class _LiveTabState extends State<LiveTab> {
     }
 
     final chips = <(String, String)>[
-      ('__all__', 'Todos'),
+      (_allId, 'Todos'),
+      (_favoritesId, '★ Favoritos'),
       ..._categories.map((c) => (c.id, c.name)),
     ];
 
@@ -117,8 +163,18 @@ class _LiveTabState extends State<LiveTab> {
       return Center(child: Text(_error!, style: const TextStyle(color: GtvTheme.textDim)));
     }
     if (_channels.isEmpty) {
-      return const Center(
-        child: Text('No hay canales en esta categoría', style: TextStyle(color: GtvTheme.textDim)),
+      final msg = _selected == _favoritesId
+          ? 'Todavía no has marcado ningún canal como favorito.\nToca la estrella de un canal para añadirlo.'
+          : 'No hay canales en esta categoría';
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            msg,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: GtvTheme.textDim, height: 1.5),
+          ),
+        ),
       );
     }
 
@@ -139,6 +195,8 @@ class _LiveTabState extends State<LiveTab> {
           aspectRatio: 16 / 9,
           onTap: () => widget.onPlay(c),
           autofocus: i == 0,
+          isFavorite: _favoriteIds.contains(c.streamId),
+          onToggleFavorite: () => _toggleFavorite(c),
         );
       },
     );

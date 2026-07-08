@@ -45,19 +45,19 @@ jobs:
       - name: Build DEBUG APK
         run: flutter build apk --debug
 
-      - name: Build RELEASE APK
-        run: flutter build apk --release
+      - name: Build RELEASE APK (universal + per-ABI splits)
+        run: flutter build apk --release --split-per-abi
 
       - name: Upload DEBUG APK
         uses: actions/upload-artifact@v4
         with:
           name: GadirTV-debug-apk
           path: gadirtv_android/build/app/outputs/flutter-apk/app-debug.apk
-          if-no-files-found: error
+          if-no-files-found: warn
 
-      - name: Upload RELEASE APK
+      - name: Upload RELEASE APKs
         uses: actions/upload-artifact@v4
         with:
-          name: GadirTV-release-apk
-          path: gadirtv_android/build/app/outputs/flutter-apk/app-release.apk
+          name: GadirTV-release-apks
+          path: gadirtv_android/build/app/outputs/flutter-apk/app-*-release.apk
           if-no-files-found: error
