@@ -7,11 +7,17 @@
     * { box-sizing: border-box; }
     html, body {
       margin: 0; padding: 0; height: 100%; width: 100%;
+      /* Transparent so mpv (which renders as a Windows child window
+         via --wid) can paint the video directly to the HWND without
+         Chromium's compositor overpainting it. */
       background: transparent;
       overflow: hidden;
       user-select: none;
+      font-family: "Outfit", -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: #fff;
     }
 
+    /* Back button (top-left) */
     #back {
       position: fixed;
       top: 22px;
@@ -24,10 +30,8 @@
       color: #fff;
       border: 1px solid rgba(255, 255, 255, 0.15);
       border-radius: 999px;
-      font-family: "Outfit", -apple-system, "Segoe UI", Roboto, sans-serif;
       font-size: 14px;
       font-weight: 500;
-      letter-spacing: 0.02em;
       cursor: pointer;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
       opacity: 0;
@@ -36,104 +40,236 @@
       pointer-events: none;
       z-index: 999999;
     }
-    body.show-ui #back {
-      opacity: 1;
-      transform: translateY(0);
-      pointer-events: auto;
-    }
+    body.show-ui #back { opacity: 1; transform: translateY(0); pointer-events: auto; }
     #back:hover { background: rgba(255, 60, 60, 1); }
     #back svg { width: 18px; height: 18px; }
 
-    #hint {
+    #title {
       position: fixed;
-      top: 32px;
-      right: 30px;
-      color: rgba(255, 255, 255, 0.7);
-      font-family: "Outfit", -apple-system, "Segoe UI", Roboto, sans-serif;
-      font-size: 12px;
-      background: rgba(0, 0, 0, 0.5);
-      padding: 6px 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      top: 30px;
+      left: 200px;
+      right: 200px;
+      color: rgba(255,255,255,0.9);
+      font-size: 14px;
+      font-weight: 500;
+      text-align: center;
+      pointer-events: none;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
       opacity: 0;
       transition: opacity 220ms ease;
-      pointer-events: none;
     }
-    body.show-ui #hint { opacity: 1; }
-    #hint kbd {
-      padding: 1px 6px;
-      background: rgba(255, 255, 255, 0.12);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 4px;
-      font-family: inherit;
-      font-size: 11px;
-      margin: 0 2px;
+    body.show-ui #title { opacity: 1; }
+
+    /* Bottom control bar */
+    #bar {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%) translateY(6px);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: rgba(15, 15, 15, 0.85);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 999px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 12px 48px rgba(0,0,0,0.8);
+      opacity: 0;
+      transition: opacity 220ms ease, transform 220ms ease;
+      pointer-events: none;
+      z-index: 999999;
+    }
+    body.show-ui #bar { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+
+    .bar-btn {
+      width: 40px; height: 40px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: transparent;
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 120ms ease, transform 120ms ease;
+    }
+    .bar-btn:hover { background: rgba(255,255,255,0.08); }
+    .bar-btn:active { transform: scale(0.94); }
+    .bar-btn svg { width: 20px; height: 20px; }
+    #btn-play { width: 48px; height: 48px; background: #dc2626; }
+    #btn-play:hover { background: #ef4444; }
+    #btn-play svg { width: 22px; height: 22px; }
+
+    .divider { width: 1px; height: 24px; background: rgba(255,255,255,0.1); margin: 0 4px; }
+
+    #vol-wrap { display: flex; align-items: center; gap: 6px; padding: 0 6px; }
+    #vol-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 90px; height: 4px;
+      background: linear-gradient(to right, #dc2626 var(--pct, 100%), rgba(255,255,255,0.12) var(--pct, 100%));
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+    #vol-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 12px; height: 12px;
+      background: #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.6);
     }
   </style>
 </head>
 <body>
+  <!-- Back button -->
   <button id="back" aria-label="Volver" title="Volver (Esc / Retroceso)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
     Volver
   </button>
-  <div id="hint">Pulsa <kbd>Esc</kbd> para volver</div>
+  <div id="title"></div>
+
+  <!-- Bottom control bar -->
+  <div id="bar" aria-label="Controles">
+    <button class="bar-btn" id="btn-back10" title="-10 segundos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12.5 3v3L8 3l4.5-3v3"/>
+        <path d="M12 6a9 9 0 1 0 9 9"/>
+        <text x="7" y="17" font-size="8" fill="currentColor" stroke="none" font-weight="700">10</text>
+      </svg>
+    </button>
+    <button class="bar-btn" id="btn-play" title="Reproducir / Pausar">
+      <svg id="ic-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+      <svg id="ic-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+    </button>
+    <button class="bar-btn" id="btn-fwd10" title="+10 segundos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11.5 3v3l4.5-3-4.5-3v3"/>
+        <path d="M12 6a9 9 0 1 1-9 9"/>
+        <text x="9" y="17" font-size="8" fill="currentColor" stroke="none" font-weight="700">10</text>
+      </svg>
+    </button>
+    <div class="divider"></div>
+    <div id="vol-wrap">
+      <button class="bar-btn" id="btn-mute" title="Silenciar / Activar sonido" style="width:32px;height:32px;">
+        <svg id="ic-vol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+        <svg id="ic-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <line x1="23" y1="9" x2="17" y2="15"/>
+          <line x1="17" y1="9" x2="23" y2="15"/>
+        </svg>
+      </button>
+      <input id="vol-slider" type="range" min="0" max="200" value="130" step="1" style="--pct:65%"/>
+    </div>
+  </div>
 
   <script>
     const body = document.body;
     const btn = document.getElementById('back');
+    const titleEl = document.getElementById('title');
+    const bar = document.getElementById('bar');
+    const btnPlay = document.getElementById('btn-play');
+    const icPlay = document.getElementById('ic-play');
+    const icPause = document.getElementById('ic-pause');
+    const btnBack10 = document.getElementById('btn-back10');
+    const btnFwd10 = document.getElementById('btn-fwd10');
+    const btnMute = document.getElementById('btn-mute');
+    const icVol = document.getElementById('ic-vol');
+    const icMute = document.getElementById('ic-mute');
+    const volSlider = document.getElementById('vol-slider');
+
     let hideTimer = null;
-    let currentlyBlocked = null; // null | true | false
+    let currentlyBlocked = null;
+    let lastVolume = 100;
+    let isMuted = false;
 
     function showUi() {
       body.classList.add('show-ui');
       clearTimeout(hideTimer);
-      hideTimer = setTimeout(() => body.classList.remove('show-ui'), 3000);
+      hideTimer = setTimeout(() => body.classList.remove('show-ui'), 3200);
     }
 
-    // Detect if a screen coordinate falls inside the visible back button.
-    // If yes → we must intercept mouse (setIgnoreMouseEvents false).
-    // If not → let mpv OSC receive the click (setIgnoreMouseEvents true).
-    function isInsideBackButton(x, y) {
-      if (!body.classList.contains('show-ui')) return false;
-      const r = btn.getBoundingClientRect();
-      // Grow the hit-box a bit so users don't have to be pixel-perfect.
-      const pad = 8;
+    function pointInside(el, x, y, pad) {
+      const r = el.getBoundingClientRect();
+      pad = pad || 6;
       return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
+    }
+    function isInsideUI(x, y) {
+      if (!body.classList.contains('show-ui')) return false;
+      return pointInside(btn, x, y, 8) || pointInside(bar, x, y, 8);
     }
 
     function setBlocking(shouldBlock) {
       if (currentlyBlocked === shouldBlock) return;
       currentlyBlocked = shouldBlock;
       if (window.gadirPlayer && window.gadirPlayer.setIgnoreMouse) {
-        // ignore=true → mouse events pass through to mpv (OSC works).
-        // ignore=false → this overlay window intercepts (button clickable).
         window.gadirPlayer.setIgnoreMouse(!shouldBlock);
       }
     }
 
-    // Reveal button on any movement / key press.
     showUi();
     setBlocking(false);
 
     window.addEventListener('mousemove', (e) => {
       showUi();
-      setBlocking(isInsideBackButton(e.clientX, e.clientY));
+      setBlocking(isInsideUI(e.clientX, e.clientY));
     }, { passive: true });
+
+    // Any click on the transparent (video) area toggles play/pause.
+    window.addEventListener('click', (e) => {
+      if (e.target === btn || btn.contains(e.target)) return;
+      if (e.target === bar || bar.contains(e.target)) return;
+      if (e.target.closest && e.target.closest('#bar,#back')) return;
+      cmd(['cycle','pause']);
+      showUi();
+    });
 
     window.addEventListener('keydown', (e) => {
       showUi();
-      if (e.key === 'Escape' || e.key === 'Backspace') {
-        e.preventDefault();
-        goBack();
-      }
+      if (e.key === 'Escape' || e.key === 'Backspace') { e.preventDefault(); goBack(); return; }
+      if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); cmd(['cycle','pause']); return; }
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); cmd(['seek', -10, 'relative']); return; }
+      if (e.key === 'ArrowRight') { e.preventDefault(); cmd(['seek',  10, 'relative']); return; }
+      if (e.key === 'ArrowUp')    { e.preventDefault(); cmd(['add','volume', 5]);  return; }
+      if (e.key === 'ArrowDown')  { e.preventDefault(); cmd(['add','volume',-5]); return; }
+      if (e.key.toLowerCase() === 'm') { e.preventDefault(); cmd(['cycle','mute']); return; }
     });
 
-    function goBack() {
-      if (window.gadirPlayer && window.gadirPlayer.back) {
-        window.gadirPlayer.back();
-      }
-    }
+    function goBack() { if (window.gadirPlayer) window.gadirPlayer.back(); }
     btn.addEventListener('click', goBack);
+
+    function cmd(arr) { if (window.gadirPlayer) window.gadirPlayer.cmd(arr); }
+
+    btnPlay.addEventListener('click', () => cmd(['cycle','pause']));
+    btnBack10.addEventListener('click', () => cmd(['seek', -10, 'relative']));
+    btnFwd10.addEventListener('click', () => cmd(['seek',  10, 'relative']));
+    btnMute.addEventListener('click', () => cmd(['cycle','mute']));
+    volSlider.addEventListener('input', () => {
+      const v = parseInt(volSlider.value, 10);
+      volSlider.style.setProperty('--pct', (v * 100 / 130) + '%');
+      cmd(['set_property','volume', v]);
+    });
+
+    // React to state changes from mpv (pause / volume / mute).
+    if (window.gadirPlayer && window.gadirPlayer.onState) {
+      window.gadirPlayer.onState((s) => {
+        if (!s) return;
+        if (s.name === 'pause') {
+          const paused = !!s.data;
+          icPlay.style.display  = paused ? '' : 'none';
+          icPause.style.display = paused ? 'none' : '';
+        } else if (s.name === 'volume' && typeof s.data === 'number') {
+          const v = Math.max(0, Math.min(130, Math.round(s.data)));
+          lastVolume = v;
+          volSlider.value = v;
+          volSlider.style.setProperty('--pct', (v * 100 / 130) + '%');
+        }
+      });
+    }
   </script>
 </body>
 </html>

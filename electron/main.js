@@ -158,7 +158,8 @@ ipcMain.handle('mpv:play', async (evt, { url, name, fullscreen }) => {
     '--keep-open=no',
     '--idle=no',
     '--osc=yes',
-    '--volume=100',
+    '--volume=130',
+    '--volume-max=200',
     '--hwdec=auto-safe',
     '--vd-lavc-software-fallback=yes',
     '--cache=yes',
@@ -203,9 +204,38 @@ ipcMain.handle('mpv:play', async (evt, { url, name, fullscreen }) => {
 let playerWin = null;
 let mainWinRef = null;
 let playerBoundsTracker = null;
+let mpvIpc = null;        // net.Socket connected to mpv's IPC named pipe
+let mpvIpcPath = null;    // Full \\.\pipe\NAME path (unique per session)
+const net = require('net');
+
+function connectMpvIpc(pipePath, tries = 40) {
+  return new Promise((resolve) => {
+    let n = 0;
+    const attempt = () => {
+      n++;
+      const s = net.connect(pipePath);
+      let done = false;
+      s.on('connect', () => { done = true; resolve(s); });
+      s.on('error', () => {
+        if (done) return;
+        try { s.destroy(); } catch (_) {}
+        if (n >= tries) { resolve(null); return; }
+        setTimeout(attempt, 100);
+      });
+    };
+    attempt();
+  });
+}
+
+function sendMpvCmd(cmd) {
+  if (!mpvIpc || mpvIpc.destroyed) return false;
+  try { mpvIpc.write(JSON.stringify({ command: cmd }) + "\n"); return true; }
+  catch (_) { return false; }
+}
 
 function destroyPlayerWin() {
   if (playerBoundsTracker) { clearInterval(playerBoundsTracker); playerBoundsTracker = null; }
+  if (mpvIpc) { try { mpvIpc.destroy(); } catch (_) {} mpvIpc = null; }
   if (playerWin && !playerWin.isDestroyed()) {
     try { playerWin.destroy(); } catch (_) {}
   }
@@ -276,6 +306,12 @@ ipcMain.on('player:ignore-mouse', (_e, ignore) => {
   try { playerWin.setIgnoreMouseEvents(!!ignore, { forward: true }); } catch (_) {}
 });
 
+// Send a command to mpv via its IPC pipe. Overlay's control bar uses this
+// for play/pause/seek/volume/etc. Fire-and-forget.
+ipcMain.on('player:cmd', (_e, cmd) => {
+  if (Array.isArray(cmd)) sendMpvCmd(cmd);
+});
+
 ipcMain.handle('player:show', async (_evt, { url, name }) => {
   try {
     if (!mainWinRef || mainWinRef.isDestroyed()) return { ok: false, error: 'main window missing' };
@@ -285,15 +321,14 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
     const pw = ensurePlayerWin(mainWinRef);
     updatePlayerBounds();
     pw.showInactive();
-    // Force above taskbar level so mpv covers the whole screen (fixes
-    // "video plays but Windows taskbar still visible").
+    // Force above taskbar level so mpv covers the whole screen.
     try { pw.setAlwaysOnTop(true, 'screen-saver'); } catch (_) {}
-    // Start in click-through mode so mpv's OSC receives mouse events.
-    // The overlay page will toggle this off when the cursor enters the
-    // Back-button hit-box, and back on when it leaves.
+    // Hide the main app window entirely — this guarantees the app UI
+    // never bleeds through the transparent overlay, no matter what
+    // aspect ratio / letterboxing mpv produces.
+    try { mainWinRef.hide(); } catch (_) {}
     try { pw.setIgnoreMouseEvents(true, { forward: true }); } catch (_) {}
     updatePlayerBounds();
-    // Focus AFTER show so mpv gets keyboard input.
     setTimeout(() => { try { pw.focus(); } catch (_) {} }, 50);
     // Track main-window bounds and mirror them.
     if (playerBoundsTracker) clearInterval(playerBoundsTracker);
@@ -302,9 +337,12 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
     const hwndBuf = pw.getNativeWindowHandle();
     // On Windows x64 HWND fits in 32 bits.
     const hwnd = hwndBuf.readInt32LE(0);
+    // IPC named pipe for controlling mpv from Node (play/pause/seek/volume).
+    mpvIpcPath = `\\\\.\\pipe\\gadirmpv-${process.pid}-${Date.now()}`;
     const args = [
       url,
       `--wid=${hwnd}`,
+      `--input-ipc-server=${mpvIpcPath}`,
       // Direct3D VO. Deprecated but the most compatible with --wid on
       // Windows over an Electron BrowserWindow (works when d3d11 / gpu
       // silently drops frames due to compositor conflict).
@@ -312,8 +350,10 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
       '--force-window=yes',
       '--keep-open=no',
       '--idle=no',
-      '--osc=yes',
-      '--volume=100',
+      '--osc=no',
+      '--volume=130',
+      '--volume-max=200',
+      '--audio-normalize-downmix=yes',
       '--hwdec=no',
       '--vd-lavc-software-fallback=yes',
       '--cache=yes',
@@ -344,12 +384,48 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
     // Register Escape / Backspace as global "hide player" while playing.
     try { globalShortcut.register('Escape', () => hideEmbeddedPlayer()); } catch (_) {}
     try { globalShortcut.register('Backspace', () => hideEmbeddedPlayer()); } catch (_) {}
+    // Connect to mpv IPC pipe (async, may take a few hundred ms).
+    (async () => {
+      const sock = await connectMpvIpc(mpvIpcPath);
+      if (sock) {
+        mpvIpc = sock;
+        mpvIpc.on('close', () => { mpvIpc = null; });
+        mpvIpc.on('error', () => {});
+        // Observe pause + volume so overlay UI can reflect state.
+        sendMpvCmd(['observe_property', 1, 'pause']);
+        sendMpvCmd(['observe_property', 2, 'volume']);
+        let buf = '';
+        mpvIpc.on('data', (chunk) => {
+          buf += chunk.toString('utf8');
+          const lines = buf.split('\n'); buf = lines.pop();
+          for (const l of lines) {
+            if (!l) continue;
+            try {
+              const obj = JSON.parse(l);
+              if (obj && obj.event === 'property-change' && playerWin && !playerWin.isDestroyed()) {
+                try { playerWin.webContents.send('player:state', { name: obj.name, data: obj.data }); } catch (_) {}
+              }
+            } catch (_) {}
+          }
+        });
+        // Prime overlay with current values.
+        setTimeout(() => {
+          try { playerWin && playerWin.webContents.send('player:state', { name: 'ipc-ready', data: true }); } catch (_) {}
+        }, 100);
+      }
+    })();
     mpvProc.on('exit', (code) => {
       mpvProc = null;
+      if (mpvIpc) { try { mpvIpc.destroy(); } catch (_) {} mpvIpc = null; }
       if (playerWin && !playerWin.isDestroyed()) { try { playerWin.hide(); } catch (_) {} }
       if (playerBoundsTracker) { clearInterval(playerBoundsTracker); playerBoundsTracker = null; }
       try { globalShortcut.unregister('Escape'); } catch (_) {}
       try { globalShortcut.unregister('Backspace'); } catch (_) {}
+      // Restore the main window so the user isn't left staring at nothing.
+      if (mainWinRef && !mainWinRef.isDestroyed()) {
+        try { mainWinRef.show(); } catch (_) {}
+        try { mainWinRef.focus(); } catch (_) {}
+      }
       BrowserWindow.getAllWindows().forEach(w => {
         try { w.webContents.send('mpv:exited', { code, stderr: stderr.slice(-1000) }); } catch (_) {}
         try { w.webContents.send('player:visibility', { visible: false }); } catch (_) {}
@@ -364,12 +440,15 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
 function hideEmbeddedPlayer() {
   killMpv();
   if (playerBoundsTracker) { clearInterval(playerBoundsTracker); playerBoundsTracker = null; }
+  if (mpvIpc) { try { mpvIpc.destroy(); } catch (_) {} mpvIpc = null; }
   if (playerWin && !playerWin.isDestroyed()) { try { playerWin.hide(); } catch (_) {} }
   try { globalShortcut.unregister('Escape'); } catch (_) {}
   try { globalShortcut.unregister('Backspace'); } catch (_) {}
+  // Restore the main window that was hidden while the player was up.
   if (mainWinRef && !mainWinRef.isDestroyed()) {
-    try { mainWinRef.webContents.send('player:visibility', { visible: false }); } catch (_) {}
+    try { mainWinRef.show(); } catch (_) {}
     try { mainWinRef.focus(); } catch (_) {}
+    try { mainWinRef.webContents.send('player:visibility', { visible: false }); } catch (_) {}
   }
 }
 

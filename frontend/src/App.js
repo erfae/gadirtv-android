@@ -182,7 +182,7 @@ function Login({ onLogin, onCancel }) {
           <input placeholder="Nombre perfil (opcional)" value={name} onChange={e=>setName(e.target.value)} className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600" data-testid="profile-name-input"/>
           <input placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="username-input"/>
           <input type="password" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="password-input"/>
-          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.8</div>
+          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.12</div>
           {warn && <div className="text-amber-400 text-xs text-center" data-testid="warn-msg">{warn}</div>}
           <button type="submit" disabled={loading} className="w-full py-4 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium transition-colors disabled:opacity-50" data-testid="login-btn">{loading?"Guardando...":"Entrar"}</button>
         </form>
@@ -229,7 +229,7 @@ function ItemCard({ item, onSelect, big, sm, xl, onHover }) {
     : big
       ? "w-40"
       : sm
-        ? "w-20 sm:w-24 md:w-24 lg:w-28"
+        ? "w-16 sm:w-20 md:w-20 lg:w-24"
         : "w-32 md:w-40 lg:w-44";
   return (
     <button
@@ -256,15 +256,15 @@ function Rail({ title, items, onSelect, big, sm, xl, onHover }) {
     el.scrollBy({ left: dir * (el.clientWidth * 0.85), behavior: 'smooth' });
   };
   return (
-    <section className="mb-2 group/rail relative">
+    <section className="mb-2 relative">
       <h2 className="text-sm md:text-base font-medium text-white mb-1.5 tracking-tight px-8" style={{fontFamily:"'Outfit',sans-serif"}}>{title}</h2>
-      <button onClick={()=>scroll(-1)} className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-10 h-16 rounded-r-lg bg-black/70 hover:bg-black/90 text-white opacity-0 group-hover/rail:opacity-100 transition-opacity flex items-center justify-center" data-testid="rail-scroll-left">
+      <button onClick={()=>scroll(-1)} className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-8 h-16 rounded-r-lg bg-black/80 hover:bg-red-600/90 text-white flex items-center justify-center transition-colors" data-testid="rail-scroll-left">
         <ChevronLeft size={22}/>
       </button>
-      <button onClick={()=>scroll(1)} className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-10 h-16 rounded-l-lg bg-black/70 hover:bg-black/90 text-white opacity-0 group-hover/rail:opacity-100 transition-opacity flex items-center justify-center" data-testid="rail-scroll-right">
+      <button onClick={()=>scroll(1)} className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-8 h-16 rounded-l-lg bg-black/80 hover:bg-red-600/90 text-white flex items-center justify-center transition-colors" data-testid="rail-scroll-right">
         <ChevronRight size={22}/>
       </button>
-      <div ref={scrollRef} className="flex gap-2 overflow-x-auto overflow-y-visible scrollbar-hide px-8 pb-3 pt-1 scroll-smooth">
+      <div ref={scrollRef} className="flex gap-2 overflow-x-auto overflow-y-visible scrollbar-hide px-10 pb-3 pt-1 scroll-smooth">
         {items.slice(0, 30).map((it, i) => <ItemCard key={i} item={it} big={big} sm={sm} xl={xl} onHover={onHover} onSelect={()=>onSelect(it)}/>)}
       </div>
     </section>
@@ -413,9 +413,26 @@ function HomeTab({ profile, onSelect, onHover }) {
         loadFromCategories(api.seriesCategories, api.seriesList, "series"),
       ]);
       if (cancelled) return;
-      setRM(vod.slice(0, 24));
-      setRS(ser.slice(0, 24));
-      if (!vod.length && !ser.length) setMsg("No se pudo cargar contenido reciente. Comprueba conexión con gadir.co o si tu cuenta tiene VOD/Series.");
+      let vodFinal = vod;
+      // Retry once for movies if we got nothing (gadir.co occasionally
+      // returns empty responses on the first cold hit).
+      if (!vod.length) {
+        await new Promise(r => setTimeout(r, 800));
+        if (cancelled) return;
+        const retry = await loadFromCategories(api.vodCategories, api.vodStreams, "vod-retry");
+        if (retry.length) vodFinal = retry;
+      }
+      let serFinal = ser;
+      if (!ser.length) {
+        await new Promise(r => setTimeout(r, 800));
+        if (cancelled) return;
+        const retry = await loadFromCategories(api.seriesCategories, api.seriesList, "series-retry");
+        if (retry.length) serFinal = retry;
+      }
+      if (cancelled) return;
+      setRM(vodFinal.slice(0, 24));
+      setRS(serFinal.slice(0, 24));
+      if (!vodFinal.length && !serFinal.length) setMsg("No se pudo cargar contenido reciente. Comprueba conexión con gadir.co o si tu cuenta tiene VOD/Series.");
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -433,28 +450,25 @@ function HomeTab({ profile, onSelect, onHover }) {
     <div className="flex flex-col h-screen pb-24 overflow-hidden" data-testid="home-tab">
       {hero && (
         <div className="relative flex-shrink-0" style={{minHeight:"220px"}} data-testid="hero-banner">
-          <div className="h-[24vh] sm:h-[26vh] md:h-[28vh] lg:h-[30vh] xl:h-[32vh] relative">
+          <button
+            onClick={()=>onSelect(hero, hero.series_id?"series":"movie")}
+            data-testid="hero-play-btn"
+            className="w-full text-left h-[32vh] sm:h-[36vh] md:h-[38vh] lg:h-[40vh] xl:h-[42vh] relative overflow-hidden group cursor-pointer"
+            title="Ver detalle"
+          >
           <img src={api.proxyImg(hero.stream_icon||hero.cover) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover animate-slow-zoom" alt=""/>
-          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/60 to-transparent"/>
+          <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/30 to-transparent"/>
           <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent"/>
           <div className="absolute bottom-3 right-4 md:right-8 flex gap-2 z-10">
             {heroList.map((_, i) => (
-              <button key={i} onClick={()=>setHeroIdx(i)} className={"h-1 rounded-full transition-all " + (i===heroIdx?"w-8 bg-red-600":"w-4 bg-white/30 hover:bg-white/60")} data-testid={`hero-dot-${i}`}/>
+              <span key={i} className={"h-1 rounded-full transition-all " + (i===heroIdx?"w-8 bg-red-600":"w-4 bg-white/30")} data-testid={`hero-dot-${i}`}/>
             ))}
           </div>
-          <div className="absolute bottom-4 md:bottom-6 left-4 md:left-8 max-w-2xl z-10 pr-4">
-            <p className="text-red-500 text-[10px] md:text-[11px] font-medium tracking-[0.3em] uppercase mb-1.5 md:mb-2">{hero.series_id?"Serie":"Película"} · Reciente en GadirTV</p>
-            <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-medium tracking-tight mb-2 md:mb-3 drop-shadow-2xl" style={{fontFamily:"'Outfit',sans-serif"}}>{hero.name}</h1>
-            <div className="flex items-center gap-2 md:gap-3 flex-wrap">
-              <button onClick={()=>onSelect(hero, hero.series_id?"series":"movie")} data-testid="hero-play-btn" className="flex items-center gap-2 bg-white text-black px-4 md:px-6 py-2 md:py-2.5 rounded-full font-medium hover:bg-neutral-200 transition-all text-xs md:text-sm shadow-2xl">
-                <Play size={14} fill="black"/>Reproducir
-              </button>
-              <button onClick={()=>onSelect(hero, hero.series_id?"series":"movie")} data-testid="hero-info-btn" className="flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-full font-medium hover:bg-white/20 transition-all text-xs md:text-sm">
-                Más información
-              </button>
-            </div>
+          <div className="absolute bottom-3 md:bottom-4 left-4 md:left-8 max-w-xl z-10 pr-4">
+            <p className="text-red-500 text-[10px] md:text-[11px] font-medium tracking-[0.3em] uppercase mb-1 md:mb-1.5">{hero.series_id?"Serie":"Película"} · Reciente en GadirTV</p>
+            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-medium tracking-tight drop-shadow-2xl group-hover:text-red-400 transition-colors" style={{fontFamily:"'Outfit',sans-serif"}}>{hero.name}</h1>
           </div>
-          </div>
+          </button>
         </div>
       )}
       <div className="flex-1 min-h-0 flex flex-col justify-start overflow-hidden pt-3">
@@ -1049,7 +1063,10 @@ function LivePreview({ channel, profile, fsSignal, onClose, onFullscreen }) {
 
 function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }) {
   const [tab, setTab] = useState("home");
-  const [liveChannel, setLiveChannel] = useState(null);
+  const [liveChannel, setLiveChannel] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("g_last_channel") || "null"); }
+    catch (_) { return null; }
+  });
   const [fsSignal, setFsSignal] = useState(0);
   const [hoverBg, setHoverBg] = useState(null);
 
@@ -1079,10 +1096,20 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
   const handleSelect = (item, kind) => {
     if (kind === "series") onOpenSeries(item);
     else if (kind === "movie") onOpenMovie(item);
-    else if (kind === "live_fs") { setLiveChannel(item); playLiveInMpv(item, true); }
-    else if (kind === "live") setLiveChannel(item);
+    else if (kind === "live_fs") { setLiveChannel(item); playLiveInMpv(item, true); try { localStorage.setItem("g_last_channel", JSON.stringify(item)); } catch (_) {} }
+    else if (kind === "live") { setLiveChannel(item); try { localStorage.setItem("g_last_channel", JSON.stringify(item)); } catch (_) {} }
   };
+  // Clear preview when leaving Live TV, but keep last-played in localStorage.
   useEffect(() => { if (tab !== "live") setLiveChannel(null); }, [tab]);
+  // Restore last channel when re-entering Live TV.
+  useEffect(() => {
+    if (tab === "live" && !liveChannel) {
+      try {
+        const last = JSON.parse(localStorage.getItem("g_last_channel") || "null");
+        if (last) setLiveChannel(last);
+      } catch (_) {}
+    }
+  }, [tab]);
 
   return (
     <div className="min-h-screen bg-[#050505] text-white relative overflow-hidden">
