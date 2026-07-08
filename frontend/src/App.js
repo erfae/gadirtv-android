@@ -182,7 +182,7 @@ function Login({ onLogin, onCancel }) {
           <input placeholder="Nombre perfil (opcional)" value={name} onChange={e=>setName(e.target.value)} className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600" data-testid="profile-name-input"/>
           <input placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="username-input"/>
           <input type="password" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="password-input"/>
-          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.12</div>
+          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.13</div>
           {warn && <div className="text-amber-400 text-xs text-center" data-testid="warn-msg">{warn}</div>}
           <button type="submit" disabled={loading} className="w-full py-4 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium transition-colors disabled:opacity-50" data-testid="login-btn">{loading?"Guardando...":"Entrar"}</button>
         </form>
@@ -449,11 +449,11 @@ function HomeTab({ profile, onSelect, onHover }) {
   return (
     <div className="flex flex-col h-screen pb-24 overflow-hidden" data-testid="home-tab">
       {hero && (
-        <div className="relative flex-shrink-0" style={{minHeight:"220px"}} data-testid="hero-banner">
+        <div className="relative flex-shrink-0" data-testid="hero-banner" style={{height:"38vh", minHeight:"220px", maxHeight:"420px"}}>
           <button
             onClick={()=>onSelect(hero, hero.series_id?"series":"movie")}
             data-testid="hero-play-btn"
-            className="w-full text-left h-[32vh] sm:h-[36vh] md:h-[38vh] lg:h-[40vh] xl:h-[42vh] relative overflow-hidden group cursor-pointer"
+            className="w-full text-left h-full relative overflow-hidden group cursor-pointer"
             title="Ver detalle"
           >
           <img src={api.proxyImg(hero.stream_icon||hero.cover) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover animate-slow-zoom" alt=""/>
@@ -471,13 +471,13 @@ function HomeTab({ profile, onSelect, onHover }) {
           </button>
         </div>
       )}
-      <div className="flex-1 min-h-0 flex flex-col justify-start overflow-hidden pt-3">
-        {loading && <div className="text-center text-neutral-500 py-6 text-sm" data-testid="loading-home">Cargando contenido…</div>}
-        {!loading && msg && <div className="text-center text-red-400 py-6 text-sm px-8" data-testid="home-msg">{msg}</div>}
+      <div className="flex-1 min-h-0 grid grid-rows-2 gap-1 overflow-hidden pt-2">
+        {loading && <div className="text-center text-neutral-500 py-6 text-sm col-span-full" data-testid="loading-home">Cargando contenido…</div>}
+        {!loading && msg && <div className="text-center text-red-400 py-6 text-sm px-8 col-span-full" data-testid="home-msg">{msg}</div>}
         {!loading && !msg && (
           <>
-            <Rail title="Añadidos recientemente · Películas" items={recentMovies} onSelect={i=>onSelect(i,"movie")} onHover={onHover} sm/>
-            <Rail title="Añadidas recientemente · Series"   items={recentSeries} onSelect={i=>onSelect(i,"series")} onHover={onHover} sm/>
+            <div className="min-h-0 overflow-hidden"><Rail title="Añadidos recientemente · Películas" items={recentMovies} onSelect={i=>onSelect(i,"movie")} onHover={onHover} sm/></div>
+            <div className="min-h-0 overflow-hidden"><Rail title="Añadidas recientemente · Series"   items={recentSeries} onSelect={i=>onSelect(i,"series")} onHover={onHover} sm/></div>
           </>
         )}
       </div>

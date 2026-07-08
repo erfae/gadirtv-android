@@ -321,12 +321,7 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
     const pw = ensurePlayerWin(mainWinRef);
     updatePlayerBounds();
     pw.showInactive();
-    // Force above taskbar level so mpv covers the whole screen.
     try { pw.setAlwaysOnTop(true, 'screen-saver'); } catch (_) {}
-    // Hide the main app window entirely — this guarantees the app UI
-    // never bleeds through the transparent overlay, no matter what
-    // aspect ratio / letterboxing mpv produces.
-    try { mainWinRef.hide(); } catch (_) {}
     try { pw.setIgnoreMouseEvents(true, { forward: true }); } catch (_) {}
     updatePlayerBounds();
     setTimeout(() => { try { pw.focus(); } catch (_) {} }, 50);
@@ -350,7 +345,7 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
       '--force-window=yes',
       '--keep-open=no',
       '--idle=no',
-      '--osc=no',
+      '--osc=yes',
       '--volume=130',
       '--volume-max=200',
       '--audio-normalize-downmix=yes',
@@ -421,9 +416,7 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
       if (playerBoundsTracker) { clearInterval(playerBoundsTracker); playerBoundsTracker = null; }
       try { globalShortcut.unregister('Escape'); } catch (_) {}
       try { globalShortcut.unregister('Backspace'); } catch (_) {}
-      // Restore the main window so the user isn't left staring at nothing.
       if (mainWinRef && !mainWinRef.isDestroyed()) {
-        try { mainWinRef.show(); } catch (_) {}
         try { mainWinRef.focus(); } catch (_) {}
       }
       BrowserWindow.getAllWindows().forEach(w => {
@@ -444,9 +437,7 @@ function hideEmbeddedPlayer() {
   if (playerWin && !playerWin.isDestroyed()) { try { playerWin.hide(); } catch (_) {} }
   try { globalShortcut.unregister('Escape'); } catch (_) {}
   try { globalShortcut.unregister('Backspace'); } catch (_) {}
-  // Restore the main window that was hidden while the player was up.
   if (mainWinRef && !mainWinRef.isDestroyed()) {
-    try { mainWinRef.show(); } catch (_) {}
     try { mainWinRef.focus(); } catch (_) {}
     try { mainWinRef.webContents.send('player:visibility', { visible: false }); } catch (_) {}
   }
