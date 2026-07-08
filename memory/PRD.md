@@ -1,63 +1,55 @@
-# GadirTV — Windows Desktop IPTV Player
+# GadirTV — PRD
 
 ## Original problem statement
-Create a Windows desktop IPTV application (.exe) using Electron + React that
-connects to `http://gadir.co:80` via the Xtream Codes API
-(`/player_api.php`). Requirements:
-1. Multi-user profiles (save credentials, switch between profiles).
-2. IPTV Smarters style layout with bottom nav, ordered category groups for
-   Live TV / Movies / Series and a top banner with recently added content.
-3. Working video player supporting MPEG-TS, AC3, EAC3, MPEG-2.
-4. Installable Windows .exe.
+Windows desktop IPTV app (`.exe`) built with Electron + React that
+connects to `http://gadir.co:80` (Xtream Codes API):
+1. Multi-user profile support (save credentials, switch between).
+2. IPTV Smarters style layout: bottom nav, ordered groups (Live/Movies/
+   Series), top banner with recently added.
+3. Video player compatible with MPEG-TS, AC3, EAC3, MPEG-2.
+4. Installable Windows `.exe`.
 5. Frameless window with custom title bar controls.
 
-User language: Spanish.
+User's preferred language: Spanish.
 
-## Architecture
-- `frontend/`   React app (compiled with CRA and copied into Electron).
-- `backend/`    FastAPI proxy used by the web preview only.
-- `electron/`   Electron shell. Native mpv.exe embedded for playback.
+## Current status — v1.13 (definitive)
 
-### Playback
-Chromium cannot decode AC3/EAC3/MPEG-2, so playback is delegated to a
-bundled `mpv.exe`. Main process spawns mpv via IPC (`mpv:play` /
-`mpv:kill`) and forwards the stream URL directly (no proxy).
+### Delivered
+- Frameless Electron window, custom title bar (min/max/close).
+- Full-screen kiosk mode covering the Windows taskbar.
+- Multi-profile login (localStorage).
+- Home Netflix-style: rotating hero + Movies/Series recently added rails.
+- Live TV / Movies / Series categorised grids + preview panel.
+- Embedded mpv player inside the app window (via `--wid=<HWND>`).
+- Native mpv OSC (progress bar, play/pause/seek).
+- Volume up to 200 % with software amplification.
+- Custom Volver button + Esc/Backspace exit.
+- Last-played channel restored on next TV visit.
+- Sinopsis + star rating + cast/director on movie & series detail.
+- Error suppression: noisy media errors replaced with "SIN SEÑAL"
+  overlay when a channel really fails.
+- Xtream API requests routed via Node.js (bypasses Chromium blocking).
+- Automatic retries when `gadir.co` returns empty responses.
+- NSIS installer + portable ZIP + encrypted ZIP + source ZIP + docs.
 
-### Xtream API networking (Feb 2026 fix)
-Renderer requests to `http://gadir.co` from `file://` origin were being
-silently dropped by Chromium even with `webSecurity: false`. All Xtream
-API calls now route through Node.js in the main process via the
-`xtream:get` IPC handler, using `User-Agent: VLC/3.0.20 LibVLC/3.0.20`.
-This mirrors how VLC and IPTV Smarters talk to Xtream servers.
+### Not implemented (out of scope)
+- Android build.
+- EPG guide.
+- Recording.
+- Cast to TV / remote control.
 
-## Implemented
-- Frameless Electron window with custom title-bar controls.
-- Multi-profile login stored in `localStorage`.
-- Live TV / Movies / Series categorised grid with recent-content banner.
-- Hover effects showing VOD posters as background.
-- Embedded mpv.exe playback for all IPTV codecs.
-- Session reset + mpv kill on profile switch / quit.
-- F5 / Ctrl+R reload shortcuts blocked to prevent accidental session wipe.
-- NSIS installer + portable ZIP + encrypted portable ZIP.
-- Backend endpoints for download distribution.
-- **[Feb 2026]** Xtream API rerouted through Node.js main process to fix
-  "connection error" on all tabs (Chromium blocking plain HTTP on file://).
+## Backend endpoints
+- `GET /api/download/installer`     → `.exe` installer
+- `GET /api/download/installer_zip` → `.exe` wrapped in ZIP
+- `GET /api/download/portable`      → portable ZIP
+- `GET /api/download/encrypted`     → password-protected portable ZIP (pw `gadir`)
+- `GET /api/download/source`        → full source code ZIP
+- `GET /api/download/docs`          → technical docs (Markdown)
 
-## Backend download endpoints
-- `GET /api/download/installer`      → GadirTV-Setup-1.0.0.exe
-- `GET /api/download/installer_zip`  → GadirTV-Installer.zip
-- `GET /api/download/portable`       → GadirTV-Windows-x64.zip
-- `GET /api/download/encrypted`      → GadirTV-portable-encrypted.zip (pw `gadir`)
+## Test credentials
+- Server: `http://gadir.co:80`
+- Username: `seismeses01`
+- Password: `3d13zxs5oz`
 
-## Credentials for testing
-Username `seismeses01` / Password `3d13zxs5oz` / Server `http://gadir.co:80`.
-gadir.co blocks the Linux container's IP, so all IPTV runtime testing must
-be done by the user on their Windows PC.
-
-## Backlog / Future
-- P2: refactor `frontend/src/App.js` (~988 lines) into smaller components
-  (Player, HomeTab, CategorySection, ProfileSwitcher, Login, TitleBar).
-- P2: optional user-editable Server URL in login for non-gadir.co Xtream
-  subscriptions.
-- P2: cache full VOD/Series catalogue in `localStorage` with TTL to speed
-  up startup.
+Note: gadir.co blocks the Linux container IP so all runtime IPTV
+testing has to be performed by the user on their Windows PC.

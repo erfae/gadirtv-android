@@ -75,6 +75,24 @@ async def download_encrypted():
         raise HTTPException(404, "encrypted zip not built yet")
     return FileResponse(path, filename="GadirTV-Portable-v1.13-encrypted.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
 
+
+@app.get("/api/download/source")
+async def download_source():
+    """Complete source code (frontend + electron + backend + docs) as a ZIP."""
+    path = "/app/electron/GadirTV-SourceCode-v1.13.zip"
+    if not os.path.exists(path):
+        raise HTTPException(404, "source zip not built yet")
+    return FileResponse(path, filename="GadirTV-SourceCode-v1.13.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
+
+
+@app.get("/api/download/docs")
+async def download_docs():
+    """Technical documentation (Markdown)."""
+    path = "/app/DOCUMENTATION.md"
+    if not os.path.exists(path):
+        raise HTTPException(404, "docs not found")
+    return FileResponse(path, filename="GadirTV-Documentation.md", media_type="text/markdown", headers=NO_CACHE_HEADERS)
+
 @app.post("/api/login")
 async def login(body: LoginBody):
     try:
