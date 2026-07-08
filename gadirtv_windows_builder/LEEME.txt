@@ -1,0 +1,46 @@
+══════════════════════════════════════════════════════════
+  GadirTV Android — Compilador automatico para Windows
+══════════════════════════════════════════════════════════
+
+¿QUE HACE ESTO?
+  Compila el APK de GadirTV Android en tu propio PC Windows,
+  sin necesidad de cuentas, GitHub, ni conocimientos tecnicos.
+
+¿QUE NECESITAS?
+  · Windows 10 o 11
+  · Conexion a internet
+  · 10 GB libres en C:
+  · 15-20 minutos de tu tiempo (mayormente esperando)
+
+PASOS:
+  1. Descomprime este ZIP en una carpeta con nombre corto,
+     por ejemplo C:\GadirTV\  (evita rutas largas con espacios).
+  2. Haz clic DERECHO sobre "COMPILAR_APK.bat".
+  3. Elige "Ejecutar como administrador".
+  4. Cuando salga el aviso de Windows, dale a "Si".
+  5. Espera. La ventana negra ira mostrando lo que hace.
+  6. Al terminar, se abrira sola la carpeta con los APKs
+     en tu Escritorio ("GadirTV-APKs").
+
+APKs QUE OBTENDRAS:
+  app-arm64-v8a-release.apk        <- INSTALA ESTE en tu movil/TV Box moderno
+  app-armeabi-v7a-release.apk      <- solo si tu Android es muy antiguo
+  app-x86_64-release.apk           <- solo para emuladores
+  app-universal-release.apk        <- si no sabes cual, usa este (mas pesado)
+
+QUE HACE CON TU PC:
+  · Todo lo descargado va a C:\GadirTVBuild\
+  · No se instala nada en el sistema
+  · Cuando termines, borra C:\GadirTVBuild\ para liberar los ~10 GB
+  · Puede que Windows Defender avise (nada se toca fuera de esa carpeta)
+
+CREDENCIALES DE PRUEBA XTREAM (para el login de la app):
+  Servidor:  http://gadir.co:80
+  Usuario:   seismeses01
+  Clave:     3d13zxs5oz
+
+SI HAY UN ERROR:
+  · Copia el texto rojo de la ventana negra
+  · Pegalo en el chat de Emergent y te lo arreglo al momento
+
+══════════════════════════════════════════════════════════
