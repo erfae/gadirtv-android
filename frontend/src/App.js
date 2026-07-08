@@ -167,7 +167,7 @@ function Login({ onLogin, onCancel }) {
           <input placeholder="Nombre perfil (opcional)" value={name} onChange={e=>setName(e.target.value)} className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600" data-testid="profile-name-input"/>
           <input placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="username-input"/>
           <input type="password" placeholder="Contraseña" value={p} onChange={e=>setP(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="password-input"/>
-          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.5</div>
+          <div className="text-xs text-neutral-500 pl-5">Servidor: <span className="text-neutral-400">gadir.co:80</span> · Build v1.6</div>
           {warn && <div className="text-amber-400 text-xs text-center" data-testid="warn-msg">{warn}</div>}
           <button type="submit" disabled={loading} className="w-full py-4 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium transition-colors disabled:opacity-50" data-testid="login-btn">{loading?"Guardando...":"Entrar"}</button>
         </form>
@@ -434,7 +434,7 @@ function HomeTab({ profile, onSelect, onHover }) {
     <div className="flex flex-col h-screen pb-24 overflow-hidden" data-testid="home-tab">
       {hero && (
         <div className="relative flex-shrink-0" style={{minHeight:"260px"}} data-testid="hero-banner">
-          <div className="h-[36vh] sm:h-[40vh] md:h-[42vh] lg:h-[45vh] xl:h-[48vh] relative">
+          <div className="h-[30vh] sm:h-[34vh] md:h-[36vh] lg:h-[38vh] xl:h-[40vh] relative">
           <img src={api.proxyImg(hero.stream_icon||hero.cover) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover animate-slow-zoom" alt=""/>
           <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/60 to-transparent"/>
           <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent"/>
@@ -664,13 +664,20 @@ function SeriesDetail({ series, profile, onClose, onPlay }) {
         <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent"/>
         <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent"/>
         <div className="absolute bottom-6 left-8 max-w-2xl">
-          <h1 className="text-4xl font-medium tracking-tight mb-2" style={{fontFamily:"'Outfit',sans-serif"}}>{series.name}</h1>
-          <div className="text-sm text-neutral-400 flex flex-wrap gap-3">
-            {meta.releaseDate && <span>{meta.releaseDate.slice(0,4)}</span>}
-            {meta.rating && <span className="text-amber-400">★ {meta.rating}</span>}
-            {meta.genre && <span>{meta.genre}</span>}
+          <h1 className="text-3xl md:text-4xl font-medium tracking-tight mb-2" style={{fontFamily:"'Outfit',sans-serif"}}>{series.name}</h1>
+          <div className="text-sm text-neutral-400 flex flex-wrap items-center gap-3 mb-2">
+            <span className="text-red-500 text-[11px] font-medium tracking-widest uppercase">Serie</span>
+            {meta.releaseDate && <span>{String(meta.releaseDate).slice(0,4)}</span>}
+            {meta.genre && <span className="truncate max-w-[220px]">{meta.genre}</span>}
           </div>
-          {meta.plot && <p className="mt-3 text-neutral-300 text-sm max-w-xl line-clamp-3">{meta.plot}</p>}
+          {(meta.rating_5based || meta.rating) && <div className="mb-2"><StarRating value={meta.rating_5based || meta.rating}/></div>}
+          {(meta.director || meta.cast) && (
+            <div className="text-xs text-neutral-500 mb-2 space-y-0.5">
+              {meta.director && <div><span className="text-neutral-500">Director: </span><span className="text-neutral-300">{meta.director}</span></div>}
+              {meta.cast && <div className="line-clamp-1"><span className="text-neutral-500">Reparto: </span><span className="text-neutral-300">{meta.cast}</span></div>}
+            </div>
+          )}
+          {meta.plot && <p className="mt-3 text-neutral-300 text-sm max-w-xl line-clamp-4" data-testid="series-plot">{meta.plot}</p>}
         </div>
       </div>
 
@@ -713,37 +720,82 @@ function SeriesDetail({ series, profile, onClose, onPlay }) {
   );
 }
 
+function StarRating({ value }) {
+  // Xtream servers usually return rating as string "0-10" or "0-5". Normalise
+  // to 0-5 stars.
+  const raw = parseFloat(value);
+  if (!raw || isNaN(raw)) return null;
+  const stars = raw > 5 ? raw / 2 : raw;
+  const full = Math.floor(stars);
+  const half = stars - full >= 0.5;
+  const empty = 5 - full - (half ? 1 : 0);
+  return (
+    <div className="flex items-center gap-1" data-testid="star-rating">
+      {[...Array(full)].map((_, i) => <span key={`f${i}`} className="text-amber-400 text-base leading-none">★</span>)}
+      {half && <span className="text-amber-400 text-base leading-none">⯪</span>}
+      {[...Array(empty)].map((_, i) => <span key={`e${i}`} className="text-neutral-700 text-base leading-none">★</span>)}
+      <span className="text-neutral-400 text-xs ml-1">{stars.toFixed(1)}/5</span>
+    </div>
+  );
+}
+
 function MovieDetail({ movie, profile, onClose, onPlay }) {
   const [info, setInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
+    let cancelled = false;
     (async () => {
+      setLoading(true);
       try {
-        const data = IS_ELECTRON
-          ? await api.vodStreams(profile).then(()=>null).catch(()=>null)
-          : null;
-        // richer info requires extra endpoint; skip if fails
-        setInfo(data);
+        const data = await api.vodInfo(profile, movie.stream_id || movie.id);
+        if (!cancelled) setInfo(data);
       } catch(_) {}
+      if (!cancelled) setLoading(false);
     })();
+    return () => { cancelled = true; };
   }, [movie, profile]);
-  const cover = api.proxyImg(movie.stream_icon || movie.cover) || IMG_FB;
-  const meta = movie || {};
+  const cover = api.proxyImg((info && info.info && info.info.movie_image) || movie.stream_icon || movie.cover) || IMG_FB;
+  const meta = (info && info.info) || {};
+  const year = meta.releasedate ? String(meta.releasedate).slice(0,4) : (meta.year || "");
+  const genre = meta.genre || "";
+  const duration = meta.duration || meta.duration_secs;
+  const cast = meta.cast || meta.actors;
+  const director = meta.director;
+  const plot = meta.plot || meta.description;
+  const rating = meta.rating_5based || meta.rating;
   return (
     <div className="fixed inset-0 z-[95] bg-black/95 backdrop-blur-xl overflow-y-auto" data-testid="movie-detail" onClick={onClose}>
       <div className="min-h-screen flex items-center justify-center p-8" onClick={e=>e.stopPropagation()}>
         <div className="relative w-full max-w-5xl bg-[#0a0a0a] rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
           <button onClick={onClose} data-testid="close-movie-btn" className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-black/70 hover:bg-black/90 flex items-center justify-center text-white border border-white/10"><X size={18}/></button>
-          <div className="grid md:grid-cols-[300px_1fr] gap-0">
+          <div className="grid md:grid-cols-[280px_1fr] gap-0">
             <div className="relative aspect-[2/3] overflow-hidden bg-neutral-900">
               <img src={cover} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover animate-slow-zoom" alt=""/>
             </div>
-            <div className="p-8 flex flex-col">
-              <h1 className="text-3xl font-medium tracking-tight mb-3" style={{fontFamily:"'Outfit',sans-serif"}}>{meta.name}</h1>
-              <div className="text-sm text-neutral-500 mb-6">Película</div>
-              <button onClick={()=>onPlay(movie, "movie")} data-testid="detail-play-btn" className="self-start flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-full font-medium transition-colors mb-6">
+            <div className="p-6 md:p-8 flex flex-col">
+              <h1 className="text-2xl md:text-3xl font-medium tracking-tight mb-2" style={{fontFamily:"'Outfit',sans-serif"}}>{movie.name}</h1>
+              <div className="flex flex-wrap items-center gap-3 mb-4 text-sm text-neutral-400">
+                <span className="text-red-500 text-[11px] font-medium tracking-widest uppercase">Película</span>
+                {year && <span>{year}</span>}
+                {genre && <span className="truncate max-w-[240px]">{genre}</span>}
+                {duration && <span>{typeof duration === 'number' ? Math.round(duration/60)+"m" : duration}</span>}
+              </div>
+              {rating && <div className="mb-4"><StarRating value={rating}/></div>}
+              {loading && <div className="text-neutral-500 text-sm mb-4">Cargando información…</div>}
+              {plot && (
+                <div className="mb-6">
+                  <p className="text-neutral-300 text-sm leading-relaxed" data-testid="movie-plot">{plot}</p>
+                </div>
+              )}
+              {(cast || director) && (
+                <div className="mb-6 space-y-1 text-xs">
+                  {director && <div><span className="text-neutral-500">Director: </span><span className="text-neutral-300">{director}</span></div>}
+                  {cast && <div><span className="text-neutral-500">Reparto: </span><span className="text-neutral-300 line-clamp-2">{cast}</span></div>}
+                </div>
+              )}
+              <button onClick={()=>onPlay(movie, "movie")} data-testid="detail-play-btn" className="self-start flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-full font-medium transition-colors mt-auto">
                 <Play size={18} fill="white"/>Reproducir
               </button>
-              <p className="text-neutral-400 text-sm">Pulsa reproducir para ver la película. Se abrirá el reproductor en pantalla completa. Doble clic para alternar pantalla completa.</p>
             </div>
           </div>
         </div>

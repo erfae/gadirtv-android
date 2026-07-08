@@ -249,14 +249,24 @@ function ensurePlayerWin(parent) {
 // bar remain interactive above the embedded mpv.
 const PLAYER_TOP_STRIP = 48;
 function updatePlayerBounds() {
-  if (!playerWin || playerWin.isDestroyed() || !mainWinRef || mainWinRef.isDestroyed()) return;
-  const b = mainWinRef.getContentBounds();
+  if (!playerWin || playerWin.isDestroyed()) return;
+  // Use the full primary-display bounds (not just main content) so mpv
+  // covers the taskbar even if the main window doesn't quite touch it.
+  let x, y, w, h;
+  try {
+    const d = screen.getPrimaryDisplay();
+    ({ x, y, width: w, height: h } = d.bounds);
+  } catch (_) {
+    if (!mainWinRef || mainWinRef.isDestroyed()) return;
+    const b = mainWinRef.getContentBounds();
+    x = b.x; y = b.y; w = b.width; h = b.height;
+  }
   try {
     playerWin.setBounds({
-      x: b.x,
-      y: b.y + PLAYER_TOP_STRIP,
-      width: b.width,
-      height: Math.max(1, b.height - PLAYER_TOP_STRIP),
+      x,
+      y: y + PLAYER_TOP_STRIP,
+      width: w,
+      height: Math.max(1, h - PLAYER_TOP_STRIP),
     });
   } catch (_) {}
 }
@@ -270,6 +280,9 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
     const pw = ensurePlayerWin(mainWinRef);
     updatePlayerBounds();
     pw.showInactive();
+    // Force above taskbar level so mpv covers the whole screen (fixes
+    // "video plays but Windows taskbar still visible").
+    try { pw.setAlwaysOnTop(true, 'screen-saver'); } catch (_) {}
     updatePlayerBounds();
     // Focus AFTER show so mpv gets keyboard input.
     setTimeout(() => { try { pw.focus(); } catch (_) {} }, 50);

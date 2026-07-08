@@ -115,6 +115,11 @@ export const api = {
       ? xtreamGet(profile.username, profile.password, "get_series_info", { series_id })
       : (await axios.get(`${PROXY}/series/info`, { params: { ...profile, series_id }, signal: sig() })).data;
   },
+  async vodInfo(profile, vod_id) {
+    return IS_ELECTRON
+      ? xtreamGet(profile.username, profile.password, "get_vod_info", { vod_id })
+      : (await axios.get(`${PROXY}/vod/info`, { params: { ...profile, vod_id }, signal: sig() })).data;
+  },
   async shortEpg(profile, stream_id, limit = 10) {
     return IS_ELECTRON
       ? xtreamGet(profile.username, profile.password, "get_short_epg", { stream_id, limit })
