@@ -26,9 +26,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _user = TextEditingController();
   final _pass = TextEditingController();
   final _name = TextEditingController();
+  final _m3uUrl = TextEditingController();
 
   final _api = ApiService();
   final _store = ProfileStore();
+
+  /// 'xtream' or 'm3u'
+  String _mode = 'xtream';
 
   bool _busy = false;
   bool _passVisible = false;
@@ -42,26 +46,12 @@ class _LoginScreenState extends State<LoginScreen> {
     _user.dispose();
     _pass.dispose();
     _name.dispose();
+    _m3uUrl.dispose();
     super.dispose();
   }
 
   Future<void> _connect() async {
     if (_busy) return;
-    var host = _host.text.trim();
-    // Strip trailing slashes and add http:// if missing
-    while (host.endsWith('/')) {
-      host = host.substring(0, host.length - 1);
-    }
-    if (host.isNotEmpty && !host.startsWith('http://') && !host.startsWith('https://')) {
-      host = 'http://$host';
-    }
-    final user = _user.text.trim();
-    final pass = _pass.text.trim();
-
-    if (host.isEmpty || user.isEmpty || pass.isEmpty) {
-      setState(() => _error = 'Host, usuario y contraseña son obligatorios');
-      return;
-    }
 
     setState(() {
       _busy = true;
@@ -69,15 +59,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _diagnostic = null;
       _progress = 'Conectando…';
     });
-
-    final all = await _store.loadAll();
-    final profile = Profile(
-      name: _name.text.trim().isEmpty ? user : _name.text.trim(),
-      host: host,
-      username: user,
-      password: pass,
-      avatarSeed: all.length,
-    );
 
     _api.onProgress = (attempt, total, msg) {
       if (!mounted) return;
@@ -87,9 +68,63 @@ class _LoginScreenState extends State<LoginScreen> {
           : '$phase (intento $attempt/$total)…');
     };
 
-    final res = await _api.login(profile);
-    _api.onProgress = null;
+    final all = await _store.loadAll();
+    LoginResult res;
+    Profile profile;
 
+    if (_mode == 'm3u') {
+      // ── M3U mode ────────────────────────────────────────────
+      final rawUrl = _m3uUrl.text.trim();
+      if (rawUrl.isEmpty) {
+        setState(() {
+          _busy = false;
+          _progress = null;
+          _error = 'Introduce la URL del M3U';
+        });
+        _api.onProgress = null;
+        return;
+      }
+      profile = Profile(
+        mode: 'm3u',
+        name: _name.text.trim().isEmpty ? 'Playlist M3U' : _name.text.trim(),
+        m3uUrl: rawUrl,
+        avatarSeed: all.length,
+      );
+      res = await _api.loginM3U(profile);
+    } else {
+      // ── Xtream mode ─────────────────────────────────────────
+      var host = _host.text.trim();
+      while (host.endsWith('/')) {
+        host = host.substring(0, host.length - 1);
+      }
+      if (host.isNotEmpty && !host.startsWith('http://') && !host.startsWith('https://')) {
+        host = 'http://$host';
+      }
+      final user = _user.text.trim();
+      final pass = _pass.text.trim();
+
+      if (host.isEmpty || user.isEmpty || pass.isEmpty) {
+        setState(() {
+          _busy = false;
+          _progress = null;
+          _error = 'Servidor, usuario y contraseña son obligatorios';
+        });
+        _api.onProgress = null;
+        return;
+      }
+
+      profile = Profile(
+        mode: 'xtream',
+        name: _name.text.trim().isEmpty ? user : _name.text.trim(),
+        host: host,
+        username: user,
+        password: pass,
+        avatarSeed: all.length,
+      );
+      res = await _api.login(profile);
+    }
+
+    _api.onProgress = null;
     if (!mounted) return;
 
     if (!res.ok) {
@@ -160,6 +195,32 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
+                // ── Mode toggle: Xtream / M3U ────────────────────
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    children: [
+                      Expanded(child: _ModeChip(
+                        label: 'Xtream Codes',
+                        selected: _mode == 'xtream',
+                        enabled: !_busy,
+                        onTap: () => setState(() => _mode = 'xtream'),
+                      )),
+                      Expanded(child: _ModeChip(
+                        label: 'Playlist M3U',
+                        selected: _mode == 'm3u',
+                        enabled: !_busy,
+                        onTap: () => setState(() => _mode = 'm3u'),
+                      )),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
                 AbsorbPointer(
                   absorbing: _busy,
                   child: AnimatedOpacity(
@@ -167,57 +228,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     duration: const Duration(milliseconds: 180),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextField(
-                          controller: _host,
-                          keyboardType: TextInputType.url,
-                          enabled: !_busy,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
-                            hintText: 'Servidor (http://gadir.co:80)',
-                            helperText: 'Compatible con cualquier servidor Xtream Codes. '
-                                'Cambia esta URL si usas otro proveedor.',
-                            helperMaxLines: 2,
-                            helperStyle: TextStyle(color: GtvTheme.textDim, fontSize: 11),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        TextField(
-                          controller: _user,
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          enabled: !_busy,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(hintText: 'Usuario'),
-                        ),
-                        const SizedBox(height: 14),
-                        TextField(
-                          controller: _pass,
-                          obscureText: !_passVisible,
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          enabled: !_busy,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            hintText: 'Contraseña',
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _passVisible ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                                color: GtvTheme.textDim,
-                              ),
-                              tooltip: _passVisible ? 'Ocultar contraseña' : 'Mostrar contraseña',
-                              onPressed: _busy ? null : () => setState(() => _passVisible = !_passVisible),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        TextField(
-                          controller: _name,
-                          enabled: !_busy,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(hintText: 'Nombre del perfil (opcional)'),
-                        ),
-                      ],
+                      children: _mode == 'xtream'
+                          ? _xtreamFields()
+                          : _m3uFields(),
                     ),
                   ),
                 ),

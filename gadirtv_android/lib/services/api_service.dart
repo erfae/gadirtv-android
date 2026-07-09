@@ -133,6 +133,214 @@ class ApiService {
     'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
   ];
 
+  /// Downloads an M3U playlist and returns its raw text. Uses the same 4-UA
+  /// rotation + phase-by-phase diagnostics as the Xtream login.
+  Future<LoginResult> loginM3U(Profile p) async {
+    final rawUrl = p.m3uUrl.trim();
+    if (rawUrl.isEmpty) {
+      return const LoginResult(
+        ok: false,
+        error: 'Introduce la URL del M3U',
+      );
+    }
+    // Normalize (add scheme if missing)
+    var url = rawUrl;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'http://$url';
+    }
+
+    Uri? parsedUri;
+    try {
+      parsedUri = Uri.parse(url);
+    } catch (e) {
+      return LoginResult(
+        ok: false,
+        error: 'URL inválida',
+        diagnostic: 'Parse error: $e',
+      );
+    }
+    final hostname = parsedUri.host;
+    final port = parsedUri.port == 0
+        ? (parsedUri.scheme == 'https' ? 443 : 80)
+        : parsedUri.port;
+    final totalAttempts = _userAgents.length;
+    String? lastDiag;
+
+    for (var attempt = 1; attempt <= totalAttempts; attempt++) {
+      final ua = _userAgents[attempt - 1];
+      onProgress?.call(attempt, totalAttempts, 'Descargando M3U');
+      final diag = StringBuffer('URL: $url\nIntento: $attempt/$totalAttempts\nUA: $ua\n');
+      HttpClient? client;
+      final sw = Stopwatch()..start();
+      try {
+        onProgress?.call(attempt, totalAttempts, 'Resolviendo DNS');
+        final addrs = await InternetAddress.lookup(hostname)
+            .timeout(const Duration(seconds: 4));
+        diag.writeln('DNS OK (${sw.elapsedMilliseconds} ms): '
+            '${addrs.map((a) => a.address).take(3).join(", ")}');
+
+        client = HttpClient()
+          ..connectionTimeout = const Duration(seconds: 6)
+          ..idleTimeout = const Duration(seconds: 4)
+          ..userAgent = ua
+          ..autoUncompress = false;
+
+        onProgress?.call(attempt, totalAttempts, 'Enviando petición HTTP');
+        final req = await client.getUrl(parsedUri).timeout(const Duration(seconds: 8));
+        req.headers.set('Accept', '*/*');
+        req.headers.set('Accept-Encoding', 'identity');
+        req.headers.set('Connection', 'close');
+
+        onProgress?.call(attempt, totalAttempts, 'Esperando respuesta');
+        final res = await req.close().timeout(const Duration(seconds: 15));
+        diag.writeln('HTTP status (${sw.elapsedMilliseconds} ms): ${res.statusCode}');
+
+        if (res.statusCode >= 500) {
+          lastDiag = diag.toString();
+          if (attempt < totalAttempts) {
+            await Future.delayed(Duration(seconds: 1 << attempt));
+            continue;
+          }
+          return LoginResult(
+            ok: false,
+            error: 'El servidor devuelve ${res.statusCode}. Prueba más tarde o con otro proveedor.',
+            diagnostic: lastDiag,
+          );
+        }
+        if (res.statusCode != 200) {
+          return LoginResult(
+            ok: false,
+            error: 'HTTP ${res.statusCode} al descargar la playlist',
+            diagnostic: diag.toString(),
+          );
+        }
+
+        onProgress?.call(attempt, totalAttempts, 'Descargando canales');
+        final body = await res
+            .transform(utf8.decoder)
+            .join()
+            .timeout(const Duration(seconds: 30));
+        diag.writeln('Body: ${body.length} bytes');
+
+        // Validate M3U format
+        final trimmed = body.trimLeft();
+        if (!trimmed.startsWith('#EXTM3U') && !trimmed.startsWith('#EXTINF')) {
+          diag.writeln('Contenido no parece M3U: ${body.substring(0, body.length > 200 ? 200 : body.length)}');
+          return LoginResult(
+            ok: false,
+            error: 'La URL no devuelve una playlist M3U válida',
+            diagnostic: diag.toString(),
+          );
+        }
+
+        onProgress?.call(attempt, totalAttempts, 'Procesando');
+        final channels = _parseM3U(body);
+        diag.writeln('Canales encontrados: ${channels.length}');
+        if (channels.isEmpty) {
+          return LoginResult(
+            ok: false,
+            error: 'La playlist M3U está vacía',
+            diagnostic: diag.toString(),
+          );
+        }
+
+        return LoginResult(
+          ok: true,
+          userInfo: {'auth': 1, 'status': 'Active'},
+          serverInfo: {
+            'url': hostname,
+            'port': port.toString(),
+            'server_protocol': parsedUri.scheme,
+          },
+          m3uChannels: channels,
+        );
+      } on TimeoutException catch (e) {
+        diag.writeln('Excepción (${sw.elapsedMilliseconds} ms): TimeoutException — ${e.message}');
+        lastDiag = diag.toString();
+        if (attempt < totalAttempts) {
+          await Future.delayed(Duration(seconds: 1 << attempt));
+          continue;
+        }
+        return LoginResult(
+          ok: false,
+          error: 'Tiempo agotado descargando M3U',
+          diagnostic: lastDiag,
+        );
+      } on SocketException catch (e) {
+        diag.writeln('Excepción (${sw.elapsedMilliseconds} ms): SocketException — ${e.message}');
+        lastDiag = diag.toString();
+        if (attempt < totalAttempts) {
+          await Future.delayed(Duration(seconds: 1 << attempt));
+          continue;
+        }
+        return LoginResult(
+          ok: false,
+          error: 'No se pudo conectar a $hostname:$port',
+          diagnostic: lastDiag,
+        );
+      } catch (e, st) {
+        diag.writeln('Excepción: ${e.runtimeType} — $e');
+        diag.writeln('Stack (top): ${st.toString().split('\n').take(2).join(' | ')}');
+        return LoginResult(
+          ok: false,
+          error: 'Error inesperado: ${e.runtimeType}',
+          diagnostic: diag.toString(),
+        );
+      } finally {
+        client?.close(force: true);
+      }
+    }
+
+    return LoginResult(
+      ok: false,
+      error: 'No se pudo descargar la playlist tras $totalAttempts intentos',
+      diagnostic: lastDiag,
+    );
+  }
+
+  /// Parses an M3U/M3U8 playlist into a list of channels.
+  /// Each channel is `{name, url, group, tvgId, tvgLogo}`.
+  static List<Map<String, dynamic>> _parseM3U(String body) {
+    final lines = body.split(RegExp(r'\r?\n'));
+    final channels = <Map<String, dynamic>>[];
+    Map<String, dynamic>? pending;
+
+    final attrRe = RegExp(r'([a-zA-Z0-9-]+)="([^"]*)"');
+
+    for (final rawLine in lines) {
+      final line = rawLine.trim();
+      if (line.isEmpty || line.startsWith('#EXTM3U')) continue;
+
+      if (line.startsWith('#EXTINF')) {
+        // #EXTINF:-1 tvg-id="x" tvg-name="Y" tvg-logo="Z" group-title="G",Display Name
+        final commaIdx = line.lastIndexOf(',');
+        final display = commaIdx >= 0 ? line.substring(commaIdx + 1).trim() : 'Canal';
+        final attrs = <String, String>{};
+        for (final m in attrRe.allMatches(line)) {
+          attrs[m.group(1)!] = m.group(2)!;
+        }
+        pending = {
+          'name': display.isEmpty ? (attrs['tvg-name'] ?? 'Canal') : display,
+          'group': attrs['group-title'] ?? 'General',
+          'tvgId': attrs['tvg-id'] ?? '',
+          'tvgLogo': attrs['tvg-logo'] ?? '',
+        };
+      } else if (line.startsWith('#')) {
+        // ignore other tags (#EXTVLCOPT, #EXTGRP…)
+        continue;
+      } else {
+        // stream URL line
+        if (pending != null) {
+          pending['url'] = line;
+          channels.add(pending);
+          pending = null;
+        }
+      }
+    }
+    return channels;
+  }
+
+
   Future<LoginResult> login(Profile p) async {
     final host = _normalizeHost(p.host);
     final url =
@@ -427,6 +635,7 @@ class LoginResult {
   final Map<String, dynamic>? userInfo;
   final Map<String, dynamic>? serverInfo;
   final String? diagnostic;
+  final List<Map<String, dynamic>>? m3uChannels;
 
   const LoginResult({
     required this.ok,
@@ -434,5 +643,6 @@ class LoginResult {
     this.userInfo,
     this.serverInfo,
     this.diagnostic,
+    this.m3uChannels,
   });
 }
