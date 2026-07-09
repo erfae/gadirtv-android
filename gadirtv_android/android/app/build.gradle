@@ -80,21 +80,9 @@ android {
         }
     }
 
-    // Ship one APK per ABI so users of ARM devices don't download the x86
-    // native libs (libmpv weighs ~15 MB per ABI).
-    // NOTE: only applies to RELEASE builds — `flutter build apk --debug`
-    // expects a single `app-debug.apk`, not split by ABI.
-    splits {
-        abi {
-            enable gradle.startParameter.taskNames.any { it.toLowerCase().contains("release") }
-            reset()
-            // Solo arm64-v8a — cubre el 99% de dispositivos Android modernos
-            // (móviles/TV boxes desde 2017) y evita el fallo del CI cuando
-            // Flutter espera múltiples APKs.
-            include 'arm64-v8a'
-            universalApk false
-        }
-    }
+    // NOTE: no `splits { abi }` block — usamos `flutter build apk
+    // --target-platform=android-arm64` que produce un `app-release.apk`
+    // limpio. Añadir `splits` rompe la búsqueda de salida de Flutter.
 }
 
 flutter {
