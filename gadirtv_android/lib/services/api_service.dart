@@ -124,11 +124,20 @@ class ApiService {
   ///
   /// Also captures full diagnostic info (URL, HTTP status, response snippet,
   /// exception class) into [LoginResult.diagnostic] so the UI can show it.
+  /// User-Agents típicos de apps IPTV — algunos paneles Xtream bloquean UAs
+  /// concretos (VLC, curl…), así que rotamos por intento hasta que uno funcione.
+  static const List<String> _userAgents = [
+    'IPTVSmartersPro',
+    'TiviMate/4.5.0',
+    'VLC/3.0.20 LibVLC/3.0.20',
+    'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+  ];
+
   Future<LoginResult> login(Profile p) async {
     final host = _normalizeHost(p.host);
     final url =
         '$host/player_api.php?username=${Uri.encodeQueryComponent(p.username)}&password=${Uri.encodeQueryComponent(p.password)}';
-    const totalAttempts = 3;
+    final totalAttempts = _userAgents.length;
     String? lastDiag;
 
     // Parse host once so we can do DNS lookup separately.
@@ -146,8 +155,10 @@ class ApiService {
     final port = parsedUri.port == 0 ? 80 : parsedUri.port;
 
     for (var attempt = 1; attempt <= totalAttempts; attempt++) {
+      final ua = _userAgents[attempt - 1];
       onProgress?.call(attempt, totalAttempts, 'Conectando');
-      final diag = StringBuffer('URL: $url\nIntento: $attempt/$totalAttempts\n');
+      final diag = StringBuffer('URL: $url\nIntento: $attempt/$totalAttempts\n'
+          'UA: $ua\n');
       HttpClient? client;
       final sw = Stopwatch()..start();
       try {
@@ -171,7 +182,7 @@ class ApiService {
         client = HttpClient()
           ..connectionTimeout = const Duration(seconds: 5)
           ..idleTimeout = const Duration(seconds: 3)
-          ..userAgent = 'VLC/3.0.20 LibVLC/3.0.20'
+          ..userAgent = ua
           ..autoUncompress = false;
 
         final req =
@@ -196,12 +207,17 @@ class ApiService {
         if (res.statusCode >= 500) {
           lastDiag = diag.toString();
           if (attempt < totalAttempts) {
-            await Future.delayed(Duration(milliseconds: 400 * attempt));
+            // Exponential backoff: 2 s, 4 s, 8 s (gives server-side backend
+            // time to recover from 502/503 flaps).
+            final backoff = Duration(seconds: 1 << attempt);
+            await Future.delayed(backoff);
             continue;
           }
           return LoginResult(
             ok: false,
-            error: 'Servidor no disponible (${res.statusCode}). Intenta de nuevo en unos segundos.',
+            error: 'Servidor devuelve ${res.statusCode} con todos los User-Agents probados. '
+                'El servidor está rechazando este dispositivo. '
+                'Prueba con VPN o espera unos minutos.',
             diagnostic: lastDiag,
           );
         }
@@ -235,6 +251,10 @@ class ApiService {
         final ok = data is Map &&
             data['user_info'] is Map &&
             (data['user_info']['auth'] == 1 || data['user_info']['auth'] == '1');
+        if (ok) {
+          // Persist the winning UA so subsequent API calls use it too.
+          _dio.options.headers['User-Agent'] = ua;
+        }
         return LoginResult(
           ok: ok,
           userInfo: ok ? Map<String, dynamic>.from(data['user_info'] as Map) : null,
@@ -248,12 +268,12 @@ class ApiService {
         diag.writeln('Excepción (${sw.elapsedMilliseconds} ms): TimeoutException — ${e.message}');
         lastDiag = diag.toString();
         if (attempt < totalAttempts) {
-          await Future.delayed(Duration(milliseconds: 400 * attempt));
+          await Future.delayed(Duration(seconds: 1 << attempt));
           continue;
         }
         return LoginResult(
           ok: false,
-          error: 'Tiempo agotado — el servidor no responde. Comprueba tu conexión y que gadir.co esté online.',
+          error: 'Tiempo agotado — el servidor no responde con ninguno de los User-Agents probados.',
           diagnostic: lastDiag,
         );
       } on SocketException catch (e) {
@@ -265,7 +285,7 @@ class ApiService {
         if (e.port != null) diag.writeln('Port: ${e.port}');
         lastDiag = diag.toString();
         if (attempt < totalAttempts) {
-          await Future.delayed(Duration(milliseconds: 400 * attempt));
+          await Future.delayed(Duration(seconds: 1 << attempt));
           continue;
         }
         return LoginResult(
@@ -277,7 +297,7 @@ class ApiService {
         diag.writeln('Excepción: HttpException — ${e.message}');
         lastDiag = diag.toString();
         if (attempt < totalAttempts) {
-          await Future.delayed(Duration(milliseconds: 400 * attempt));
+          await Future.delayed(Duration(seconds: 1 << attempt));
           continue;
         }
         return LoginResult(
@@ -300,7 +320,7 @@ class ApiService {
 
     return LoginResult(
       ok: false,
-      error: 'No se pudo iniciar sesión tras $totalAttempts intentos',
+      error: 'No se pudo iniciar sesión tras $totalAttempts intentos con distintos User-Agents',
       diagnostic: lastDiag,
     );
   }
