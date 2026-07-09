@@ -168,27 +168,89 @@ class _SeriesTabState extends State<SeriesTab> {
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 140,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 14,
-        childAspectRatio: 2 / 3.4,
-      ),
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       itemCount: _series.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (_, i) {
         final s = _series[i];
-        return PosterCard(
-          title: s.name,
-          imageUrl: s.cover,
-          rating: s.rating,
-          onTap: () => widget.onOpen(s),
-          autofocus: i == 0,
+        return _SeriesRow(
+          series: s,
           isFavorite: _favoriteIds.contains(s.seriesId),
+          onTap: () => widget.onOpen(s),
           onToggleFavorite: () => _toggleFavorite(s),
         );
       },
+    );
+  }
+}
+
+class _SeriesRow extends StatelessWidget {
+  const _SeriesRow({
+    required this.series,
+    required this.isFavorite,
+    required this.onTap,
+    required this.onToggleFavorite,
+  });
+
+  final Series series;
+  final bool isFavorite;
+  final VoidCallback onTap;
+  final VoidCallback onToggleFavorite;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: GtvTheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: GtvTheme.border),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: 60,
+                height: 84,
+                child: series.cover.isNotEmpty
+                    ? Image.network(series.cover, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                            color: GtvTheme.bg,
+                            child: const Icon(Icons.tv_rounded, color: GtvTheme.textDim)))
+                    : Container(color: GtvTheme.bg, child: const Icon(Icons.tv_rounded, color: GtvTheme.textDim)),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(series.name,
+                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 6),
+                  if (series.rating.isNotEmpty)
+                    Row(children: [
+                      const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                      const SizedBox(width: 4),
+                      Text(series.rating, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    ]),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border, color: isFavorite ? GtvTheme.red : Colors.white54),
+              onPressed: onToggleFavorite,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

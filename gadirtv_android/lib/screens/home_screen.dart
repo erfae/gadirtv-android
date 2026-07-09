@@ -59,55 +59,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openMovie(Movie m) {
-    showQuickActions(
-      context,
-      title: m.name,
-      imageUrl: m.icon,
-      kindLabel: 'PELÍCULA',
-      rating: m.rating,
-      onPlay: () {
-        Navigator.of(context).pop(); // close sheet
-        _playMovie(m);
-      },
-      onInfo: () {
-        Navigator.of(context).pop(); // close sheet
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => MovieDetailScreen(profile: _profile!, movie: m)),
-        );
-      },
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => MovieDetailScreen(profile: _profile!, movie: m)),
     );
   }
 
   void _openSeries(Series s) {
-    showQuickActions(
-      context,
-      title: s.name,
-      imageUrl: s.cover,
-      kindLabel: 'SERIE',
-      rating: s.rating,
-      onPlay: () async {
-        // Series play needs an episode: fetch info and pick the first
-        // resumable one, or fall back to S01E01.
-        final navigator = Navigator.of(context);
-        try {
-          final info = await _api.seriesInfo(_profile!, s.seriesId);
-          if (!mounted) return;
-          navigator.pop(); // close sheet
-          _playFirstEpisode(s, info);
-        } catch (_) {
-          if (!mounted) return;
-          navigator.pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se pudo cargar los episodios')),
-          );
-        }
-      },
-      onInfo: () {
-        Navigator.of(context).pop();
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => SeriesDetailScreen(profile: _profile!, series: s)),
-        );
-      },
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => SeriesDetailScreen(profile: _profile!, series: s)),
+    );
+  }
+
+  void _openSeries(Series s) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => SeriesDetailScreen(profile: _profile!, series: s)),
     );
   }
 
@@ -329,9 +294,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Row(
         children: [
-          const Text(
-            'GadirTV',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: GtvTheme.red, letterSpacing: 0.5),
+          Image.asset(
+            'assets/gadirtv_logo.png',
+            height: 42,
+            fit: BoxFit.contain,
           ),
           const Spacer(),
           InkWell(
@@ -492,7 +458,7 @@ class _NavButtonState extends State<_NavButton> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           decoration: BoxDecoration(
             color: on ? GtvTheme.red.withOpacity(0.15) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
@@ -501,13 +467,13 @@ class _NavButtonState extends State<_NavButton> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.item.icon, color: on ? GtvTheme.red : GtvTheme.textDim, size: 20),
-              const SizedBox(width: 8),
+              Icon(widget.item.icon, color: on ? GtvTheme.red : GtvTheme.textDim, size: 28),
+              const SizedBox(width: 10),
               Text(
                 widget.item.label,
                 style: TextStyle(
                   color: on ? Colors.white : GtvTheme.textDim,
-                  fontSize: 13,
+                  fontSize: 15,
                   fontWeight: on ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),

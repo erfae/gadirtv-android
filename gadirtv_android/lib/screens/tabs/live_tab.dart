@@ -178,27 +178,78 @@ class _LiveTabState extends State<LiveTab> {
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 180,
-        mainAxisSpacing: 14,
-        crossAxisSpacing: 14,
-        childAspectRatio: 16 / 11,
-      ),
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       itemCount: _channels.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (_, i) {
         final c = _channels[i];
-        return PosterCard(
-          title: c.name,
-          imageUrl: c.icon,
-          aspectRatio: 16 / 9,
-          onTap: () => widget.onPlay(c),
-          autofocus: i == 0,
+        return _ChannelRow(
+          channel: c,
           isFavorite: _favoriteIds.contains(c.streamId),
+          onTap: () => widget.onPlay(c),
           onToggleFavorite: () => _toggleFavorite(c),
         );
       },
+    );
+  }
+}
+
+class _ChannelRow extends StatelessWidget {
+  const _ChannelRow({
+    required this.channel,
+    required this.isFavorite,
+    required this.onTap,
+    required this.onToggleFavorite,
+  });
+
+  final LiveChannel channel;
+  final bool isFavorite;
+  final VoidCallback onTap;
+  final VoidCallback onToggleFavorite;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      onDoubleTap: onTap, // double-tap to launch (future: fullscreen).
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: GtvTheme.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: GtvTheme.border),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                width: 70,
+                height: 45,
+                child: channel.icon.isNotEmpty
+                    ? Image.network(channel.icon, fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Container(
+                            color: GtvTheme.bg, child: const Icon(Icons.live_tv_rounded, color: GtvTheme.textDim, size: 22)))
+                    : Container(color: GtvTheme.bg, child: const Icon(Icons.live_tv_rounded, color: GtvTheme.textDim, size: 22)),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(channel.name,
+                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis),
+            ),
+            IconButton(
+              icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border, color: isFavorite ? GtvTheme.red : Colors.white54),
+              onPressed: onToggleFavorite,
+            ),
+            const Icon(Icons.play_arrow_rounded, color: GtvTheme.red, size: 28),
+          ],
+        ),
+      ),
     );
   }
 }
