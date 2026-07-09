@@ -82,14 +82,13 @@ android {
 
     // Ship one APK per ABI so users of ARM devices don't download the x86
     // native libs (libmpv weighs ~15 MB per ABI).
+    // NOTE: only applies to RELEASE builds — `flutter build apk --debug`
+    // expects a single `app-debug.apk`, not split by ABI.
     splits {
         abi {
-            enable true
+            enable gradle.startParameter.taskNames.any { it.toLowerCase().contains("release") }
             reset()
             include 'armeabi-v7a', 'arm64-v8a', 'x86_64'
-            // universalApk conflicts with `flutter build apk --split-per-abi`
-            // (NullPointerException on output.getFilter). Per-ABI splits are
-            // enough for sideload.
             universalApk false
         }
     }
