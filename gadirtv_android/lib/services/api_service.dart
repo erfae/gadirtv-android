@@ -184,7 +184,6 @@ class ApiService {
       final ua = _userAgents[attempt - 1];
       onProgress?.call(attempt, totalAttempts, 'Descargando M3U');
       final diag = StringBuffer('URL: $url\nIntento: $attempt/$totalAttempts\nUA: $ua\n');
-      HttpClient? client;
       final sw = Stopwatch()..start();
       try {
         onProgress?.call(attempt, totalAttempts, 'Resolviendo DNS');
@@ -193,23 +192,24 @@ class ApiService {
         diag.writeln('DNS OK (${sw.elapsedMilliseconds} ms): '
             '${addrs.map((a) => a.address).take(3).join(", ")}');
 
-        client = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 6)
-          ..idleTimeout = const Duration(seconds: 4)
-          ..userAgent = ua
-          ..autoUncompress = false;
-
         onProgress?.call(attempt, totalAttempts, 'Enviando petición HTTP');
-        final req = await client.getUrl(parsedUri).timeout(const Duration(seconds: 8));
-        req.headers.set('Accept', '*/*');
-        req.headers.set('Accept-Encoding', 'identity');
-        req.headers.set('Connection', 'close');
+        final httpClient = await HttpFactory.get();
+        diag.writeln('HTTP client: ${HttpFactory.isCronet ? "Cronet" : "IOClient"}');
+
+        final req = http.Request('GET', parsedUri)
+          ..headers['User-Agent'] = ua
+          ..headers['Accept'] = '*/*'
+          ..headers['Accept-Encoding'] = 'identity'
+          ..headers['Connection'] = 'close'
+          ..followRedirects = true;
 
         onProgress?.call(attempt, totalAttempts, 'Esperando respuesta');
-        final res = await req.close().timeout(const Duration(seconds: 15));
-        diag.writeln('HTTP status (${sw.elapsedMilliseconds} ms): ${res.statusCode}');
+        final streamed = await httpClient
+            .send(req)
+            .timeout(const Duration(seconds: 15));
+        diag.writeln('HTTP status (${sw.elapsedMilliseconds} ms): ${streamed.statusCode}');
 
-        if (res.statusCode >= 500) {
+        if (streamed.statusCode >= 500) {
           lastDiag = diag.toString();
           if (attempt < totalAttempts) {
             await Future.delayed(Duration(seconds: 1 << attempt));
@@ -217,23 +217,23 @@ class ApiService {
           }
           return LoginResult(
             ok: false,
-            error: 'El servidor devuelve ${res.statusCode}. Prueba más tarde o con otro proveedor.',
+            error: 'El servidor devuelve ${streamed.statusCode}. Prueba más tarde o con otro proveedor.',
             diagnostic: lastDiag,
           );
         }
-        if (res.statusCode != 200) {
+        if (streamed.statusCode != 200) {
           return LoginResult(
             ok: false,
-            error: 'HTTP ${res.statusCode} al descargar la playlist',
+            error: 'HTTP ${streamed.statusCode} al descargar la playlist',
             diagnostic: diag.toString(),
           );
         }
 
         onProgress?.call(attempt, totalAttempts, 'Descargando canales');
-        final body = await res
-            .transform(utf8.decoder)
-            .join()
+        final bytes = await streamed.stream
+            .toBytes()
             .timeout(const Duration(seconds: 30));
+        final body = utf8.decode(bytes, allowMalformed: true);
         diag.writeln('Body: ${body.length} bytes');
 
         // Validate M3U format
@@ -323,8 +323,6 @@ class ApiService {
           error: 'Error inesperado: ${e.runtimeType}',
           diagnostic: diag.toString(),
         );
-      } finally {
-        client?.close(force: true);
       }
     }
 
@@ -404,7 +402,6 @@ class ApiService {
       onProgress?.call(attempt, totalAttempts, 'Conectando');
       final diag = StringBuffer('URL: $url\nIntento: $attempt/$totalAttempts\n'
           'UA: $ua\n');
-      HttpClient? client;
       final sw = Stopwatch()..start();
       try {
         // ── Phase 1: DNS resolution ────────────────────────────
@@ -414,69 +411,67 @@ class ApiService {
         diag.writeln('DNS OK (${sw.elapsedMilliseconds} ms): '
             '${addrs.map((a) => a.address).take(3).join(", ")}');
 
-        // ── Phase 2: TCP socket connect ────────────────────────
+        // ── Phase 2: TCP socket connect probe ──────────────────
         onProgress?.call(attempt, totalAttempts, 'Conectando socket TCP');
         final sock = await Socket.connect(hostname, port,
                 timeout: const Duration(seconds: 5))
             .timeout(const Duration(seconds: 6));
         diag.writeln('TCP OK (${sw.elapsedMilliseconds} ms): ${sock.remoteAddress.address}:$port');
-        await sock.close(); // Close probe socket, HttpClient will open its own.
+        await sock.close();
 
-        // ── Phase 3: HTTP request ──────────────────────────────
+        // ── Phase 3: HTTP request via Cronet (fallback IOClient) ──
         onProgress?.call(attempt, totalAttempts, 'Enviando petición HTTP');
-        client = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 5)
-          ..idleTimeout = const Duration(seconds: 3)
-          ..userAgent = ua
-          ..autoUncompress = false;
+        final client = await HttpFactory.get();
+        diag.writeln('HTTP client: ${HttpFactory.isCronet ? "Cronet" : "IOClient"}');
 
-        final req =
-            await client.getUrl(parsedUri).timeout(const Duration(seconds: 6));
-        req.headers.set('Accept', 'application/json, text/plain, */*');
-        req.headers.set('Accept-Encoding', 'identity');
-        req.headers.set('Connection', 'close');
+        final req = http.Request('GET', parsedUri)
+          ..headers['User-Agent'] = ua
+          ..headers['Accept'] = 'application/json, text/plain, */*'
+          ..headers['Accept-Encoding'] = 'identity'
+          ..headers['Connection'] = 'close'
+          ..followRedirects = true;
 
         onProgress?.call(attempt, totalAttempts, 'Esperando respuesta');
-        final res = await req.close().timeout(const Duration(seconds: 8));
-        diag.writeln('HTTP status (${sw.elapsedMilliseconds} ms): ${res.statusCode}');
-        diag.writeln('Content-Type: ${res.headers.contentType}');
+        final streamed = await client
+            .send(req)
+            .timeout(const Duration(seconds: 10));
+        diag.writeln('HTTP status (${sw.elapsedMilliseconds} ms): ${streamed.statusCode}');
+        diag.writeln('Content-Type: ${streamed.headers['content-type']}');
 
         onProgress?.call(attempt, totalAttempts, 'Recibiendo datos');
-        final body = await res
-            .transform(utf8.decoder)
-            .join()
+        final bytes = await streamed.stream
+            .toBytes()
             .timeout(const Duration(seconds: 6));
+        final body = utf8.decode(bytes, allowMalformed: true);
         final snippet = body.length > 400 ? '${body.substring(0, 400)}…' : body;
         diag.writeln('Body ${body.length} bytes (${sw.elapsedMilliseconds} ms): $snippet');
 
-        if (res.statusCode >= 500) {
+        if (streamed.statusCode >= 500) {
           lastDiag = diag.toString();
           if (attempt < totalAttempts) {
-            // Exponential backoff: 2 s, 4 s, 8 s (gives server-side backend
-            // time to recover from 502/503 flaps).
             final backoff = Duration(seconds: 1 << attempt);
             await Future.delayed(backoff);
             continue;
           }
           return LoginResult(
             ok: false,
-            error: 'Servidor devuelve ${res.statusCode} con todos los User-Agents probados. '
+            error: 'Servidor devuelve ${streamed.statusCode} con todos los User-Agents probados. '
                 'El servidor está rechazando este dispositivo. '
                 'Prueba con VPN o espera unos minutos.',
             diagnostic: lastDiag,
           );
         }
-        if (res.statusCode == 401 || res.statusCode == 403) {
+        if (streamed.statusCode == 401 || streamed.statusCode == 403) {
           return LoginResult(
             ok: false,
-            error: 'Credenciales incorrectas (${res.statusCode})',
+            error: 'Credenciales incorrectas (${streamed.statusCode})',
             diagnostic: diag.toString(),
           );
         }
-        if (res.statusCode != 200) {
+        if (streamed.statusCode != 200) {
           return LoginResult(
             ok: false,
-            error: 'El servidor devolvió ${res.statusCode}',
+            error: 'El servidor devolvió ${streamed.statusCode}',
             diagnostic: diag.toString(),
           );
         }
@@ -497,7 +492,6 @@ class ApiService {
             data['user_info'] is Map &&
             (data['user_info']['auth'] == 1 || data['user_info']['auth'] == '1');
         if (ok) {
-          // Persist the winning UA so subsequent API calls use it too.
           _dio.options.headers['User-Agent'] = ua;
         }
         return LoginResult(
@@ -558,8 +552,6 @@ class ApiService {
           error: 'Error inesperado: ${e.runtimeType}',
           diagnostic: diag.toString(),
         );
-      } finally {
-        client?.close(force: true);
       }
     }
 
