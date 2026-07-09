@@ -127,9 +127,9 @@ class ApiService {
   /// Also captures full diagnostic info (URL, HTTP status, response snippet,
   /// exception class) into [LoginResult.diagnostic] so the UI can show it.
   static const List<String> _userAgents = [
-    'Xtream-Codes-Api',
-    'okhttp/5.0.0-alpha.2',
-    'IPTVSmartersPro',
+    'VLC/3.0.20 LibVLC/3.0.20',
+    'VLC/3.0.20 LibVLC/3.0.20',
+    'VLC/3.0.20 LibVLC/3.0.20',
   ];
 
   /// Downloads an M3U playlist and returns its raw text. Uses the same 4-UA
@@ -193,7 +193,7 @@ class ApiService {
           ..headers['User-Agent'] = ua
           ..headers['Accept'] = '*/*'
           ..headers['Accept-Encoding'] = 'identity'
-          ..headers['Connection'] = 'close'
+          ..headers['Connection'] = 'keep-alive'
           ..followRedirects = true;
 
         onProgress?.call(attempt, totalAttempts, 'Esperando respuesta');
@@ -420,7 +420,7 @@ class ApiService {
           ..headers['User-Agent'] = ua
           ..headers['Accept'] = 'application/json, text/plain, */*'
           ..headers['Accept-Encoding'] = 'identity'
-          ..headers['Connection'] = 'close'
+          ..headers['Connection'] = 'keep-alive'
           ..followRedirects = true;
 
         onProgress?.call(attempt, totalAttempts, 'Esperando respuesta');

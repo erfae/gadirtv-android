@@ -26,10 +26,14 @@ class HttpFactory {
       try {
         // CronetEngine.build() throws if Google Play Services or the Cronet
         // native lib is not available (typical on ancient TV boxes).
+        //
+        // enableHttp2: false — old Xtream/nginx panels (gadir.co and similar)
+        // don't support HTTP/2. When Cronet negotiates h2, the upstream PHP
+        // backend returns 502 Bad Gateway. Windows GadirTV works because Node
+        // http module is HTTP/1.1 only.
         final engine = await CronetEngine.build(
-          userAgent: 'Xtream-Codes-Api',
           enableBrotli: false,
-          enableHttp2: true,
+          enableHttp2: false,
           enableQuic: false,
         );
         _cachedClient = CronetClient.fromCronetEngine(engine, closeEngine: true);
