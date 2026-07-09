@@ -6,6 +6,10 @@ import '../services/api_service.dart';
 import '../services/profile_store.dart';
 import '../theme.dart';
 
+/// Bump this string every release so users can visually confirm they have
+/// the latest APK installed (avoids the "am I testing the right build?" loop).
+const String kAppVersionLabel = 'v0.2.6';
+
 /// Add-profile / connect-to-Xtream screen.
 ///
 /// Fields (host / username / password / display name) mirror the Windows
@@ -133,6 +137,26 @@ class _LoginScreenState extends State<LoginScreen> {
                   'Conecta tu cuenta Xtream Codes',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, color: GtvTheme.textDim),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 96),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: GtvTheme.red.withOpacity(0.15),
+                    border: Border.all(color: GtvTheme.red.withOpacity(0.35)),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    'GadirTV $kAppVersionLabel',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: GtvTheme.redHi,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 32),
                 TextField(
