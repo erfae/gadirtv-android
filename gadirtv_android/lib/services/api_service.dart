@@ -42,66 +42,80 @@ class ApiService {
   /// "Intento 2/3…" while the retry loop is running.
   void Function(int attempt, int total, String? message)? onProgress;
 
-  /// GET `player_api.php` with automatic retries on transient failures
-  /// (503, empty body, network errors). Mirrors the Windows client's
-  /// 3-attempt strategy against gadir.co's anti-abuse throttling.
+  /// GET `player_api.php` via Cronet (same stack as `login()`). Replaces
+  /// the previous Dio-based implementation which suffered the same
+  /// `dart:io HttpClient` hang bug on Android that we solved for login.
   Future<dynamic> _get(Profile p, String action, [Map<String, dynamic>? extra]) async {
-    final url = '${_normalizeHost(p.host)}/player_api.php';
-    final query = <String, dynamic>{
-      'username': p.username,
-      'password': p.password,
-      if (action.isNotEmpty) 'action': action,
-      ...?extra,
-    };
+    final base = _normalizeHost(p.host);
+    final queryParts = <String>[
+      'username=${Uri.encodeQueryComponent(p.username)}',
+      'password=${Uri.encodeQueryComponent(p.password)}',
+      if (action.isNotEmpty) 'action=$action',
+      ...?extra?.entries
+          .where((e) => e.value != null && e.value.toString().isNotEmpty)
+          .map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value.toString())}'),
+    ];
+    final url = '$base/player_api.php?${queryParts.join('&')}';
+    final parsedUri = Uri.parse(url);
 
     Object? lastError;
     const totalAttempts = 3;
     for (var attempt = 1; attempt <= totalAttempts; attempt++) {
-      onProgress?.call(attempt, totalAttempts, null);
       try {
-        // Hard app-level timeout — bypasses the dart:io HttpClient bug where
-        // Dio's internal `receiveTimeout` sometimes doesn't fire on Android
-        // when the socket is open but the server never sends a full response.
-        final res = await _dio
-            .get(url, queryParameters: query)
-            .timeout(
-              const Duration(seconds: 12),
-              onTimeout: () => throw DioException(
-                requestOptions: RequestOptions(path: url),
-                type: DioExceptionType.receiveTimeout,
-                message: 'App-level timeout (12s)',
-              ),
-            );
-        final data = res.data;
-        // Server sometimes returns 200 with an empty body under load — retry.
-        final isEmpty = data == null ||
-            (data is String && data.trim().isEmpty) ||
-            (data is List && data.isEmpty && action.isNotEmpty);
-        if (!isEmpty) return data;
-        lastError = 'empty-body';
-      } on DioException catch (e) {
+        final client = await HttpFactory.get();
+        final req = http.Request('GET', parsedUri)
+          ..headers['User-Agent'] = 'VLC/3.0.20 LibVLC/3.0.20'
+          ..headers['Accept'] = 'application/json, text/plain, */*'
+          ..headers['Accept-Encoding'] = 'identity'
+          ..headers['Connection'] = 'keep-alive'
+          ..followRedirects = true;
+
+        final streamed = await client.send(req).timeout(const Duration(seconds: 15));
+        final bytes = await streamed.stream.toBytes().timeout(const Duration(seconds: 15));
+        final body = utf8.decode(bytes, allowMalformed: true);
+
+        if (streamed.statusCode >= 500) {
+          lastError = 'HTTP ${streamed.statusCode}';
+          if (attempt < totalAttempts) {
+            await Future.delayed(Duration(milliseconds: 500 * attempt));
+            continue;
+          }
+          throw Exception('Servidor devolvió ${streamed.statusCode} tras $totalAttempts intentos');
+        }
+        if (streamed.statusCode != 200) {
+          throw Exception('HTTP ${streamed.statusCode}');
+        }
+        // Try to parse JSON; if empty, retry (server anti-abuse quirk).
+        if (body.trim().isEmpty) {
+          lastError = 'empty-body';
+          if (attempt < totalAttempts) {
+            await Future.delayed(Duration(milliseconds: 500 * attempt));
+            continue;
+          }
+          return null;
+        }
+        try {
+          return jsonDecode(body);
+        } catch (_) {
+          return body; // caller can decide how to handle non-JSON
+        }
+      } on TimeoutException catch (e) {
         lastError = e;
-        // Retry on transient errors: any 5xx / custom Xtream codes (512, 520...),
-        // timeouts, connection errors. Windows client retries 3× on ANY failure.
-        final code = e.response?.statusCode ?? 0;
-        final retryable = code >= 500 ||
-            e.type == DioExceptionType.connectionTimeout ||
-            e.type == DioExceptionType.receiveTimeout ||
-            e.type == DioExceptionType.sendTimeout ||
-            e.type == DioExceptionType.connectionError ||
-            e.type == DioExceptionType.unknown;
-        if (!retryable) rethrow;
-      }
-      // Back-off before next attempt (0.4s, 0.8s).
-      if (attempt < totalAttempts) {
-        await Future.delayed(Duration(milliseconds: 400 * attempt));
+        if (attempt < totalAttempts) {
+          await Future.delayed(Duration(milliseconds: 500 * attempt));
+          continue;
+        }
+        rethrow;
+      } on SocketException catch (e) {
+        lastError = e;
+        if (attempt < totalAttempts) {
+          await Future.delayed(Duration(milliseconds: 500 * attempt));
+          continue;
+        }
+        rethrow;
       }
     }
-    if (lastError is DioException) throw lastError;
-    throw DioException(
-      requestOptions: RequestOptions(path: url),
-      message: 'Sin respuesta tras 3 intentos',
-    );
+    throw Exception('Sin respuesta tras $totalAttempts intentos ($lastError)');
   }
 
   /// Normalizes user-typed hosts:
