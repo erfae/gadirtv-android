@@ -8,7 +8,7 @@ import '../theme.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v0.2.6';
+const String kAppVersionLabel = 'v0.2.7';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -81,9 +81,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     _api.onProgress = (attempt, total, msg) {
       if (!mounted) return;
+      final phase = msg ?? 'Conectando';
       setState(() => _progress = attempt == 1
-          ? 'Conectando…'
-          : 'Reintentando ($attempt/$total)…');
+          ? '$phase…'
+          : '$phase (intento $attempt/$total)…');
     };
 
     final res = await _api.login(profile);
@@ -159,44 +160,60 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                TextField(
-                  controller: _host,
-                  keyboardType: TextInputType.url,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(hintText: 'Servidor (http://gadir.co:80)'),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _user,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(hintText: 'Usuario'),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _pass,
-                  obscureText: !_passVisible,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Contraseña',
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _passVisible ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                        color: GtvTheme.textDim,
-                      ),
-                      tooltip: _passVisible ? 'Ocultar contraseña' : 'Mostrar contraseña',
-                      onPressed: () => setState(() => _passVisible = !_passVisible),
+                AbsorbPointer(
+                  absorbing: _busy,
+                  child: AnimatedOpacity(
+                    opacity: _busy ? 0.45 : 1.0,
+                    duration: const Duration(milliseconds: 180),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
+                          controller: _host,
+                          keyboardType: TextInputType.url,
+                          enabled: !_busy,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: const InputDecoration(hintText: 'Servidor (http://gadir.co:80)'),
+                        ),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: _user,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          enabled: !_busy,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: const InputDecoration(hintText: 'Usuario'),
+                        ),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: _pass,
+                          obscureText: !_passVisible,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          enabled: !_busy,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'Contraseña',
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _passVisible ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                color: GtvTheme.textDim,
+                              ),
+                              tooltip: _passVisible ? 'Ocultar contraseña' : 'Mostrar contraseña',
+                              onPressed: _busy ? null : () => setState(() => _passVisible = !_passVisible),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: _name,
+                          enabled: !_busy,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: const InputDecoration(hintText: 'Nombre del perfil (opcional)'),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _name,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(hintText: 'Nombre del perfil (opcional)'),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 18),

@@ -131,33 +131,67 @@ class ApiService {
     const totalAttempts = 3;
     String? lastDiag;
 
+    // Parse host once so we can do DNS lookup separately.
+    Uri? parsedUri;
+    try {
+      parsedUri = Uri.parse(url);
+    } catch (e) {
+      return LoginResult(
+        ok: false,
+        error: 'URL inválida: $host',
+        diagnostic: 'Parse error: $e',
+      );
+    }
+    final hostname = parsedUri.host;
+    final port = parsedUri.port == 0 ? 80 : parsedUri.port;
+
     for (var attempt = 1; attempt <= totalAttempts; attempt++) {
-      onProgress?.call(attempt, totalAttempts, null);
+      onProgress?.call(attempt, totalAttempts, 'Conectando');
       final diag = StringBuffer('URL: $url\nIntento: $attempt/$totalAttempts\n');
       HttpClient? client;
+      final sw = Stopwatch()..start();
       try {
+        // ── Phase 1: DNS resolution ────────────────────────────
+        onProgress?.call(attempt, totalAttempts, 'Resolviendo DNS');
+        final addrs = await InternetAddress.lookup(hostname)
+            .timeout(const Duration(seconds: 4));
+        diag.writeln('DNS OK (${sw.elapsedMilliseconds} ms): '
+            '${addrs.map((a) => a.address).take(3).join(", ")}');
+
+        // ── Phase 2: TCP socket connect ────────────────────────
+        onProgress?.call(attempt, totalAttempts, 'Conectando socket TCP');
+        final sock = await Socket.connect(hostname, port,
+                timeout: const Duration(seconds: 5))
+            .timeout(const Duration(seconds: 6));
+        diag.writeln('TCP OK (${sw.elapsedMilliseconds} ms): ${sock.remoteAddress.address}:$port');
+        await sock.close(); // Close probe socket, HttpClient will open its own.
+
+        // ── Phase 3: HTTP request ──────────────────────────────
+        onProgress?.call(attempt, totalAttempts, 'Enviando petición HTTP');
         client = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 6)
-          ..idleTimeout = const Duration(seconds: 5)
+          ..connectionTimeout = const Duration(seconds: 5)
+          ..idleTimeout = const Duration(seconds: 3)
           ..userAgent = 'VLC/3.0.20 LibVLC/3.0.20'
           ..autoUncompress = false;
 
-        final uri = Uri.parse(url);
-        final req = await client.getUrl(uri).timeout(const Duration(seconds: 8));
+        final req =
+            await client.getUrl(parsedUri).timeout(const Duration(seconds: 6));
         req.headers.set('Accept', 'application/json, text/plain, */*');
         req.headers.set('Accept-Encoding', 'identity');
-        req.headers.set('Connection', 'keep-alive');
+        req.headers.set('Connection', 'close');
 
-        final res = await req.close().timeout(const Duration(seconds: 10));
-        diag.writeln('HTTP status: ${res.statusCode}');
+        onProgress?.call(attempt, totalAttempts, 'Esperando respuesta');
+        final res = await req.close().timeout(const Duration(seconds: 8));
+        diag.writeln('HTTP status (${sw.elapsedMilliseconds} ms): ${res.statusCode}');
         diag.writeln('Content-Type: ${res.headers.contentType}');
 
+        onProgress?.call(attempt, totalAttempts, 'Recibiendo datos');
         final body = await res
             .transform(utf8.decoder)
             .join()
-            .timeout(const Duration(seconds: 10));
+            .timeout(const Duration(seconds: 6));
         final snippet = body.length > 400 ? '${body.substring(0, 400)}…' : body;
-        diag.writeln('Body (${body.length} bytes): $snippet');
+        diag.writeln('Body ${body.length} bytes (${sw.elapsedMilliseconds} ms): $snippet');
 
         if (res.statusCode >= 500) {
           lastDiag = diag.toString();
@@ -186,6 +220,7 @@ class ApiService {
           );
         }
 
+        onProgress?.call(attempt, totalAttempts, 'Procesando');
         dynamic data;
         try {
           data = jsonDecode(body);
@@ -210,7 +245,7 @@ class ApiService {
           diagnostic: ok ? null : diag.toString(),
         );
       } on TimeoutException catch (e) {
-        diag.writeln('Excepción: TimeoutException — ${e.message}');
+        diag.writeln('Excepción (${sw.elapsedMilliseconds} ms): TimeoutException — ${e.message}');
         lastDiag = diag.toString();
         if (attempt < totalAttempts) {
           await Future.delayed(Duration(milliseconds: 400 * attempt));
@@ -222,10 +257,12 @@ class ApiService {
           diagnostic: lastDiag,
         );
       } on SocketException catch (e) {
-        diag.writeln('Excepción: SocketException — ${e.message}');
+        diag.writeln('Excepción (${sw.elapsedMilliseconds} ms): SocketException — ${e.message}');
         if (e.osError != null) {
           diag.writeln('OSError: ${e.osError!.errorCode} ${e.osError!.message}');
         }
+        if (e.address != null) diag.writeln('Address: ${e.address!.address}');
+        if (e.port != null) diag.writeln('Port: ${e.port}');
         lastDiag = diag.toString();
         if (attempt < totalAttempts) {
           await Future.delayed(Duration(milliseconds: 400 * attempt));
@@ -233,7 +270,7 @@ class ApiService {
         }
         return LoginResult(
           ok: false,
-          error: 'No se pudo conectar a $host. Comprueba la URL del servidor y tu conexión.',
+          error: 'No se pudo conectar a $hostname:$port. Comprueba la URL y tu conexión.',
           diagnostic: lastDiag,
         );
       } on HttpException catch (e) {
