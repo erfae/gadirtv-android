@@ -163,7 +163,7 @@ class ApiService {
       }
     }
 
-    Uri? parsedUri;
+    late Uri parsedUri;
     try {
       parsedUri = Uri.parse(url);
     } catch (e) {
@@ -383,8 +383,7 @@ class ApiService {
     final totalAttempts = _userAgents.length;
     String? lastDiag;
 
-    // Parse host once so we can do DNS lookup separately.
-    Uri? parsedUri;
+    late final Uri parsedUri;
     try {
       parsedUri = Uri.parse(url);
     } catch (e) {
