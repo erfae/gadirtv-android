@@ -45,6 +45,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   String? _fatalError;
   String? _epgNow;    // current programme name
   String? _epgNext;   // next programme name
+  BoxFit _videoFit = BoxFit.contain; // toggled by fullscreen button
+  Duration _lastGoodPosition = Duration.zero;
 
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
@@ -69,7 +71,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     _subs = [
       _player.stream.position.listen((p) {
-        if (mounted) setState(() => _position = p);
+        if (mounted) {
+          setState(() {
+            _position = p;
+            // If playback is progressing, clear any stale "SIN SEÑAL"
+            // that might have surfaced from a transient error event.
+            if (p > _lastGoodPosition) {
+              _lastGoodPosition = p;
+              if (_fatalError != null) _fatalError = null;
+            }
+          });
+        }
       }),
       _player.stream.duration.listen((d) {
         if (mounted) setState(() => _duration = d);
@@ -80,8 +92,23 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _player.stream.completed.listen((c) {
         if (c && mounted) setState(() => _ended = true);
       }),
+      _player.stream.playing.listen((playing) {
+        // A live playing event clears any stale error.
+        if (playing && mounted && _fatalError != null) {
+          setState(() => _fatalError = null);
+        }
+      }),
       _player.stream.error.listen((e) {
-        if (mounted) setState(() => _fatalError = e.toString());
+        // Only surface an error if we don't already have frames.
+        // Xtream streams frequently emit demux warnings that mpv reports
+        // as "error" but recover from immediately.
+        if (!mounted) return;
+        Future.delayed(const Duration(seconds: 4), () {
+          if (!mounted) return;
+          if (_player.state.playing) return; // recovered
+          if (_position > Duration.zero) return; // already showing frames
+          setState(() => _fatalError = e.toString());
+        });
       }),
     ];
 
@@ -197,7 +224,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 Video(
                   controller: _controller,
                   controls: NoVideoControls,
-                  fit: BoxFit.contain,
+                  fit: _videoFit,
                 ),
                 if (_buffering && _fatalError == null)
                   const Center(child: CircularProgressIndicator(color: GtvTheme.red)),
@@ -242,7 +269,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
           const Spacer(),
           _buildCenterControls(),
           const Spacer(),
-          if (!widget.playable.isLive) _buildProgress(),
+          _buildVolumeBar(),
+          if (!widget.playable.isLive) ...[
+            const SizedBox(height: 8),
+            _buildProgress(),
+          ],
         ],
       ),
     );
@@ -325,6 +356,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
               style: TextStyle(color: Colors.white, fontSize: 10, letterSpacing: 1.2, fontWeight: FontWeight.w800),
             ),
           ),
+        const SizedBox(width: 8),
+        IconButton(
+          tooltip: _videoFit == BoxFit.contain ? 'Rellenar pantalla' : 'Ajustar pantalla',
+          onPressed: () {
+            setState(() => _videoFit = _videoFit == BoxFit.contain ? BoxFit.cover : BoxFit.contain);
+            if (_showOverlay) _armAutoHide();
+          },
+          icon: Icon(
+            _videoFit == BoxFit.contain ? Icons.fullscreen_rounded : Icons.fullscreen_exit_rounded,
+            color: Colors.white,
+            size: 28,
+          ),
+        ),
       ],
     );
   }
@@ -350,6 +394,43 @@ class _PlayerScreenState extends State<PlayerScreen> {
             icon: Icons.forward_10_rounded,
             onTap: () => _seekBy(const Duration(seconds: 10)),
           ),
+      ],
+    );
+  }
+
+  Widget _buildVolumeBar() {
+    return Row(
+      children: [
+        Icon(
+          _volume <= 0 ? Icons.volume_off_rounded : (_volume < 60 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
+          color: Colors.white,
+          size: 22,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: Colors.white,
+              inactiveTrackColor: Colors.white24,
+              thumbColor: Colors.white,
+              overlayColor: Colors.white.withOpacity(0.2),
+              trackHeight: 2,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+            ),
+            child: Slider(
+              min: 0,
+              max: 100,
+              value: _volume.clamp(0, 100),
+              onChanged: _setVolume,
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 34,
+          child: Text('${_volume.round()}',
+              textAlign: TextAlign.right,
+              style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        ),
       ],
     );
   }

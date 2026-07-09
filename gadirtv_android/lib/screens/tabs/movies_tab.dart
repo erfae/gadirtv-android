@@ -168,89 +168,30 @@ class _MoviesTabState extends State<MoviesTab> {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-      itemCount: _movies.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (_, i) {
-        final m = _movies[i];
-        return _MovieRow(
-          movie: m,
-          isFavorite: _favoriteIds.contains(m.streamId),
-          onTap: () => widget.onOpen(m),
-          onToggleFavorite: () => _toggleFavorite(m),
-        );
-      },
-    );
-  }
-}
-
-class _MovieRow extends StatelessWidget {
-  const _MovieRow({
-    required this.movie,
-    required this.isFavorite,
-    required this.onTap,
-    required this.onToggleFavorite,
-  });
-
-  final Movie movie;
-  final bool isFavorite;
-  final VoidCallback onTap;
-  final VoidCallback onToggleFavorite;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: GtvTheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: GtvTheme.border),
+    return LayoutBuilder(builder: (context, constraints) {
+      final w = constraints.maxWidth;
+      final cols = w >= 1400 ? 8 : w >= 1100 ? 7 : w >= 850 ? 6 : w >= 640 ? 5 : w >= 480 ? 4 : 3;
+      return GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: cols,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 0.58,
         ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: 60,
-                height: 84,
-                child: movie.icon.isNotEmpty
-                    ? Image.network(movie.icon, fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                            color: GtvTheme.bg,
-                            child: const Icon(Icons.movie_rounded, color: GtvTheme.textDim)))
-                    : Container(color: GtvTheme.bg, child: const Icon(Icons.movie_rounded, color: GtvTheme.textDim)),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(movie.name,
-                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 6),
-                  if (movie.rating > 0)
-                    Row(children: [
-                      const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
-                      const SizedBox(width: 4),
-                      Text(movie.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                    ]),
-                ],
-              ),
-            ),
-            IconButton(
-              icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border, color: isFavorite ? GtvTheme.red : Colors.white54),
-              onPressed: onToggleFavorite,
-            ),
-          ],
-        ),
-      ),
-    );
+        itemCount: _movies.length,
+        itemBuilder: (_, i) {
+          final m = _movies[i];
+          return PosterCard(
+            title: m.name,
+            imageUrl: m.icon,
+            rating: m.rating,
+            onTap: () => widget.onOpen(m),
+            isFavorite: _favoriteIds.contains(m.streamId),
+            onToggleFavorite: () => _toggleFavorite(m),
+          );
+        },
+      );
+    });
   }
 }

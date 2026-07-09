@@ -225,6 +225,34 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ),
           ),
+          // Prev / Next hero navigation buttons
+          Positioned(
+            right: 16,
+            top: 0,
+            bottom: 0,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _HeroArrow(
+                  icon: Icons.chevron_left_rounded,
+                  onTap: () {
+                    _heroTimer?.cancel();
+                    setState(() => _heroIndex = (_heroIndex - 1 + pool.length) % pool.length);
+                    _startHeroRotation();
+                  },
+                ),
+                const SizedBox(width: 8),
+                _HeroArrow(
+                  icon: Icons.chevron_right_rounded,
+                  onTap: () {
+                    _heroTimer?.cancel();
+                    setState(() => _heroIndex = (_heroIndex + 1) % pool.length);
+                    _startHeroRotation();
+                  },
+                ),
+              ],
+            ),
+          ),
           Positioned.fill(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
@@ -394,5 +422,36 @@ class _ResumeItem {
   final String image;
   final double progress;
   final VoidCallback onTap;
+}
+
+class _HeroArrow extends StatelessWidget {
+  const _HeroArrow({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Material(
+        color: Colors.black.withOpacity(0.45),
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white24),
+            ),
+            child: Icon(icon, color: Colors.white, size: 28),
+          ),
+        ),
+      ),
+    );
+  }
 }
 

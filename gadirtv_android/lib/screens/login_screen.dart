@@ -9,7 +9,7 @@ import '../theme.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v0.3.7';
+const String kAppVersionLabel = 'v0.3.8';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -23,7 +23,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _host = TextEditingController(text: 'http://gadir.co:80');
+  final _host = TextEditingController();
   final _user = TextEditingController();
   final _pass = TextEditingController();
   final _name = TextEditingController();

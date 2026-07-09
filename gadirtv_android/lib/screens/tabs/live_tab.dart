@@ -223,22 +223,21 @@ class _ChannelRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: SizedBox(
-                width: 70,
-                height: 45,
-                child: channel.icon.isNotEmpty
-                    ? Image.network(channel.icon, fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Container(
-                            color: GtvTheme.bg, child: const Icon(Icons.live_tv_rounded, color: GtvTheme.textDim, size: 22)))
-                    : Container(color: GtvTheme.bg, child: const Icon(Icons.live_tv_rounded, color: GtvTheme.textDim, size: 22)),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: GtvTheme.bg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: GtvTheme.border),
               ),
+              alignment: Alignment.center,
+              child: const Icon(Icons.live_tv_rounded, color: GtvTheme.red, size: 20),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Text(channel.name,
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis),
             ),
