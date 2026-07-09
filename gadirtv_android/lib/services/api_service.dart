@@ -125,11 +125,15 @@ class ApiService {
   /// Also captures full diagnostic info (URL, HTTP status, response snippet,
   /// exception class) into [LoginResult.diagnostic] so the UI can show it.
   /// User-Agents típicos de apps IPTV — algunos paneles Xtream bloquean UAs
-  /// concretos (VLC, curl…), así que rotamos por intento hasta que uno funcione.
+  /// concretos, así que rotamos por intento hasta que uno funcione.
+  /// El primero (`Xtream-Codes-Api`) es el UA extraído de una app IPTV que
+  /// SÍ funciona con gadir.co (verificado por reverse engineering del APK).
   static const List<String> _userAgents = [
+    'Xtream-Codes-Api',
+    'okhttp/5.0.0-alpha.2',
     'IPTVSmartersPro',
-    'TiviMate/4.5.0',
     'VLC/3.0.20 LibVLC/3.0.20',
+    'TiviMate/4.5.0',
     'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
   ];
 
@@ -147,6 +151,14 @@ class ApiService {
     var url = rawUrl;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'http://$url';
+    }
+    // Auto-fix: if scheme is https:// but port is 80 (plain HTTP), the browser
+    // "upgraded" the URL when pasting. Xtream servers use plain HTTP on port 80.
+    if (url.startsWith('https://')) {
+      final tmp = Uri.tryParse(url);
+      if (tmp != null && tmp.hasPort && tmp.port == 80) {
+        url = url.replaceFirst('https://', 'http://');
+      }
     }
 
     Uri? parsedUri;
@@ -253,6 +265,29 @@ class ApiService {
             'server_protocol': parsedUri.scheme,
           },
           m3uChannels: channels,
+        );
+      } on HandshakeException catch (e) {
+        diag.writeln('Excepción (${sw.elapsedMilliseconds} ms): HandshakeException — ${e.message}');
+        // Common cause: URL was pasted as https:// but server is plain HTTP.
+        // Auto-fall back to http:// and retry immediately (without consuming
+        // this attempt's slot).
+        if (parsedUri.scheme == 'https') {
+          final fixed = url.replaceFirst('https://', 'http://');
+          diag.writeln('Retry con http:// → $fixed');
+          url = fixed;
+          parsedUri = Uri.parse(url);
+          attempt--;
+          continue;
+        }
+        lastDiag = diag.toString();
+        if (attempt < totalAttempts) {
+          await Future.delayed(Duration(seconds: 1 << attempt));
+          continue;
+        }
+        return LoginResult(
+          ok: false,
+          error: 'Error TLS al conectar. La URL puede requerir http:// en vez de https://.',
+          diagnostic: lastDiag,
         );
       } on TimeoutException catch (e) {
         diag.writeln('Excepción (${sw.elapsedMilliseconds} ms): TimeoutException — ${e.message}');
