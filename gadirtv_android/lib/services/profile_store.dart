@@ -16,12 +16,12 @@ class ProfileStore {
   Future<List<Profile>> loadAll() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kProfiles);
-    if (raw == null || raw.isEmpty) return const [];
+    if (raw == null || raw.isEmpty) return <Profile>[];
     try {
       final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
       return list.map(Profile.fromJson).toList();
     } catch (_) {
-      return const [];
+      return <Profile>[];
     }
   }
 
