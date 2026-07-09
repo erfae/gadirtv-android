@@ -70,12 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openSeries(Series s) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => SeriesDetailScreen(profile: _profile!, series: s)),
-    );
-  }
-
   /// Direct movie play — used both by the quick-actions sheet and the
   /// hero "VER AHORA" button which skip the detail screen.
   void _playMovie(Movie m) {

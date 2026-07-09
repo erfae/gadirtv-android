@@ -235,11 +235,11 @@ class _SeriesRow extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 6),
-                  if (series.rating.isNotEmpty)
+                  if (series.rating > 0)
                     Row(children: [
                       const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
                       const SizedBox(width: 4),
-                      Text(series.rating, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      Text(series.rating.toStringAsFixed(1), style: const TextStyle(color: Colors.white70, fontSize: 12)),
                     ]),
                 ],
               ),
