@@ -54,10 +54,10 @@ jobs:
         run: flutter analyze || true
 
       - name: Build DEBUG APK
-        run: flutter build apk --debug
+        run: flutter build apk --debug --target-platform=android-arm64
 
-      - name: Build RELEASE APK (universal + per-ABI splits)
-        run: flutter build apk --release --split-per-abi
+      - name: Build RELEASE APK (arm64-v8a only)
+        run: flutter build apk --release --target-platform=android-arm64
 
       - name: Upload DEBUG APK
         uses: actions/upload-artifact@v4
@@ -66,9 +66,11 @@ jobs:
           path: gadirtv_android/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: warn
 
-      - name: Upload RELEASE APKs
+      - name: Upload RELEASE APK
         uses: actions/upload-artifact@v4
         with:
-          name: GadirTV-release-apks
-          path: gadirtv_android/build/app/outputs/flutter-apk/app-*-release.apk
+          name: GadirTV-release-apk
+          path: |
+            gadirtv_android/build/app/outputs/flutter-apk/app-release.apk
+            gadirtv_android/build/app/outputs/flutter-apk/app-*-release.apk
           if-no-files-found: error

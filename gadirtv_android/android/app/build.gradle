@@ -88,9 +88,10 @@ android {
         abi {
             enable gradle.startParameter.taskNames.any { it.toLowerCase().contains("release") }
             reset()
-            // x86_64 removed — Flutter deprecates Android x86 targets post-3.27
-            // and libmpv is ~15 MB per ABI (was running out of disk on CI).
-            include 'armeabi-v7a', 'arm64-v8a'
+            // Solo arm64-v8a — cubre el 99% de dispositivos Android modernos
+            // (móviles/TV boxes desde 2017) y evita el fallo del CI cuando
+            // Flutter espera múltiples APKs.
+            include 'arm64-v8a'
             universalApk false
         }
     }
