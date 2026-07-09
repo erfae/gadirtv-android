@@ -9,7 +9,7 @@ import '../theme.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v0.3.4';
+const String kAppVersionLabel = 'v0.3.5';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -154,16 +154,44 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    await _store.upsert(profile);
-    await _store.setActive(profile);
+    // Login OK — reset UI right away so we don't stay stuck on "Procesando".
+    setState(() {
+      _progress = 'Guardando perfil…';
+    });
+    try {
+      await _store.upsert(profile).timeout(const Duration(seconds: 5));
+      await _store.setActive(profile).timeout(const Duration(seconds: 5));
 
-    // Cache M3U channels so home screen can render them without re-downloading.
-    if (profile.isM3U && res.m3uChannels != null) {
-      await M3UCache.save(profile, res.m3uChannels!);
+      // Cache M3U channels so home screen can render them without re-downloading.
+      if (profile.isM3U && res.m3uChannels != null) {
+        setState(() => _progress = 'Guardando ${res.m3uChannels!.length} canales…');
+        await M3UCache.save(profile, res.m3uChannels!)
+            .timeout(const Duration(seconds: 8));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _progress = null;
+        _error = 'Login OK pero falló guardar perfil: $e';
+        _diagnostic = 'Error tras login (paso guardar): ${e.runtimeType} — $e';
+      });
+      return;
     }
 
     if (!mounted) return;
-    context.go('/home');
+    setState(() => _progress = 'Abriendo pantalla principal…');
+    try {
+      context.go('/home');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _progress = null;
+        _error = 'Error navegando: $e';
+        _diagnostic = 'Navigation error: ${e.runtimeType} — $e';
+      });
+    }
   }
 
   @override
