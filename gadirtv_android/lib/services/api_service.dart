@@ -126,17 +126,10 @@ class ApiService {
   ///
   /// Also captures full diagnostic info (URL, HTTP status, response snippet,
   /// exception class) into [LoginResult.diagnostic] so the UI can show it.
-  /// User-Agents típicos de apps IPTV — algunos paneles Xtream bloquean UAs
-  /// concretos, así que rotamos por intento hasta que uno funcione.
-  /// El primero (`Xtream-Codes-Api`) es el UA extraído de una app IPTV que
-  /// SÍ funciona con gadir.co (verificado por reverse engineering del APK).
   static const List<String> _userAgents = [
     'Xtream-Codes-Api',
     'okhttp/5.0.0-alpha.2',
     'IPTVSmartersPro',
-    'VLC/3.0.20 LibVLC/3.0.20',
-    'TiviMate/4.5.0',
-    'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
   ];
 
   /// Downloads an M3U playlist and returns its raw text. Uses the same 4-UA
@@ -212,7 +205,7 @@ class ApiService {
         if (streamed.statusCode >= 500) {
           lastDiag = diag.toString();
           if (attempt < totalAttempts) {
-            await Future.delayed(Duration(seconds: 1 << attempt));
+            await Future.delayed(Duration(milliseconds: 500 * attempt));
             continue;
           }
           return LoginResult(
@@ -283,7 +276,7 @@ class ApiService {
         }
         lastDiag = diag.toString();
         if (attempt < totalAttempts) {
-          await Future.delayed(Duration(seconds: 1 << attempt));
+          await Future.delayed(Duration(milliseconds: 500 * attempt));
           continue;
         }
         return LoginResult(
@@ -295,7 +288,7 @@ class ApiService {
         diag.writeln('Excepción (${sw.elapsedMilliseconds} ms): TimeoutException — ${e.message}');
         lastDiag = diag.toString();
         if (attempt < totalAttempts) {
-          await Future.delayed(Duration(seconds: 1 << attempt));
+          await Future.delayed(Duration(milliseconds: 500 * attempt));
           continue;
         }
         return LoginResult(
@@ -307,7 +300,7 @@ class ApiService {
         diag.writeln('Excepción (${sw.elapsedMilliseconds} ms): SocketException — ${e.message}');
         lastDiag = diag.toString();
         if (attempt < totalAttempts) {
-          await Future.delayed(Duration(seconds: 1 << attempt));
+          await Future.delayed(Duration(milliseconds: 500 * attempt));
           continue;
         }
         return LoginResult(
@@ -448,7 +441,7 @@ class ApiService {
         if (streamed.statusCode >= 500) {
           lastDiag = diag.toString();
           if (attempt < totalAttempts) {
-            final backoff = Duration(seconds: 1 << attempt);
+            final backoff = Duration(milliseconds: 500 * attempt);
             await Future.delayed(backoff);
             continue;
           }
@@ -506,7 +499,7 @@ class ApiService {
         diag.writeln('Excepción (${sw.elapsedMilliseconds} ms): TimeoutException — ${e.message}');
         lastDiag = diag.toString();
         if (attempt < totalAttempts) {
-          await Future.delayed(Duration(seconds: 1 << attempt));
+          await Future.delayed(Duration(milliseconds: 500 * attempt));
           continue;
         }
         return LoginResult(
@@ -523,7 +516,7 @@ class ApiService {
         if (e.port != null) diag.writeln('Port: ${e.port}');
         lastDiag = diag.toString();
         if (attempt < totalAttempts) {
-          await Future.delayed(Duration(seconds: 1 << attempt));
+          await Future.delayed(Duration(milliseconds: 500 * attempt));
           continue;
         }
         return LoginResult(
@@ -535,7 +528,7 @@ class ApiService {
         diag.writeln('Excepción: HttpException — ${e.message}');
         lastDiag = diag.toString();
         if (attempt < totalAttempts) {
-          await Future.delayed(Duration(seconds: 1 << attempt));
+          await Future.delayed(Duration(milliseconds: 500 * attempt));
           continue;
         }
         return LoginResult(
