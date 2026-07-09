@@ -138,3 +138,5 @@ electron/GadirTV-Setup-1.13.exe
 credentials.json
 *.key
 .credentials
+frontend/public/downloads/GadirTV-Setup-1.13.exe
+frontend/public/downloads/GadirTV-Portable-v1.13.zip
