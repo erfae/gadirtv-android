@@ -5,6 +5,8 @@ import '../models/media.dart';
 import '../models/playable.dart';
 import '../models/profile.dart';
 import '../services/api_service.dart';
+import '../services/backup_service.dart';
+import '../services/m3u_cache.dart';
 import '../services/profile_store.dart';
 import '../theme.dart';
 import '../widgets/quick_actions_sheet.dart';
@@ -12,7 +14,6 @@ import 'movie_detail_screen.dart';
 import 'player_screen.dart';
 import 'search_screen.dart';
 import 'series_detail_screen.dart';
-import '../services/backup_service.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/live_tab.dart';
 import 'tabs/movies_tab.dart';
@@ -286,6 +287,12 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator(color: GtvTheme.red)));
     }
 
+    // M3U mode uses a completely different data source — no Xtream API,
+    // no categories, no EPG. Render a dedicated placeholder screen for now.
+    if (p.isM3U) {
+      return _buildM3UScreen(p);
+    }
+
     final tabs = <Widget>[
       HomeTab(profile: p, onOpenMovie: _openMovie, onOpenSeries: _openSeries),
       LiveTab(profile: p, onPlay: _playChannel),
@@ -412,6 +419,38 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // M3U mode — dedicated screen (flat channel list, no categories)
+  // ═══════════════════════════════════════════════════════════════
+  Widget _buildM3UScreen(Profile p) {
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildTopBar(p),
+            Expanded(child: _M3UChannelList(profile: p, onPlay: _playM3UChannel)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _playM3UChannel(Map<String, dynamic> ch) async {
+    final url = ch['url'] as String? ?? '';
+    if (url.isEmpty) return;
+    final name = ch['name'] as String? ?? 'Canal';
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => PlayerScreen(
+        playable: Playable(
+          kind: 'live',
+          id: url.hashCode.toString(),
+          title: name,
+          url: url,
+        ),
+      ),
+    ));
+  }
 }
 
 class _NavItem {
@@ -479,3 +518,195 @@ class _NavButtonState extends State<_NavButton> {
     );
   }
 }
+
+/// Flat list of channels from a parsed M3U playlist, grouped by `group-title`.
+class _M3UChannelList extends StatefulWidget {
+  const _M3UChannelList({required this.profile, required this.onPlay});
+
+  final Profile profile;
+  final Future<void> Function(Map<String, dynamic>) onPlay;
+
+  @override
+  State<_M3UChannelList> createState() => _M3UChannelListState();
+}
+
+class _M3UChannelListState extends State<_M3UChannelList> {
+  List<Map<String, dynamic>> _all = [];
+  Map<String, List<Map<String, dynamic>>> _byGroup = {};
+  String _query = '';
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final list = await M3UCache.load(widget.profile);
+    if (!mounted) return;
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final ch in list) {
+      final g = (ch['group'] as String?)?.trim().isNotEmpty == true
+          ? ch['group'] as String
+          : 'General';
+      grouped.putIfAbsent(g, () => []).add(ch);
+    }
+    setState(() {
+      _all = list;
+      _byGroup = grouped;
+      _loading = false;
+    });
+  }
+
+  List<Map<String, dynamic>> get _filtered {
+    if (_query.isEmpty) return _all;
+    final q = _query.toLowerCase();
+    return _all
+        .where((ch) => (ch['name'] as String? ?? '').toLowerCase().contains(q))
+        .toList(growable: false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(color: GtvTheme.red));
+    }
+    if (_all.isEmpty) {
+      return const Center(
+        child: Text(
+          'No hay canales en la playlist',
+          style: TextStyle(color: GtvTheme.textDim),
+        ),
+      );
+    }
+
+    final filtered = _filtered;
+
+    return Column(
+      children: [
+        // Search bar + counter
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: (v) => setState(() => _query = v.trim()),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar canal…',
+                    prefixIcon: const Icon(Icons.search_rounded, color: GtvTheme.textDim, size: 20),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    filled: true,
+                    fillColor: GtvTheme.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(999),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: GtvTheme.red.withOpacity(0.12),
+                  border: Border.all(color: GtvTheme.red.withOpacity(0.35)),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '${filtered.length} / ${_all.length}',
+                  style: const TextStyle(color: GtvTheme.redHi, fontSize: 11, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _query.isNotEmpty
+              ? _flatList(filtered)
+              : _groupedList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _groupedList() {
+    final entries = _byGroup.entries.toList()
+      ..sort((a, b) => a.key.toLowerCase().compareTo(b.key.toLowerCase()));
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 24),
+      itemCount: entries.length,
+      itemBuilder: (_, i) {
+        final group = entries[i];
+        return ExpansionTile(
+          title: Text(
+            group.key,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          ),
+          subtitle: Text(
+            '${group.value.length} canales',
+            style: const TextStyle(color: GtvTheme.textDim, fontSize: 12),
+          ),
+          collapsedIconColor: Colors.white54,
+          iconColor: Colors.white70,
+          children: [
+            for (final ch in group.value) _channelRow(ch),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _flatList(List<Map<String, dynamic>> items) {
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const Divider(color: GtvTheme.border, height: 1),
+      itemBuilder: (_, i) => _channelRow(items[i]),
+    );
+  }
+
+  Widget _channelRow(Map<String, dynamic> ch) {
+    final logo = ch['tvgLogo'] as String? ?? '';
+    return ListTile(
+      leading: SizedBox(
+        width: 44,
+        height: 44,
+        child: logo.isNotEmpty
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  logo,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const _ChannelFallback(),
+                ),
+              )
+            : const _ChannelFallback(),
+      ),
+      title: Text(
+        ch['name'] as String? ?? 'Canal',
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: const Icon(Icons.play_arrow_rounded, color: GtvTheme.red),
+      onTap: () => widget.onPlay(ch),
+    );
+  }
+}
+
+class _ChannelFallback extends StatelessWidget {
+  const _ChannelFallback();
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: GtvTheme.surface,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(Icons.live_tv_rounded, color: GtvTheme.textDim, size: 22),
+      );
+}
+

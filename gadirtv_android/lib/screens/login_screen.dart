@@ -3,12 +3,13 @@ import 'package:go_router/go_router.dart';
 
 import '../models/profile.dart';
 import '../services/api_service.dart';
+import '../services/m3u_cache.dart';
 import '../services/profile_store.dart';
 import '../theme.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v0.2.8';
+const String kAppVersionLabel = 'v0.2.9';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -140,6 +141,11 @@ class _LoginScreenState extends State<LoginScreen> {
     await _store.upsert(profile);
     await _store.setActive(profile);
 
+    // Cache M3U channels so home screen can render them without re-downloading.
+    if (profile.isM3U && res.m3uChannels != null) {
+      await M3UCache.save(profile, res.m3uChannels!);
+    }
+
     if (!mounted) return;
     context.go('/home');
   }
@@ -169,10 +175,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Conecta tu cuenta Xtream Codes',
+                Text(
+                  _mode == 'm3u'
+                      ? 'Conecta con una URL M3U/M3U8'
+                      : 'Conecta tu cuenta Xtream Codes',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: GtvTheme.textDim),
+                  style: const TextStyle(fontSize: 14, color: GtvTheme.textDim),
                 ),
                 const SizedBox(height: 6),
                 Container(
@@ -305,6 +313,126 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Field groups (rendered conditionally by mode) ────────────
+  List<Widget> _xtreamFields() => [
+        TextField(
+          controller: _host,
+          keyboardType: TextInputType.url,
+          enabled: !_busy,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Servidor (http://gadir.co:80)',
+            helperText: 'Compatible con cualquier servidor Xtream Codes. '
+                'Cambia esta URL si usas otro proveedor.',
+            helperMaxLines: 2,
+            helperStyle: TextStyle(color: GtvTheme.textDim, fontSize: 11),
+          ),
+        ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _user,
+          autocorrect: false,
+          enableSuggestions: false,
+          enabled: !_busy,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(hintText: 'Usuario'),
+        ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _pass,
+          obscureText: !_passVisible,
+          autocorrect: false,
+          enableSuggestions: false,
+          enabled: !_busy,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Contraseña',
+            suffixIcon: IconButton(
+              icon: Icon(
+                _passVisible ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                color: GtvTheme.textDim,
+              ),
+              tooltip: _passVisible ? 'Ocultar contraseña' : 'Mostrar contraseña',
+              onPressed: _busy ? null : () => setState(() => _passVisible = !_passVisible),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _name,
+          enabled: !_busy,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(hintText: 'Nombre del perfil (opcional)'),
+        ),
+      ];
+
+  List<Widget> _m3uFields() => [
+        TextField(
+          controller: _m3uUrl,
+          keyboardType: TextInputType.url,
+          enabled: !_busy,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'URL M3U (http://…/get.php?…&type=m3u_plus)',
+            helperText: 'Pega la URL completa de tu playlist M3U/M3U8. '
+                'Compatible con cualquier proveedor que ofrezca link M3U.',
+            helperMaxLines: 2,
+            helperStyle: TextStyle(color: GtvTheme.textDim, fontSize: 11),
+          ),
+        ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _name,
+          enabled: !_busy,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(hintText: 'Nombre del perfil (opcional)'),
+        ),
+      ];
+}
+
+/// Segmented control chip for Xtream / M3U mode toggle.
+class _ModeChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _ModeChip({
+    required this.label,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? GtvTheme.red : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: selected
+              ? [BoxShadow(color: GtvTheme.red.withOpacity(0.45), blurRadius: 12, spreadRadius: 1)]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : Colors.white70,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            letterSpacing: 0.3,
           ),
         ),
       ),
