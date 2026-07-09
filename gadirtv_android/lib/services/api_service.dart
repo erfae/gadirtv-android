@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:http/http.dart' as http;
 
 import '../models/profile.dart';
+import 'http_factory.dart';
 
 /// Thin wrapper around Xtream Codes' `player_api.php`.
 ///
