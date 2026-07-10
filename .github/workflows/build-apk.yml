@@ -50,8 +50,8 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build RELEASE APK (arm + arm64 — cubre móviles Android modernos y TV boxes 32/64 bits)
-        run: flutter build apk --release --target-platform=android-arm,android-arm64
+      - name: Build RELEASE APK universal (arm + arm64 + x86_64 — cubre móviles, TV boxes, Fire Stick y Android TV)
+        run: flutter build apk --release --target-platform=android-arm,android-arm64,android-x64
 
       - name: Upload RELEASE APK
         uses: actions/upload-artifact@v4
