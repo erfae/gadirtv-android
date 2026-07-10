@@ -9,7 +9,7 @@ import '../theme.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v0.3.8';
+const String kAppVersionLabel = 'v0.3.9';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -371,9 +371,9 @@ class _LoginScreenState extends State<LoginScreen> {
           enabled: !_busy,
           style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
-            hintText: 'Servidor (http://gadir.co:80)',
+            hintText: 'Servidor (http://tu-servidor.com:8080)',
             helperText: 'Compatible con cualquier servidor Xtream Codes. '
-                'Cambia esta URL si usas otro proveedor.',
+                'Introduce la URL de tu proveedor.',
             helperMaxLines: 2,
             helperStyle: TextStyle(color: GtvTheme.textDim, fontSize: 11),
           ),

@@ -5,7 +5,7 @@ import '../../models/profile.dart';
 import '../../services/api_service.dart';
 import '../../services/favorites_store.dart';
 import '../../theme.dart';
-import '../../widgets/category_strip.dart';
+import '../../widgets/category_list_rail.dart';
 import '../../widgets/poster_card.dart';
 
 /// Movies (VOD) tab — categories on top, portrait poster grid below.
@@ -139,11 +139,17 @@ class _MoviesTabState extends State<MoviesTab> {
       ..._categories.map((c) => (c.id, c.name)),
     ];
 
-    return Column(
+    return Row(
       children: [
-        const SizedBox(height: 12),
-        CategoryStrip(labels: chips, selectedId: _selected, onSelected: _load),
-        const SizedBox(height: 16),
+        SizedBox(
+          width: 150,
+          child: CategoryListRail(
+            categories: chips,
+            selectedId: _selected,
+            onSelected: _load,
+          ),
+        ),
+        const VerticalDivider(width: 1, color: GtvTheme.border),
         Expanded(child: _buildGrid()),
       ],
     );
