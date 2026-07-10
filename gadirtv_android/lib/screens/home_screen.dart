@@ -254,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final tabs = <Widget>[
       HomeTab(profile: p, onOpenMovie: _openMovie, onOpenSeries: _openSeries),
-      LiveTab(profile: p, onPlay: _playChannel),
+      LiveTab(profile: p, onPlay: _playChannel, active: _tab == 1),
       MoviesTab(profile: p, onOpen: _openMovie),
       SeriesTab(profile: p, onOpen: _openSeries),
     ];

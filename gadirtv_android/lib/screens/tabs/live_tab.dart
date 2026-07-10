@@ -22,10 +22,12 @@ class LiveTab extends StatefulWidget {
     super.key,
     required this.profile,
     required this.onPlay,
+    this.active = true,
   });
 
   final Profile profile;
   final ValueChanged<LiveChannel> onPlay;
+  final bool active;
 
   @override
   State<LiveTab> createState() => _LiveTabState();
@@ -135,6 +137,18 @@ class _LiveTabState extends State<LiveTab> {
     });
   }
 
+  @override
+  void didUpdateWidget(covariant LiveTab old) {
+    super.didUpdateWidget(old);
+    // Pause the mini player whenever this tab stops being the active one
+    // in the parent IndexedStack.
+    if (old.active && !widget.active) {
+      _miniKey.currentState?.pause();
+    }
+  }
+
+  final _miniKey = GlobalKey<_MiniPlayerState>();
+
   Future<void> _preview(LiveChannel c) async {
     setState(() {
       _current = c;
@@ -163,8 +177,9 @@ class _LiveTabState extends State<LiveTab> {
     }
   }
 
-  void _fullscreen() {
+  Future<void> _fullscreen() async {
     if (_current == null) return;
+    await _miniKey.currentState?.pause();
     widget.onPlay(_current!);
   }
 
@@ -186,14 +201,60 @@ class _LiveTabState extends State<LiveTab> {
             kind: 'live', streamId: _current!.streamId, ext: 'ts');
 
     return LayoutBuilder(builder: (context, constraints) {
-      // Cap mini player height to 35% of tab height so that on landscape/TV
-      // the channels list still fits underneath. Fall back to natural
-      // 16:9 aspect for portrait phones where the width is smaller.
+      final wide = constraints.maxWidth >= 700;
+
+      final miniBox = _MiniPlayer(
+        key: _miniKey,
+        streamUrl: streamUrl,
+        title: _current?.name ?? 'Selecciona un canal para previsualizar',
+        onFullscreen: _fullscreen,
+      );
+      final epgBox = _EpgBar(now: _epgNow, next: _epgNext);
+
+      if (wide) {
+        // ── 3 columns: Groups | Channels | (Mini + EPG) ──
+        final rightW = constraints.maxWidth * 0.36; // ~360-460 px on TV
+        final miniH = rightW * 9 / 16;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: 170,
+              child: CategoryListRail(
+                categories: categories,
+                selectedId: _selected,
+                onSelected: _loadChannels,
+              ),
+            ),
+            const VerticalDivider(width: 1, color: GtvTheme.border),
+            Expanded(child: _buildChannels()),
+            const VerticalDivider(width: 1, color: GtvTheme.border),
+            SizedBox(
+              width: rightW,
+              child: Column(
+                children: [
+                  Container(
+                    color: Colors.black,
+                    height: miniH,
+                    width: rightW,
+                    child: miniBox,
+                  ),
+                  const Divider(height: 1, color: GtvTheme.border),
+                  epgBox,
+                  const Divider(height: 1, color: GtvTheme.border),
+                  const Expanded(child: SizedBox.shrink()),
+                ],
+              ),
+            ),
+          ],
+        );
+      }
+
+      // ── Narrow (phone portrait): mini on top, categories+channels below ──
       final natural = constraints.maxWidth * 9 / 16;
       final capped = constraints.maxHeight * 0.35;
       final h = natural > capped ? capped : natural;
       final w = h * 16 / 9;
-
       return Column(
         children: [
           Container(
@@ -203,15 +264,10 @@ class _LiveTabState extends State<LiveTab> {
             child: SizedBox(
               width: w > constraints.maxWidth ? constraints.maxWidth : w,
               height: h,
-              child: _MiniPlayer(
-                key: ValueKey(_current?.streamId ?? -1),
-                streamUrl: streamUrl,
-                title: _current?.name ?? 'Selecciona un canal para previsualizar',
-                onFullscreen: _fullscreen,
-              ),
+              child: miniBox,
             ),
           ),
-          _EpgBar(now: _epgNow, next: _epgNext),
+          epgBox,
           const Divider(height: 1, color: GtvTheme.border),
           Expanded(
             child: Row(
@@ -291,15 +347,17 @@ class _MiniPlayer extends StatefulWidget {
   State<_MiniPlayer> createState() => _MiniPlayerState();
 }
 
-class _MiniPlayerState extends State<_MiniPlayer> {
+class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   late final Player _player = Player();
   late final VideoController _controller = VideoController(_player);
   bool _muted = false;
   bool _buffering = false;
+  String? _openedUrl;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _player.stream.buffering.listen((b) {
       if (mounted) setState(() => _buffering = b);
     });
@@ -312,17 +370,33 @@ class _MiniPlayerState extends State<_MiniPlayer> {
     if (old.streamUrl != widget.streamUrl) _open();
   }
 
-  Future<void> _open() async {
-    if (widget.streamUrl == null || widget.streamUrl!.isEmpty) {
-      await _player.stop();
-      return;
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Pause when the app goes to background so audio doesn't keep leaking
+    // out of the mini player.
+    if (state != AppLifecycleState.resumed) {
+      _player.pause();
     }
+  }
+
+  Future<void> _open() async {
+    // Always stop the previous stream first — otherwise media_kit can end
+    // up with two decoders emitting audio at the same time when the user
+    // taps channels quickly.
+    await _player.stop();
+    _openedUrl = widget.streamUrl;
+    if (widget.streamUrl == null || widget.streamUrl!.isEmpty) return;
     await _player.open(Media(widget.streamUrl!), play: true);
     await _player.setVolume(_muted ? 0 : 100);
   }
 
+  /// Called by the parent tab when navigating to full-screen playback so
+  /// the mini stops before the big player starts.
+  Future<void> pause() => _player.stop();
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _player.dispose();
     super.dispose();
   }
