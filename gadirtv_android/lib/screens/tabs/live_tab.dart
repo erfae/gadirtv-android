@@ -185,34 +185,53 @@ class _LiveTabState extends State<LiveTab> {
         : _api.streamUrl(widget.profile,
             kind: 'live', streamId: _current!.streamId, ext: 'ts');
 
-    return Column(
-      children: [
-        _MiniPlayer(
-          key: ValueKey(_current?.streamId ?? -1),
-          streamUrl: streamUrl,
-          title: _current?.name ?? 'Selecciona un canal para previsualizar',
-          onFullscreen: _fullscreen,
-        ),
-        _EpgBar(now: _epgNow, next: _epgNext),
-        const Divider(height: 1, color: GtvTheme.border),
-        Expanded(
-          child: Row(
-            children: [
-              SizedBox(
-                width: 150,
-                child: CategoryListRail(
-                  categories: categories,
-                  selectedId: _selected,
-                  onSelected: _loadChannels,
-                ),
+    return LayoutBuilder(builder: (context, constraints) {
+      // Cap mini player height to 35% of tab height so that on landscape/TV
+      // the channels list still fits underneath. Fall back to natural
+      // 16:9 aspect for portrait phones where the width is smaller.
+      final natural = constraints.maxWidth * 9 / 16;
+      final capped = constraints.maxHeight * 0.35;
+      final h = natural > capped ? capped : natural;
+      final w = h * 16 / 9;
+
+      return Column(
+        children: [
+          Container(
+            width: constraints.maxWidth,
+            alignment: Alignment.center,
+            color: Colors.black,
+            child: SizedBox(
+              width: w > constraints.maxWidth ? constraints.maxWidth : w,
+              height: h,
+              child: _MiniPlayer(
+                key: ValueKey(_current?.streamId ?? -1),
+                streamUrl: streamUrl,
+                title: _current?.name ?? 'Selecciona un canal para previsualizar',
+                onFullscreen: _fullscreen,
               ),
-              const VerticalDivider(width: 1, color: GtvTheme.border),
-              Expanded(child: _buildChannels()),
-            ],
+            ),
           ),
-        ),
-      ],
-    );
+          _EpgBar(now: _epgNow, next: _epgNext),
+          const Divider(height: 1, color: GtvTheme.border),
+          Expanded(
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 150,
+                  child: CategoryListRail(
+                    categories: categories,
+                    selectedId: _selected,
+                    onSelected: _loadChannels,
+                  ),
+                ),
+                const VerticalDivider(width: 1, color: GtvTheme.border),
+                Expanded(child: _buildChannels()),
+              ],
+            ),
+          ),
+        ],
+      );
+    });
   }
 
   Widget _buildChannels() {
@@ -315,13 +334,11 @@ class _MiniPlayerState extends State<_MiniPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: Container(
-        color: Colors.black,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
+    return Container(
+      color: Colors.black,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
             if (widget.streamUrl != null)
               Video(
                 controller: _controller,
@@ -378,7 +395,6 @@ class _MiniPlayerState extends State<_MiniPlayer> {
             ),
           ],
         ),
-      ),
     );
   }
 }

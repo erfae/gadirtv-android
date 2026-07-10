@@ -102,54 +102,25 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final genre = (info['genre'] ?? '').toString();
     final year = (info['releasedate'] ?? info['year'] ?? '').toString();
     final rating = widget.movie.rating;
-    final backdrop = _firstBackdrop(info);
     final hasResume = _resumeEntry != null && !_resumeEntry!.progress.isNaN;
 
     return Scaffold(
       backgroundColor: GtvTheme.bg,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            pinned: true,
-            expandedHeight: 260,
-            backgroundColor: GtvTheme.bg,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            title: Text(widget.movie.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 16)),
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(fit: StackFit.expand, children: [
-                if (backdrop.isNotEmpty)
-                  CachedNetworkImage(imageUrl: backdrop, fit: BoxFit.cover)
-                else if (widget.movie.icon.isNotEmpty)
-                  CachedNetworkImage(imageUrl: widget.movie.icon, fit: BoxFit.cover)
-                else
-                  Container(color: GtvTheme.surface),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.55),
-                        Colors.transparent,
-                        GtvTheme.bg,
-                      ],
-                      stops: const [0, 0.4, 1],
-                    ),
-                  ),
-                ),
-              ]),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-              child: Column(
+      appBar: AppBar(
+        backgroundColor: GtvTheme.bg,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(widget.movie.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white, fontSize: 16)),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
@@ -245,19 +216,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   ],
                 ],
               ),
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  String _firstBackdrop(Map<String, dynamic> info) {
-    final list = info['backdrop_path'];
-    if (list is List && list.isNotEmpty) return list.first.toString();
-    if (list is String) return list;
-    return '';
-  }
+  String _firstBackdrop(Map<String, dynamic> info) => '';
 
   Widget _stars(double rating) {
     return Row(mainAxisSize: MainAxisSize.min, children: List.generate(5, (i) {
