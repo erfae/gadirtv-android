@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -369,7 +370,17 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   @override
   void didUpdateWidget(covariant _MiniPlayer old) {
     super.didUpdateWidget(old);
-    if (old.streamUrl != widget.streamUrl) _open();
+    if (old.streamUrl != widget.streamUrl) _scheduleOpen();
+  }
+
+  Timer? _debounce;
+
+  /// Debounce rapid channel taps — otherwise every tap queues an
+  /// [_open] which each stop/start mpv, and 5 taps in a second can lock
+  /// the native audio thread on some devices.
+  void _scheduleOpen() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), _open);
   }
 
   @override
@@ -387,16 +398,23 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
     if (_opening) return;
     _opening = true;
     try {
-      await _player.stop();
+      await _player.stop().timeout(const Duration(seconds: 3),
+          onTimeout: () {});
       _openedUrl = widget.streamUrl;
       if (widget.streamUrl == null || widget.streamUrl!.isEmpty) return;
-      await _player.open(
-        Media(widget.streamUrl!, httpHeaders: {
-          'User-Agent': ApiService.activeUserAgent,
-          'Connection': 'keep-alive',
-        }),
-        play: true,
-      );
+      await _player
+          .open(
+            Media(widget.streamUrl!, httpHeaders: {
+              'User-Agent': ApiService.activeUserAgent,
+              'Connection': 'keep-alive',
+            }),
+            play: true,
+          )
+          .timeout(const Duration(seconds: 8), onTimeout: () {
+        // The stream is probably dead. Rather than hang the app we
+        // just leave the mini idle; the fullscreen player will show the
+        // SIN SEÑAL card if the user actually opens it.
+      });
       await _player.setVolume(_muted ? 0 : 100);
     } catch (_) {
       // Swallow — the parent will restart on next channel tap.
@@ -425,6 +443,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _player.dispose();
     super.dispose();
