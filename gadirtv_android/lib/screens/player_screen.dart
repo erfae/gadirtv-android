@@ -181,10 +181,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _armNoSignalTimer() {
     _noSignalTimer?.cancel();
+    // Snapshot the current position; if it hasn't meaningfully advanced
+    // in 10 s the stream is stuck / buffering forever → show the test
+    // card. Just checking `_position <= 0` is not enough because mpv
+    // reports a few hundred ms of position while priming its demuxer,
+    // even on dead streams.
+    final startPos = _position;
     _noSignalTimer = Timer(const Duration(seconds: 10), () {
       if (!mounted) return;
-      // If we still haven't seen any frames after 10 s, show the test-card.
-      if (_position <= Duration.zero) {
+      if (_position - startPos < const Duration(seconds: 1)) {
         setState(() => _noSignal = true);
       }
     });
