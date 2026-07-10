@@ -1,4 +1,10 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Manifest override — cronet_http declares minSdk 24 but the app
+         gracefully falls back to IOClient on older devices, so we allow
+         the merger to lower it here. -->
+    <uses-sdk tools:overrideLibrary="io.flutter.plugins.cronet_http" />
 
     <!-- IPTV streams travel through HTTP + need internet -->
     <uses-permission android:name="android.permission.INTERNET" />
