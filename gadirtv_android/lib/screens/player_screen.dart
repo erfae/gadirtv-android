@@ -238,6 +238,27 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     child: _buildOverlay(),
                   ),
                 ),
+                // Always-tappable back button (survives IgnorePointer hide).
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: SafeArea(
+                    child: Material(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        onTap: () => Navigator.of(context).pop(),
+                        customBorder: const CircleBorder(),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
