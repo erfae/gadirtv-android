@@ -71,6 +71,13 @@ android {
                 if (keystoreProperties['storeType']) {
                     storeType keystoreProperties['storeType']
                 }
+                // Enable legacy signing schemes (v1 JAR + v2 APK signature).
+                // Some Sony Bravia and other older Android TV firmwares reject
+                // packages that only carry the modern v3/v4 signatures.
+                v1SigningEnabled true
+                v2SigningEnabled true
+                v3SigningEnabled true
+                v4SigningEnabled false
             }
         }
     }
