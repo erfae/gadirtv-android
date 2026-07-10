@@ -40,7 +40,7 @@ class ApiService {
   /// The login flow rotates through [_userAgents] until it finds one the
   /// server accepts and updates this value; subsequent API calls reuse it
   /// so a working handshake carries through the whole session.
-  static String _activeUserAgent = 'IPTVSmartersPlayer';
+  static String _activeUserAgent = 'XCIPTV';
 
   final Dio _dio;
 
@@ -147,15 +147,20 @@ class ApiService {
   /// Also captures full diagnostic info (URL, HTTP status, response snippet,
   /// exception class) into [LoginResult.diagnostic] so the UI can show it.
   static const List<String> _userAgents = [
-    // 1. Most compatible with strict Xtream servers (whitelisted by default).
+    // 1. XCIPTV — confirmed working with your provider.
+    'XCIPTV',
+    // 2. OkHttp — the HTTP client XCIPTV uses under the hood (some servers
+    //    key on this instead of the app-level User-Agent).
+    'okhttp/4.9.3',
+    // 3. IPTVSmarters — widely whitelisted by Xtream panels.
     'IPTVSmartersPlayer',
-    // 2. Legacy VLC (works with lenient servers, kept for fallback).
+    // 4. Legacy VLC (kept as fallback for lenient servers).
     'VLC/3.0.20 LibVLC/3.0.20',
-    // 3. TiviMate — widely accepted, especially on premium panels.
+    // 5. TiviMate — accepted on many premium panels.
     'TiviMate/4.6.0 (Linux;Android 12)',
-    // 4. Generic ffmpeg — many stream engines identify this way.
+    // 6. Generic ffmpeg.
     'Lavf/59.27.100',
-    // 5. Generic Android WebView as last resort.
+    // 7. Generic Android WebView as last resort.
     'Mozilla/5.0 (Linux; Android 12; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
   ];
 
