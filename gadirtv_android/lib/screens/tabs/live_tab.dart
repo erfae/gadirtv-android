@@ -213,7 +213,7 @@ class _LiveTabState extends State<LiveTab> {
 
       if (wide) {
         // ── 3 columns: Groups | Channels | (Mini + EPG) ──
-        final rightW = constraints.maxWidth * 0.36; // ~360-460 px on TV
+        final rightW = constraints.maxWidth * 0.44; // bigger preview panel
         final miniH = rightW * 9 / 16;
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -386,13 +386,33 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
     await _player.stop();
     _openedUrl = widget.streamUrl;
     if (widget.streamUrl == null || widget.streamUrl!.isEmpty) return;
-    await _player.open(Media(widget.streamUrl!), play: true);
+    await _player.open(
+      Media(widget.streamUrl!, httpHeaders: {
+        'User-Agent': ApiService.activeUserAgent,
+        'Connection': 'keep-alive',
+      }),
+      play: true,
+    );
     await _player.setVolume(_muted ? 0 : 100);
   }
 
   /// Called by the parent tab when navigating to full-screen playback so
-  /// the mini stops before the big player starts.
-  Future<void> pause() => _player.stop();
+  /// the mini stops before the big player starts. We silence the audio
+  /// track first (instant) and then stop the underlying mpv player,
+  /// because `stop()` alone can leave the audio buffer draining for a
+  /// few hundred ms — long enough to overlap with the full-screen player.
+  Future<void> pause() async {
+    try {
+      await _player.setVolume(0);
+    } catch (_) {}
+    try {
+      await _player.pause();
+    } catch (_) {}
+    try {
+      await _player.stop();
+    } catch (_) {}
+    _openedUrl = null;
+  }
 
   @override
   void dispose() {
@@ -408,11 +428,13 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
+    return GestureDetector(
+      onTap: widget.streamUrl != null ? widget.onFullscreen : null,
+      child: Container(
+        color: Colors.black,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
             if (widget.streamUrl != null)
               Video(
                 controller: _controller,
@@ -469,6 +491,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
             ),
           ],
         ),
+      ),
     );
   }
 }

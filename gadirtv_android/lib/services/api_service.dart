@@ -42,6 +42,12 @@ class ApiService {
   /// so a working handshake carries through the whole session.
   static String _activeUserAgent = 'XCIPTV';
 
+  /// Public getter used by the player to pass the same User-Agent that
+  /// authenticated the login through to the streaming endpoints.
+  /// Servers that reject VLC/mpv default UAs generally accept whichever
+  /// UA already passed authentication.
+  static String get activeUserAgent => _activeUserAgent;
+
   final Dio _dio;
 
   /// Optional live progress hook — the login screen sets this to display

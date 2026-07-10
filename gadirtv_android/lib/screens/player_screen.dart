@@ -69,6 +69,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _player = Player();
     _controller = VideoController(_player);
 
+    // Force mpv to hand video decoding to hardware when available and fall
+    // back to software otherwise — needed for HEVC-in-MKV movies that some
+    // devices can't decode in hardware. Without this the player opens the
+    // demuxer but produces a black frame.
+    try {
+      await (_player.platform as dynamic).setProperty('hwdec', 'auto-safe');
+      await (_player.platform as dynamic).setProperty('vd-lavc-threads', '4');
+    } catch (_) {}
+
     _subs = [
       _player.stream.position.listen((p) {
         if (mounted) {
@@ -112,7 +121,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }),
     ];
 
-    await _player.open(Media(widget.playable.url), play: true);
+    await _player.open(
+      Media(
+        widget.playable.url,
+        httpHeaders: {
+          'User-Agent': ApiService.activeUserAgent,
+          'Connection': 'keep-alive',
+        },
+      ),
+      play: true,
+    );
 
     if (widget.playable.initialPositionMs > 0 && !widget.playable.isLive) {
       // Wait a beat for the stream to open before seeking.
