@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../i18n/strings.dart';
 import '../models/media.dart';
 import '../models/playable.dart';
 import '../models/profile.dart';
@@ -15,6 +16,7 @@ import 'movie_detail_screen.dart';
 import 'player_screen.dart';
 import 'search_screen.dart';
 import 'series_detail_screen.dart';
+import 'settings_screen.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/live_tab.dart';
 import 'tabs/movies_tab.dart';
@@ -168,33 +170,41 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _openSettings() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+  }
+
   Future<void> _reloadPlaylist() async {
+    final t = AppI18n.of(context);
     setState(() => _reloadTick += 1);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Recargando listas…'),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text(t.reloading),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
 
   Future<void> _confirmExit() async {
+    final t = AppI18n.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: GtvTheme.surface,
-        title: const Text('Cerrar aplicación', style: TextStyle(color: Colors.white)),
-        content: const Text('¿Seguro que quieres salir de GadirTV?',
-            style: TextStyle(color: GtvTheme.textDim)),
+        title: Text(t.exitConfirmTitle, style: const TextStyle(color: Colors.white)),
+        content: Text(t.exitConfirmBody,
+            style: const TextStyle(color: GtvTheme.textDim)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
+            child: Text(t.cancel, style: const TextStyle(color: Colors.white70)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(backgroundColor: GtvTheme.red),
-            child: const Text('SALIR', style: TextStyle(color: Colors.white)),
+            child: Text(t.exit, style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -380,7 +390,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(width: 8),
           InkWell(
-            onTap: _openBackup,
+            onTap: _openSettings,
             borderRadius: BorderRadius.circular(999),
             child: Container(
               padding: const EdgeInsets.all(8),
@@ -389,7 +399,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 shape: BoxShape.circle,
                 border: Border.all(color: GtvTheme.border),
               ),
-              child: const Icon(Icons.save_alt_rounded, color: Colors.white, size: 18),
+              child: const Icon(Icons.settings_rounded, color: Colors.white, size: 18),
             ),
           ),
           const SizedBox(width: 8),
@@ -438,11 +448,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBottomNav() {
-    const items = <_NavItem>[
-      _NavItem(icon: Icons.home_rounded, label: 'Inicio'),
-      _NavItem(icon: Icons.live_tv_rounded, label: 'TV en Vivo'),
-      _NavItem(icon: Icons.movie_rounded, label: 'Películas'),
-      _NavItem(icon: Icons.video_library_rounded, label: 'Series'),
+    final t = AppI18n.of(context);
+    final items = <_NavItem>[
+      _NavItem(icon: Icons.home_rounded, label: t.tabHome),
+      _NavItem(icon: Icons.live_tv_rounded, label: t.tabLive),
+      _NavItem(icon: Icons.movie_rounded, label: t.tabMovies),
+      _NavItem(icon: Icons.video_library_rounded, label: t.tabSeries),
     ];
 
     return Container(

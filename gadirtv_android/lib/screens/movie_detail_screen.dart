@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../i18n/strings.dart';
 import '../models/media.dart';
 import '../models/playable.dart';
 import '../models/profile.dart';
@@ -119,6 +120,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             style: const TextStyle(color: Colors.white, fontSize: 16)),
       ),
       body: LayoutBuilder(builder: (context, cons) {
+        final t = AppI18n.of(context);
         final wide = cons.maxWidth >= 700;
 
         Widget leftBlock() => Column(
@@ -147,8 +149,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(color: GtvTheme.red, borderRadius: BorderRadius.circular(4)),
-                            child: const Text('PELÍCULA',
-                                style: TextStyle(color: Colors.white, fontSize: 9, letterSpacing: 1.1, fontWeight: FontWeight.w800)),
+                            child: Text(t.movie,
+                                style: const TextStyle(color: Colors.white, fontSize: 9, letterSpacing: 1.1, fontWeight: FontWeight.w800)),
                           ),
                           const SizedBox(height: 8),
                           Text(widget.movie.name,
@@ -183,7 +185,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () => _play(fromStart: !hasResume),
                         icon: const Icon(Icons.play_arrow_rounded, size: 22),
-                        label: Text(hasResume ? 'CONTINUAR' : 'VER AHORA'),
+                        label: Text(hasResume ? t.resume : t.watchNow),
                       ),
                     ),
                     if (hasResume) ...[
@@ -201,11 +203,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 ),
                 if (cast.isNotEmpty) ...[
                   const SizedBox(height: 18),
-                  _labelValue('Reparto', cast),
+                  _labelValue(t.cast, cast),
                 ],
                 if (director.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  _labelValue('Dirección', director),
+                  _labelValue(t.director, director),
                 ],
               ],
             );
@@ -213,10 +215,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         Widget synopsisBlock() => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Sinopsis',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+                Text(t.synopsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
-                Text(plot.isEmpty ? 'Sin sinopsis disponible.' : plot,
+                Text(plot.isEmpty ? t.noSynopsis : plot,
                     style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.6)),
               ],
             );

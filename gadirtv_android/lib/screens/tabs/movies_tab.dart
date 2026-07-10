@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../i18n/strings.dart';
 import '../../models/media.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
@@ -134,8 +135,8 @@ class _MoviesTabState extends State<MoviesTab> {
     }
 
     final chips = <(String, String)>[
-      (_allId, 'Todas'),
-      (_favoritesId, '★ Favoritos'),
+      (_allId, AppI18n.of(context).categoryAll),
+      (_favoritesId, AppI18n.of(context).categoryFavorites),
       ..._categories.map((c) => (c.id, c.name)),
     ];
 

@@ -12,6 +12,7 @@ import '../services/api_service.dart';
 import '../services/resume_store.dart';
 import '../theme.dart';
 import '../widgets/no_signal_test_card.dart';
+import '../i18n/strings.dart';
 
 /// Full-screen media_kit player with a custom overlay.
 ///
@@ -416,14 +417,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
               color: GtvTheme.red,
               borderRadius: BorderRadius.circular(6),
             ),
-            child: const Text(
-              'EN DIRECTO',
-              style: TextStyle(color: Colors.white, fontSize: 10, letterSpacing: 1.2, fontWeight: FontWeight.w800),
+            child: Text(
+              AppI18n.of(context).live,
+              style: const TextStyle(color: Colors.white, fontSize: 10, letterSpacing: 1.2, fontWeight: FontWeight.w800),
             ),
           ),
         const SizedBox(width: 8),
         IconButton(
-          tooltip: _videoFit == BoxFit.contain ? 'Rellenar pantalla' : 'Ajustar pantalla',
+          tooltip: AppI18n.of(context).fullscreen,
           onPressed: () {
             setState(() => _videoFit = _videoFit == BoxFit.contain ? BoxFit.cover : BoxFit.contain);
             if (_showOverlay) _armAutoHide();

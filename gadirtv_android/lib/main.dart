@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 
+import 'i18n/strings.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profiles_screen.dart';
+import 'services/prefs_settings.dart';
 import 'services/profile_store.dart';
 import 'theme.dart';
 
@@ -24,19 +26,40 @@ Future<void> main() async {
   ]);
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-  runApp(const GadirTvApp());
+  final initialLang = await PrefsSettings().getLanguage();
+  runApp(GadirTvApp(initialLanguage: initialLang));
 }
 
-class GadirTvApp extends StatelessWidget {
-  const GadirTvApp({super.key});
+class GadirTvApp extends StatefulWidget {
+  const GadirTvApp({super.key, required this.initialLanguage});
+
+  final String initialLanguage;
+
+  @override
+  State<GadirTvApp> createState() => _GadirTvAppState();
+}
+
+class _GadirTvAppState extends State<GadirTvApp> {
+  late final AppI18nController _i18n = AppI18nController(widget.initialLanguage);
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'GadirTV',
-      debugShowCheckedModeBanner: false,
-      theme: GtvTheme.build(),
-      routerConfig: _router,
+    return AppI18n(
+      controller: _i18n,
+      child: AnimatedBuilder(
+        animation: _i18n,
+        builder: (_, __) {
+          return Directionality(
+            textDirection: _i18n.isRtl ? TextDirection.rtl : TextDirection.ltr,
+            child: MaterialApp.router(
+              title: 'GadirTV',
+              debugShowCheckedModeBanner: false,
+              theme: GtvTheme.build(),
+              routerConfig: _router,
+            ),
+          );
+        },
+      ),
     );
   }
 }

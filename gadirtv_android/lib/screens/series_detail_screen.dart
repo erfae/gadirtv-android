@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../i18n/strings.dart';
 import '../models/media.dart';
 import '../models/playable.dart';
 import '../models/profile.dart';
@@ -125,6 +126,7 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
             style: const TextStyle(color: Colors.white, fontSize: 16)),
       ),
       body: LayoutBuilder(builder: (context, cons) {
+        final t = AppI18n.of(context);
         final wide = cons.maxWidth >= 700;
 
         Widget leftBlock() => Column(
@@ -187,19 +189,19 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
                 ),
                 if (cast.isNotEmpty) ...[
                   const SizedBox(height: 14),
-                  _labelValue('Reparto', cast),
+                  _labelValue(t.cast, cast),
                 ],
                 if (director.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  _labelValue('Dirección', director),
+                  _labelValue(t.director, director),
                 ],
                 const SizedBox(height: 20),
-                const Text('Temporadas',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+                Text(t.seasons,
+                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 10),
                 if (_seasons.isEmpty)
-                  const Text('No hay temporadas disponibles',
-                      style: TextStyle(color: GtvTheme.textDim, fontSize: 12)),
+                  Text(t.noSeasons,
+                      style: const TextStyle(color: GtvTheme.textDim, fontSize: 12)),
                 ..._seasons.map((s) => _SeasonRow(
                       season: s,
                       episodeCount: _episodesFor(s).length,
@@ -211,10 +213,10 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
         Widget synopsisBlock() => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Sinopsis',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+                Text(t.synopsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
-                Text(plot.isEmpty ? 'Sin sinopsis disponible.' : plot,
+                Text(plot.isEmpty ? t.noSynopsis : plot,
                     style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.6)),
               ],
             );
@@ -291,6 +293,7 @@ class _SeasonRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppI18n.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
@@ -319,10 +322,10 @@ class _SeasonRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Temporada $season',
+                  Text('${t.season} $season',
                       style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 2),
-                  Text('$episodeCount episodios',
+                  Text('$episodeCount ${t.episodes}',
                       style: const TextStyle(color: GtvTheme.textDim, fontSize: 12)),
                 ],
               ),
@@ -390,6 +393,7 @@ class _SeasonEpisodesScreenState extends State<SeasonEpisodesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppI18n.of(context);
     return Scaffold(
       backgroundColor: GtvTheme.bg,
       body: SafeArea(
@@ -424,7 +428,7 @@ class _SeasonEpisodesScreenState extends State<SeasonEpisodesScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Temporada ${widget.season}',
+                        Text('${t.season} ${widget.season}',
                             style: const TextStyle(color: GtvTheme.red, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
                         const SizedBox(height: 3),
                         Text(widget.series.name,
@@ -432,7 +436,7 @@ class _SeasonEpisodesScreenState extends State<SeasonEpisodesScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800, height: 1.15)),
                         const SizedBox(height: 4),
-                        Text('${widget.episodes.length} episodios',
+                        Text('${widget.episodes.length} ${t.episodes}',
                             style: const TextStyle(color: GtvTheme.textDim, fontSize: 12)),
                       ],
                     ),
@@ -443,9 +447,9 @@ class _SeasonEpisodesScreenState extends State<SeasonEpisodesScreen> {
             // ── Episode list ──
             Expanded(
               child: widget.episodes.isEmpty
-                  ? const Center(
-                      child: Text('No hay episodios en esta temporada',
-                          style: TextStyle(color: GtvTheme.textDim)))
+                  ? Center(
+                      child: Text(t.noEpisodes,
+                          style: const TextStyle(color: GtvTheme.textDim)))
                   : ListView.separated(
                       padding: const EdgeInsets.all(14),
                       itemCount: widget.episodes.length,

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../../i18n/strings.dart';
 import '../../models/media.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
@@ -79,7 +80,7 @@ class _LiveTabState extends State<LiveTab> {
       if (!mounted) return;
       setState(() {
         _loadingCats = false;
-        _error = 'No se pudieron cargar las categorías';
+        _error = AppI18n.of(context).categoriesLoadError;
       });
     }
   }
@@ -117,7 +118,7 @@ class _LiveTabState extends State<LiveTab> {
       if (!mounted) return;
       setState(() {
         _loadingChans = false;
-        _error = 'No se pudieron cargar los canales';
+        _error = AppI18n.of(context).channelsLoadError;
       });
     }
   }
@@ -185,13 +186,14 @@ class _LiveTabState extends State<LiveTab> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppI18n.of(context);
     if (_loadingCats) {
       return const Center(child: CircularProgressIndicator(color: GtvTheme.red));
     }
 
     final categories = <(String, String)>[
-      (_allId, 'Todos'),
-      (_favoritesId, '★ Favoritos'),
+      (_allId, t.categoryAll),
+      (_favoritesId, t.categoryFavorites),
       ..._categories.map((c) => (c.id, c.name)),
     ];
 
@@ -206,7 +208,7 @@ class _LiveTabState extends State<LiveTab> {
       final miniBox = _MiniPlayer(
         key: _miniKey,
         streamUrl: streamUrl,
-        title: _current?.name ?? 'Selecciona un canal para previsualizar',
+        title: _current?.name ?? t.selectChannel,
         onFullscreen: _fullscreen,
       );
       final epgBox = _EpgBar(now: _epgNow, next: _epgNext);
@@ -291,6 +293,7 @@ class _LiveTabState extends State<LiveTab> {
   }
 
   Widget _buildChannels() {
+    final t = AppI18n.of(context);
     if (_loadingChans) {
       return const Center(child: CircularProgressIndicator(color: GtvTheme.red));
     }
@@ -298,9 +301,7 @@ class _LiveTabState extends State<LiveTab> {
       return Center(child: Text(_error!, style: const TextStyle(color: GtvTheme.textDim)));
     }
     if (_channels.isEmpty) {
-      final msg = _selected == _favoritesId
-          ? 'Todavía no has marcado ningún canal como favorito.'
-          : 'No hay canales en esta categoría';
+      final msg = _selected == _favoritesId ? t.noFavoritesYet : t.channelsNotFound;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -436,6 +437,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppI18n.of(context);
     return GestureDetector(
       onTap: widget.streamUrl != null ? widget.onFullscreen : null,
       child: Container(
@@ -485,13 +487,13 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
                 children: [
                   _MiniBtn(
                     icon: _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                    tooltip: _muted ? 'Activar audio' : 'Silenciar',
+                    tooltip: _muted ? t.unmute : t.mute,
                     onTap: _toggleMute,
                   ),
                   const SizedBox(width: 8),
                   _MiniBtn(
                     icon: Icons.fullscreen_rounded,
-                    tooltip: 'Pantalla completa',
+                    tooltip: t.fullscreen,
                     onTap: widget.onFullscreen,
                   ),
                 ],
@@ -542,16 +544,17 @@ class _EpgBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppI18n.of(context);
     if (now == null && next == null) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         color: GtvTheme.surface,
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.event_note_rounded, color: GtvTheme.textDim, size: 14),
-            SizedBox(width: 8),
-            Text('EPG no disponible',
-                style: TextStyle(color: GtvTheme.textDim, fontSize: 12)),
+            const Icon(Icons.event_note_rounded, color: GtvTheme.textDim, size: 14),
+            const SizedBox(width: 8),
+            Text(t.epgUnavailable,
+                style: const TextStyle(color: GtvTheme.textDim, fontSize: 12)),
           ],
         ),
       );
@@ -567,8 +570,8 @@ class _EpgBar extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(color: GtvTheme.red, borderRadius: BorderRadius.circular(3)),
-                child: const Text('AHORA',
-                    style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
+                child: Text(t.now,
+                    style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -578,7 +581,7 @@ class _EpgBar extends StatelessWidget {
             ]),
           if (next != null) ...[
             const SizedBox(height: 3),
-            Text('Después: ${next!}',
+            Text('${t.next}: ${next!}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: GtvTheme.textDim, fontSize: 11)),

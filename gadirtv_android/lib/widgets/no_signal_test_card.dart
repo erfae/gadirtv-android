@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../i18n/strings.dart';
+
 /// Classic broadcast test pattern shown when a live stream fails to
 /// produce frames within the timeout window. Displays the SMPTE color
 /// bars plus a bold "SIN SEÑAL" message that mimics what a broken
@@ -22,6 +24,7 @@ class NoSignalTestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppI18n.of(context);
     return Container(
       color: Colors.black,
       alignment: Alignment.center,
@@ -67,9 +70,9 @@ class NoSignalTestCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: Colors.red.shade200, width: 2),
                     ),
-                    child: const Text(
-                      'SIN SEÑAL',
-                      style: TextStyle(
+                    child: Text(
+                      t.noSignal,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 44,
                         fontWeight: FontWeight.w900,
@@ -89,10 +92,10 @@ class NoSignalTestCard extends StatelessWidget {
                       ),
                     ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'La emisión no está disponible en este momento.',
+                  Text(
+                    t.noSignalBody,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white38, fontSize: 12),
+                    style: const TextStyle(color: Colors.white38, fontSize: 12),
                   ),
                 ],
               ),
