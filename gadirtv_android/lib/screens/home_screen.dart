@@ -205,8 +205,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openBackup() async {
-    final exported = await _backup.exportAll();
-    if (!mounted) return;
     final action = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: GtvTheme.surface,
@@ -219,23 +217,26 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Copia de seguridad', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+            const Text('Copia de seguridad',
+                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
             const Text(
-              'Guarda tus perfiles, favoritos y progreso, o restáuralos en otro dispositivo.',
+              'Guarda tus perfiles, favoritos y progreso en un archivo, o restáuralos '
+              'desde un archivo anterior.',
               style: TextStyle(color: GtvTheme.textDim, fontSize: 13),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: () => Navigator.of(context).pop('export'),
-              icon: const Icon(Icons.upload_rounded, size: 18),
-              label: const Text('COPIAR AL PORTAPAPELES'),
+              icon: const Icon(Icons.save_alt_rounded, size: 18),
+              label: const Text('CREAR ARCHIVO DE BACKUP'),
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: () => Navigator.of(context).pop('import'),
-              icon: const Icon(Icons.download_rounded, size: 18, color: Colors.white),
-              label: const Text('Restaurar desde portapapeles', style: TextStyle(color: Colors.white)),
+              icon: const Icon(Icons.folder_open_rounded, size: 18, color: Colors.white),
+              label: const Text('RESTAURAR DESDE ARCHIVO',
+                  style: TextStyle(color: Colors.white)),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: GtvTheme.border),
                 padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
@@ -255,24 +256,38 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
 
     if (action == 'export') {
-      await _backup.copyToClipboard(exported);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Backup copiado al portapapeles')),
-      );
-    } else if (action == 'import') {
-      final raw = await _backup.readFromClipboard();
-      if (!mounted) return;
-      final ok = raw != null ? await _backup.importAll(raw) : false;
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ok ? 'Restaurado. Volviendo al inicio…' : 'El portapapeles no contiene un backup válido')),
-      );
-      if (ok) {
-        await Future.delayed(const Duration(milliseconds: 600));
+      try {
+        await _backup.shareBackupFile();
         if (!mounted) return;
-        // ignore: use_build_context_synchronously
-        context.go('/');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Backup creado — elige dónde guardarlo')),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo crear el backup: $e')),
+        );
+      }
+    } else if (action == 'import') {
+      try {
+        final ok = await _backup.restoreFromFile();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ok
+              ? 'Backup restaurado — volviendo al inicio…'
+              : 'El archivo no es un backup válido de GadirTV')),
+        );
+        if (ok) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          if (!mounted) return;
+          // ignore: use_build_context_synchronously
+          context.go('/');
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al restaurar: $e')),
+        );
       }
     }
   }
@@ -361,6 +376,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 duration: const Duration(milliseconds: 600),
                 child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
               ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: _openBackup,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: GtvTheme.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: GtvTheme.border),
+              ),
+              child: const Icon(Icons.save_alt_rounded, color: Colors.white, size: 18),
             ),
           ),
           const SizedBox(width: 8),

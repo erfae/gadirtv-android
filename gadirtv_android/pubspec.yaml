@@ -1,7 +1,7 @@
 name: gadirtv
 description: GadirTV — Xtream Codes IPTV client for Android (Mobile + TV).
 publish_to: 'none'
-version: 0.3.7+19
+version: 0.3.18+30
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -38,6 +38,14 @@ dependencies:
   media_kit_libs_android_video: 1.3.6
 
   cupertino_icons: ^1.0.8
+
+  # File picker for backup save / restore.
+  file_picker: ^8.1.2
+  # Platform-specific writable directories (used to place backup files).
+  path_provider: ^2.1.4
+  # Native share sheet — lets the user send the backup to Drive, Files,
+  # WhatsApp, email, etc. after export.
+  share_plus: ^10.1.2
 
 # Pin transitive deps whose newer versions target Flutter > 3.24 and break
 # the Gradle build with `flutter.compileSdkVersion` errors.
