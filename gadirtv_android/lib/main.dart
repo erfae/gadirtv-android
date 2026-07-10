@@ -16,17 +16,33 @@ Future<void> main() async {
 
   // Initialize libmpv-based player once, at startup, so any screen can
   // instantiate Player() without extra setup.
-  MediaKit.ensureInitialized();
+  try {
+    MediaKit.ensureInitialized();
+  } catch (e) {
+    // Some Android TV firmwares can't load libmpv on startup. We swallow
+    // here so the login screen still opens; playback will surface a
+    // clearer error later if the native lib is truly missing.
+    debugPrint('MediaKit init failed: $e');
+  }
 
   // IPTV apps are landscape-first — matches the Windows client and gives
-  // TV Box remotes a natural layout.
-  await SystemChrome.setPreferredOrientations(const [
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  // TV Box remotes a natural layout. Skipped on Android TV, whose display
+  // is hardware-locked to landscape and rejects orientation overrides
+  // (calling this throws a PlatformException on some Sony / Xiaomi TVs).
+  try {
+    await SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+  } catch (_) {}
+  try {
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  } catch (_) {}
 
-  final initialLang = await PrefsSettings().getLanguage();
+  String initialLang = 'es';
+  try {
+    initialLang = await PrefsSettings().getLanguage();
+  } catch (_) {}
   runApp(GadirTvApp(initialLanguage: initialLang));
 }
 
