@@ -12,6 +12,7 @@ import '../../services/api_service.dart';
 import '../../services/favorites_store.dart';
 import '../../theme.dart';
 import '../../widgets/category_list_rail.dart';
+import '../../widgets/no_signal_test_card.dart';
 
 /// Live TV tab — split view:
 ///   ┌─ Mini player (with mute + fullscreen buttons) ─┐
@@ -355,6 +356,9 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   bool _muted = false;
   bool _buffering = false;
   bool _opening = false;
+  bool _noSignal = false;
+  Duration _lastPos = Duration.zero;
+  Timer? _noSignalTimer;
   String? _openedUrl;
 
   @override
@@ -364,7 +368,28 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
     _player.stream.buffering.listen((b) {
       if (mounted) setState(() => _buffering = b);
     });
+    _player.stream.position.listen((p) {
+      if (!mounted) return;
+      // Clear no-signal state as soon as we see the position advance,
+      // which means frames are being decoded.
+      if (p - _lastPos > const Duration(milliseconds: 500)) {
+        _lastPos = p;
+        if (_noSignal) setState(() => _noSignal = false);
+      }
+    });
     _open();
+  }
+
+  void _armNoSignalTimer() {
+    _noSignalTimer?.cancel();
+    final startPos = _lastPos;
+    _noSignalTimer = Timer(const Duration(seconds: 10), () {
+      if (!mounted) return;
+      if (_lastPos - startPos < const Duration(seconds: 1) &&
+          widget.streamUrl != null) {
+        setState(() => _noSignal = true);
+      }
+    });
   }
 
   @override
@@ -397,6 +422,14 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
     // parallel (rapid channel taps used to freeze the whole app).
     if (_opening) return;
     _opening = true;
+    // Reset per-channel state so a previous "no signal" card doesn't
+    // leak onto a fresh channel while it's still opening.
+    if (mounted) {
+      setState(() {
+        _noSignal = false;
+        _lastPos = Duration.zero;
+      });
+    }
     try {
       await _player.stop().timeout(const Duration(seconds: 3),
           onTimeout: () {});
@@ -410,12 +443,9 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
             }),
             play: true,
           )
-          .timeout(const Duration(seconds: 8), onTimeout: () {
-        // The stream is probably dead. Rather than hang the app we
-        // just leave the mini idle; the fullscreen player will show the
-        // SIN SEÑAL card if the user actually opens it.
-      });
+          .timeout(const Duration(seconds: 8), onTimeout: () {});
       await _player.setVolume(_muted ? 0 : 100);
+      _armNoSignalTimer();
     } catch (_) {
       // Swallow — the parent will restart on next channel tap.
     } finally {
@@ -444,6 +474,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   @override
   void dispose() {
     _debounce?.cancel();
+    _noSignalTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _player.dispose();
     super.dispose();
@@ -474,7 +505,11 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
               const Center(
                 child: Icon(Icons.live_tv_rounded, color: GtvTheme.textDim, size: 48),
               ),
-            if (_buffering && widget.streamUrl != null)
+            if (_noSignal && widget.streamUrl != null)
+              Positioned.fill(
+                child: NoSignalTestCard(channelName: widget.title),
+              ),
+            if (_buffering && widget.streamUrl != null && !_noSignal)
               const Center(child: CircularProgressIndicator(color: GtvTheme.red, strokeWidth: 2)),
             // Top gradient + title
             Positioned(
