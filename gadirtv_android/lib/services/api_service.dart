@@ -441,15 +441,12 @@ class ApiService {
         diag.writeln('DNS OK (${sw.elapsedMilliseconds} ms): '
             '${addrs.map((a) => a.address).take(3).join(", ")}');
 
-        // ── Phase 2: TCP socket connect probe ──────────────────
-        onProgress?.call(attempt, totalAttempts, 'Conectando socket TCP');
-        final sock = await Socket.connect(hostname, port,
-                timeout: const Duration(seconds: 5))
-            .timeout(const Duration(seconds: 6));
-        diag.writeln('TCP OK (${sw.elapsedMilliseconds} ms): ${sock.remoteAddress.address}:$port');
-        await sock.close();
-
-        // ── Phase 3: HTTP request via Cronet (fallback IOClient) ──
+        // ── Phase 2: HTTP request via Cronet ──────────────────
+        // NOTE: We intentionally skip a `Socket.connect` probe here — that
+        // uses `dart:io`'s native TCP stack, which some Xtream firewalls
+        // recognise by fingerprint and drop with `Connection refused`
+        // before we ever get to send HTTP headers. Cronet mimics Chrome
+        // at the socket level and is generally allowed through.
         onProgress?.call(attempt, totalAttempts, 'Enviando petición HTTP');
         final client = await HttpFactory.get();
         diag.writeln('HTTP client: ${HttpFactory.isCronet ? "Cronet" : "IOClient"}');
