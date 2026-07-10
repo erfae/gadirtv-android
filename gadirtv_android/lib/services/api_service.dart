@@ -27,7 +27,7 @@ class ApiService {
           // In particular `Accept-Encoding: identity` disables gzip (server
           // refuses gzipped Xtream responses on some routes).
           headers: {
-            'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20',
+            'User-Agent': _activeUserAgent,
             'Accept': 'application/json, text/plain, */*',
             'Accept-Encoding': 'identity',
             'Connection': 'keep-alive',
@@ -35,6 +35,12 @@ class ApiService {
           responseType: ResponseType.json,
           validateStatus: (s) => s != null && s < 500,
         ));
+
+  /// User-Agent that most recently succeeded against the Xtream server.
+  /// The login flow rotates through [_userAgents] until it finds one the
+  /// server accepts and updates this value; subsequent API calls reuse it
+  /// so a working handshake carries through the whole session.
+  static String _activeUserAgent = 'IPTVSmartersPlayer';
 
   final Dio _dio;
 
@@ -64,7 +70,7 @@ class ApiService {
       try {
         final client = await HttpFactory.get();
         final req = http.Request('GET', parsedUri)
-          ..headers['User-Agent'] = 'VLC/3.0.20 LibVLC/3.0.20'
+          ..headers['User-Agent'] = _activeUserAgent
           ..headers['Accept'] = 'application/json, text/plain, */*'
           ..headers['Accept-Encoding'] = 'identity'
           ..headers['Connection'] = 'keep-alive'
@@ -141,9 +147,16 @@ class ApiService {
   /// Also captures full diagnostic info (URL, HTTP status, response snippet,
   /// exception class) into [LoginResult.diagnostic] so the UI can show it.
   static const List<String> _userAgents = [
+    // 1. Most compatible with strict Xtream servers (whitelisted by default).
+    'IPTVSmartersPlayer',
+    // 2. Legacy VLC (works with lenient servers, kept for fallback).
     'VLC/3.0.20 LibVLC/3.0.20',
-    'VLC/3.0.20 LibVLC/3.0.20',
-    'VLC/3.0.20 LibVLC/3.0.20',
+    // 3. TiviMate — widely accepted, especially on premium panels.
+    'TiviMate/4.6.0 (Linux;Android 12)',
+    // 4. Generic ffmpeg — many stream engines identify this way.
+    'Lavf/59.27.100',
+    // 5. Generic Android WebView as last resort.
+    'Mozilla/5.0 (Linux; Android 12; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
   ];
 
   /// Downloads an M3U playlist and returns its raw text. Uses the same 4-UA
@@ -498,6 +511,7 @@ class ApiService {
             data['user_info'] is Map &&
             (data['user_info']['auth'] == 1 || data['user_info']['auth'] == '1');
         if (ok) {
+          _activeUserAgent = ua;
           _dio.options.headers['User-Agent'] = ua;
         }
         return LoginResult(
