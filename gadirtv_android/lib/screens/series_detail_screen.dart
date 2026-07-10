@@ -124,94 +124,130 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Colors.white, fontSize: 16)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: 110,
-                        height: 165,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: widget.series.cover.isEmpty
-                              ? Container(
-                                  color: GtvTheme.surface,
-                                  child: const Icon(Icons.tv, color: GtvTheme.textDim, size: 40))
-                              : CachedNetworkImage(imageUrl: widget.series.cover, fit: BoxFit.cover),
-                        ),
+      body: LayoutBuilder(builder: (context, cons) {
+        final wide = cons.maxWidth >= 700;
+
+        Widget leftBlock() => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 110,
+                      height: 165,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: widget.series.cover.isEmpty
+                            ? Container(
+                                color: GtvTheme.surface,
+                                child: const Icon(Icons.tv, color: GtvTheme.textDim, size: 40))
+                            : CachedNetworkImage(imageUrl: widget.series.cover, fit: BoxFit.cover),
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: GtvTheme.red,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text('SERIE',
-                                  style: TextStyle(color: Colors.white, fontSize: 9, letterSpacing: 1.1, fontWeight: FontWeight.w800)),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: GtvTheme.red,
+                              borderRadius: BorderRadius.circular(4),
                             ),
-                            const SizedBox(height: 8),
-                            Text(widget.series.name,
-                                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, height: 1.15)),
-                            const SizedBox(height: 8),
-                            if (rating > 0)
-                              Row(children: [
-                                _stars(rating),
-                                const SizedBox(width: 6),
-                                Text(rating.toStringAsFixed(1),
-                                    style: const TextStyle(color: Colors.white, fontSize: 12)),
-                              ]),
-                            const SizedBox(height: 6),
-                            Wrap(spacing: 8, runSpacing: 4, children: [
-                              if (year.isNotEmpty)
-                                Text(year, style: const TextStyle(color: GtvTheme.textDim, fontSize: 12)),
-                              if (genre.isNotEmpty)
-                                Text(genre,
-                                    style: const TextStyle(color: GtvTheme.textDim, fontSize: 12),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis),
+                            child: const Text('SERIE',
+                                style: TextStyle(color: Colors.white, fontSize: 9, letterSpacing: 1.1, fontWeight: FontWeight.w800)),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(widget.series.name,
+                              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, height: 1.15)),
+                          const SizedBox(height: 8),
+                          if (rating > 0)
+                            Row(children: [
+                              _stars(rating),
+                              const SizedBox(width: 6),
+                              Text(rating.toStringAsFixed(1),
+                                  style: const TextStyle(color: Colors.white, fontSize: 12)),
                             ]),
-                          ],
-                        ),
+                          const SizedBox(height: 6),
+                          Wrap(spacing: 8, runSpacing: 4, children: [
+                            if (year.isNotEmpty)
+                              Text(year, style: const TextStyle(color: GtvTheme.textDim, fontSize: 12)),
+                            if (genre.isNotEmpty)
+                              Text(genre,
+                                  style: const TextStyle(color: GtvTheme.textDim, fontSize: 12),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis),
+                          ]),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  if (plot.isNotEmpty)
-                    Text(plot,
-                        style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.5)),
-                  if (cast.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _labelValue('Reparto', cast),
+                    ),
                   ],
-                  if (director.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    _labelValue('Dirección', director),
-                  ],
-                  const SizedBox(height: 20),
-                  const Text('Temporadas',
-                      style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 10),
-                  if (_seasons.isEmpty)
-                    const Text('No hay temporadas disponibles',
-                        style: TextStyle(color: GtvTheme.textDim, fontSize: 12)),
-                  ..._seasons.map((s) => _SeasonRow(
-                        season: s,
-                        episodeCount: _episodesFor(s).length,
-                        onTap: () => _openSeason(s),
-                      )),
-                  const SizedBox(height: 40),
+                ),
+                if (cast.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  _labelValue('Reparto', cast),
                 ],
-              ),
-      ),
+                if (director.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  _labelValue('Dirección', director),
+                ],
+                const SizedBox(height: 20),
+                const Text('Temporadas',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 10),
+                if (_seasons.isEmpty)
+                  const Text('No hay temporadas disponibles',
+                      style: TextStyle(color: GtvTheme.textDim, fontSize: 12)),
+                ..._seasons.map((s) => _SeasonRow(
+                      season: s,
+                      episodeCount: _episodesFor(s).length,
+                      onTap: () => _openSeason(s),
+                    )),
+              ],
+            );
+
+        Widget synopsisBlock() => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Sinopsis',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                Text(plot.isEmpty ? 'Sin sinopsis disponible.' : plot,
+                    style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.6)),
+              ],
+            );
+
+        if (wide) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 5, child: SingleChildScrollView(child: leftBlock())),
+                const SizedBox(width: 20),
+                Container(width: 1, height: 400, color: GtvTheme.border),
+                const SizedBox(width: 20),
+                Expanded(flex: 4, child: SingleChildScrollView(child: synopsisBlock())),
+              ],
+            ),
+          );
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              leftBlock(),
+              const SizedBox(height: 22),
+              synopsisBlock(),
+              const SizedBox(height: 40),
+            ],
+          ),
+        );
+      }),
     );
   }
 
