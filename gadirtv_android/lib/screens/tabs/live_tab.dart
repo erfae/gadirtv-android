@@ -352,6 +352,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   late final VideoController _controller = VideoController(_player);
   bool _muted = false;
   bool _buffering = false;
+  bool _opening = false;
   String? _openedUrl;
 
   @override
@@ -380,20 +381,27 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   }
 
   Future<void> _open() async {
-    // Always stop the previous stream first — otherwise media_kit can end
-    // up with two decoders emitting audio at the same time when the user
-    // taps channels quickly.
-    await _player.stop();
-    _openedUrl = widget.streamUrl;
-    if (widget.streamUrl == null || widget.streamUrl!.isEmpty) return;
-    await _player.open(
-      Media(widget.streamUrl!, httpHeaders: {
-        'User-Agent': ApiService.activeUserAgent,
-        'Connection': 'keep-alive',
-      }),
-      play: true,
-    );
-    await _player.setVolume(_muted ? 0 : 100);
+    // Serialize open calls — mpv locks up if two Player.open() run in
+    // parallel (rapid channel taps used to freeze the whole app).
+    if (_opening) return;
+    _opening = true;
+    try {
+      await _player.stop();
+      _openedUrl = widget.streamUrl;
+      if (widget.streamUrl == null || widget.streamUrl!.isEmpty) return;
+      await _player.open(
+        Media(widget.streamUrl!, httpHeaders: {
+          'User-Agent': ApiService.activeUserAgent,
+          'Connection': 'keep-alive',
+        }),
+        play: true,
+      );
+      await _player.setVolume(_muted ? 0 : 100);
+    } catch (_) {
+      // Swallow — the parent will restart on next channel tap.
+    } finally {
+      _opening = false;
+    }
   }
 
   /// Called by the parent tab when navigating to full-screen playback so

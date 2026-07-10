@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/media.dart';
@@ -35,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _backup = BackupService();
   Profile? _profile;
   int _tab = 0;
+  int _reloadTick = 0;
 
   @override
   void initState() {
@@ -166,6 +168,42 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _reloadPlaylist() async {
+    setState(() => _reloadTick += 1);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Recargando listas…'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _confirmExit() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: GtvTheme.surface,
+        title: const Text('Cerrar aplicación', style: TextStyle(color: Colors.white)),
+        content: const Text('¿Seguro que quieres salir de GadirTV?',
+            style: TextStyle(color: GtvTheme.textDim)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: GtvTheme.red),
+            child: const Text('SALIR', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      SystemNavigator.pop(); // gracefully close on Android
+    }
+  }
+
   Future<void> _openBackup() async {
     final exported = await _backup.exportAll();
     if (!mounted) return;
@@ -253,10 +291,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final tabs = <Widget>[
-      HomeTab(profile: p, onOpenMovie: _openMovie, onOpenSeries: _openSeries),
-      LiveTab(profile: p, onPlay: _playChannel, active: _tab == 1),
-      MoviesTab(profile: p, onOpen: _openMovie),
-      SeriesTab(profile: p, onOpen: _openSeries),
+      KeyedSubtree(key: ValueKey('home-$_reloadTick'), child: HomeTab(profile: p, onOpenMovie: _openMovie, onOpenSeries: _openSeries)),
+      KeyedSubtree(key: ValueKey('live-$_reloadTick'), child: LiveTab(profile: p, onPlay: _playChannel, active: _tab == 1)),
+      KeyedSubtree(key: ValueKey('movies-$_reloadTick'), child: MoviesTab(profile: p, onOpen: _openMovie)),
+      KeyedSubtree(key: ValueKey('series-$_reloadTick'), child: SeriesTab(profile: p, onOpen: _openSeries)),
     ];
 
     // Wrapping the shell in a FocusTraversalGroup gives predictable
@@ -309,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(width: 8),
           InkWell(
-            onTap: _openBackup,
+            onTap: _reloadPlaylist,
             borderRadius: BorderRadius.circular(999),
             child: Container(
               padding: const EdgeInsets.all(8),
@@ -318,7 +356,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 shape: BoxShape.circle,
                 border: Border.all(color: GtvTheme.border),
               ),
-              child: const Icon(Icons.backup_rounded, color: Colors.white, size: 18),
+              child: AnimatedRotation(
+                turns: _reloadTick.toDouble(),
+                duration: const Duration(milliseconds: 600),
+                child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: _confirmExit,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: GtvTheme.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: GtvTheme.border),
+              ),
+              child: const Icon(Icons.power_settings_new_rounded, color: Colors.white, size: 18),
             ),
           ),
           const SizedBox(width: 12),

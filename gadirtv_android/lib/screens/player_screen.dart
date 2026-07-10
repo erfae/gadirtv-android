@@ -11,6 +11,7 @@ import '../models/profile.dart';
 import '../services/api_service.dart';
 import '../services/resume_store.dart';
 import '../theme.dart';
+import '../widgets/no_signal_test_card.dart';
 
 /// Full-screen media_kit player with a custom overlay.
 ///
@@ -42,6 +43,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _showOverlay = true;
   bool _buffering = false;
   bool _ended = false;
+  bool _noSignal = false;
   String? _fatalError;
   String? _epgNow;    // current programme name
   String? _epgNext;   // next programme name
@@ -54,6 +56,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Timer? _hideTimer;
   Timer? _saveTimer;
+  Timer? _noSignalTimer;
 
   List<StreamSubscription> _subs = [];
 
@@ -88,6 +91,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
             if (p > _lastGoodPosition) {
               _lastGoodPosition = p;
               if (_fatalError != null) _fatalError = null;
+              if (_noSignal) _noSignal = false;
+              _armNoSignalTimer(); // reset — we're playing
             }
           });
         }
@@ -132,6 +137,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
       play: true,
     );
 
+    // Start the no-signal watchdog. If we don't see any frames in 10 s
+    // we display the test-pattern card so the user knows the stream is
+    // dead instead of staring at a black screen.
+    _armNoSignalTimer();
+
     if (widget.playable.initialPositionMs > 0 && !widget.playable.isLive) {
       // Wait a beat for the stream to open before seeking.
       Future.delayed(const Duration(milliseconds: 800), () async {
@@ -159,12 +169,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _saveResume();
     _hideTimer?.cancel();
     _saveTimer?.cancel();
+    _noSignalTimer?.cancel();
     for (final s in _subs) {
       s.cancel();
     }
     _player.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     super.dispose();
+  }
+
+  void _armNoSignalTimer() {
+    _noSignalTimer?.cancel();
+    _noSignalTimer = Timer(const Duration(seconds: 10), () {
+      if (!mounted) return;
+      // If we still haven't seen any frames after 10 s, show the test-card.
+      if (_position <= Duration.zero) {
+        setState(() => _noSignal = true);
+      }
+    });
   }
 
   void _armAutoHide() {
@@ -244,7 +266,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   controls: NoVideoControls,
                   fit: _videoFit,
                 ),
-                if (_buffering && _fatalError == null)
+                if (_noSignal)
+                  Positioned.fill(
+                    child: NoSignalTestCard(channelName: widget.playable.title),
+                  ),
+                if (_buffering && _fatalError == null && !_noSignal)
                   const Center(child: CircularProgressIndicator(color: GtvTheme.red)),
                 if (_fatalError != null) _buildError(),
                 if (_ended) _buildEnded(),
