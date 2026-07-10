@@ -9,7 +9,7 @@ import '../theme.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v0.3.22';
+const String kAppVersionLabel = 'v0.3.23';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
