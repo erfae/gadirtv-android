@@ -61,6 +61,16 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Force legacy Skia renderer instead of Impeller. Some Android
+             TV boxes (esp. Amlogic S905-based Xiaomi Mi TV Box variants)
+             ship GPU drivers with broken Vulkan/GLES3 support, which
+             makes Impeller silently crash at startup before Flutter can
+             even render its splash screen. Skia is slower but works on
+             every device Flutter has ever supported. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
     </application>
 
     <queries>
