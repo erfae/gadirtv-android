@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:go_router/go_router.dart';
 
 import 'i18n/strings.dart';
@@ -9,6 +10,7 @@ import 'screens/profiles_screen.dart';
 import 'services/prefs_settings.dart';
 import 'services/profile_store.dart';
 import 'theme.dart';
+import 'utils/tv_utils.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +33,9 @@ Future<void> main() async {
   try {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   } catch (_) {}
+
+  // Warm TV detection cache so focus-heavy screens can adapt if needed.
+  unawaited(TvUtils.isAndroidTv());
 
   String initialLang = 'es';
   try {

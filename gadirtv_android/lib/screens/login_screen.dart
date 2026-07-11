@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/profile.dart';
@@ -210,9 +211,11 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+            child: FocusTraversalGroup(
+              policy: OrderedTraversalPolicy(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 const Text(
                   'Añadir perfil',
                   textAlign: TextAlign.center,
@@ -334,9 +337,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ],
                 const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _busy ? null : _connect,
-                  child: _busy
+                FocusableActionDetector(
+                  autofocus: true,
+                  actions: {
+                    ActivateIntent: CallbackAction<ActivateIntent>(
+                      onInvoke: (_) {
+                        if (!_busy) _connect();
+                        return null;
+                      },
+                    ),
+                  },
+                  child: ElevatedButton(
+                    onPressed: _busy ? null : _connect,
+                    child: _busy
                       ? Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
@@ -354,6 +367,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         )
                       : const Text('CONECTAR'),
+                  ),
                 ),
               ],
             ),
@@ -456,27 +470,41 @@ class _ModeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? GtvTheme.red : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
-          boxShadow: selected
-              ? [BoxShadow(color: GtvTheme.red.withOpacity(0.45), blurRadius: 12, spreadRadius: 1)]
-              : null,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.white70,
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-            letterSpacing: 0.3,
+    return FocusableActionDetector(
+      enabled: enabled,
+      onShowFocusHighlight: (_) {},
+      actions: enabled
+          ? {
+              ActivateIntent: CallbackAction<ActivateIntent>(
+                onInvoke: (_) {
+                  onTap();
+                  return null;
+                },
+              ),
+            }
+          : const {},
+      child: GestureDetector(
+        onTap: enabled ? onTap : null,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? GtvTheme.red : Colors.transparent,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: selected
+                ? [BoxShadow(color: GtvTheme.red.withOpacity(0.45), blurRadius: 12, spreadRadius: 1)]
+                : null,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : Colors.white70,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              letterSpacing: 0.3,
+            ),
           ),
         ),
       ),
