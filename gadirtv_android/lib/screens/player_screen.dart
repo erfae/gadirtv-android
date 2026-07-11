@@ -3,7 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../stubs/media_kit_stub.dart';
+import 'package:media_kit/media_kit.dart' hide Playable;
+import 'package:media_kit_video/media_kit_video.dart';
 
 import '../models/playable.dart';
 import '../models/profile.dart';
