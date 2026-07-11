@@ -1,7 +1,7 @@
 name: gadirtv
 description: GadirTV — Xtream Codes IPTV client for Android (Mobile + TV).
 publish_to: 'none'
-version: 2.1.0+41
+version: 2.1.1+42
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -30,7 +30,7 @@ dependencies:
   # Video player based on libVLC — mismo motor que XCIPTV Player, que es el
   # que funciona en Xiaomi TV Box (Amlogic) sin crashes. Soporta MPEG-TS,
   # AC3, EAC3, HEVC, MKV con aceleración hardware nativa.
-  flutter_vlc_player: ^7.4.4
+  flutter_vlc_player: ^7.4.2
 
   cupertino_icons: ^1.0.8
 
