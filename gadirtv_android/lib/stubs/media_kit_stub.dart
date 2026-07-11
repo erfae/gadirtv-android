@@ -38,6 +38,7 @@ class Player {
   Future<void> stop() async {}
   Future<void> pause() async {}
   Future<void> play() async {}
+  Future<void> playOrPause() async {}
   Future<void> seek(Duration d) async {}
   Future<void> setVolume(double v) async {}
   Future<void> setProperty(String k, String v) async {}
