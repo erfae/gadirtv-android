@@ -8,6 +8,7 @@ import 'i18n/strings.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profiles_screen.dart';
+import 'services/plugins_bootstrap.dart';
 import 'services/prefs_settings.dart';
 import 'services/profile_store.dart';
 import 'theme.dart';
@@ -15,6 +16,14 @@ import 'theme.dart';
 Future<void> main() async {
   await runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // Register path_provider / sqflite / backup plugins only after the engine
+    // is up — keeps cold start minimal on TV boxes (Downloader sideload).
+    try {
+      await PluginsBootstrap.ensureCore();
+    } catch (e) {
+      debugPrint('GadirTV: core plugins deferred ($e)');
+    }
 
     // Show a readable error screen on TV boxes instead of a silent crash.
     FlutterError.onError = (details) {

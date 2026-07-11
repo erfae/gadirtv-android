@@ -53,22 +53,11 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Restore deferred-VLC plugin registrant (flutter pub get overwrites it)
-        run: git checkout HEAD -- android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
-
-      - name: Verify plugin registrant matches pubspec (no stale media_kit refs)
+      - name: Verify deferred plugin registration (no VLC at cold start)
         run: |
-          REG=android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
-          if grep -q media_kit "$REG"; then
-            echo "ERROR: $REG still references removed media_kit — run flutter pub get"
-            exit 1
-          fi
-          if grep -q flutter_vlc_player "$REG"; then
-            echo "ERROR: $REG must NOT auto-register flutter_vlc_player (deferred via MainActivity)"
-            exit 1
-          fi
-          if grep -qE 'jni|cronet_http|media_kit' "$REG"; then
-            echo "ERROR: $REG references jni/cronet/media_kit — run flutter pub get"
+          grep -q GadirPluginRegistrant android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
+          if grep -q 'GeneratedPluginRegistrant.registerWith' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
+            echo "ERROR: MainActivity must not call GeneratedPluginRegistrant"
             exit 1
           fi
 
@@ -130,22 +119,11 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Restore deferred-VLC plugin registrant (flutter pub get overwrites it)
-        run: git checkout HEAD -- android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
-
-      - name: Verify plugin registrant matches pubspec (no stale media_kit refs)
+      - name: Verify deferred plugin registration (no VLC at cold start)
         run: |
-          REG=android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
-          if grep -q media_kit "$REG"; then
-            echo "ERROR: $REG still references removed media_kit — run flutter pub get"
-            exit 1
-          fi
-          if grep -q flutter_vlc_player "$REG"; then
-            echo "ERROR: $REG must NOT auto-register flutter_vlc_player (deferred via MainActivity)"
-            exit 1
-          fi
-          if grep -qE 'jni|cronet_http|media_kit' "$REG"; then
-            echo "ERROR: $REG references jni/cronet/media_kit — run flutter pub get"
+          grep -q GadirPluginRegistrant android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
+          if grep -q 'GeneratedPluginRegistrant.registerWith' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
+            echo "ERROR: MainActivity must not call GeneratedPluginRegistrant"
             exit 1
           fi
 
@@ -216,6 +194,12 @@ jobs:
           name: GadirTV-release-split-apks
           path: release-assets
 
+      - name: Download TV DEBUG APK
+        uses: actions/download-artifact@v4
+        with:
+          name: GadirTV-AndroidTV-DEBUG-apk
+          path: release-assets
+
       - name: Prepare release filenames
         run: |
           cd release-assets
@@ -248,6 +232,7 @@ jobs:
             | `GadirTV-AndroidTV.apk` | TV Box, Android TV, Google TV |
             | `GadirTV-arm64.apk` | Móvil/tablet arm64 |
             | `GadirTV-universal.apk` | Cualquier Android (más pesado) |
+            | `GadirTV-AndroidTV-DEBUG.apk` | Si crashea — muestra error en pantalla roja |
           files: release-assets/*
           make_latest: true
           overwrite_files: true

@@ -5,36 +5,59 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterShellArgs
 import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugins.GeneratedPluginRegistrant
 import software.solid.fluttervlcplayer.FlutterVlcPlayerPlugin
 
 class MainActivity : FlutterActivity() {
 
     companion object {
         private const val TAG = "GadirTV"
-        private const val VLC_CHANNEL = "com.gadir.tv/vlc"
+        private const val PLUGINS_CHANNEL = "com.gadir.tv/plugins"
     }
 
+    private var coreRegistered = false
     private var vlcRegistered = false
 
     override fun getFlutterShellArgs(): FlutterShellArgs {
-        // Manifest meta-data alone is not always honoured on TV firmware.
         return FlutterShellArgs(arrayOf("--enable-impeller=false"))
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-        GeneratedPluginRegistrant.registerWith(flutterEngine)
+        // Do NOT call GeneratedPluginRegistrant — it auto-includes libVLC and
+        // crashes many TV boxes at cold start. We control registration here.
+        GadirPluginRegistrant.registerWith(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, VLC_CHANNEL)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PLUGINS_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "register" -> {
+                    "registerCore" -> {
+                        registerCorePlugins(flutterEngine)
+                        result.success(coreRegistered)
+                    }
+                    "registerVlc" -> {
                         registerVlcPlugin(flutterEngine)
                         result.success(vlcRegistered)
                     }
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    /** Path, DB, backup & share plugins — after login UI is visible. */
+    private fun registerCorePlugins(engine: FlutterEngine) {
+        if (coreRegistered) return
+        val plugins = engine.plugins
+        try {
+            plugins.add(io.flutter.plugins.flutter_plugin_android_lifecycle.FlutterAndroidLifecyclePlugin())
+            plugins.add(io.flutter.plugins.pathprovider.PathProviderPlugin())
+            plugins.add(com.tekartik.sqflite.SqflitePlugin())
+            plugins.add(com.mr.flutter.plugin.filepicker.FilePickerPlugin())
+            plugins.add(dev.fluttercommunity.plus.share.SharePlusPlugin())
+            plugins.add(dev.fluttercommunity.plus.packageinfo.PackageInfoPlugin())
+            coreRegistered = true
+            Log.i(TAG, "Core plugins registered on demand")
+        } catch (t: Throwable) {
+            Log.e(TAG, "Core plugin registration failed", t)
+        }
     }
 
     private fun registerVlcPlugin(engine: FlutterEngine) {
