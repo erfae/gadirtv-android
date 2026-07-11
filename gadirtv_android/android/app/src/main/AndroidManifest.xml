@@ -22,8 +22,7 @@
     <uses-feature
         android:name="android.hardware.touchscreen"
         android:required="false"
-        tools:node="merge"
-        tools:replace="android:required" />
+        tools:node="replace" />
     <uses-feature
         android:name="android.hardware.faketouch"
         android:required="false" />
@@ -57,12 +56,11 @@
         tools:node="merge"
         tools:replace="android:required" />
     <uses-feature
-        android:name="android.hardware.bluetooth"
-        android:required="false"
-        tools:node="merge"
-        tools:replace="android:required" />
-
-    <application
+        android:name="android.hardware.type.television"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.wifi"
+        android:required="false" />
         android:label="GadirTV"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"

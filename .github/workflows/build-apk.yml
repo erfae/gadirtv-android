@@ -108,33 +108,59 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Swap in TV-only manifest (leanback required, no phone launcher)
-        run: |
-          cp android/app/src/main/AndroidManifest.xml android/app/src/main/AndroidManifest.phone.backup.xml
-          cp android/app/src/main/AndroidManifest.tv.xml android/app/src/main/AndroidManifest.xml
+      # La mayoría de Android TV / TV Box (Xiaomi, ONN, Hisense, Chromecast…)
+      # ejecutan Android en modo 32-bit (armeabi-v7a) aunque el chip sea 64-bit.
+      # Solo Nvidia Shield y pocos modelos usan arm64 de verdad. Por eso generamos
+      # SIEMPRE el APK 32-bit además del 64-bit.
 
-      - name: Build TV APK (arm64-v8a only — Xiaomi Mi Box, Chromecast GTV, Sony 2018+, Nvidia Shield)
-        run: flutter build apk --release --target-platform=android-arm64
+      - name: Build TV APK 32-bit (armeabi-v7a — PRUEBA ESTE PRIMERO EN TV)
+        run: flutter build apk --release --target-platform=android-arm
 
-      - name: Rename output
-        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/GadirTV-AndroidTV.apk
+      - name: Rename 32-bit output
+        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/GadirTV-AndroidTV-armv7a.apk
 
-      - name: Upload TV APK
+      - name: Upload TV APK 32-bit
         uses: actions/upload-artifact@v4
         with:
-          name: GadirTV-AndroidTV-apk
-          path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-AndroidTV.apk
+          name: GadirTV-AndroidTV-armv7a
+          path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-AndroidTV-armv7a.apk
           if-no-files-found: error
 
-      - name: Build TV DEBUG APK (arm64-v8a — muestra pantalla roja con stack trace si crashea)
-        run: flutter build apk --debug --target-platform=android-arm64
+      - name: Build TV APK 64-bit (arm64-v8a — solo Shield y TVs 64-bit reales)
+        run: flutter build apk --release --target-platform=android-arm64
+
+      - name: Rename 64-bit output
+        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/GadirTV-AndroidTV-arm64.apk
+
+      - name: Upload TV APK 64-bit
+        uses: actions/upload-artifact@v4
+        with:
+          name: GadirTV-AndroidTV-arm64
+          path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-AndroidTV-arm64.apk
+          if-no-files-found: error
+
+      - name: Build TV APK universal (arm32 + arm64 en un solo archivo)
+        run: flutter build apk --release --target-platform=android-arm,android-arm64
+
+      - name: Rename universal output
+        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/GadirTV-AndroidTV-universal.apk
+
+      - name: Upload TV APK universal
+        uses: actions/upload-artifact@v4
+        with:
+          name: GadirTV-AndroidTV-universal
+          path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-AndroidTV-universal.apk
+          if-no-files-found: error
+
+      - name: Build TV DEBUG APK 32-bit (stack trace si crashea al abrir)
+        run: flutter build apk --debug --target-platform=android-arm
 
       - name: Rename debug output
-        run: mv build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/GadirTV-AndroidTV-DEBUG.apk
+        run: mv build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/GadirTV-AndroidTV-DEBUG-armv7a.apk
 
       - name: Upload TV DEBUG APK
         uses: actions/upload-artifact@v4
         with:
-          name: GadirTV-AndroidTV-DEBUG-apk
-          path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-AndroidTV-DEBUG.apk
+          name: GadirTV-AndroidTV-DEBUG-armv7a
+          path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-AndroidTV-DEBUG-armv7a.apk
           if-no-files-found: error

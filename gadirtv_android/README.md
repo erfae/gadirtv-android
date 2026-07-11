@@ -45,7 +45,13 @@ gadirtv_android/
 1. Push any change (or trigger manually: **Actions → Build Android APK → Run workflow**).
 2. Wait ~5–8 minutes for the workflow to finish.
 3. Open the completed run → download the **APK artifact** (zip) at the bottom.
-4. Unzip → transfer `app-release.apk` to your Android device → install.
+4. Unzip → transfer the APK to your Android device → install.
+
+### Android TV / TV Box
+
+**La mayoría de TVs no instalan el APK arm64.** Usa el artefacto `GadirTV-AndroidTV-armv7a` del job **build-tv**.
+
+Guía completa de instalación: [INSTALL_TV.md](INSTALL_TV.md)
 
 ### Local build (optional, requires Flutter + Android SDK)
 
