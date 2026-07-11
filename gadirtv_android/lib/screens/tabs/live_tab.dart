@@ -9,6 +9,7 @@ import '../../models/media.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
 import '../../services/favorites_store.dart';
+import '../../services/vlc_bootstrap.dart';
 import '../../theme.dart';
 import '../../widgets/category_list_rail.dart';
 import '../../widgets/no_signal_test_card.dart';
@@ -370,7 +371,14 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
     }
   }
 
-  void _initController(String url) {
+  void _initController(String url) async {
+    try {
+      await VlcBootstrap.ensureReady();
+    } catch (_) {
+      if (mounted) setState(() => _noSignal = true);
+      return;
+    }
+    if (!mounted) return;
     _controller = VlcPlayerController.network(
       url,
       hwAcc: HwAcc.full,

@@ -315,12 +315,15 @@ class _HomeScreenState extends State<HomeScreen> {
       return _buildM3UScreen(p);
     }
 
-    final tabs = <Widget>[
-      KeyedSubtree(key: ValueKey('home-$_reloadTick'), child: HomeTab(profile: p, onOpenMovie: _openMovie, onOpenSeries: _openSeries)),
-      KeyedSubtree(key: ValueKey('live-$_reloadTick'), child: LiveTab(profile: p, onPlay: _playChannel, active: _tab == 1)),
-      KeyedSubtree(key: ValueKey('movies-$_reloadTick'), child: MoviesTab(profile: p, onOpen: _openMovie)),
-      KeyedSubtree(key: ValueKey('series-$_reloadTick'), child: SeriesTab(profile: p, onOpen: _openSeries)),
+    final tabs = <Widget Function()>[
+      () => KeyedSubtree(key: ValueKey('home-$_reloadTick'), child: HomeTab(profile: p, onOpenMovie: _openMovie, onOpenSeries: _openSeries)),
+      () => KeyedSubtree(key: ValueKey('live-$_reloadTick'), child: LiveTab(profile: p, onPlay: _playChannel, active: _tab == 1)),
+      () => KeyedSubtree(key: ValueKey('movies-$_reloadTick'), child: MoviesTab(profile: p, onOpen: _openMovie)),
+      () => KeyedSubtree(key: ValueKey('series-$_reloadTick'), child: SeriesTab(profile: p, onOpen: _openSeries)),
     ];
+
+    // Build only the active tab — IndexedStack eagerly constructed all four
+    // tabs (including LiveTab's VLC imports) even when the user was on Inicio.
 
     // Wrapping the shell in a FocusTraversalGroup gives predictable
     // left/right/up/down navigation across the top-bar, content and
@@ -332,7 +335,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             children: [
               _buildTopBar(p),
-              Expanded(child: IndexedStack(index: _tab, children: tabs)),
+              Expanded(child: tabs[_tab]()),
               _buildBottomNav(),
             ],
           ),

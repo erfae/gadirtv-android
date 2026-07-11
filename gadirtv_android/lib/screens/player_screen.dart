@@ -8,6 +8,7 @@ import '../models/playable.dart';
 import '../models/profile.dart';
 import '../services/api_service.dart';
 import '../services/resume_store.dart';
+import '../services/vlc_bootstrap.dart';
 import '../theme.dart';
 import '../widgets/no_signal_test_card.dart';
 import '../i18n/strings.dart';
@@ -38,7 +39,7 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  late final VlcPlayerController _controller;
+  VlcPlayerController? _controller;
   final _resume = ResumeStore();
 
   bool _showOverlay = true;
@@ -69,7 +70,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
   }
 
-  void _initPlayer() {
+  void _initPlayer() async {
+    try {
+      await VlcBootstrap.ensureReady();
+    } catch (e) {
+      if (mounted) setState(() => _fatalError = e.toString());
+      return;
+    }
+    if (!mounted) return;
     // Build libVLC controller. `HwAcc.full` uses MediaCodec (Android
     // hardware decoder) which is what makes MKV/HEVC/MPEG-TS playback
     // work on low-end Amlogic TV boxes.
@@ -111,7 +119,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _onControllerUpdate() {
     if (!mounted) return;
-    final value = _controller.value;
+    final c = _controller;
+    if (c == null) return;
+    final value = c.value;
 
     final newPosition = value.position;
     final newDuration = value.duration;
@@ -136,7 +146,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       Future.delayed(const Duration(milliseconds: 400), () async {
         if (!mounted) return;
         try {
-          await _controller.seekTo(
+          await c.seekTo(
             Duration(milliseconds: widget.playable.initialPositionMs),
           );
         } catch (_) {}
@@ -147,11 +157,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (newState == PlayingState.error && _fatalError == null) {
       Future.delayed(const Duration(seconds: 4), () {
         if (!mounted) return;
-        if (_controller.value.playingState == PlayingState.playing) return; // recovered
-        if (_controller.value.position > Duration.zero) return; // showing frames
+        if (c.value.playingState == PlayingState.playing) return; // recovered
+        if (c.value.position > Duration.zero) return; // showing frames
         setState(() {
-          _fatalError = _controller.value.errorDescription.isNotEmpty
-              ? _controller.value.errorDescription
+          _fatalError = c.value.errorDescription.isNotEmpty
+              ? c.value.errorDescription
               : 'Playback error';
         });
       });
@@ -195,10 +205,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _hideTimer?.cancel();
     _saveTimer?.cancel();
     _noSignalTimer?.cancel();
-    _controller.removeListener(_onControllerUpdate);
-    // VLC needs an async teardown. Fire-and-forget so dispose stays sync.
-    _controller.stopRendererScanning().catchError((_) {});
-    _controller.dispose();
+    final c = _controller;
+    if (c != null) {
+      c.removeListener(_onControllerUpdate);
+      c.stopRendererScanning().catchError((_) {});
+      c.dispose();
+    }
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     super.dispose();
   }
@@ -232,27 +244,33 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _togglePlayPause() async {
+    final c = _controller;
+    if (c == null) return;
     if (_isPlaying) {
-      await _controller.pause();
+      await c.pause();
     } else {
-      await _controller.play();
+      await c.play();
     }
     if (_showOverlay) _armAutoHide();
   }
 
   Future<void> _seekBy(Duration delta) async {
+    final c = _controller;
+    if (c == null) return;
     final target = _position + delta;
     final clamped = target < Duration.zero
         ? Duration.zero
         : (target > _duration ? _duration : target);
-    await _controller.seekTo(clamped);
+    await c.seekTo(clamped);
     if (_showOverlay) _armAutoHide();
   }
 
   Future<void> _setVolume(double v) async {
+    final c = _controller;
+    if (c == null) return;
     setState(() => _volume = v);
     // VLC expects int 0-100 for volume.
-    await _controller.setVolume(v.round().clamp(0, 100));
+    await c.setVolume(v.round().clamp(0, 100));
     if (_showOverlay) _armAutoHide();
   }
 
@@ -345,8 +363,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// Fills the Stack with the VLC surface, honoring the current [BoxFit]
   /// (toggle between letterbox `contain` and fill-crop `cover`).
   Widget _buildVideoSurface() {
+    final c = _controller;
+    if (c == null) return const ColoredBox(color: Colors.black);
+
     // Native video aspect ratio, or 16:9 fallback if not yet known.
-    final size = _controller.value.size;
+    final size = c.value.size;
     final videoAr = (size.width > 0 && size.height > 0)
         ? size.width / size.height
         : 16 / 9;
@@ -382,7 +403,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             width: w,
             height: h,
             child: VlcPlayer(
-              controller: _controller,
+              controller: c,
               aspectRatio: videoAr,
               placeholder: const SizedBox.shrink(),
             ),
@@ -601,7 +622,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               max: total,
               value: current.clamp(0, total),
               onChanged: (v) => setState(() => _position = Duration(milliseconds: v.toInt())),
-              onChangeEnd: (v) => _controller.seekTo(Duration(milliseconds: v.toInt())),
+              onChangeEnd: (v) => _controller?.seekTo(Duration(milliseconds: v.toInt())),
             ),
           ),
         ),

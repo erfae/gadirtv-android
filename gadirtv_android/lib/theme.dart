@@ -20,7 +20,7 @@ class GtvTheme {
     );
 
     return ThemeData(
-      useMaterial3: true,
+      useMaterial3: false,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: bg,
       colorScheme: base,
