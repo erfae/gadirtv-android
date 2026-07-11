@@ -101,7 +101,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       ),
     );
 
-    _controller.addListener(_onControllerUpdate);
+    _controller!.addListener(_onControllerUpdate);
 
     // Start the no-signal watchdog. If we don't see any frames in 10 s
     // we display the test-pattern card so the user knows the stream is
