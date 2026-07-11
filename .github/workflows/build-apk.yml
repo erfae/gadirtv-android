@@ -125,3 +125,16 @@ jobs:
           name: GadirTV-AndroidTV-apk
           path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-AndroidTV.apk
           if-no-files-found: error
+
+      - name: Build TV DEBUG APK (arm64-v8a — muestra pantalla roja con stack trace si crashea)
+        run: flutter build apk --debug --target-platform=android-arm64
+
+      - name: Rename debug output
+        run: mv build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/GadirTV-AndroidTV-DEBUG.apk
+
+      - name: Upload TV DEBUG APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GadirTV-AndroidTV-DEBUG-apk
+          path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-AndroidTV-DEBUG.apk
+          if-no-files-found: error
