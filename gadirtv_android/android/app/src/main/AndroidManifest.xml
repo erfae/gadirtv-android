@@ -1,23 +1,65 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Manifest override — cronet_http declares minSdk 24 but the app
-         gracefully falls back to IOClient on older devices, so we allow
-         the merger to lower it here. -->
-    <uses-sdk tools:overrideLibrary="io.flutter.plugins.cronet_http" />
-
     <!-- IPTV streams travel through HTTP + need internet -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
-    <!-- Android TV / Fire TV support: leanback optional (so phones can install too) -->
+    <!-- Android TV / Fire TV / Google TV — leanback optional so phones
+         can install the same universal APK. -->
     <uses-feature
         android:name="android.software.leanback"
         android:required="false" />
+    <!-- Touchscreen is NOT required on TV; force false so merged plugin
+         manifests cannot block installation on leanback devices. -->
     <uses-feature
         android:name="android.hardware.touchscreen"
+        android:required="false"
+        tools:node="replace" />
+    <uses-feature
+        android:name="android.hardware.faketouch"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.gamepad"
+        android:required="false" />
+    <!-- Plugins sometimes declare these as required; TVs lack them. -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.location"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.type.television"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.wifi"
         android:required="false" />
 
     <application
@@ -41,29 +83,34 @@
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize"
-            android:screenOrientation="landscape">
+            android:windowSoftInputMode="adjustResize">
 
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
 
-            <!-- Phone launcher -->
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-
-            <!-- Android TV / Fire TV launcher -->
+            <!-- Android TV / Fire TV launcher — listed first so hybrid TV
+                 launchers (Xiaomi, generic boxes) discover the app. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+
+            <!-- Phone / tablet launcher -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Google TV / Play Store TV discovery -->
+        <meta-data
+            android:name="com.google.android.tv.feature"
+            android:value="true" />
 
         <!-- Force legacy Skia renderer instead of Impeller. Some Android
              TV boxes (esp. Amlogic S905-based Xiaomi Mi TV Box variants)
@@ -73,13 +120,13 @@
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
-        <!-- Disable the new Android SurfaceControl path introduced in
-             Flutter 3.24+. Some Sony Bravia and Xiaomi Amlogic firmwares
-             (Android 9-11) ship broken SurfaceControl implementations
-             that make the Flutter engine crash before rendering. -->
+        <!-- Disable the Android SurfaceControl swapchain path. The key must be
+             DisableSurfaceControl=true (NOT EnableSurfaceControl=false — that
+             key is ignored by the engine). Broken SurfaceControl drivers on
+             Sony Bravia / Xiaomi Amlogic TV boxes crash before first frame. -->
         <meta-data
-            android:name="io.flutter.embedding.android.EnableSurfaceControl"
-            android:value="false" />
+            android:name="io.flutter.embedding.android.DisableSurfaceControl"
+            android:value="true" />
     </application>
 
     <queries>

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 
 import '../../i18n/strings.dart';
@@ -9,8 +10,11 @@ import '../../models/media.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
 import '../../services/favorites_store.dart';
+import '../../services/vlc_bootstrap.dart';
+import '../../services/vlc_device_profile.dart';
 import '../../theme.dart';
 import '../../widgets/category_list_rail.dart';
+import '../../widgets/gtv_focusable.dart';
 import '../../widgets/no_signal_test_card.dart';
 
 /// Live TV tab — split view:
@@ -370,10 +374,17 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
     }
   }
 
-  void _initController(String url) {
+  void _initController(String url) async {
+    try {
+      await VlcBootstrap.ensureReady();
+    } catch (_) {
+      if (mounted) setState(() => _noSignal = true);
+      return;
+    }
+    if (!mounted) return;
     _controller = VlcPlayerController.network(
       url,
-      hwAcc: HwAcc.full,
+      hwAcc: VlcDeviceProfile.hwAcc,
       autoPlay: true,
       options: VlcPlayerOptions(
         advanced: VlcAdvancedOptions([
@@ -384,10 +395,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
           VlcHttpOptions.httpReconnect(true),
           VlcHttpOptions.httpUserAgent(ApiService.activeUserAgent),
         ]),
-        extras: [
-          '--no-drop-late-frames',
-          '--no-skip-frames',
-        ],
+        extras: VlcDeviceProfile.vlcExtras,
       ),
     );
     _controller!.addListener(_onControllerUpdate);
@@ -479,7 +487,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
       // stop → open sequence internally, we just call the API.
       _openedUrl = url;
       await _controller!
-          .setMediaFromNetwork(url, hwAcc: HwAcc.full)
+          .setMediaFromNetwork(url, hwAcc: VlcDeviceProfile.hwAcc)
           .timeout(const Duration(seconds: 8), onTimeout: () {});
       await _controller!.setVolume(_muted ? 0 : 100);
       _armNoSignalTimer();
@@ -685,7 +693,7 @@ class _EpgBar extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────
 
-class _ChannelRow extends StatelessWidget {
+class _ChannelRow extends StatefulWidget {
   const _ChannelRow({
     required this.channel,
     required this.isFavorite,
@@ -703,47 +711,67 @@ class _ChannelRow extends StatelessWidget {
   final VoidCallback onToggleFavorite;
 
   @override
+  State<_ChannelRow> createState() => _ChannelRowState();
+}
+
+class _ChannelRowState extends State<_ChannelRow> {
+  bool _focused = false;
+
+  @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      onDoubleTap: onDoubleTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? GtvTheme.red.withOpacity(0.12) : GtvTheme.surface,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: selected ? GtvTheme.red : GtvTheme.border),
+    return FocusableActionDetector(
+      onShowFocusHighlight: (v) => setState(() => _focused = v),
+      onShowHoverHighlight: (v) => setState(() => _focused = v),
+      mouseCursor: SystemMouseCursors.click,
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap();
+            return null;
+          },
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 34, height: 34,
-              decoration: BoxDecoration(
-                color: GtvTheme.bg,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: GtvTheme.border),
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onDoubleTap: widget.onDoubleTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: widget.selected ? GtvTheme.red.withOpacity(0.12) : GtvTheme.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _focused ? GtvTheme.red : (widget.selected ? GtvTheme.red : GtvTheme.border),
+              width: _focused ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34, height: 34,
+                decoration: BoxDecoration(
+                  color: GtvTheme.bg,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: GtvTheme.border),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.live_tv_rounded, color: widget.selected ? GtvTheme.red : GtvTheme.textDim, size: 18),
               ),
-              alignment: Alignment.center,
-              child: Icon(Icons.live_tv_rounded, color: selected ? GtvTheme.red : GtvTheme.textDim, size: 18),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(channel.name,
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
-            ),
-            InkWell(
-              onTap: onToggleFavorite,
-              borderRadius: BorderRadius.circular(999),
-              child: Padding(
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(widget.channel.name,
+                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              GtvFocusable(
+                borderRadius: BorderRadius.circular(999),
                 padding: const EdgeInsets.all(6),
-                child: Icon(isFavorite ? Icons.favorite : Icons.favorite_border,
-                    color: isFavorite ? GtvTheme.red : Colors.white54, size: 20),
+                onTap: widget.onToggleFavorite,
+                child: Icon(widget.isFavorite ? Icons.favorite : Icons.favorite_border,
+                    color: widget.isFavorite ? GtvTheme.red : Colors.white54, size: 20),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

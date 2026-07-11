@@ -62,6 +62,12 @@ android {
     }
 
     signingConfigs {
+        debug {
+            // Algunos firmwares Android TV antiguos (Sony Bravia, Amlogic)
+            // rechazan APKs firmados solo con esquema v3/v4.
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
         if (hasKeystore) {
             release {
                 keyAlias keystoreProperties['keyAlias']
@@ -87,6 +93,7 @@ android {
             signingConfig hasKeystore ? signingConfigs.release : signingConfigs.debug
             minifyEnabled false
             shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
@@ -95,8 +102,8 @@ android {
     // limpio. Añadir `splits` rompe la búsqueda de salida de Flutter.
 
     // flutter_vlc_player (libVLC) ships its own libc++_shared.so which
-    // conflicts with other native plugins (cronet_http, etc.). Tell the
-    // packager to just pick the first copy — they are ABI-compatible.
+    // can conflict with other native plugins. Tell the packager to just
+    // pick the first copy — they are ABI-compatible.
     packagingOptions {
         pickFirst 'lib/**/libc++_shared.so'
         pickFirst 'lib/**/libjsc.so'

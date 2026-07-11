@@ -11,6 +11,7 @@ import '../services/backup_service.dart';
 import '../services/m3u_cache.dart';
 import '../services/profile_store.dart';
 import '../theme.dart';
+import '../widgets/gtv_focusable.dart';
 import '../widgets/quick_actions_sheet.dart';
 import 'movie_detail_screen.dart';
 import 'player_screen.dart';
@@ -315,12 +316,15 @@ class _HomeScreenState extends State<HomeScreen> {
       return _buildM3UScreen(p);
     }
 
-    final tabs = <Widget>[
-      KeyedSubtree(key: ValueKey('home-$_reloadTick'), child: HomeTab(profile: p, onOpenMovie: _openMovie, onOpenSeries: _openSeries)),
-      KeyedSubtree(key: ValueKey('live-$_reloadTick'), child: LiveTab(profile: p, onPlay: _playChannel, active: _tab == 1)),
-      KeyedSubtree(key: ValueKey('movies-$_reloadTick'), child: MoviesTab(profile: p, onOpen: _openMovie)),
-      KeyedSubtree(key: ValueKey('series-$_reloadTick'), child: SeriesTab(profile: p, onOpen: _openSeries)),
+    final tabs = <Widget Function()>[
+      () => KeyedSubtree(key: ValueKey('home-$_reloadTick'), child: HomeTab(profile: p, onOpenMovie: _openMovie, onOpenSeries: _openSeries)),
+      () => KeyedSubtree(key: ValueKey('live-$_reloadTick'), child: LiveTab(profile: p, onPlay: _playChannel, active: _tab == 1)),
+      () => KeyedSubtree(key: ValueKey('movies-$_reloadTick'), child: MoviesTab(profile: p, onOpen: _openMovie)),
+      () => KeyedSubtree(key: ValueKey('series-$_reloadTick'), child: SeriesTab(profile: p, onOpen: _openSeries)),
     ];
+
+    // Build only the active tab — IndexedStack eagerly constructed all four
+    // tabs (including LiveTab's VLC imports) even when the user was on Inicio.
 
     // Wrapping the shell in a FocusTraversalGroup gives predictable
     // left/right/up/down navigation across the top-bar, content and
@@ -332,7 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             children: [
               _buildTopBar(p),
-              Expanded(child: IndexedStack(index: _tab, children: tabs)),
+              Expanded(child: tabs[_tab]()),
               _buildBottomNav(),
             ],
           ),
@@ -357,89 +361,34 @@ class _HomeScreenState extends State<HomeScreen> {
             fit: BoxFit.contain,
           ),
           const Spacer(),
-          InkWell(
-            onTap: _openSearch,
-            borderRadius: BorderRadius.circular(999),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: GtvTheme.surface,
-                shape: BoxShape.circle,
-                border: Border.all(color: GtvTheme.border),
-              ),
-              child: const Icon(Icons.search_rounded, color: Colors.white, size: 18),
-            ),
-          ),
+          GtvIconButton(icon: Icons.search_rounded, tooltip: 'Buscar', onTap: _openSearch),
           const SizedBox(width: 8),
-          InkWell(
-            onTap: _reloadPlaylist,
-            borderRadius: BorderRadius.circular(999),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: GtvTheme.surface,
-                shape: BoxShape.circle,
-                border: Border.all(color: GtvTheme.border),
-              ),
-              child: AnimatedRotation(
-                turns: _reloadTick.toDouble(),
-                duration: const Duration(milliseconds: 600),
-                child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
-              ),
-            ),
-          ),
+          GtvIconButton(icon: Icons.refresh_rounded, tooltip: 'Recargar', onTap: _reloadPlaylist),
           const SizedBox(width: 8),
-          InkWell(
-            onTap: _openSettings,
-            borderRadius: BorderRadius.circular(999),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: GtvTheme.surface,
-                shape: BoxShape.circle,
-                border: Border.all(color: GtvTheme.border),
-              ),
-              child: const Icon(Icons.settings_rounded, color: Colors.white, size: 18),
-            ),
-          ),
+          GtvIconButton(icon: Icons.settings_rounded, tooltip: 'Ajustes', onTap: _openSettings),
           const SizedBox(width: 8),
-          InkWell(
-            onTap: _confirmExit,
-            borderRadius: BorderRadius.circular(999),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: GtvTheme.surface,
-                shape: BoxShape.circle,
-                border: Border.all(color: GtvTheme.border),
-              ),
-              child: const Icon(Icons.power_settings_new_rounded, color: Colors.white, size: 18),
-            ),
-          ),
+          GtvIconButton(icon: Icons.power_settings_new_rounded, tooltip: 'Salir', onTap: _confirmExit),
           const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: GtvTheme.surface,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: GtvTheme.border),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.person_rounded, size: 14, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(p.name.isEmpty ? p.username : p.name, style: const TextStyle(color: Colors.white, fontSize: 12)),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: _switchProfile,
-                  borderRadius: BorderRadius.circular(999),
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(Icons.logout_rounded, size: 14, color: GtvTheme.textDim),
-                  ),
-                ),
-              ],
+          GtvFocusable(
+            borderRadius: BorderRadius.circular(999),
+            onTap: _switchProfile,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: GtvTheme.surface,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: GtvTheme.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.person_rounded, size: 14, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(p.name.isEmpty ? p.username : p.name, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.logout_rounded, size: 14, color: GtvTheme.textDim),
+                ],
+              ),
             ),
           ),
         ],
