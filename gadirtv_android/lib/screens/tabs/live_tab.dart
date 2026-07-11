@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
+import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 
 import '../../i18n/strings.dart';
 import '../../models/media.dart';
@@ -351,8 +350,7 @@ class _MiniPlayer extends StatefulWidget {
 }
 
 class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
-  late final Player _player = Player();
-  late final VideoController _controller = VideoController(_player);
+  VlcPlayerController? _controller;
   bool _muted = false;
   bool _buffering = false;
   bool _opening = false;
@@ -360,24 +358,55 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   Duration _lastPos = Duration.zero;
   Timer? _noSignalTimer;
   String? _openedUrl;
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _player.stream.buffering.listen((b) {
-      if (mounted) setState(() => _buffering = b);
-    });
-    _player.stream.position.listen((p) {
-      if (!mounted) return;
-      // Clear no-signal state as soon as we see the position advance,
-      // which means frames are being decoded.
-      if (p - _lastPos > const Duration(milliseconds: 500)) {
-        _lastPos = p;
-        if (_noSignal) setState(() => _noSignal = false);
-      }
-    });
-    _open();
+    final url = widget.streamUrl;
+    if (url != null && url.isNotEmpty) {
+      _initController(url);
+    }
+  }
+
+  void _initController(String url) {
+    _controller = VlcPlayerController.network(
+      url,
+      hwAcc: HwAcc.full,
+      autoPlay: true,
+      options: VlcPlayerOptions(
+        advanced: VlcAdvancedOptions([
+          VlcAdvancedOptions.networkCaching(1500),
+          VlcAdvancedOptions.liveCaching(1500),
+        ]),
+        http: VlcHttpOptions([
+          VlcHttpOptions.httpReconnect(true),
+          VlcHttpOptions.httpUserAgent(ApiService.activeUserAgent),
+        ]),
+        extras: [
+          '--no-drop-late-frames',
+          '--no-skip-frames',
+        ],
+      ),
+    );
+    _controller!.addListener(_onControllerUpdate);
+    _openedUrl = url;
+    _armNoSignalTimer();
+  }
+
+  void _onControllerUpdate() {
+    if (!mounted || _controller == null) return;
+    final value = _controller!.value;
+    final isBuf = value.playingState == PlayingState.buffering;
+    if (isBuf != _buffering) {
+      setState(() => _buffering = isBuf);
+    }
+    final p = value.position;
+    if (p - _lastPos > const Duration(milliseconds: 500)) {
+      _lastPos = p;
+      if (_noSignal) setState(() => _noSignal = false);
+    }
   }
 
   void _armNoSignalTimer() {
@@ -398,10 +427,8 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
     if (old.streamUrl != widget.streamUrl) _scheduleOpen();
   }
 
-  Timer? _debounce;
-
   /// Debounce rapid channel taps — otherwise every tap queues an
-  /// [_open] which each stop/start mpv, and 5 taps in a second can lock
+  /// [_open] which each stop/start VLC, and 5 taps in a second can lock
   /// the native audio thread on some devices.
   void _scheduleOpen() {
     _debounce?.cancel();
@@ -413,13 +440,13 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
     // Pause when the app goes to background so audio doesn't keep leaking
     // out of the mini player.
     if (state != AppLifecycleState.resumed) {
-      _player.pause();
+      _controller?.pause().catchError((_) {});
     }
   }
 
   Future<void> _open() async {
-    // Serialize open calls — mpv locks up if two Player.open() run in
-    // parallel (rapid channel taps used to freeze the whole app).
+    // Serialize open calls — VLC can lock up if two setMediaFromNetwork
+    // calls run in parallel (rapid channel taps used to freeze the app).
     if (_opening) return;
     _opening = true;
     // Reset per-channel state so a previous "no signal" card doesn't
@@ -431,20 +458,30 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
       });
     }
     try {
-      await _player.stop().timeout(const Duration(seconds: 3),
-          onTimeout: () {});
-      _openedUrl = widget.streamUrl;
-      if (widget.streamUrl == null || widget.streamUrl!.isEmpty) return;
-      await _player
-          .open(
-            Media(widget.streamUrl!, httpHeaders: {
-              'User-Agent': ApiService.activeUserAgent,
-              'Connection': 'keep-alive',
-            }),
-            play: true,
-          )
+      final url = widget.streamUrl;
+      if (url == null || url.isEmpty) {
+        try {
+          await _controller?.stop().timeout(const Duration(seconds: 3),
+              onTimeout: () {});
+        } catch (_) {}
+        _openedUrl = null;
+        return;
+      }
+
+      if (_controller == null) {
+        // First-time init.
+        _initController(url);
+        if (mounted) setState(() {});
+        return;
+      }
+
+      // Swap media on the existing controller. VLC handles the
+      // stop → open sequence internally, we just call the API.
+      _openedUrl = url;
+      await _controller!
+          .setMediaFromNetwork(url, hwAcc: HwAcc.full)
           .timeout(const Duration(seconds: 8), onTimeout: () {});
-      await _player.setVolume(_muted ? 0 : 100);
+      await _controller!.setVolume(_muted ? 0 : 100);
       _armNoSignalTimer();
     } catch (_) {
       // Swallow — the parent will restart on next channel tap.
@@ -455,18 +492,16 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
 
   /// Called by the parent tab when navigating to full-screen playback so
   /// the mini stops before the big player starts. We silence the audio
-  /// track first (instant) and then stop the underlying mpv player,
-  /// because `stop()` alone can leave the audio buffer draining for a
-  /// few hundred ms — long enough to overlap with the full-screen player.
+  /// track first (instant) and then stop the underlying VLC player.
   Future<void> pause() async {
     try {
-      await _player.setVolume(0);
+      await _controller?.setVolume(0);
     } catch (_) {}
     try {
-      await _player.pause();
+      await _controller?.pause();
     } catch (_) {}
     try {
-      await _player.stop();
+      await _controller?.stop();
     } catch (_) {}
     _openedUrl = null;
   }
@@ -476,13 +511,15 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
     _debounce?.cancel();
     _noSignalTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
-    _player.dispose();
+    _controller?.removeListener(_onControllerUpdate);
+    _controller?.stopRendererScanning().catchError((_) {});
+    _controller?.dispose();
     super.dispose();
   }
 
   void _toggleMute() {
     setState(() => _muted = !_muted);
-    _player.setVolume(_muted ? 0 : 100);
+    _controller?.setVolume(_muted ? 0 : 100);
   }
 
   @override
@@ -495,11 +532,11 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (widget.streamUrl != null)
-              Video(
-                controller: _controller,
-                controls: NoVideoControls,
-                fit: BoxFit.contain,
+            if (widget.streamUrl != null && _controller != null)
+              VlcPlayer(
+                controller: _controller!,
+                aspectRatio: 16 / 9,
+                placeholder: const SizedBox.shrink(),
               )
             else
               const Center(

@@ -93,6 +93,14 @@ android {
     // NOTE: no `splits { abi }` block — usamos `flutter build apk
     // --target-platform=android-arm64` que produce un `app-release.apk`
     // limpio. Añadir `splits` rompe la búsqueda de salida de Flutter.
+
+    // flutter_vlc_player (libVLC) ships its own libc++_shared.so which
+    // conflicts with other native plugins (cronet_http, etc.). Tell the
+    // packager to just pick the first copy — they are ABI-compatible.
+    packagingOptions {
+        pickFirst 'lib/**/libc++_shared.so'
+        pickFirst 'lib/**/libjsc.so'
+    }
 }
 
 flutter {

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:media_kit/media_kit.dart';
 
 import 'i18n/strings.dart';
 import 'screens/home_screen.dart';
@@ -14,16 +13,10 @@ import 'theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize libmpv-based player once, at startup, so any screen can
-  // instantiate Player() without extra setup.
-  try {
-    MediaKit.ensureInitialized();
-  } catch (e) {
-    // Some Android TV firmwares can't load libmpv on startup. We swallow
-    // here so the login screen still opens; playback will surface a
-    // clearer error later if the native lib is truly missing.
-    debugPrint('MediaKit init failed: $e');
-  }
+  // NOTE: flutter_vlc_player (libVLC) initializes lazily when the first
+  // VlcPlayerController is created — no manual ensureInitialized() call
+  // required. This is the same engine XCIPTV Player uses, verified to run
+  // on the Xiaomi Amlogic TV boxes where libmpv (media_kit) crashed.
 
   // IPTV apps are landscape-first — matches the Windows client and gives
   // TV Box remotes a natural layout. Skipped on Android TV, whose display

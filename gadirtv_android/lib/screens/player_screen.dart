@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:media_kit/media_kit.dart' hide Playable;
-import 'package:media_kit_video/media_kit_video.dart';
+import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 
 import '../models/playable.dart';
 import '../models/profile.dart';
@@ -14,13 +12,17 @@ import '../theme.dart';
 import '../widgets/no_signal_test_card.dart';
 import '../i18n/strings.dart';
 
-/// Full-screen media_kit player with a custom overlay.
+/// Full-screen libVLC player with a custom overlay.
 ///
 ///  - Overlay fades in on tap / D-pad and auto-hides after 3.5 s.
 ///  - Live streams hide the progress bar (they don't seek).
 ///  - VOD & series save their position on pause/exit so we can offer
 ///    "Continuar viendo" next time.
 ///  - Screen stays awake for the whole session and is released on dispose.
+///
+/// Migrated from `media_kit` (libmpv) to `flutter_vlc_player` (libVLC) —
+/// libVLC is the same engine XCIPTV Player ships, which is verified to
+/// run on the Xiaomi Amlogic TV boxes where libmpv silently crashed.
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key, required this.playable, this.liveProfile, this.liveStreamId});
 
@@ -36,15 +38,15 @@ class PlayerScreen extends StatefulWidget {
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  late final Player _player;
-  late final VideoController _controller;
+  late final VlcPlayerController _controller;
   final _resume = ResumeStore();
-  final _api = ApiService();
 
   bool _showOverlay = true;
   bool _buffering = false;
   bool _ended = false;
   bool _noSignal = false;
+  bool _isPlaying = false;
+  bool _initialSeekDone = false;
   String? _fatalError;
   String? _epgNow;    // current programme name
   String? _epgNext;   // next programme name
@@ -59,8 +61,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Timer? _saveTimer;
   Timer? _noSignalTimer;
 
-  List<StreamSubscription> _subs = [];
-
   @override
   void initState() {
     super.initState();
@@ -69,90 +69,114 @@ class _PlayerScreenState extends State<PlayerScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
   }
 
-  Future<void> _initPlayer() async {
-    _player = Player();
-    _controller = VideoController(_player);
-
-    // Force mpv to hand video decoding to hardware when available and fall
-    // back to software otherwise — needed for HEVC-in-MKV movies that some
-    // devices can't decode in hardware. Without this the player opens the
-    // demuxer but produces a black frame.
-    try {
-      await (_player.platform as dynamic).setProperty('hwdec', 'auto-safe');
-      await (_player.platform as dynamic).setProperty('vd-lavc-threads', '4');
-    } catch (_) {}
-
-    _subs = [
-      _player.stream.position.listen((p) {
-        if (mounted) {
-          setState(() {
-            _position = p;
-            // If playback is progressing, clear any stale "SIN SEÑAL"
-            // that might have surfaced from a transient error event.
-            if (p > _lastGoodPosition) {
-              _lastGoodPosition = p;
-              if (_fatalError != null) _fatalError = null;
-              if (_noSignal) _noSignal = false;
-              _armNoSignalTimer(); // reset — we're playing
-            }
-          });
-        }
-      }),
-      _player.stream.duration.listen((d) {
-        if (mounted) setState(() => _duration = d);
-      }),
-      _player.stream.buffering.listen((b) {
-        if (mounted) setState(() => _buffering = b);
-      }),
-      _player.stream.completed.listen((c) {
-        if (c && mounted) setState(() => _ended = true);
-      }),
-      _player.stream.playing.listen((playing) {
-        // A live playing event clears any stale error.
-        if (playing && mounted && _fatalError != null) {
-          setState(() => _fatalError = null);
-        }
-      }),
-      _player.stream.error.listen((e) {
-        // Only surface an error if we don't already have frames.
-        // Xtream streams frequently emit demux warnings that mpv reports
-        // as "error" but recover from immediately.
-        if (!mounted) return;
-        Future.delayed(const Duration(seconds: 4), () {
-          if (!mounted) return;
-          if (_player.state.playing) return; // recovered
-          if (_position > Duration.zero) return; // already showing frames
-          setState(() => _fatalError = e.toString());
-        });
-      }),
-    ];
-
-    await _player.open(
-      Media(
-        widget.playable.url,
-        httpHeaders: {
-          'User-Agent': ApiService.activeUserAgent,
-          'Connection': 'keep-alive',
-        },
+  void _initPlayer() {
+    // Build libVLC controller. `HwAcc.full` uses MediaCodec (Android
+    // hardware decoder) which is what makes MKV/HEVC/MPEG-TS playback
+    // work on low-end Amlogic TV boxes.
+    _controller = VlcPlayerController.network(
+      widget.playable.url,
+      hwAcc: HwAcc.full,
+      autoPlay: true,
+      options: VlcPlayerOptions(
+        advanced: VlcAdvancedOptions([
+          // 1500 ms of network cache — enough to smooth over Wi-Fi
+          // hiccups on TV boxes without adding perceptible zap delay.
+          VlcAdvancedOptions.networkCaching(1500),
+          VlcAdvancedOptions.liveCaching(1500),
+          VlcAdvancedOptions.fileCaching(1500),
+        ]),
+        http: VlcHttpOptions([
+          VlcHttpOptions.httpReconnect(true),
+          // Inject the rotating User-Agent that bypasses the upstream
+          // 512 HTTP block. Same trick XCIPTV uses.
+          VlcHttpOptions.httpUserAgent(ApiService.activeUserAgent),
+        ]),
+        extras: [
+          '--no-drop-late-frames',
+          '--no-skip-frames',
+        ],
       ),
-      play: true,
     );
+
+    _controller.addListener(_onControllerUpdate);
 
     // Start the no-signal watchdog. If we don't see any frames in 10 s
     // we display the test-pattern card so the user knows the stream is
     // dead instead of staring at a black screen.
     _armNoSignalTimer();
 
-    if (widget.playable.initialPositionMs > 0 && !widget.playable.isLive) {
-      // Wait a beat for the stream to open before seeking.
-      Future.delayed(const Duration(milliseconds: 800), () async {
+    // Save resume position every 10 s while playing.
+    _saveTimer = Timer.periodic(const Duration(seconds: 10), (_) => _saveResume());
+  }
+
+  void _onControllerUpdate() {
+    if (!mounted) return;
+    final value = _controller.value;
+
+    final newPosition = value.position;
+    final newDuration = value.duration;
+    final newState = value.playingState;
+    final newBuffering = newState == PlayingState.buffering;
+    final newPlaying = newState == PlayingState.playing;
+    // VLC does not expose a distinct "ended" state — it transitions to
+    // `stopped` both on end-of-stream and on manual stop. Consider the
+    // stream ended only when we have a known duration and playback
+    // stopped at or near the end.
+    final newEnded = newState == PlayingState.stopped &&
+        !widget.playable.isLive &&
+        newDuration.inMilliseconds > 0 &&
+        newPosition.inMilliseconds >= newDuration.inMilliseconds - 2000;
+
+      // Seek to resume point once the media is initialized (VOD/series only).
+    if (!_initialSeekDone &&
+        value.isInitialized &&
+        widget.playable.initialPositionMs > 0 &&
+        !widget.playable.isLive) {
+      _initialSeekDone = true;
+      Future.delayed(const Duration(milliseconds: 400), () async {
         if (!mounted) return;
-        await _player.seek(Duration(milliseconds: widget.playable.initialPositionMs));
+        try {
+          await _controller.seekTo(
+            Duration(milliseconds: widget.playable.initialPositionMs),
+          );
+        } catch (_) {}
       });
     }
 
-    // Save resume position every 10 s while playing.
-    _saveTimer = Timer.periodic(const Duration(seconds: 10), (_) => _saveResume());
+    // Detect fatal error but tolerate transient demux warnings.
+    if (newState == PlayingState.error && _fatalError == null) {
+      Future.delayed(const Duration(seconds: 4), () {
+        if (!mounted) return;
+        if (_controller.value.playingState == PlayingState.playing) return; // recovered
+        if (_controller.value.position > Duration.zero) return; // showing frames
+        setState(() {
+          _fatalError = _controller.value.errorDescription.isNotEmpty
+              ? _controller.value.errorDescription
+              : 'Playback error';
+        });
+      });
+    }
+
+    setState(() {
+      _position = newPosition;
+      _duration = newDuration;
+      _buffering = newBuffering;
+      _isPlaying = newPlaying;
+      _ended = newEnded;
+
+      // If playback is progressing, clear any stale "SIN SEÑAL".
+      if (newPosition > _lastGoodPosition) {
+        _lastGoodPosition = newPosition;
+        if (_fatalError != null) _fatalError = null;
+        if (_noSignal) _noSignal = false;
+        _armNoSignalTimer(); // reset — we're playing
+      }
+
+      // A playing event clears any stale error.
+      if (newPlaying && _fatalError != null) {
+        _fatalError = null;
+      }
+    });
   }
 
   Future<void> _saveResume() async {
@@ -171,10 +195,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _hideTimer?.cancel();
     _saveTimer?.cancel();
     _noSignalTimer?.cancel();
-    for (final s in _subs) {
-      s.cancel();
-    }
-    _player.dispose();
+    _controller.removeListener(_onControllerUpdate);
+    // VLC needs an async teardown. Fire-and-forget so dispose stays sync.
+    _controller.stopRendererScanning().catchError((_) {});
+    _controller.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     super.dispose();
   }
@@ -183,7 +207,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _noSignalTimer?.cancel();
     // Snapshot the current position; if it hasn't meaningfully advanced
     // in 10 s the stream is stuck / buffering forever → show the test
-    // card. Just checking `_position <= 0` is not enough because mpv
+    // card. Checking `_position <= 0` is not enough because libVLC
     // reports a few hundred ms of position while priming its demuxer,
     // even on dead streams.
     final startPos = _position;
@@ -208,7 +232,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _togglePlayPause() async {
-    await _player.playOrPause();
+    if (_isPlaying) {
+      await _controller.pause();
+    } else {
+      await _controller.play();
+    }
     if (_showOverlay) _armAutoHide();
   }
 
@@ -217,13 +245,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final clamped = target < Duration.zero
         ? Duration.zero
         : (target > _duration ? _duration : target);
-    await _player.seek(clamped);
+    await _controller.seekTo(clamped);
     if (_showOverlay) _armAutoHide();
   }
 
   Future<void> _setVolume(double v) async {
     setState(() => _volume = v);
-    await _player.setVolume(v);
+    // VLC expects int 0-100 for volume.
+    await _controller.setVolume(v.round().clamp(0, 100));
     if (_showOverlay) _armAutoHide();
   }
 
@@ -237,10 +266,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
         _seekBy(const Duration(seconds: 10));
         return KeyEventResult.handled;
       case 'Arrow Up':
-        _setVolume((_volume + 10).clamp(0, 200));
+        _setVolume((_volume + 10).clamp(0, 100));
         return KeyEventResult.handled;
       case 'Arrow Down':
-        _setVolume((_volume - 10).clamp(0, 200));
+        _setVolume((_volume - 10).clamp(0, 100));
         return KeyEventResult.handled;
       case ' ':
       case 'Enter':
@@ -267,11 +296,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Video(
-                  controller: _controller,
-                  controls: NoVideoControls,
-                  fit: _videoFit,
-                ),
+                _buildVideoSurface(),
                 if (_noSignal)
                   Positioned.fill(
                     child: NoSignalTestCard(channelName: widget.playable.title),
@@ -314,6 +339,56 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Fills the Stack with the VLC surface, honoring the current [BoxFit]
+  /// (toggle between letterbox `contain` and fill-crop `cover`).
+  Widget _buildVideoSurface() {
+    // Native video aspect ratio, or 16:9 fallback if not yet known.
+    final size = _controller.value.size;
+    final videoAr = (size.width > 0 && size.height > 0)
+        ? size.width / size.height
+        : 16 / 9;
+
+    return LayoutBuilder(
+      builder: (ctx, cons) {
+        final containerAr = cons.maxWidth / cons.maxHeight;
+        // Compute the FittedBox child dimensions so the underlying
+        // Texture stays at the correct AR regardless of screen shape.
+        final double w, h;
+        if (_videoFit == BoxFit.cover) {
+          // Fill and crop overflow.
+          if (containerAr > videoAr) {
+            w = cons.maxWidth;
+            h = cons.maxWidth / videoAr;
+          } else {
+            h = cons.maxHeight;
+            w = cons.maxHeight * videoAr;
+          }
+        } else {
+          // Letterbox (contain).
+          if (containerAr > videoAr) {
+            h = cons.maxHeight;
+            w = cons.maxHeight * videoAr;
+          } else {
+            w = cons.maxWidth;
+            h = cons.maxWidth / videoAr;
+          }
+        }
+
+        return Center(
+          child: SizedBox(
+            width: w,
+            height: h,
+            child: VlcPlayer(
+              controller: _controller,
+              aspectRatio: videoAr,
+              placeholder: const SizedBox.shrink(),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -455,7 +530,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ),
         const SizedBox(width: 32),
         _CircleBtn(
-          icon: _player.state.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+          icon: _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
           big: true,
           onTap: _togglePlayPause,
         ),
@@ -526,7 +601,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               max: total,
               value: current.clamp(0, total),
               onChanged: (v) => setState(() => _position = Duration(milliseconds: v.toInt())),
-              onChangeEnd: (v) => _player.seek(Duration(milliseconds: v.toInt())),
+              onChangeEnd: (v) => _controller.seekTo(Duration(milliseconds: v.toInt())),
             ),
           ),
         ),

@@ -63,7 +63,7 @@ gadirtv_android/
 
 ### Key technical decisions
 
-- **Player:** `media_kit` (libmpv backend) — same engine as the Windows app, guaranteed MPEG-TS/AC3/EAC3/HEVC support without vendor-specific quirks.
+- **Player:** `flutter_vlc_player` (libVLC backend) — mismo motor que XCIPTV Player, verificado compatible con Xiaomi Amlogic TV Boxes donde `media_kit` (libmpv) crasheaba. Soporta MPEG-TS/AC3/EAC3/HEVC/MKV con aceleración hardware nativa vía MediaCodec.
 - **HTTP:** `dio` with a VLC User-Agent (Xtream servers occasionally block plain Dart/OkHttp UAs).
 - **Persistence:** `shared_preferences` with the same JSON shape used by Windows (`gp` = profile list, `ga` = active). Migration between platforms is trivial if ever needed.
 - **Router:** `go_router` — declarative, easy to extend when we add per-episode deep links in Phase 4.
@@ -94,6 +94,19 @@ The Emergent container is 1.5 GB free; Flutter SDK + Android SDK would need ~12 
   - **Show/hide password toggle:** botón de ojo en el input de contraseña del login.
   - **Icono GadirTV:** launcher icons regenerados en las 5 densidades desde `/app/electron/icon.png`, más `ic_launcher_round`, adaptive icon (foreground + background `#0B0C0F`) y `tv_banner` 320×180. Nombre app ya era "GadirTV".
   - **Build:** `pubspec.yaml` version 0.2.0+2.
+
+- ✅ **v2.0.0 — Migración a libVLC** *(Feb 2026, fork)*
+  - **Motor de video:** Sustituido `media_kit` (libmpv) → `flutter_vlc_player 7.4.4` (libVLC). Análisis forense de las APKs de XCIPTV, IBO Player y NetTV confirmó que las apps IPTV que funcionan en el Xiaomi Amlogic TV Box del usuario usan `libvlc.so` o `libffmpegJNI.so`+ExoPlayer — nunca libmpv. libVLC es el motor que garantiza compatibilidad con firmwares Amlogic antiguos.
+  - **Archivos modificados:**
+    - `pubspec.yaml`: quitados `media_kit`, `media_kit_video`, `media_kit_libs_android_video`; añadido `flutter_vlc_player ^7.4.4`.
+    - `lib/main.dart`: eliminado `MediaKit.ensureInitialized()` (VLC inicializa lazy).
+    - `lib/screens/player_screen.dart`: reescrito con `VlcPlayerController` — misma UX (overlay auto-hide, no-signal card, resume, EPG, D-pad, boxFit toggle).
+    - `lib/screens/tabs/live_tab.dart`: `_MiniPlayer` migrado a `VlcPlayer` con `setMediaFromNetwork` para cambios de canal.
+    - `android/app/build.gradle`: añadido `packagingOptions { pickFirst 'lib/**/libc++_shared.so' }` para resolver conflicto de C++ libs entre VLC y cronet.
+    - `android/app/src/main/AndroidManifest.xml` + `AndroidManifest.tv.xml`: añadido `android:largeHeap="true"` (VLC requiere más memoria).
+  - **User-Agent:** ahora se pasa vía `VlcHttpOptions.httpUserAgent()` en lugar de headers HTTP manuales (mantiene el bypass del 512 Block del servidor).
+  - **Build:** `pubspec.yaml` version 2.0.0+31.
+  - **Status:** Pendiente prueba en Xiaomi TV Box + móvil por parte del usuario, vía APK generado por GitHub Actions.
 
 
 ---
