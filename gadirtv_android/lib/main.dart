@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:media_kit/media_kit.dart';
+import 'stubs/media_kit_stub.dart' show MediaKit;
 
 import 'i18n/strings.dart';
 import 'screens/home_screen.dart';
