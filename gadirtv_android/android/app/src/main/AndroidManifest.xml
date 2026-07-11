@@ -73,6 +73,13 @@
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
+        <!-- Disable the new Android SurfaceControl path introduced in
+             Flutter 3.24+. Some Sony Bravia and Xiaomi Amlogic firmwares
+             (Android 9-11) ship broken SurfaceControl implementations
+             that make the Flutter engine crash before rendering. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableSurfaceControl"
+            android:value="false" />
     </application>
 
     <queries>
