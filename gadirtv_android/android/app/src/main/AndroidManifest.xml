@@ -56,11 +56,18 @@
         tools:node="merge"
         tools:replace="android:required" />
     <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
+    <uses-feature
         android:name="android.hardware.type.television"
         android:required="false" />
     <uses-feature
         android:name="android.hardware.wifi"
         android:required="false" />
+
+    <application
         android:label="GadirTV"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
