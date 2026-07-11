@@ -9,6 +9,7 @@ import '../models/profile.dart';
 import '../services/api_service.dart';
 import '../services/resume_store.dart';
 import '../services/vlc_bootstrap.dart';
+import '../services/vlc_device_profile.dart';
 import '../theme.dart';
 import '../widgets/no_signal_test_card.dart';
 import '../i18n/strings.dart';
@@ -78,12 +79,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       return;
     }
     if (!mounted) return;
-    // Build libVLC controller. `HwAcc.full` uses MediaCodec (Android
-    // hardware decoder) which is what makes MKV/HEVC/MPEG-TS playback
-    // work on low-end Amlogic TV boxes.
     _controller = VlcPlayerController.network(
       widget.playable.url,
-      hwAcc: HwAcc.full,
+      hwAcc: VlcDeviceProfile.hwAcc,
       autoPlay: true,
       options: VlcPlayerOptions(
         advanced: VlcAdvancedOptions([
@@ -99,10 +97,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           // 512 HTTP block. Same trick XCIPTV uses.
           VlcHttpOptions.httpUserAgent(ApiService.activeUserAgent),
         ]),
-        extras: [
-          '--no-drop-late-frames',
-          '--no-skip-frames',
-        ],
+        extras: VlcDeviceProfile.vlcExtras,
       ),
     );
 

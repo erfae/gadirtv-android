@@ -10,6 +10,7 @@ import '../../models/profile.dart';
 import '../../services/api_service.dart';
 import '../../services/favorites_store.dart';
 import '../../services/vlc_bootstrap.dart';
+import '../../services/vlc_device_profile.dart';
 import '../../theme.dart';
 import '../../widgets/category_list_rail.dart';
 import '../../widgets/no_signal_test_card.dart';
@@ -381,7 +382,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
     if (!mounted) return;
     _controller = VlcPlayerController.network(
       url,
-      hwAcc: HwAcc.full,
+      hwAcc: VlcDeviceProfile.hwAcc,
       autoPlay: true,
       options: VlcPlayerOptions(
         advanced: VlcAdvancedOptions([
@@ -392,10 +393,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
           VlcHttpOptions.httpReconnect(true),
           VlcHttpOptions.httpUserAgent(ApiService.activeUserAgent),
         ]),
-        extras: [
-          '--no-drop-late-frames',
-          '--no-skip-frames',
-        ],
+        extras: VlcDeviceProfile.vlcExtras,
       ),
     );
     _controller!.addListener(_onControllerUpdate);
@@ -487,7 +485,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
       // stop → open sequence internally, we just call the API.
       _openedUrl = url;
       await _controller!
-          .setMediaFromNetwork(url, hwAcc: HwAcc.full)
+          .setMediaFromNetwork(url, hwAcc: VlcDeviceProfile.hwAcc)
           .timeout(const Duration(seconds: 8), onTimeout: () {});
       await _controller!.setVolume(_muted ? 0 : 100);
       _armNoSignalTimer();

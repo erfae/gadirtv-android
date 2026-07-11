@@ -9,7 +9,7 @@ import '../theme.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v2.0.6';
+const String kAppVersionLabel = 'v2.0.7';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -236,7 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: const Text(
-                    'GadirTV $kAppVersionLabel',
+                    'GadirTV $kAppVersionLabel · Xiaomi / Android TV',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: GtvTheme.redHi,
