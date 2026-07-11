@@ -25,6 +25,9 @@ class GtvTheme {
       scaffoldBackgroundColor: bg,
       colorScheme: base,
       fontFamily: 'Roboto',
+      focusColor: red.withOpacity(0.35),
+      hoverColor: Colors.white.withOpacity(0.06),
+      highlightColor: red.withOpacity(0.18),
       textTheme: const TextTheme(
         displayLarge: TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
         headlineMedium: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
