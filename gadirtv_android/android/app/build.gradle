@@ -33,7 +33,7 @@ if (hasKeystore) {
 
 android {
     namespace "com.gadir.tv"
-    compileSdk 34
+    compileSdk 35
     ndkVersion "26.3.11579264"
 
     compileOptions {
@@ -100,6 +100,14 @@ android {
     packagingOptions {
         pickFirst 'lib/**/libc++_shared.so'
         pickFirst 'lib/**/libjsc.so'
+        // Force extracted native libs. Some older Android TV box
+        // firmwares (Amlogic S905/S912 / Xiaomi Mi TV Box) fail to
+        // install APKs whose .so files are packed uncompressed, which
+        // is the AGP 8 default. Extracting on install produces the
+        // classic /data/data/.../lib layout every device supports.
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
