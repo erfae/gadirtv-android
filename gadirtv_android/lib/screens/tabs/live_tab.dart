@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 
 import '../../i18n/strings.dart';
@@ -13,6 +14,7 @@ import '../../services/vlc_bootstrap.dart';
 import '../../services/vlc_device_profile.dart';
 import '../../theme.dart';
 import '../../widgets/category_list_rail.dart';
+import '../../widgets/gtv_focusable.dart';
 import '../../widgets/no_signal_test_card.dart';
 
 /// Live TV tab — split view:
@@ -691,7 +693,7 @@ class _EpgBar extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────
 
-class _ChannelRow extends StatelessWidget {
+class _ChannelRow extends StatefulWidget {
   const _ChannelRow({
     required this.channel,
     required this.isFavorite,
@@ -709,47 +711,67 @@ class _ChannelRow extends StatelessWidget {
   final VoidCallback onToggleFavorite;
 
   @override
+  State<_ChannelRow> createState() => _ChannelRowState();
+}
+
+class _ChannelRowState extends State<_ChannelRow> {
+  bool _focused = false;
+
+  @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      onDoubleTap: onDoubleTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? GtvTheme.red.withOpacity(0.12) : GtvTheme.surface,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: selected ? GtvTheme.red : GtvTheme.border),
+    return FocusableActionDetector(
+      onShowFocusHighlight: (v) => setState(() => _focused = v),
+      onShowHoverHighlight: (v) => setState(() => _focused = v),
+      mouseCursor: SystemMouseCursors.click,
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap();
+            return null;
+          },
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 34, height: 34,
-              decoration: BoxDecoration(
-                color: GtvTheme.bg,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: GtvTheme.border),
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onDoubleTap: widget.onDoubleTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: widget.selected ? GtvTheme.red.withOpacity(0.12) : GtvTheme.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _focused ? GtvTheme.red : (widget.selected ? GtvTheme.red : GtvTheme.border),
+              width: _focused ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34, height: 34,
+                decoration: BoxDecoration(
+                  color: GtvTheme.bg,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: GtvTheme.border),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.live_tv_rounded, color: widget.selected ? GtvTheme.red : GtvTheme.textDim, size: 18),
               ),
-              alignment: Alignment.center,
-              child: Icon(Icons.live_tv_rounded, color: selected ? GtvTheme.red : GtvTheme.textDim, size: 18),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(channel.name,
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
-            ),
-            InkWell(
-              onTap: onToggleFavorite,
-              borderRadius: BorderRadius.circular(999),
-              child: Padding(
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(widget.channel.name,
+                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              GtvFocusable(
+                borderRadius: BorderRadius.circular(999),
                 padding: const EdgeInsets.all(6),
-                child: Icon(isFavorite ? Icons.favorite : Icons.favorite_border,
-                    color: isFavorite ? GtvTheme.red : Colors.white54, size: 20),
+                onTap: widget.onToggleFavorite,
+                child: Icon(widget.isFavorite ? Icons.favorite : Icons.favorite_border,
+                    color: widget.isFavorite ? GtvTheme.red : Colors.white54, size: 20),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

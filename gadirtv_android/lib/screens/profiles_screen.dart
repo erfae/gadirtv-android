@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/profile.dart';
@@ -73,9 +74,11 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+            child: FocusTraversalGroup(
+              policy: OrderedTraversalPolicy(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 const Text(
                   '¿Quién está viendo?',
                   style: TextStyle(fontSize: 42, fontWeight: FontWeight.w800, color: Colors.white),
@@ -108,19 +111,31 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                 ),
                 const SizedBox(height: 48),
                 if (_profiles.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: () => setState(() => _manage = !_manage),
-                    icon: Icon(
-                      _manage ? Icons.check_rounded : Icons.edit_rounded,
-                      color: GtvTheme.textDim,
-                      size: 18,
-                    ),
-                    label: Text(
-                      _manage ? 'Listo' : 'Gestionar perfiles',
-                      style: const TextStyle(color: GtvTheme.textDim, fontSize: 14),
+                  FocusableActionDetector(
+                    onShowFocusHighlight: (_) {},
+                    actions: {
+                      ActivateIntent: CallbackAction<ActivateIntent>(
+                        onInvoke: (_) {
+                          setState(() => _manage = !_manage);
+                          return null;
+                        },
+                      ),
+                    },
+                    child: TextButton.icon(
+                      onPressed: () => setState(() => _manage = !_manage),
+                      icon: Icon(
+                        _manage ? Icons.check_rounded : Icons.edit_rounded,
+                        color: GtvTheme.textDim,
+                        size: 18,
+                      ),
+                      label: Text(
+                        _manage ? 'Listo' : 'Gestionar perfiles',
+                        style: const TextStyle(color: GtvTheme.textDim, fontSize: 14),
+                      ),
                     ),
                   ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -160,78 +175,85 @@ class _AvatarTileState extends State<_AvatarTile> {
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
+    return FocusableActionDetector(
       focusNode: _focus,
-      onFocusChange: (v) => setState(() => _hover = v),
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: SizedBox(
-            width: 132,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: 132,
-                      height: 132,
-                      decoration: BoxDecoration(
-                        color: widget.color,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: _hover ? Colors.white : Colors.transparent,
-                          width: 3,
-                        ),
-                        boxShadow: _hover
-                            ? [BoxShadow(color: widget.color.withOpacity(0.4), blurRadius: 22, spreadRadius: 2)]
-                            : null,
+      onShowFocusHighlight: (v) => setState(() => _hover = v),
+      onShowHoverHighlight: (v) => setState(() => _hover = v),
+      mouseCursor: widget.onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      actions: widget.onTap != null
+          ? {
+              ActivateIntent: CallbackAction<ActivateIntent>(
+                onInvoke: (_) {
+                  widget.onTap?.call();
+                  return null;
+                },
+              ),
+            }
+          : const {},
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: SizedBox(
+          width: 132,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 132,
+                    height: 132,
+                    decoration: BoxDecoration(
+                      color: widget.color,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: _hover ? Colors.white : Colors.transparent,
+                        width: 3,
                       ),
-                      child: Center(
-                        child: Icon(
-                          widget.dashed ? Icons.add_rounded : Icons.person_rounded,
-                          size: 68,
-                          color: Colors.white.withOpacity(widget.dashed ? 0.6 : 0.95),
+                      boxShadow: _hover
+                          ? [BoxShadow(color: widget.color.withOpacity(0.4), blurRadius: 22, spreadRadius: 2)]
+                          : null,
+                    ),
+                    child: Center(
+                      child: Icon(
+                        widget.dashed ? Icons.add_rounded : Icons.person_rounded,
+                        size: 68,
+                        color: Colors.white.withOpacity(widget.dashed ? 0.6 : 0.95),
+                      ),
+                    ),
+                  ),
+                  if (widget.onDelete != null)
+                    Positioned(
+                      top: -10,
+                      right: -10,
+                      child: GestureDetector(
+                        onTap: widget.onDelete,
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: const BoxDecoration(
+                            color: GtvTheme.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
                         ),
                       ),
                     ),
-                    if (widget.onDelete != null)
-                      Positioned(
-                        top: -10,
-                        right: -10,
-                        child: GestureDetector(
-                          onTap: widget.onDelete,
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: const BoxDecoration(
-                              color: GtvTheme.red,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
-                          ),
-                        ),
-                      ),
-                  ],
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                widget.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: _hover ? Colors.white : GtvTheme.textDim,
                 ),
-                const SizedBox(height: 14),
-                Text(
-                  widget.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: _hover ? Colors.white : GtvTheme.textDim,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

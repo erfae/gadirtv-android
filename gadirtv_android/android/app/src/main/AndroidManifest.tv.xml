@@ -9,10 +9,48 @@
 
     <uses-feature
         android:name="android.software.leanback"
-        android:required="false" />
+        android:required="true" />
     <uses-feature
         android:name="android.hardware.touchscreen"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.faketouch"
         android:required="false" />
+    <uses-feature
+        android:name="android.hardware.gamepad"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.location"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
+    <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="false"
+        tools:node="merge"
+        tools:replace="android:required" />
 
     <application
         android:label="GadirTV"
@@ -59,6 +97,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <meta-data
+            android:name="com.google.android.tv.feature"
+            android:value="true" />
 
         <!-- Force legacy Skia renderer instead of Impeller. Some Android
              TV boxes (esp. Amlogic S905-based Xiaomi Mi TV Box variants)

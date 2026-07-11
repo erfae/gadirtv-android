@@ -12,6 +12,7 @@ import 'services/plugins_bootstrap.dart';
 import 'services/prefs_settings.dart';
 import 'services/profile_store.dart';
 import 'theme.dart';
+import 'utils/tv_utils.dart';
 
 Future<void> main() async {
   await runZonedGuarded(() async {
@@ -53,6 +54,9 @@ Future<void> main() async {
     try {
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } catch (_) {}
+
+    // Warm TV detection cache so focus-heavy screens can adapt if needed.
+    unawaited(TvUtils.isAndroidTv());
 
     String initialLang = 'es';
     try {

@@ -63,5 +63,5 @@ flutter build apk --release
 - 🟡 **Phase 2:** Categories & lists (Live / Movies / Series).
 - ⬜ **Phase 3:** Player (media_kit) with custom controls.
 - ⬜ **Phase 4:** Details + resume playback.
-- ⬜ **Phase 5:** Android TV / Fire TV D-pad focus.
+- ✅ **Phase 5:** Android TV / Fire TV D-pad focus + leanback launcher.
 - ⬜ **Phase 6:** Signed release APK.
