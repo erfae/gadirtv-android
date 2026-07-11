@@ -151,17 +151,17 @@ jobs:
           cp android/app/src/main/AndroidManifest.xml android/app/src/main/AndroidManifest.phone.backup.xml
           cp android/app/src/main/AndroidManifest.tv.xml android/app/src/main/AndroidManifest.xml
 
-      - name: Build TV APK (arm64-v8a only — Xiaomi Mi Box, Chromecast GTV, Sony 2018+, Nvidia Shield)
+      - name: Build TV APK (arm64-v8a — Android TV / TV Box / Google TV)
         run: flutter build apk --release --target-platform=android-arm64
 
       - name: Rename output
-        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/GadirTV-Xiaomi-AndroidTV-arm64.apk
+        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/GadirTV-AndroidTV.apk
 
       - name: Upload TV APK
         uses: actions/upload-artifact@v4
         with:
-          name: GadirTV-Xiaomi-AndroidTV-apk
-          path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-Xiaomi-AndroidTV-arm64.apk
+          name: GadirTV-AndroidTV-apk
+          path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-AndroidTV.apk
           if-no-files-found: error
 
       - name: Build TV DEBUG APK (arm64-v8a — muestra pantalla roja con stack trace si crashea)
