@@ -1,10 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Manifest override — cronet_http declares minSdk 24 but the app
-         gracefully falls back to IOClient on older devices. -->
-    <uses-sdk tools:overrideLibrary="io.flutter.plugins.cronet_http" />
-
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -73,13 +69,13 @@
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
-        <!-- Disable the new Android SurfaceControl path introduced in
-             Flutter 3.24+. Some Sony Bravia and Xiaomi Amlogic firmwares
-             (Android 9-11) ship broken SurfaceControl implementations
-             that make the Flutter engine crash before rendering. -->
+        <!-- Disable the Android SurfaceControl swapchain path. The key must be
+             DisableSurfaceControl=true (NOT EnableSurfaceControl=false — that
+             key is ignored by the engine). Broken SurfaceControl drivers on
+             Sony Bravia / Xiaomi Amlogic TV boxes crash before first frame. -->
         <meta-data
-            android:name="io.flutter.embedding.android.EnableSurfaceControl"
-            android:value="false" />
+            android:name="io.flutter.embedding.android.DisableSurfaceControl"
+            android:value="true" />
     </application>
 
     <queries>

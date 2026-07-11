@@ -61,6 +61,10 @@ jobs:
             echo "ERROR: $REG missing flutter_vlc_player — run flutter pub get"
             exit 1
           fi
+          if grep -qE 'jni|cronet_http|media_kit' "$REG"; then
+            echo "ERROR: $REG references jni/cronet/media_kit — run flutter pub get"
+            exit 1
+          fi
 
       - name: Build RELEASE APKs (uno por arquitectura — más pequeños, más fiables)
         run: flutter build apk --release --split-per-abi --target-platform=android-arm,android-arm64,android-x64
@@ -129,6 +133,10 @@ jobs:
           fi
           if ! grep -q flutter_vlc_player "$REG"; then
             echo "ERROR: $REG missing flutter_vlc_player — run flutter pub get"
+            exit 1
+          fi
+          if grep -qE 'jni|cronet_http|media_kit' "$REG"; then
+            echo "ERROR: $REG references jni/cronet/media_kit — run flutter pub get"
             exit 1
           fi
 
