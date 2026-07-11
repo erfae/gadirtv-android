@@ -50,6 +50,18 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Verify plugin registrant matches pubspec (no stale media_kit refs)
+        run: |
+          REG=android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+          if grep -q media_kit "$REG"; then
+            echo "ERROR: $REG still references removed media_kit — run flutter pub get"
+            exit 1
+          fi
+          if ! grep -q flutter_vlc_player "$REG"; then
+            echo "ERROR: $REG missing flutter_vlc_player — run flutter pub get"
+            exit 1
+          fi
+
       - name: Build RELEASE APKs (uno por arquitectura — más pequeños, más fiables)
         run: flutter build apk --release --split-per-abi --target-platform=android-arm,android-arm64,android-x64
 
@@ -107,6 +119,18 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Verify plugin registrant matches pubspec (no stale media_kit refs)
+        run: |
+          REG=android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+          if grep -q media_kit "$REG"; then
+            echo "ERROR: $REG still references removed media_kit — run flutter pub get"
+            exit 1
+          fi
+          if ! grep -q flutter_vlc_player "$REG"; then
+            echo "ERROR: $REG missing flutter_vlc_player — run flutter pub get"
+            exit 1
+          fi
 
       - name: Swap in TV-only manifest (leanback required, no phone launcher)
         run: |
