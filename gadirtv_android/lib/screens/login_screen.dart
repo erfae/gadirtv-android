@@ -12,7 +12,7 @@ import '../widgets/gtv_tv_text_field.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v2.1.8';
+const String kAppVersionLabel = 'v2.1.9';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -39,6 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _hostBrowse = FocusNode();
   final _userBrowse = FocusNode();
   final _passBrowse = FocusNode();
+  final _passToggleBrowse = FocusNode();
   final _nameBrowse = FocusNode();
   final _m3uBrowse = FocusNode();
   final _m3uNameBrowse = FocusNode();
@@ -48,6 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _busy = false;
   bool _passVisible = false;
+  bool _fieldEditing = false;
   String? _error;
   String? _progress;
   String? _diagnostic;
@@ -58,6 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _hostBrowse.dispose();
     _userBrowse.dispose();
     _passBrowse.dispose();
+    _passToggleBrowse.dispose();
     _nameBrowse.dispose();
     _m3uBrowse.dispose();
     _m3uNameBrowse.dispose();
@@ -215,6 +218,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final keyboardPad = _fieldEditing ? 340.0 : 0.0;
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -233,7 +237,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           controller: _scrollController,
-          padding: EdgeInsets.fromLTRB(48, 24, 48, 24 + bottomInset),
+          padding: EdgeInsets.fromLTRB(48, 24, 48, 24 + bottomInset + keyboardPad),
           child: Align(
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
@@ -402,6 +406,8 @@ class _LoginScreenState extends State<LoginScreen> {
         GtvTvTextField(
           controller: _host,
           browseFocusNode: _hostBrowse,
+          scrollController: _scrollController,
+          onEditingChanged: (v) => setState(() => _fieldEditing = v),
           onAdvance: () => _userBrowse.requestFocus(),
           textInputAction: TextInputAction.next,
           keyboardType: TextInputType.url,
@@ -418,6 +424,8 @@ class _LoginScreenState extends State<LoginScreen> {
         GtvTvTextField(
           controller: _user,
           browseFocusNode: _userBrowse,
+          scrollController: _scrollController,
+          onEditingChanged: (v) => setState(() => _fieldEditing = v),
           onAdvance: () => _passBrowse.requestFocus(),
           textInputAction: TextInputAction.next,
           autocorrect: false,
@@ -429,28 +437,28 @@ class _LoginScreenState extends State<LoginScreen> {
         GtvTvTextField(
           controller: _pass,
           browseFocusNode: _passBrowse,
+          toggleFocusNode: _passToggleBrowse,
+          scrollController: _scrollController,
+          keyboardLift: 380,
+          onEditingChanged: (v) => setState(() => _fieldEditing = v),
           onAdvance: () => _nameBrowse.requestFocus(),
+          onToggleObscure: _busy ? null : () => setState(() => _passVisible = !_passVisible),
           textInputAction: TextInputAction.next,
           obscureText: !_passVisible,
           autocorrect: false,
           enableSuggestions: false,
           enabled: !_busy,
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             hintText: 'Contraseña',
-            suffixIcon: IconButton(
-              icon: Icon(
-                _passVisible ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                color: GtvTheme.textDim,
-              ),
-              tooltip: _passVisible ? 'Ocultar contraseña' : 'Mostrar contraseña',
-              onPressed: _busy ? null : () => setState(() => _passVisible = !_passVisible),
-            ),
           ),
         ),
         const SizedBox(height: 14),
         GtvTvTextField(
           controller: _name,
           browseFocusNode: _nameBrowse,
+          scrollController: _scrollController,
+          keyboardLift: 400,
+          onEditingChanged: (v) => setState(() => _fieldEditing = v),
           textInputAction: TextInputAction.done,
           enabled: !_busy,
           decoration: const InputDecoration(hintText: 'Nombre del perfil (opcional)'),
@@ -461,6 +469,8 @@ class _LoginScreenState extends State<LoginScreen> {
         GtvTvTextField(
           controller: _m3uUrl,
           browseFocusNode: _m3uBrowse,
+          scrollController: _scrollController,
+          onEditingChanged: (v) => setState(() => _fieldEditing = v),
           onAdvance: () => _m3uNameBrowse.requestFocus(),
           textInputAction: TextInputAction.next,
           keyboardType: TextInputType.url,
@@ -477,6 +487,9 @@ class _LoginScreenState extends State<LoginScreen> {
         GtvTvTextField(
           controller: _name,
           browseFocusNode: _m3uNameBrowse,
+          scrollController: _scrollController,
+          keyboardLift: 380,
+          onEditingChanged: (v) => setState(() => _fieldEditing = v),
           textInputAction: TextInputAction.done,
           enabled: !_busy,
           decoration: const InputDecoration(hintText: 'Nombre del perfil (opcional)'),
