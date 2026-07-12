@@ -140,8 +140,8 @@ Step 7 'Vinculando Flutter con el Android SDK'
 
 # ---------- 8. Build APKs -----------------------------------------------------
 
-Step 8 'Compilando APKs release (esto tarda 5-10 minutos)'
-& flutter build apk --release --split-per-abi
+Step 8 'Compilando APKs release ARM (movil + TV Box, sin x86 emulador)'
+& flutter build apk --release --split-per-abi --target-platform=android-arm,android-arm64
 if ($LASTEXITCODE -ne 0) { throw 'flutter build apk fallo' }
 
 $apkDir  = Join-Path $PROJECT 'build\app\outputs\flutter-apk'
@@ -153,7 +153,7 @@ Pop-Location
 
 Say "==== APK GENERADO CON EXITO ====" 'Green'
 Say "APKs copiados a: $outDir" 'Green'
-Say "Abre esa carpeta y transfiere `"app-arm64-v8a-release.apk`" a tu Android." 'Green'
+Say "TV Box: prueba `"app-armeabi-v7a-release.apk`" primero. Movil: `"app-arm64-v8a-release.apk`"." 'Green'
 
 # Open the folder in Explorer for the user
 Start-Process explorer.exe $outDir

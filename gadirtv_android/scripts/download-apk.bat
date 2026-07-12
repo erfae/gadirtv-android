@@ -12,8 +12,8 @@ curl.exe -fL --retry 5 --retry-delay 3 -o "%DEST%\GadirTV-AndroidTV.apk" "%URL%"
 if not errorlevel 1 goto :ok
 
 echo.
-echo Reintento con v2.3.8...
-set URL=https://github.com/erfae/gadirtv-android/releases/download/v2.3.8/GadirTV-AndroidTV.apk
+echo Reintento con v2.4.1...
+set URL=https://github.com/erfae/gadirtv-android/releases/download/v2.4.1/GadirTV-AndroidTV.apk
 curl.exe -fL --retry 5 --retry-delay 3 -o "%DEST%\GadirTV-AndroidTV.apk" "%URL%"
 if errorlevel 1 goto :fail
 
