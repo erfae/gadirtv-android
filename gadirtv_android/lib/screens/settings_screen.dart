@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../i18n/strings.dart';
 import '../services/backup_service.dart';
+import '../services/player_constants.dart';
 import '../services/prefs_settings.dart';
 import '../theme.dart';
+import '../widgets/gtv_focusable.dart';
 
 /// Ajustes globales — copia de seguridad e idioma. Se accede desde el
 /// icono del engranaje del topbar.
@@ -23,6 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _prefs = PrefsSettings();
   final _backup = BackupService();
   String _lang = 'es';
+  String _player = PlayerEngine.defaultEngine;
   bool _loading = true;
   bool _busy = false;
 
@@ -33,12 +36,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _load() async {
-    final v = await _prefs.getLanguage();
+    final results = await Future.wait([
+      _prefs.getLanguage(),
+      _prefs.getPlayerEngine(),
+    ]);
     if (!mounted) return;
     setState(() {
-      _lang = v;
+      _lang = results[0] as String;
+      _player = results[1] as String;
       _loading = false;
     });
+  }
+
+  Future<void> _setPlayer(String engine) async {
+    await _prefs.setPlayerEngine(engine);
+    if (!mounted) return;
+    setState(() => _player = engine);
   }
 
   Future<void> _setLanguage(String code) async {
@@ -107,6 +120,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
           : ListView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               children: [
+                const SizedBox(height: 30),
+                _sectionTitle('Reproductor'),
+                const SizedBox(height: 4),
+                Container(
+                  decoration: BoxDecoration(
+                    color: GtvTheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: GtvTheme.border),
+                  ),
+                  child: Column(
+                    children: [
+                      for (final engine in [
+                        PlayerEngine.exo,
+                        PlayerEngine.vlc,
+                        PlayerEngine.external,
+                      ])
+                        GtvFocusable(
+                          onTap: () => _setPlayer(engine),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _player == engine
+                                      ? Icons.radio_button_checked_rounded
+                                      : Icons.radio_button_unchecked_rounded,
+                                  color: _player == engine ? GtvTheme.red : GtvTheme.textDim,
+                                  size: 22,
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Text(
+                                    PlayerEngine.labels[engine]!,
+                                    style: TextStyle(
+                                      color: _player == engine ? GtvTheme.redHi : Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: _player == engine ? FontWeight.w700 : FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
                 _sectionTitle(t.language),
                 const SizedBox(height: 4),
                 Container(
@@ -205,7 +267,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: Text('GadirTV',
                             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                       ),
-                      const Text('v0.3.19',
+                      const Text('v2.3.0',
                           style: TextStyle(color: GtvTheme.textDim, fontSize: 12)),
                     ],
                   ),

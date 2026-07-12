@@ -10,6 +10,7 @@ import '../../models/media.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
 import '../../services/favorites_store.dart';
+import '../../services/player_constants.dart';
 import '../../services/vlc_bootstrap.dart';
 import '../../services/vlc_device_profile.dart';
 import '../../theme.dart';
@@ -402,8 +403,8 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
       autoPlay: true,
       options: VlcPlayerOptions(
         advanced: VlcAdvancedOptions([
-          VlcAdvancedOptions.networkCaching(1500),
-          VlcAdvancedOptions.liveCaching(1500),
+          VlcAdvancedOptions.networkCaching(PlayerConstants.vlcLiveCacheMs),
+          VlcAdvancedOptions.liveCaching(PlayerConstants.vlcLiveCacheMs),
         ]),
         http: VlcHttpOptions([
           VlcHttpOptions.httpReconnect(true),
@@ -434,7 +435,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   void _armNoSignalTimer() {
     _noSignalTimer?.cancel();
     final startPos = _lastPos;
-    _noSignalTimer = Timer(const Duration(seconds: 10), () {
+    _noSignalTimer = Timer(PlayerConstants.noSignalDelay, () {
       if (!mounted) return;
       if (_lastPos - startPos < const Duration(seconds: 1) &&
           widget.streamUrl != null) {

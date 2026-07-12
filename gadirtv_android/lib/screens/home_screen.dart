@@ -16,7 +16,7 @@ import '../utils/xtream_utils.dart';
 import '../widgets/gtv_focusable.dart';
 import '../widgets/quick_actions_sheet.dart';
 import 'movie_detail_screen.dart';
-import 'player_screen.dart';
+import '../services/playback_launcher.dart';
 import 'search_screen.dart';
 import 'series_detail_screen.dart';
 import 'settings_screen.dart';
@@ -104,23 +104,20 @@ class _HomeScreenState extends State<HomeScreen> {
     final sid = movieStreamId(info, m.streamId);
     final url = _api.streamUrl(_profile!, kind: 'movie', streamId: sid, ext: ext);
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PlayerScreen(
-          playable: Playable(
-            kind: 'movie',
-            id: m.streamId.toString(),
-            title: m.name,
-            url: url,
-          ),
-        ),
+    await PlaybackLauncher.launch(
+      context,
+      playable: Playable(
+        kind: 'movie',
+        id: sid.toString(),
+        title: m.name,
+        url: url,
       ),
     );
   }
 
   /// Pick the first episode (season 1, ep 1) of a series and play it. This
   /// is the Netflix behaviour when the user hits PLAY on a series poster.
-  void _playFirstEpisode(Series s, Map<String, dynamic> info) {
+  Future<void> _playFirstEpisode(Series s, Map<String, dynamic> info) async {
     final episodes = info['episodes'];
     if (episodes is! Map || episodes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -141,36 +138,30 @@ class _HomeScreenState extends State<HomeScreen> {
     final ext = pickContainerExt(ep, null, fallback: 'mp4');
     final epNum = (ep['episode_num'] ?? '1').toString();
     final url = _api.streamUrl(_profile!, kind: 'series', streamId: id, ext: ext);
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PlayerScreen(
-          playable: Playable(
-            kind: 'series',
-            id: id,
-            title: '${s.name} · T$firstSeason E$epNum',
-            subtitle: (ep['title'] ?? '').toString(),
-            url: url,
-          ),
-        ),
+    await PlaybackLauncher.launch(
+      context,
+      playable: Playable(
+        kind: 'series',
+        id: id,
+        title: '${s.name} · T$firstSeason E$epNum',
+        subtitle: (ep['title'] ?? '').toString(),
+        url: url,
       ),
     );
   }
 
-  void _playChannel(LiveChannel c) {
+  Future<void> _playChannel(LiveChannel c) async {
     final url = _api.streamUrl(_profile!, kind: 'live', streamId: c.streamId, ext: 'ts');
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PlayerScreen(
-          playable: Playable(
-            kind: 'live',
-            id: c.streamId.toString(),
-            title: c.name,
-            url: url,
-          ),
-          liveProfile: _profile,
-          liveStreamId: c.streamId,
-        ),
+    await PlaybackLauncher.launch(
+      context,
+      playable: Playable(
+        kind: 'live',
+        id: c.streamId.toString(),
+        title: c.name,
+        url: url,
       ),
+      liveProfile: _profile,
+      liveStreamId: c.streamId,
     );
   }
 
@@ -470,16 +461,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final url = ch['url'] as String? ?? '';
     if (url.isEmpty) return;
     final name = ch['name'] as String? ?? 'Canal';
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => PlayerScreen(
-        playable: Playable(
-          kind: 'live',
-          id: url.hashCode.toString(),
-          title: name,
-          url: url,
-        ),
+    await PlaybackLauncher.launch(
+      context,
+      playable: Playable(
+        kind: 'live',
+        id: url.hashCode.toString(),
+        title: name,
+        url: url,
       ),
-    ));
+    );
   }
 }
 

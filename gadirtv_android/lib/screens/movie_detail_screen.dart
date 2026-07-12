@@ -10,7 +10,7 @@ import '../services/resume_store.dart';
 import '../theme.dart';
 import '../utils/xtream_utils.dart';
 import '../widgets/gtv_focusable.dart';
-import 'player_screen.dart';
+import '../services/playback_launcher.dart';
 
 /// Movie detail — mobile-first: backdrop hero + poster overlay + synopsis +
 /// PLAY / CONTINUAR button.
@@ -54,7 +54,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     });
   }
 
-  void _play({bool fromStart = false}) {
+  Future<void> _play({bool fromStart = false}) async {
     final meta = _info['info'] is Map ? Map<String, dynamic>.from(_info['info'] as Map) : <String, dynamic>{};
     final ext = pickContainerExt(_mvInfo, meta, fallback: widget.movie.containerExt);
     final sid = movieStreamId(_info, widget.movie.streamId);
@@ -64,20 +64,19 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       streamId: sid,
       ext: ext,
     );
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PlayerScreen(
-          playable: Playable(
-            kind: 'movie',
-            id: widget.movie.streamId.toString(),
-            title: widget.movie.name,
-            subtitle: (meta['genre'] ?? '').toString(),
-            url: url,
-            initialPositionMs: fromStart ? 0 : (_resumeEntry?.positionMs ?? 0),
-          ),
-        ),
+    await PlaybackLauncher.launch(
+      context,
+      playable: Playable(
+        kind: 'movie',
+        id: widget.movie.streamId.toString(),
+        title: widget.movie.name,
+        subtitle: (meta['genre'] ?? '').toString(),
+        url: url,
+        initialPositionMs: fromStart ? 0 : (_resumeEntry?.positionMs ?? 0),
       ),
-    ).then((_) => _load());
+    );
+    if (!mounted) return;
+    _load();
   }
 
   @override
