@@ -71,11 +71,23 @@ cd gadirtv_android
 ./scripts/build-tv-apk.sh arm64          # Shield / TVs 64-bit
 ```
 
-**Windows:**
+**Windows (si tienes Flutter instalado):**
+```cmd
+cd gadirtv_android
+COMPILAR_TV.bat
+```
+
+O solo el script de build:
 ```cmd
 scripts\build-tv-apk.bat
 scripts\download-tv-apk.bat
 ```
+
+**Windows (sin Flutter — descarga automática de JDK/Flutter/SDK):**
+```cmd
+gadirtv_windows_builder\COMPILAR_APK.bat
+```
+(Requiere que `gadirtv_android` y `gadirtv_windows_builder` estén en la misma carpeta padre.)
 
 Si `flutter pub get` falla o la compilación da errores de plugins, restaura el registrant mínimo antes de compilar:
 ```bash

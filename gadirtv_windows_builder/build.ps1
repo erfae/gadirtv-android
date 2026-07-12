@@ -14,7 +14,12 @@ $WORK       = 'C:\GadirTVBuild'
 $JDK_DIR    = "$WORK\jdk17"
 $FLUTTER    = "$WORK\flutter"
 $SDK        = "$WORK\android-sdk"
-$SRC        = Join-Path (Split-Path -Parent $PSCommandPath) 'gadirtv_android'
+$builderDir = Split-Path -Parent $PSCommandPath
+$SRC        = Join-Path $builderDir 'gadirtv_android'
+if (-not (Test-Path $SRC)) {
+    # Repo layout: gadirtv_android/ and gadirtv_windows_builder/ are siblings.
+    $SRC = Join-Path (Split-Path -Parent $builderDir) 'gadirtv_android'
+}
 $PROJECT    = "$WORK\project"
 
 $JDK_URL     = 'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.11%2B9/OpenJDK17U-jdk_x64_windows_hotspot_17.0.11_9.zip'
@@ -52,8 +57,10 @@ function Extract([string]$zip, [string]$dest) {
 # ---------- prerequisites ------------------------------------------------------
 
 if (-not (Test-Path $SRC)) {
-    Say "ERROR: no encuentro la carpeta del proyecto en $SRC" 'Red'
-    Say "Este script debe estar junto a la carpeta 'gadirtv_android/'." 'Red'
+    Say "ERROR: no encuentro la carpeta del proyecto en:" 'Red'
+    Say "  $builderDir\gadirtv_android" 'Red'
+    Say "  ni en $(Split-Path -Parent $builderDir)\gadirtv_android" 'Red'
+    Say "Descarga el repo completo o coloca 'gadirtv_android' junto a este script." 'Red'
     exit 1
 }
 

@@ -13,9 +13,12 @@
   · 15-20 minutos de tu tiempo (mayormente esperando)
 
 PASOS:
-  1. Descomprime este ZIP en una carpeta con nombre corto,
-     por ejemplo C:\GadirTV\  (evita rutas largas con espacios).
-  2. Haz clic DERECHO sobre "COMPILAR_APK.bat".
+  1. Descomprime el ZIP del repo en una carpeta corta, por ejemplo:
+       C:\GadirTV\
+     Debe quedar asi:
+       C:\GadirTV\gadirtv_android\
+       C:\GadirTV\gadirtv_windows_builder\
+  2. Haz clic DERECHO sobre "COMPILAR_APK.bat" (en esta carpeta).
   3. Elige "Ejecutar como administrador".
   4. Cuando salga el aviso de Windows, dale a "Si".
   5. Espera. La ventana negra ira mostrando lo que hace.
