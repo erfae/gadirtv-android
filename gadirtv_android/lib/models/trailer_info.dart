@@ -19,4 +19,17 @@ class TrailerInfo {
     if (spanish) return spanishUrl ?? originalUrl;
     return originalUrl ?? spanishUrl;
   }
+
+  /// Best URL to play without asking the user (Spanish first when distinct).
+  String? get preferredUrl {
+    if (hasLanguageChoice) return spanishUrl;
+    return spanishUrl ?? originalUrl;
+  }
+
+  /// Whether the embedded player should use Spanish UI/captions params.
+  bool get preferSpanishEmbed {
+    if (spanishUrl == null || spanishUrl!.isEmpty) return false;
+    if (!hasLanguageChoice) return true;
+    return preferredUrl == spanishUrl;
+  }
 }

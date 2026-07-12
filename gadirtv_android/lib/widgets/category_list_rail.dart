@@ -4,36 +4,69 @@ import 'package:flutter/services.dart';
 import '../theme.dart';
 import '../utils/tv_layout.dart';
 
-/// Vertical category list — used as the left rail in Live TV, Movies
-/// and Series tabs. Each row is a full-width tap target with a red
-/// accent bar on the selected entry and D-pad focus ring.
-class CategoryListRail extends StatelessWidget {
+/// Vertical category list — left rail for Live / Movies / Series.
+class CategoryListRail extends StatefulWidget {
   const CategoryListRail({
     super.key,
     required this.categories,
     required this.selectedId,
     required this.onSelected,
+    this.onMoveRight,
   });
 
   final List<(String, String)> categories;
   final String selectedId;
   final ValueChanged<String> onSelected;
+  final VoidCallback? onMoveRight;
+
+  @override
+  State<CategoryListRail> createState() => CategoryListRailState();
+}
+
+class CategoryListRailState extends State<CategoryListRail> {
+  final _rowFocusNodes = <FocusNode>[];
+
+  @override
+  void dispose() {
+    for (final n in _rowFocusNodes) {
+      n.dispose();
+    }
+    super.dispose();
+  }
+
+  void _syncNodes() {
+    while (_rowFocusNodes.length < widget.categories.length) {
+      _rowFocusNodes.add(FocusNode());
+    }
+    while (_rowFocusNodes.length > widget.categories.length) {
+      _rowFocusNodes.removeLast().dispose();
+    }
+  }
+
+  void focusSelected() {
+    final i = widget.categories.indexWhere((c) => c.$1 == widget.selectedId);
+    if (i < 0) return;
+    if (i < _rowFocusNodes.length) _rowFocusNodes[i].requestFocus();
+  }
 
   @override
   Widget build(BuildContext context) {
+    _syncNodes();
     return Container(
-      color: GtvTheme.surface.withOpacity(0.35),
+      color: GtvTheme.surface,
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: categories.length,
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        itemCount: widget.categories.length,
         itemBuilder: (_, i) {
-          final (id, name) = categories[i];
-          final selected = id == selectedId;
+          final (id, name) = widget.categories[i];
+          final selected = id == widget.selectedId;
           return _CategoryRow(
+            focusNode: _rowFocusNodes[i],
             name: name,
             selected: selected,
             autofocus: i == 0,
-            onTap: () => onSelected(id),
+            onTap: () => widget.onSelected(id),
+            onMoveRight: widget.onMoveRight,
           );
         },
       ),
@@ -43,16 +76,20 @@ class CategoryListRail extends StatelessWidget {
 
 class _CategoryRow extends StatefulWidget {
   const _CategoryRow({
+    required this.focusNode,
     required this.name,
     required this.selected,
     required this.onTap,
     this.autofocus = false,
+    this.onMoveRight,
   });
 
+  final FocusNode focusNode;
   final String name;
   final bool selected;
   final VoidCallback onTap;
   final bool autofocus;
+  final VoidCallback? onMoveRight;
 
   @override
   State<_CategoryRow> createState() => _CategoryRowState();
@@ -62,49 +99,64 @@ class _CategoryRowState extends State<_CategoryRow> {
   bool _focused = false;
 
   @override
-  Widget build(BuildContext context) {
-    final fontSize = TvLayout.labelFont(context, 15);
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_onFocus);
+  }
 
-    return FocusableActionDetector(
+  @override
+  void didUpdateWidget(covariant _CategoryRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode.removeListener(_onFocus);
+      widget.focusNode.addListener(_onFocus);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocus);
+    super.dispose();
+  }
+
+  void _onFocus() {
+    if (mounted) setState(() => _focused = widget.focusNode.hasFocus);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fontSize = TvLayout.labelFont(context, 13);
+
+    return Focus(
+      focusNode: widget.focusNode,
       autofocus: widget.autofocus,
-      onShowFocusHighlight: (v) {
-        setState(() => _focused = v);
-        if (v) {
-          Scrollable.ensureVisible(
-            context,
-            alignment: 0.45,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-          );
+      onKeyEvent: (_, event) {
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        if (event.logicalKey == LogicalKeyboardKey.arrowRight && widget.onMoveRight != null) {
+          widget.onMoveRight!();
+          return KeyEventResult.handled;
         }
-      },
-      onShowHoverHighlight: (v) => setState(() => _focused = v),
-      mouseCursor: SystemMouseCursors.click,
-      actions: {
-        ActivateIntent: CallbackAction<ActivateIntent>(
-          onInvoke: (_) {
-            widget.onTap();
-            return null;
-          },
-        ),
+        if (event.logicalKey == LogicalKeyboardKey.select ||
+            event.logicalKey == LogicalKeyboardKey.enter) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
       },
       child: GestureDetector(
         onTap: widget.onTap,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 48),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
           decoration: BoxDecoration(
             color: widget.selected
-                ? GtvTheme.red.withOpacity(0.15)
-                : (_focused ? GtvTheme.red.withOpacity(0.08) : Colors.transparent),
+                ? GtvTheme.red
+                : (_focused ? GtvTheme.red.withOpacity(0.2) : Colors.transparent),
             border: Border(
               left: BorderSide(
-                color: widget.selected || _focused ? GtvTheme.red : Colors.transparent,
+                color: widget.selected || _focused ? GtvTheme.redHi : Colors.transparent,
                 width: 3,
-              ),
-              right: BorderSide(
-                color: _focused ? GtvTheme.red : Colors.transparent,
-                width: 2,
               ),
             ),
           ),
@@ -112,15 +164,13 @@ class _CategoryRowState extends State<_CategoryRow> {
             alignment: Alignment.centerLeft,
             child: Text(
               widget.name,
-              maxLines: 4,
+              maxLines: 6,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: _focused
-                    ? GtvTheme.redHi
-                    : (widget.selected ? GtvTheme.red.withOpacity(0.9) : Colors.white70),
+                color: widget.selected || _focused ? Colors.white : Colors.white70,
                 fontSize: fontSize,
-                fontWeight: _focused || widget.selected ? FontWeight.w800 : FontWeight.w500,
-                height: 1.12,
+                fontWeight: widget.selected || _focused ? FontWeight.w800 : FontWeight.w500,
+                height: 1.1,
               ),
             ),
           ),

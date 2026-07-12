@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme.dart';
 import '../utils/tv_layout.dart';
@@ -19,6 +20,11 @@ class PosterCard extends StatefulWidget {
     this.rating,
     this.badge,
     this.autofocus = false,
+    this.focusNode,
+    this.onMoveLeft,
+    this.onMoveRight,
+    this.onMoveUp,
+    this.onMoveDown,
     this.isFavorite,
     this.onToggleFavorite,
   });
@@ -31,6 +37,11 @@ class PosterCard extends StatefulWidget {
   final double? rating;
   final String? badge;
   final bool autofocus;
+  final FocusNode? focusNode;
+  final VoidCallback? onMoveLeft;
+  final VoidCallback? onMoveRight;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
 
   /// When both [isFavorite] and [onToggleFavorite] are provided, a star
   /// button is drawn in the top-left corner. Filled yellow = favorite;
@@ -48,8 +59,36 @@ class _PosterCardState extends State<PosterCard> {
 
   @override
   Widget build(BuildContext context) {
-    return FocusableActionDetector(
+    return Focus(
+      focusNode: widget.focusNode,
       autofocus: widget.autofocus,
+      onKeyEvent: (_, event) {
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        final k = event.logicalKey;
+        if (k == LogicalKeyboardKey.arrowLeft && widget.onMoveLeft != null) {
+          widget.onMoveLeft!();
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.arrowRight && widget.onMoveRight != null) {
+          widget.onMoveRight!();
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.arrowUp && widget.onMoveUp != null) {
+          widget.onMoveUp!();
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.arrowDown && widget.onMoveDown != null) {
+          widget.onMoveDown!();
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.select || k == LogicalKeyboardKey.enter) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: FocusableActionDetector(
+      autofocus: widget.focusNode == null && widget.autofocus,
       onShowFocusHighlight: (v) {
         setState(() => _focused = v);
         if (v) {
@@ -186,6 +225,7 @@ class _PosterCardState extends State<PosterCard> {
           ),
         ),
       ),
+    ),
     );
   }
 

@@ -74,7 +74,7 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                flex: 11,
+                flex: 10,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -171,7 +171,7 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
               ),
               const SizedBox(width: 20),
               Expanded(
-                flex: 9,
+                flex: 11,
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: _LargePoster(posterUrl: posterUrl),
@@ -208,8 +208,8 @@ class _LargePoster extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final h = constraints.maxHeight.isFinite ? constraints.maxHeight : 320.0;
-        final w = (h * 2 / 3).clamp(140.0, 340.0);
+        final h = constraints.maxHeight.isFinite ? constraints.maxHeight : 360.0;
+        final w = (h * 2 / 3).clamp(160.0, 400.0);
         return Container(
           height: h,
           width: w,

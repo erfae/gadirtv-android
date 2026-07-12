@@ -430,7 +430,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   FocusTraversalOrder(
                     order: const NumericFocusOrder(100),
-                    child: _buildBottomNav(immersive: _tab == 0),
+                    child: _buildBottomNav(),
                   ),
                 ],
               ),
@@ -494,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBottomNav({bool immersive = false}) {
+  Widget _buildBottomNav() {
     final t = AppI18n.of(context);
     final items = <_NavItem>[
       _NavItem(icon: Icons.home_rounded, label: t.tabHome),
@@ -504,24 +504,11 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return Container(
-      decoration: BoxDecoration(
-        gradient: immersive
-            ? LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [
-                  GtvTheme.bg.withOpacity(0.98),
-                  GtvTheme.bg.withOpacity(0.7),
-                  Colors.transparent,
-                ],
-              )
-            : null,
-        color: immersive ? null : GtvTheme.bg,
-        border: immersive
-            ? null
-            : const Border(top: BorderSide(color: GtvTheme.border)),
+      decoration: const BoxDecoration(
+        color: GtvTheme.surface,
+        border: Border(top: BorderSide(color: GtvTheme.border)),
       ),
-      padding: EdgeInsets.fromLTRB(8, immersive ? 14 : 6, 8, immersive ? 8 : 6),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       child: FocusTraversalGroup(
         policy: OrderedTraversalPolicy(),
         child: Row(
@@ -535,7 +522,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   navIndex: i,
                   item: items[i],
                   selected: _tab == i,
-                  compact: immersive,
                   onTap: () => _selectTab(i),
                 ),
               ),
@@ -598,7 +584,6 @@ class _NavButton extends StatefulWidget {
     required this.item,
     required this.selected,
     required this.onTap,
-    this.compact = false,
   });
 
   final FocusNode focusNode;
@@ -606,7 +591,6 @@ class _NavButton extends StatefulWidget {
   final _NavItem item;
   final bool selected;
   final VoidCallback onTap;
-  final bool compact;
 
   @override
   State<_NavButton> createState() => _NavButtonState();
@@ -618,7 +602,6 @@ class _NavButtonState extends State<_NavButton> {
   @override
   Widget build(BuildContext context) {
     final on = widget.selected;
-    final compact = widget.compact;
     return FocusableActionDetector(
       focusNode: widget.focusNode,
       onShowFocusHighlight: (v) => setState(() => _focused = v),
@@ -636,30 +619,32 @@ class _NavButtonState extends State<_NavButton> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          padding: EdgeInsets.symmetric(
-            horizontal: compact ? 14 : 18,
-            vertical: compact ? 10 : 12,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           decoration: BoxDecoration(
-            color: on ? GtvTheme.red.withOpacity(compact ? 0.22 : 0.15) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _focused ? GtvTheme.red : Colors.transparent, width: 2),
+            color: on
+                ? GtvTheme.red
+                : (_focused ? GtvTheme.surfaceHi : GtvTheme.bg),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _focused ? GtvTheme.redHi : GtvTheme.border,
+              width: _focused ? 2 : 1,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 widget.item.icon,
-                color: on ? GtvTheme.red : (compact ? Colors.white70 : GtvTheme.textDim),
-                size: compact ? 24 : 28,
+                color: on || _focused ? Colors.white : GtvTheme.textDim,
+                size: 26,
               ),
               const SizedBox(width: 10),
               Text(
                 widget.item.label,
                 style: TextStyle(
-                  color: on ? Colors.white : (compact ? Colors.white70 : GtvTheme.textDim),
-                  fontSize: compact ? 13 : 15,
-                  fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+                  color: on || _focused ? Colors.white : GtvTheme.textDim,
+                  fontSize: 14,
+                  fontWeight: on ? FontWeight.w800 : FontWeight.w600,
                 ),
               ),
             ],

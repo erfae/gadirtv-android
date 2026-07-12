@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -40,6 +41,7 @@ class _HomeTabState extends State<HomeTab> {
   final _api = ApiService();
   final _resumeStore = ResumeStore();
   final _playFocus = FocusNode();
+  final _rng = Random();
 
   List<Movie> _recentMovies = const [];
   List<Series> _recentSeries = const [];
@@ -109,7 +111,7 @@ class _HomeTabState extends State<HomeTab> {
       }
 
       final pool = <_HeroItem>[
-        ...movies.take(6).map((m) => _HeroItem(
+        ...movies.take(12).map((m) => _HeroItem(
               title: m.name,
               imageUrl: m.icon,
               badge: 'PELÍCULA',
@@ -125,7 +127,7 @@ class _HomeTabState extends State<HomeTab> {
               },
               onOpen: () => widget.onOpenMovie(m),
             )),
-        ...series.take(6).map((s) => _HeroItem(
+        ...series.take(12).map((s) => _HeroItem(
               title: s.name,
               imageUrl: s.cover,
               badge: 'SERIE',
@@ -141,14 +143,15 @@ class _HomeTabState extends State<HomeTab> {
               },
               onOpen: () => widget.onOpenSeries(s),
             )),
-      ];
+      ]..shuffle(_rng);
 
       if (!mounted) return;
       setState(() {
         _recentMovies = movies.take(24).toList();
         _recentSeries = series.take(24).toList();
         _resume = resumeItems.take(8).toList();
-        _heroPool = pool;
+        _heroPool = pool.take(20).toList();
+        _heroIndex = 0;
         _loading = false;
       });
 
@@ -169,12 +172,20 @@ class _HomeTabState extends State<HomeTab> {
   void _startHeroRotation() {
     _heroTimer?.cancel();
     if (_heroPool.length <= 1) return;
-    _heroTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (!mounted) return;
-      final next = (_heroIndex + 1) % _heroPool.length;
-      setState(() => _heroIndex = next);
-      _loadHeroMeta(next);
-    });
+    _heroTimer = Timer.periodic(const Duration(seconds: 12), (_) => _shiftHeroRandom());
+  }
+
+  void _shiftHeroRandom() {
+    if (_heroPool.isEmpty) return;
+    var next = _rng.nextInt(_heroPool.length);
+    if (_heroPool.length > 1) {
+      while (next == _heroIndex) {
+        next = _rng.nextInt(_heroPool.length);
+      }
+    }
+    setState(() => _heroIndex = next);
+    _loadHeroMeta(next);
+    _playFocus.requestFocus();
   }
 
   Future<void> _loadHeroMeta(int index) async {

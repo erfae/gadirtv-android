@@ -9,6 +9,7 @@ import '../../theme.dart';
 import '../../utils/tv_layout.dart';
 import '../../widgets/category_list_rail.dart';
 import '../../widgets/poster_card.dart';
+import '../../widgets/poster_grid_focus.dart';
 
 /// Series tab — categories on top, portrait cover grid below.
 ///
@@ -45,10 +46,19 @@ class _SeriesTabState extends State<SeriesTab> {
   bool _loading = false;
   String? _error;
 
+  final _railKey = GlobalKey<CategoryListRailState>();
+  final _gridFocus = PosterGridFocus();
+
   @override
   void initState() {
     super.initState();
     _boot();
+  }
+
+  @override
+  void dispose() {
+    _gridFocus.dispose();
+    super.dispose();
   }
 
   Future<void> _boot() async {
@@ -89,6 +99,7 @@ class _SeriesTabState extends State<SeriesTab> {
         _series = list;
         _loading = false;
       });
+      _gridFocus.rebuild(list.length);
       return;
     }
 
@@ -105,6 +116,7 @@ class _SeriesTabState extends State<SeriesTab> {
         _loading = false;
         if (id == _allId) _allSeries = list;
       });
+      _gridFocus.rebuild(list.length);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -150,9 +162,11 @@ class _SeriesTabState extends State<SeriesTab> {
           child: SizedBox(
           width: TvLayout.categoryRailWidth(context),
           child: CategoryListRail(
+            key: _railKey,
             categories: chips,
             selectedId: _selected,
             onSelected: _load,
+            onMoveRight: () => _gridFocus.focus(0),
           ),
         ),
         ),
@@ -188,6 +202,10 @@ class _SeriesTabState extends State<SeriesTab> {
     return LayoutBuilder(builder: (context, constraints) {
       final w = constraints.maxWidth;
       final cols = w >= 1400 ? 8 : w >= 1100 ? 7 : w >= 850 ? 6 : w >= 640 ? 5 : w >= 480 ? 4 : 3;
+      _gridFocus.cols = cols;
+      if (_gridFocus.nodes.length != _series.length) {
+        _gridFocus.rebuild(_series.length);
+      }
       return GridView.builder(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -199,13 +217,20 @@ class _SeriesTabState extends State<SeriesTab> {
         itemCount: _series.length,
         itemBuilder: (_, i) {
           final s = _series[i];
+          final node = i < _gridFocus.nodes.length ? _gridFocus.nodes[i] : null;
           return PosterCard(
+            focusNode: node,
+            autofocus: i == 0,
             title: s.name,
             imageUrl: s.cover,
             rating: s.rating,
             onTap: () => widget.onOpen(s),
             isFavorite: _favoriteIds.contains(s.seriesId),
             onToggleFavorite: () => _toggleFavorite(s),
+            onMoveLeft: () => _gridFocus.move(i, -1, 0, onLeaveLeft: () => _railKey.currentState?.focusSelected()),
+            onMoveRight: () => _gridFocus.move(i, 1, 0),
+            onMoveUp: () => _gridFocus.move(i, 0, -1),
+            onMoveDown: () => _gridFocus.move(i, 0, 1),
           );
         },
       );
