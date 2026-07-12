@@ -1,6 +1,8 @@
 package com.gadir.tv
 
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
@@ -56,6 +58,7 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "isAndroidTv" -> result.success(isTvDevice())
+                    "openUrl" -> openExternalUrl(call.argument("url"), result)
                     else -> result.notImplemented()
                 }
             }
@@ -169,6 +172,50 @@ class MainActivity : FlutterActivity() {
         val pm = packageManager
         return pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
             || pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
+    }
+
+    /** VIEW intent for trailers / external links — prefers YouTube TV on leanback. */
+    private fun openExternalUrl(url: String?, result: MethodChannel.Result) {
+        if (url.isNullOrBlank()) {
+            result.error("BAD_ARGS", "url required", null)
+            return
+        }
+        try {
+            val uri = Uri.parse(url)
+            val isYoutube = uri.scheme == "vnd.youtube"
+                || uri.host?.contains("youtube") == true
+                || uri.host == "youtu.be"
+
+            if (isYoutube) {
+                for (pkg in listOf(
+                    "com.google.android.youtube.tv",
+                    "com.google.android.youtube",
+                )) {
+                    val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        setPackage(pkg)
+                    }
+                    if (intent.resolveActivity(packageManager) != null) {
+                        startActivity(intent)
+                        result.success(true)
+                        return
+                    }
+                }
+            }
+
+            val generic = Intent(Intent.ACTION_VIEW, uri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (generic.resolveActivity(packageManager) != null) {
+                startActivity(generic)
+                result.success(true)
+            } else {
+                result.success(false)
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "openUrl failed: ${t.message}")
+            result.success(false)
+        }
     }
 
     /** OkHttp Xtream login — GET and POST (some panels only accept POST). */

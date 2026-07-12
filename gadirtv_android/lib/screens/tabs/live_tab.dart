@@ -192,8 +192,8 @@ class _LiveTabState extends State<LiveTab> {
   Future<void> _fullscreen() async {
     if (_current == null) return;
     final ch = _current!;
-    await _miniKey.currentState?.pause();
-    await Future.delayed(const Duration(milliseconds: 350));
+    await _miniKey.currentState?.releaseForFullscreen();
+    await Future.delayed(const Duration(milliseconds: 650));
     if (!mounted) return;
     widget.onPlay(ch);
   }
@@ -238,10 +238,14 @@ class _LiveTabState extends State<LiveTab> {
         // ── 3 columns: Groups | Channels | (Mini + EPG) ──
         final rightW = constraints.maxWidth * 0.44; // bigger preview panel
         final miniH = rightW * 9 / 16;
-        return Row(
+        return FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(),
+          child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(
+            FocusTraversalOrder(
+              order: const NumericFocusOrder(1),
+              child: SizedBox(
               width: TvLayout.categoryRailWidth(context),
               child: CategoryListRail(
                 categories: categories,
@@ -249,10 +253,16 @@ class _LiveTabState extends State<LiveTab> {
                 onSelected: _loadChannels,
               ),
             ),
+            ),
             const VerticalDivider(width: 1, color: GtvTheme.border),
-            Expanded(child: _buildChannels()),
+            FocusTraversalOrder(
+              order: const NumericFocusOrder(2),
+              child: Expanded(child: _buildChannels()),
+            ),
             const VerticalDivider(width: 1, color: GtvTheme.border),
-            SizedBox(
+            FocusTraversalOrder(
+              order: const NumericFocusOrder(3),
+              child: SizedBox(
               width: rightW,
               child: Column(
                 children: [
@@ -269,7 +279,9 @@ class _LiveTabState extends State<LiveTab> {
                 ],
               ),
             ),
+            ),
           ],
+        ),
         );
       }
 
@@ -278,7 +290,9 @@ class _LiveTabState extends State<LiveTab> {
       final capped = constraints.maxHeight * 0.35;
       final h = natural > capped ? capped : natural;
       final w = h * 16 / 9;
-      return Column(
+      return FocusTraversalGroup(
+        policy: OrderedTraversalPolicy(),
+        child: Column(
         children: [
           Container(
             width: constraints.maxWidth,
@@ -295,7 +309,9 @@ class _LiveTabState extends State<LiveTab> {
           Expanded(
             child: Row(
               children: [
-                SizedBox(
+                FocusTraversalOrder(
+                  order: const NumericFocusOrder(1),
+                  child: SizedBox(
                   width: TvLayout.categoryRailWidth(context),
                   child: CategoryListRail(
                     categories: categories,
@@ -303,12 +319,17 @@ class _LiveTabState extends State<LiveTab> {
                     onSelected: _loadChannels,
                   ),
                 ),
+                ),
                 const VerticalDivider(width: 1, color: GtvTheme.border),
-                Expanded(child: _buildChannels()),
+                FocusTraversalOrder(
+                  order: const NumericFocusOrder(2),
+                  child: Expanded(child: _buildChannels()),
+                ),
               ],
             ),
           ),
         ],
+      ),
       );
     });
   }
@@ -343,6 +364,7 @@ class _LiveTabState extends State<LiveTab> {
           isFavorite: _favoriteIds.contains(c.streamId),
           selected: selected,
           onTap: () => _preview(c),
+          onFocus: () => _preview(c),
           onDoubleTap: () => widget.onPlay(c),
           onToggleFavorite: () => _toggleFavorite(c),
         );
@@ -516,9 +538,27 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
     }
   }
 
-  /// Called by the parent tab when navigating to full-screen playback so
-  /// the mini stops before the big player starts. We silence the audio
-  /// track first (instant) and then stop the underlying VLC player.
+  /// Release the mini player before full-screen ExoPlayer starts.
+  /// Stops VLC cleanly so native decoders are not contended on TV boxes.
+  Future<void> releaseForFullscreen() async {
+    _debounce?.cancel();
+    _noSignalTimer?.cancel();
+    try {
+      await _controller?.setVolume(0);
+    } catch (_) {}
+    _controller?.removeListener(_onControllerUpdate);
+    try {
+      await _controller?.stop().timeout(const Duration(seconds: 2), onTimeout: () {});
+    } catch (_) {}
+    try {
+      await _controller?.dispose();
+    } catch (_) {}
+    _controller = null;
+    _openedUrl = null;
+    if (mounted) setState(() {});
+  }
+
+  /// Called when the tab goes inactive — pause audio without tearing down.
   Future<void> pause() async {
     try {
       await _controller?.setVolume(0);
@@ -551,6 +591,13 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final t = AppI18n.of(context);
+    if (widget.streamUrl != null && _controller == null && !_opening) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.streamUrl != null && _controller == null) {
+          _scheduleOpen();
+        }
+      });
+    }
     return GtvFocusable(
       focusNode: widget.focusNode,
       onTap: widget.streamUrl != null ? widget.onFullscreen : null,
@@ -722,12 +769,14 @@ class _ChannelRow extends StatefulWidget {
     required this.onTap,
     required this.onDoubleTap,
     required this.onToggleFavorite,
+    this.onFocus,
   });
 
   final LiveChannel channel;
   final bool isFavorite;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback? onFocus;
   final VoidCallback onDoubleTap;
   final VoidCallback onToggleFavorite;
 
@@ -744,6 +793,7 @@ class _ChannelRowState extends State<_ChannelRow> {
       onShowFocusHighlight: (v) {
         setState(() => _focused = v);
         if (v) {
+          widget.onFocus?.call();
           Scrollable.ensureVisible(
             context,
             alignment: 0.35,
@@ -757,7 +807,6 @@ class _ChannelRowState extends State<_ChannelRow> {
       actions: {
         ActivateIntent: CallbackAction<ActivateIntent>(
           onInvoke: (_) {
-            // TV remote: first OK previews, second OK on same channel → fullscreen.
             if (widget.selected) {
               widget.onDoubleTap();
             } else {
@@ -770,14 +819,19 @@ class _ChannelRowState extends State<_ChannelRow> {
       child: GestureDetector(
         onTap: widget.onTap,
         onDoubleTap: widget.onDoubleTap,
+        onLongPress: widget.onToggleFavorite,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           decoration: BoxDecoration(
-            color: widget.selected ? GtvTheme.red.withOpacity(0.12) : GtvTheme.surface,
+            color: widget.selected
+                ? GtvTheme.red.withOpacity(0.32)
+                : (_focused ? GtvTheme.red.withOpacity(0.12) : GtvTheme.surface),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: _focused ? GtvTheme.red : (widget.selected ? GtvTheme.red : GtvTheme.border),
-              width: _focused ? 2 : 1,
+              color: widget.selected
+                  ? GtvTheme.red
+                  : (_focused ? GtvTheme.redHi : GtvTheme.border),
+              width: widget.selected || _focused ? 2 : 1,
             ),
           ),
           child: Row(
@@ -785,29 +839,37 @@ class _ChannelRowState extends State<_ChannelRow> {
               Container(
                 width: 34, height: 34,
                 decoration: BoxDecoration(
-                  color: GtvTheme.bg,
+                  color: widget.selected ? GtvTheme.red.withOpacity(0.2) : GtvTheme.bg,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: GtvTheme.border),
+                  border: Border.all(
+                    color: widget.selected ? GtvTheme.red : GtvTheme.border,
+                  ),
                 ),
                 alignment: Alignment.center,
-                child: Icon(Icons.live_tv_rounded, color: widget.selected ? GtvTheme.red : GtvTheme.textDim, size: 18),
+                child: Icon(
+                  Icons.live_tv_rounded,
+                  color: widget.selected ? Colors.white : GtvTheme.textDim,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(widget.channel.name,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: TvLayout.labelFont(context, 14),
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis),
+                    Text(
+                      widget.channel.name,
+                      style: TextStyle(
+                        color: widget.selected ? Colors.white : Colors.white70,
+                        fontSize: TvLayout.labelFont(context, 14),
+                        fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     if (widget.selected)
                       Text(
-                        'Pulsa OK de nuevo → pantalla completa',
+                        'OK → pantalla completa · Mantén OK → favorito',
                         style: TextStyle(
                           color: GtvTheme.redHi,
                           fontSize: TvLayout.labelFont(context, 10),
@@ -817,12 +879,10 @@ class _ChannelRowState extends State<_ChannelRow> {
                   ],
                 ),
               ),
-              GtvFocusable(
-                borderRadius: BorderRadius.circular(999),
-                padding: const EdgeInsets.all(6),
-                onTap: widget.onToggleFavorite,
-                child: Icon(widget.isFavorite ? Icons.favorite : Icons.favorite_border,
-                    color: widget.isFavorite ? GtvTheme.red : Colors.white54, size: 20),
+              Icon(
+                widget.isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: widget.isFavorite ? GtvTheme.red : Colors.white38,
+                size: 20,
               ),
             ],
           ),

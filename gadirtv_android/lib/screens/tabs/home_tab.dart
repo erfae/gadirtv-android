@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/media.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
 import '../../services/resume_store.dart';
+import '../../services/trailer_launcher.dart';
 import '../../theme.dart';
 import '../../utils/tv_layout.dart';
 import '../../utils/xtream_utils.dart';
@@ -222,32 +222,7 @@ class _HomeTabState extends State<HomeTab> {
   Future<void> _openTrailer() async {
     final url = _heroTrailer;
     if (url == null) return;
-    final uri = Uri.tryParse(url);
-    if (uri == null) return;
-    try {
-      final can = await canLaunchUrl(uri);
-      if (!can) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se encontró una app para abrir el tráiler (YouTube o navegador)'),
-            duration: Duration(seconds: 4),
-          ),
-        );
-        return;
-      }
-      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo abrir el tráiler')),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al abrir tráiler: $e')),
-      );
-    }
+    await TrailerLauncher.open(context, url);
   }
 
   void _shiftHero(int delta) {
@@ -279,7 +254,9 @@ class _HomeTabState extends State<HomeTab> {
         final railH = TvLayout.compactRailBlockHeight(context, maxHeight: constraints.maxHeight);
         final heroH = constraints.maxHeight - railH * 2 - (_resume.isEmpty ? 0 : railH * 0.85) - 8;
 
-        return Column(
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 72),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
@@ -325,6 +302,7 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ),
           ],
+          ),
         );
       },
     );
@@ -396,12 +374,12 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(28, 16, 56, 16),
+          padding: const EdgeInsets.fromLTRB(28, 20, 20, 20),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                flex: 5,
+                flex: 6,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -495,53 +473,58 @@ class _HomeTabState extends State<HomeTab> {
                   ],
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 16),
               Expanded(
-                flex: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.45),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'Sinopsis',
-                        style: TextStyle(
-                          color: GtvTheme.redHi,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      if (_heroMetaLoading)
-                        const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: GtvTheme.red),
-                        )
-                      else
-                        Text(
-                          _heroPlot.isEmpty
-                              ? 'Sinopsis no disponible para este título.'
-                              : _heroPlot,
-                          maxLines: 7,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                            height: 1.55,
+                flex: 3,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 340),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.55),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Sinopsis',
+                          style: TextStyle(
+                            color: GtvTheme.redHi,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.1,
                           ),
                         ),
-                    ],
+                        const SizedBox(height: 10),
+                        if (_heroMetaLoading)
+                          const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: GtvTheme.red),
+                          )
+                        else
+                          Text(
+                            _heroPlot.isEmpty
+                                ? 'Sinopsis no disponible para este título.'
+                                : _heroPlot,
+                            maxLines: 9,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                              height: 1.55,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+              const SizedBox(width: 48),
             ],
           ),
         ),

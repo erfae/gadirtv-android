@@ -141,9 +141,13 @@ class _SeriesTabState extends State<SeriesTab> {
       ..._categories.map((c) => (c.id, c.name)),
     ];
 
-    return Row(
+    return FocusTraversalGroup(
+      policy: OrderedTraversalPolicy(),
+      child: Row(
       children: [
-        SizedBox(
+        FocusTraversalOrder(
+          order: const NumericFocusOrder(1),
+          child: SizedBox(
           width: TvLayout.categoryRailWidth(context),
           child: CategoryListRail(
             categories: chips,
@@ -151,9 +155,14 @@ class _SeriesTabState extends State<SeriesTab> {
             onSelected: _load,
           ),
         ),
+        ),
         const VerticalDivider(width: 1, color: GtvTheme.border),
-        Expanded(child: _buildGrid()),
+        FocusTraversalOrder(
+          order: const NumericFocusOrder(2),
+          child: Expanded(child: _buildGrid()),
+        ),
       ],
+    ),
     );
   }
 
