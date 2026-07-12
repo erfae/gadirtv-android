@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/profile.dart';
+import '../utils/url_utils.dart';
 import 'http_factory.dart';
 import 'native_http.dart';
 
@@ -131,20 +132,7 @@ class ApiService {
     throw Exception('Sin respuesta tras $totalAttempts intentos ($lastError)');
   }
 
-  /// Normalizes user-typed hosts:
-  ///  * strips whitespace and trailing slashes
-  ///  * adds `http://` when no scheme is present (Xtream Codes doesn't use HTTPS
-  ///    for gadir.co and typing the scheme is error-prone on mobile).
-  static String _normalizeHost(String raw) {
-    var h = raw.trim();
-    while (h.endsWith('/')) {
-      h = h.substring(0, h.length - 1);
-    }
-    if (!h.startsWith('http://') && !h.startsWith('https://')) {
-      h = 'http://$h';
-    }
-    return h;
-  }
+  static String _normalizeHost(String raw) => normalizeXtreamHost(raw);
 
   /// Xtream login — uses raw `dart:io HttpClient` (bypasses Dio) with hard
   /// timeouts on each phase (DNS, connect, headers, body). This works around
