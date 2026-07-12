@@ -84,6 +84,13 @@
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
 
+            <meta-data
+                android:name="io.flutter.embedding.android.EnableImpeller"
+                android:value="false" />
+            <meta-data
+                android:name="io.flutter.embedding.android.DisableSurfaceControl"
+                android:value="true" />
+
             <!-- Launchers: both leanback (Android TV) and standard so the
                  app is discoverable on any launcher shell — some Xiaomi and
                  generic TV boxes ship a hybrid launcher that expects both
@@ -105,23 +112,6 @@
 
         <meta-data
             android:name="com.google.android.tv.feature"
-            android:value="true" />
-
-        <!-- Force legacy Skia renderer instead of Impeller. Some Android
-             TV boxes (esp. Amlogic S905-based Xiaomi Mi TV Box variants)
-             ship GPU drivers with broken Vulkan/GLES3 support, which
-             makes Impeller silently crash at startup before Flutter can
-             even render its splash screen. Skia is slower but works on
-             every device Flutter has ever supported. -->
-        <meta-data
-            android:name="io.flutter.embedding.android.EnableImpeller"
-            android:value="false" />
-        <!-- Disable the Android SurfaceControl swapchain path. The key must be
-             DisableSurfaceControl=true (NOT EnableSurfaceControl=false — that
-             key is ignored by the engine). Broken SurfaceControl drivers on
-             Sony Bravia / Xiaomi Amlogic TV boxes crash before first frame. -->
-        <meta-data
-            android:name="io.flutter.embedding.android.DisableSurfaceControl"
             android:value="true" />
     </application>
 

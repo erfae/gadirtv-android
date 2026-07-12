@@ -8,7 +8,6 @@ import 'i18n/strings.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profiles_screen.dart';
-import 'services/plugins_bootstrap.dart';
 import 'services/prefs_settings.dart';
 import 'services/profile_store.dart';
 import 'theme.dart';
@@ -18,13 +17,9 @@ Future<void> main() async {
   await runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    // Register path_provider / sqflite / backup plugins only after the engine
-    // is up — keeps cold start minimal on TV boxes (Downloader sideload).
-    try {
-      await PluginsBootstrap.ensureCore();
-    } catch (e) {
-      debugPrint('GadirTV: core plugins deferred ($e)');
-    }
+    // Core plugins (path_provider, sqflite, file_picker…) load only when the
+    // home screen needs them — NOT here. Cold start only needs shared_preferences
+    // which GadirPluginRegistrant registers natively before Dart main().
 
     // Show a readable error screen on TV boxes instead of a silent crash.
     FlutterError.onError = (details) {
@@ -64,8 +59,11 @@ Future<void> main() async {
     } catch (_) {}
     runApp(GadirTvApp(initialLanguage: initialLang));
   }, (error, stack) {
-    // Last-resort handler — paints the error on screen if runApp already ran.
     debugPrint('GadirTV uncaught: $error\n$stack');
+    runApp(MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: _FatalErrorScreen(message: error.toString(), stack: stack),
+    ));
   });
 }
 
