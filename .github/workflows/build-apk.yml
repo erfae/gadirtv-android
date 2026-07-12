@@ -77,7 +77,7 @@ jobs:
           fi
 
       - name: Build RELEASE APKs (uno por arquitectura — más pequeños, más fiables)
-        run: flutter build apk --release --split-per-abi --target-platform=android-arm,android-arm64,android-x64
+        run: flutter build apk --release --split-per-abi --target-platform=android-arm,android-arm64
 
       - name: Upload split APKs
         uses: actions/upload-artifact@v4
@@ -87,7 +87,7 @@ jobs:
           if-no-files-found: error
 
       - name: Build RELEASE APK universal (fallback si prefieres uno solo)
-        run: flutter build apk --release --target-platform=android-arm,android-arm64,android-x64
+        run: flutter build apk --release --target-platform=android-arm,android-arm64
 
       - name: Upload RELEASE APK
         uses: actions/upload-artifact@v4
@@ -214,33 +214,6 @@ jobs:
           path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-AndroidTV-DEBUG-armv7a.apk
           if-no-files-found: error
 
-      # Android Studio emulator (x86_64) — los APK TV arm NO arrancan aquí.
-      - name: Build EMULATOR APK universal release (ARM64 + x86_64)
-        run: flutter build apk --release --target-platform=android-arm,android-arm64,android-x64 -PgtvEmulatorBuild=true
-
-      - name: Rename emulator universal release
-        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/GadirTV-emulator.apk
-
-      - name: Upload emulator universal release
-        uses: actions/upload-artifact@v4
-        with:
-          name: GadirTV-emulator
-          path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-emulator.apk
-          if-no-files-found: error
-
-      - name: Build EMULATOR APK x64 debug (Android Studio)
-        run: flutter build apk --debug --target-platform=android-x64 -PgtvEmulatorBuild=true
-
-      - name: Rename emulator x64 debug
-        run: mv build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/GadirTV-emulator-x64-debug.apk
-
-      - name: Upload emulator x64 debug
-        uses: actions/upload-artifact@v4
-        with:
-          name: GadirTV-emulator-x64-debug
-          path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-emulator-x64-debug.apk
-          if-no-files-found: error
-
   # Public GitHub Release so Android TV users can paste a direct URL into
   # the Downloader app (artifact zips from Actions are not usable there).
   publish-release:
@@ -297,18 +270,6 @@ jobs:
           name: GadirTV-AndroidTV-DEBUG-armv7a
           path: release-assets
 
-      - name: Download emulator universal release
-        uses: actions/download-artifact@v4
-        with:
-          name: GadirTV-emulator
-          path: release-assets
-
-      - name: Download emulator x64 debug
-        uses: actions/download-artifact@v4
-        with:
-          name: GadirTV-emulator-x64-debug
-          path: release-assets
-
       - name: Prepare release filenames
         run: |
           cd release-assets
@@ -345,10 +306,6 @@ jobs:
             | `GadirTV-arm64.apk` | Móvil/tablet arm64 |
             | `GadirTV-universal-phone.apk` | Cualquier Android (más pesado) |
             | `GadirTV-AndroidTV-DEBUG-armv7a.apk` | Si crashea en TV — muestra error en pantalla roja |
-            | `GadirTV-emulator.apk` | **Emulador Android Studio (ARM64 + x86_64)** |
-            | `GadirTV-emulator-x64-debug.apk` | Emulador debug (más lento al arrancar) |
-
-            > **Emulador:** instala `GadirTV-emulator.apk` (un solo archivo para cualquier emulador).
           files: release-assets/*
           make_latest: true
           overwrite_files: true

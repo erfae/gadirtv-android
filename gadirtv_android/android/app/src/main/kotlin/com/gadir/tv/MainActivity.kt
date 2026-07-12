@@ -4,7 +4,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
@@ -62,7 +61,6 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "isAndroidTv" -> result.success(isTvDevice())
-                    "isEmulator" -> result.success(isEmulator())
                     "openUrl" -> openExternalUrl(call.argument("url"), result)
                     else -> result.notImplemented()
                 }
@@ -114,7 +112,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        // Only consume DPAD on leanback/TV — on phone emulators Flutter handles keys.
+        // Only consume DPAD on leanback/TV devices.
         if (isTvDevice() &&
             event.action == KeyEvent.ACTION_DOWN &&
             forwardKeyToFlutter(event.keyCode)
@@ -184,18 +182,6 @@ class MainActivity : FlutterActivity() {
         val pm = packageManager
         return pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
             || pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
-    }
-
-    /** Android Studio emulator / sdk_gphone — not a real TV Box. */
-    private fun isEmulator(): Boolean {
-        val fp = Build.FINGERPRINT.lowercase()
-        return fp.contains("generic")
-            || fp.contains("emulator")
-            || Build.MODEL.contains("Emulator", ignoreCase = true)
-            || Build.MODEL.contains("Android SDK built for", ignoreCase = true)
-            || Build.HARDWARE.contains("goldfish", ignoreCase = true)
-            || Build.HARDWARE.contains("ranchu", ignoreCase = true)
-            || Build.PRODUCT.contains("sdk", ignoreCase = true)
     }
 
     /** VIEW intent for trailers / external links — prefers YouTube TV on leanback. */
@@ -268,16 +254,9 @@ class MainActivity : FlutterActivity() {
         return File(dir, "libflutter.so").exists()
     }
 
-    /** Shown when a TV/ARM APK was installed on an x86 emulator (instant crash otherwise). */
     private fun showWrongApkScreen() {
-        val message = if (isEmulator()) {
-            "APK incorrecto para el emulador Android Studio.\n\n" +
-                "1. Desinstala GadirTV\n" +
-                "2. Instala: GadirTV-emulator-x64-release.apk\n\n" +
-                "NO uses GadirTV-AndroidTV.apk en el emulador."
-        } else {
-            "Faltan bibliotecas nativas.\nReinstala el APK correcto para tu dispositivo."
-        }
+        val message = "Faltan bibliotecas nativas.\n" +
+            "Reinstala GadirTV-AndroidTV.apk en tu TV Box o dispositivo Android."
         val tv = TextView(this).apply {
             text = message
             setTextColor(Color.WHITE)

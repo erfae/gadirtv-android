@@ -11,7 +11,6 @@ import '../services/api_service.dart';
 import '../services/player_constants.dart';
 import '../services/resume_store.dart';
 import '../theme.dart';
-import '../utils/tv_utils.dart';
 import 'player_screen.dart';
 import '../widgets/gtv_focusable.dart';
 import '../widgets/no_signal_test_card.dart';
@@ -97,13 +96,6 @@ class _ExoPlayerScreenState extends State<ExoPlayerScreen> {
       setState(() => _buffering = false);
     } catch (e) {
       if (!mounted) return;
-      if (await TvUtils.isEmulator()) {
-        setState(() {
-          _fatalError = 'No se pudo reproducir en el emulador: $e';
-          _buffering = false;
-        });
-        return;
-      }
       await _fallbackToVlc();
     }
   }

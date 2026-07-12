@@ -68,94 +68,33 @@ Instala **AIDA64** desde Play Store en el TV → CPU → Instruction set:
 
 En la práctica, si no tienes Nvidia Shield, casi siempre es **armv7a**.
 
-## 7. Emulador Android Studio (PC)
-
-Los APK de TV (`GadirTV-AndroidTV.apk`, universal, arm64…) son **ARM** y en el emulador x86_64 **se instalan pero no arrancan**.
-
-| Artefacto | Cuándo usarlo |
-|---|---|
-| **`GadirTV-emulator-x64-release.apk`** | **Emulador Android Studio x86_64 — usa este** |
-| `GadirTV-emulator-x64-debug.apk` | Mismo emulador, build debug (arranque más lento) |
-
-> Si aparece **"System UI isn't responding"**, pulsa **Wait** (no Close app).
-> El primer arranque puede tardar 15–30 s en emuladores lentos.
-
-> **Emulador:** no uses `GadirTV-AndroidTV.apk` — **no arranca** (solo ARM).
-> Usa **`GadirTV-emulator-x64-release.apk`** exclusivamente.
+## 7. Compilar localmente (Android TV / TV Box)
 
 ```bash
-adb uninstall com.gadir.tv
-adb install -r GadirTV-emulator-x64-release.apk
+cd gadirtv_android
+./scripts/build-tv-apk.sh arm            # 32-bit — mayoría de TVs
+./scripts/build-tv-apk.sh arm64          # TVs 64-bit
+./scripts/build-tv-apk.sh universal     # 32+64 en un solo APK
+```
+
+**Windows:**
+```cmd
+cd gadirtv_android
+scripts\build-tv-apk.bat
+```
+
+Antes de compilar, restaura el registrant mínimo:
+```bash
+./scripts/restore-minimal-registrant.sh
 ```
 
 ### Error `INSTALL_FAILED_NO_MATCHING_ABIS`
 
-Significa que el APK **no coincide con la CPU** del dispositivo al que apunta `adb`.
+El APK no coincide con la CPU de tu TV Box.
 
-**1. Comprueba a qué dispositivo instalas** (muy habitual con el móvil conectado por USB):
-
-```cmd
-adb devices
-adb shell getprop ro.product.cpu.abi
-```
-
-| CPU que devuelve `getprop` | APK correcto |
+| CPU del dispositivo | APK correcto |
 |---|---|
-| `x86_64` | `GadirTV-emulator-x64-release.apk` |
-| `armeabi-v7a` | `GadirTV-AndroidTV-armv7a.apk` (o `GadirTV-AndroidTV.apk`) |
+| `armeabi-v7a` | `GadirTV-AndroidTV.apk` |
 | `arm64-v8a` | `GadirTV-AndroidTV-arm64.apk` o universal |
 
-Si tienes **móvil/TV y emulador** conectados a la vez, especifica el destino:
-
-```cmd
-adb -e install -r GadirTV-emulator-x64-release.apk
-```
-(`-e` = solo emulador; `-d` = solo dispositivo físico)
-
-**2. Verifica que el APK es el de emulador** (debe pesar ~15 MB, no ~50 MB):
-
-Abre el `.apk` con 7-Zip → debe existir la carpeta `lib/x86_64/libflutter.so`.
-Si solo ves `lib/armeabi-v7a` o `lib/arm64-v8a`, es un APK de TV — no sirve en emulador x86_64.
-
-**3. Emulador con imagen ARM** (p. ej. "ARM 64" en AVD Manager):
-
-No uses el APK x64. Instala `GadirTV-AndroidTV-arm64.apk` desde la [release](https://github.com/erfae/gadirtv-android/releases).
-
-**4. TV Box o móvil real por USB:**
-
-Usa `GadirTV-AndroidTV.apk`, **no** el de emulador.
-
-O compila en el proyecto (desde la carpeta `gadirtv_android`):
-
-**Linux / macOS:**
-```bash
-cd gadirtv_android
-./scripts/build-emulator-apk.sh
-```
-
-**Windows (CMD):**
-```cmd
-cd gadirtv_android
-scripts\build-emulator-apk.bat
-```
-
-**Windows (PowerShell):**
-```powershell
-cd gadirtv_android
-.\scripts\build-emulator-apk.ps1
-```
-
-**Manual (cualquier SO):**
-```bash
-cd gadirtv_android
-flutter pub get
-# Restaurar registrant mínimo (sin libVLC al arrancar):
-cp scripts/templates/GeneratedPluginRegistrant.minimal.java \
-   android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
-flutter build apk --release --target-platform=android-x64 -PgtvEmulatorBuild=true
-```
-
-> **Importante:** ejecuta los comandos dentro de `gadirtv_android`, no en la raíz del repo.
-> Si ves `No pubspec.yaml file found`, estás en la carpeta equivocada.
-
-> El debug puede tardar 1–2 minutos en la primera pantalla negra/splash; el **release** arranca mucho más rápido.
+Descarga: https://github.com/erfae/gadirtv-android/releases

@@ -64,19 +64,17 @@ flutter build apk --release
 # Output: build/app/outputs/flutter-apk/app-release.apk
 ```
 
-**Emulador Android Studio (x86_64):**
-```bash
-cd gadirtv_android
-./scripts/build-emulator-apk.sh          # Linux/macOS
-# scripts\build-emulator-apk.bat       # Windows CMD
-# .\scripts\build-emulator-apk.ps1     # Windows PowerShell
-```
-
-**TV Box (ARM):**
+**TV Box / Android TV:**
 ```bash
 cd gadirtv_android
 ./scripts/build-tv-apk.sh arm            # 32-bit — la mayoría de TVs
 ./scripts/build-tv-apk.sh arm64          # Shield / TVs 64-bit
+```
+
+**Windows:**
+```cmd
+scripts\build-tv-apk.bat
+scripts\download-tv-apk.bat
 ```
 
 Si `flutter pub get` falla o la compilación da errores de plugins, restaura el registrant mínimo antes de compilar:

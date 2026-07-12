@@ -38,8 +38,7 @@ Future<void> main() async {
     // required. This is the same engine XCIPTV Player uses, verified to run
     // on the Xiaomi Amlogic TV boxes where libmpv (media_kit) crashed.
 
-    // IPTV apps are landscape-first on real TV boxes. On emulators and phones
-    // skip orientation lock — forcing landscape on a phone AVD freezes System UI.
+    // Landscape + immersive on Android TV.
     GtvTvKeyBridge.install();
     runApp(const GadirTvApp());
     unawaited(_configureDisplayForTv());
@@ -54,7 +53,6 @@ Future<void> main() async {
 }
 
 Future<void> _configureDisplayForTv() async {
-  if (await TvUtils.isEmulator()) return;
   if (!await TvUtils.isAndroidTv()) return;
   try {
     await SystemChrome.setPreferredOrientations(const [

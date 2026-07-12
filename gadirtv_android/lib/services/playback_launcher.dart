@@ -4,7 +4,6 @@ import '../models/playable.dart';
 import '../models/profile.dart';
 import '../screens/exo_player_screen.dart';
 import '../screens/player_screen.dart';
-import '../utils/tv_utils.dart';
 import 'external_player.dart';
 import 'player_constants.dart';
 import 'prefs_settings.dart';
@@ -20,9 +19,6 @@ class PlaybackLauncher {
     int? liveStreamId,
   }) async {
     var engine = await PrefsSettings().getPlayerEngine();
-    if (await TvUtils.isEmulator()) {
-      engine = PlayerEngine.exo;
-    }
 
     if (engine == PlayerEngine.external) {
       final ok = await ExternalPlayer.launch(playable.url);

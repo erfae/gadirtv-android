@@ -31,12 +31,6 @@ if (hasKeystore) {
     }
 }
 
-// Emulator build flag — any of these works (Windows-friendly: -PgtvEmulatorBuild=true).
-def gtvEmulatorBuild = System.getenv('GTV_EMULATOR_BUILD') == 'true' ||
-    (project.hasProperty('gtvEmulatorBuild') &&
-        project.property('gtvEmulatorBuild').toString() == 'true') ||
-    localProperties.getProperty('gtv.emulator.build') == 'true'
-
 android {
     namespace "com.gadir.tv"
     compileSdk 35
@@ -65,16 +59,9 @@ android {
         targetSdkVersion 33
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
-        // TV builds: ARM only — blocks install on x86 emulators (wrong APK trap).
-        // Emulator build: x86_64 only via GTV_EMULATOR_BUILD=true, -PgtvEmulatorBuild=true,
-        // or gtv.emulator.build=true in local.properties.
+        // Android + Android TV: ARM only (32-bit y 64-bit).
         ndk {
-            if (gtvEmulatorBuild) {
-                // Universal emulator: 32-bit ARM (TV emulator) + ARM64 + x86_64.
-                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
-            } else {
-                abiFilters 'armeabi-v7a', 'arm64-v8a'
-            }
+            abiFilters 'armeabi-v7a', 'arm64-v8a'
         }
     }
 
@@ -124,21 +111,8 @@ android {
     packagingOptions {
         pickFirst 'lib/**/libc++_shared.so'
         pickFirst 'lib/**/libjsc.so'
-        if (gtvEmulatorBuild) {
-            // Emulator APK: sin libVLC — arranque rápido en ARM64 y x86_64.
-            exclude 'lib/x86_64/libvlc.so'
-            exclude 'lib/x86_64/libvlcjni.so'
-            exclude 'lib/x86/libvlc.so'
-            exclude 'lib/x86/libvlcjni.so'
-            exclude 'lib/arm64-v8a/libvlc.so'
-            exclude 'lib/arm64-v8a/libvlcjni.so'
-            exclude 'lib/armeabi-v7a/libvlc.so'
-            exclude 'lib/armeabi-v7a/libvlcjni.so'
-        } else {
-            // Evita que libVLC meta .so x86 en APK TV — instalaba en emulador sin libflutter.
-            exclude 'lib/x86/**'
-            exclude 'lib/x86_64/**'
-        }
+        exclude 'lib/x86/**'
+        exclude 'lib/x86_64/**'
         // Force extracted native libs. Some older Android TV box
         // firmwares (Amlogic S905/S912 / Xiaomi Mi TV Box) fail to
         // install APKs whose .so files are packed uncompressed, which
