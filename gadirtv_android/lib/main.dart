@@ -12,6 +12,7 @@ import 'services/prefs_settings.dart';
 import 'services/profile_store.dart';
 import 'theme.dart';
 import 'utils/tv_utils.dart';
+import 'widgets/gtv_tv_shortcuts.dart';
 
 Future<void> main() async {
   await runZonedGuarded(() async {
@@ -131,11 +132,13 @@ class _GadirTvAppState extends State<GadirTvApp> {
         builder: (_, __) {
           return Directionality(
             textDirection: _i18n.isRtl ? TextDirection.rtl : TextDirection.ltr,
-            child: MaterialApp.router(
-              title: 'GadirTV',
-              debugShowCheckedModeBanner: false,
-              theme: GtvTheme.build(),
-              routerConfig: _router,
+            child: GtvTvShortcuts(
+              child: MaterialApp.router(
+                title: 'GadirTV',
+                debugShowCheckedModeBanner: false,
+                theme: GtvTheme.build(),
+                routerConfig: _router,
+              ),
             ),
           );
         },
