@@ -80,10 +80,17 @@ Los APK de TV (`GadirTV-AndroidTV.apk`, universal, arm64…) son **ARM** y en el
 > Si aparece **"System UI isn't responding"**, pulsa **Wait** (no Close app).
 > El primer arranque puede tardar 15–30 s en emuladores lentos.
 
+> **Emulador:** no uses `GadirTV-AndroidTV.apk` — **no arranca** (solo ARM).
+> Usa **`GadirTV-emulator-x64-release.apk`** exclusivamente.
+
 ```bash
 adb uninstall com.gadir.tv
 adb install -r GadirTV-emulator-x64-release.apk
-adb shell am start -n com.gadir.tv/.MainActivity
+```
+
+O compila en el proyecto:
+```bash
+./scripts/build-emulator-apk.sh
 ```
 
 > El debug puede tardar 1–2 minutos en la primera pantalla negra/splash; el **release** arranca mucho más rápido.

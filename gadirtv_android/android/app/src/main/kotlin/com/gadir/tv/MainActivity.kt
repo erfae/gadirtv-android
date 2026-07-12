@@ -2,12 +2,15 @@ package com.gadir.tv
 
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
+import android.widget.TextView
 import io.flutter.embedding.android.FlutterActivity
+import java.io.File
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterShellArgs
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -84,6 +87,10 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        if (!hasFlutterNativeLibs()) {
+            showWrongApkScreen()
+            return
+        }
         super.onCreate(savedInstanceState)
         window.decorView.isFocusable = true
         window.decorView.isFocusableInTouchMode = true
@@ -254,5 +261,30 @@ class MainActivity : FlutterActivity() {
                 )
             }
         }.start()
+    }
+
+    private fun hasFlutterNativeLibs(): Boolean {
+        val dir = applicationInfo.nativeLibraryDir ?: return false
+        return File(dir, "libflutter.so").exists()
+    }
+
+    /** Shown when a TV/ARM APK was installed on an x86 emulator (instant crash otherwise). */
+    private fun showWrongApkScreen() {
+        val message = if (isEmulator()) {
+            "APK incorrecto para el emulador Android Studio.\n\n" +
+                "1. Desinstala GadirTV\n" +
+                "2. Instala: GadirTV-emulator-x64-release.apk\n\n" +
+                "NO uses GadirTV-AndroidTV.apk en el emulador."
+        } else {
+            "Faltan bibliotecas nativas.\nReinstala el APK correcto para tu dispositivo."
+        }
+        val tv = TextView(this).apply {
+            text = message
+            setTextColor(Color.WHITE)
+            textSize = 17f
+            setPadding(48, 64, 48, 48)
+            setBackgroundColor(Color.parseColor("#1A0000"))
+        }
+        setContentView(tv)
     }
 }
