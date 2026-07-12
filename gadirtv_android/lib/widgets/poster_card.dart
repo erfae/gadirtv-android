@@ -50,7 +50,17 @@ class _PosterCardState extends State<PosterCard> {
   Widget build(BuildContext context) {
     return FocusableActionDetector(
       autofocus: widget.autofocus,
-      onShowFocusHighlight: (v) => setState(() => _focused = v),
+      onShowFocusHighlight: (v) {
+        setState(() => _focused = v);
+        if (v) {
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.45,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+          );
+        }
+      },
       onShowHoverHighlight: (v) => setState(() => _focused = v),
       mouseCursor: SystemMouseCursors.click,
       actions: {

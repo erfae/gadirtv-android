@@ -49,6 +49,16 @@ class _HomeScreenState extends State<HomeScreen> {
     _boot();
   }
 
+  KeyEventResult _onTabShortcut(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final n = event.logicalKey;
+    if (n == LogicalKeyboardKey.digit1) { setState(() => _tab = 0); return KeyEventResult.handled; }
+    if (n == LogicalKeyboardKey.digit2) { setState(() => _tab = 1); return KeyEventResult.handled; }
+    if (n == LogicalKeyboardKey.digit3) { setState(() => _tab = 2); return KeyEventResult.handled; }
+    if (n == LogicalKeyboardKey.digit4) { setState(() => _tab = 3); return KeyEventResult.handled; }
+    return KeyEventResult.ignored;
+  }
+
   Future<void> _boot() async {
     try {
       await PluginsBootstrap.ensureCore();
@@ -345,18 +355,40 @@ class _HomeScreenState extends State<HomeScreen> {
     // Wrapping the shell in a FocusTraversalGroup gives predictable
     // left/right/up/down navigation across the top-bar, content and
     // bottom-nav — critical for the Android TV remote experience.
-    return FocusTraversalGroup(
+    return Focus(
+      onKeyEvent: _onTabShortcut,
+      child: FocusTraversalGroup(
       policy: OrderedTraversalPolicy(),
       child: Scaffold(
+        backgroundColor: GtvTheme.bg,
         body: SafeArea(
-          child: Column(
-            children: [
-              _buildTopBar(p),
-              Expanded(child: tabs[_tab]()),
-              _buildBottomNav(),
-            ],
-          ),
+          child: _tab == 0
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Column(
+                      children: [
+                        Expanded(child: tabs[_tab]()),
+                        _buildBottomNav(),
+                      ],
+                    ),
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: _buildNetflixTopBar(p),
+                    ),
+                  ],
+                )
+              : Column(
+                  children: [
+                    _buildTopBar(p),
+                    Expanded(child: tabs[_tab]()),
+                    _buildBottomNav(),
+                  ],
+                ),
         ),
+      ),
       ),
     );
   }
@@ -385,29 +417,59 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 8),
           GtvIconButton(icon: Icons.power_settings_new_rounded, tooltip: 'Salir', onTap: _confirmExit),
           const SizedBox(width: 12),
-          GtvFocusable(
-            borderRadius: BorderRadius.circular(999),
-            onTap: _switchProfile,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: GtvTheme.surface,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: GtvTheme.border),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.person_rounded, size: 14, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Text(p.name.isEmpty ? p.username : p.name, style: const TextStyle(color: Colors.white, fontSize: 12)),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.logout_rounded, size: 14, color: GtvTheme.textDim),
-                ],
-              ),
-            ),
-          ),
+          _buildProfileChip(p),
         ],
+      ),
+    );
+  }
+
+  /// Minimal overlay bar on the Netflix-style home tab — logo + profile only.
+  Widget _buildNetflixTopBar(Profile p) {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.black.withOpacity(0.75), Colors.transparent],
+        ),
+      ),
+      child: Row(
+        children: [
+          Image.asset(
+            'assets/gadirtv_logo.png',
+            height: 34,
+            fit: BoxFit.contain,
+          ),
+          const Spacer(),
+          _buildProfileChip(p),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileChip(Profile p) {
+    return GtvFocusable(
+      borderRadius: BorderRadius.circular(999),
+      onTap: _switchProfile,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.45),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.person_rounded, size: 14, color: Colors.white),
+            const SizedBox(width: 8),
+            Text(p.name.isEmpty ? p.username : p.name, style: const TextStyle(color: Colors.white, fontSize: 12)),
+            const SizedBox(width: 8),
+            const Icon(Icons.logout_rounded, size: 14, color: GtvTheme.textDim),
+          ],
+        ),
       ),
     );
   }

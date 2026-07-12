@@ -224,7 +224,30 @@ class _HomeTabState extends State<HomeTab> {
     if (url == null) return;
     final uri = Uri.tryParse(url);
     if (uri == null) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      final can = await canLaunchUrl(uri);
+      if (!can) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se encontró una app para abrir el tráiler (YouTube o navegador)'),
+            duration: Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo abrir el tráiler')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al abrir tráiler: $e')),
+      );
+    }
   }
 
   void _shiftHero(int delta) {

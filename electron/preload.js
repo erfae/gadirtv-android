@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // to main). No separate taskbar entry, closes with the app.
   showPlayer: (opts) => ipcRenderer.invoke('player:show', opts),
   hidePlayer: () => ipcRenderer.invoke('player:hide'),
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   onPlayerVisibility: (cb) => {
     const h = (_e, data) => cb(data);
     ipcRenderer.on('player:visibility', h);
