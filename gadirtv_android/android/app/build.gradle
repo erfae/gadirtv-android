@@ -31,7 +31,11 @@ if (hasKeystore) {
     }
 }
 
-def gtvEmulatorBuild = System.getenv('GTV_EMULATOR_BUILD') == 'true'
+// Emulator build flag — any of these works (Windows-friendly: -PgtvEmulatorBuild=true).
+def gtvEmulatorBuild = System.getenv('GTV_EMULATOR_BUILD') == 'true' ||
+    (project.hasProperty('gtvEmulatorBuild') &&
+        project.property('gtvEmulatorBuild').toString() == 'true') ||
+    localProperties.getProperty('gtv.emulator.build') == 'true'
 
 android {
     namespace "com.gadir.tv"
@@ -62,7 +66,8 @@ android {
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         // TV builds: ARM only — blocks install on x86 emulators (wrong APK trap).
-        // Emulator build: x86_64 only via GTV_EMULATOR_BUILD=true.
+        // Emulator build: x86_64 only via GTV_EMULATOR_BUILD=true, -PgtvEmulatorBuild=true,
+        // or gtv.emulator.build=true in local.properties.
         ndk {
             if (gtvEmulatorBuild) {
                 abiFilters 'x86_64'

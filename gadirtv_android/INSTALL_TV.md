@@ -88,9 +88,37 @@ adb uninstall com.gadir.tv
 adb install -r GadirTV-emulator-x64-release.apk
 ```
 
-O compila en el proyecto:
+O compila en el proyecto (desde la carpeta `gadirtv_android`):
+
+**Linux / macOS:**
 ```bash
+cd gadirtv_android
 ./scripts/build-emulator-apk.sh
 ```
+
+**Windows (CMD):**
+```cmd
+cd gadirtv_android
+scripts\build-emulator-apk.bat
+```
+
+**Windows (PowerShell):**
+```powershell
+cd gadirtv_android
+.\scripts\build-emulator-apk.ps1
+```
+
+**Manual (cualquier SO):**
+```bash
+cd gadirtv_android
+flutter pub get
+# Restaurar registrant mínimo (sin libVLC al arrancar):
+cp android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.minimal.java \
+   android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+flutter build apk --release --target-platform=android-x64 -PgtvEmulatorBuild=true
+```
+
+> **Importante:** ejecuta los comandos dentro de `gadirtv_android`, no en la raíz del repo.
+> Si ves `No pubspec.yaml file found`, estás en la carpeta equivocada.
 
 > El debug puede tardar 1–2 minutos en la primera pantalla negra/splash; el **release** arranca mucho más rápido.

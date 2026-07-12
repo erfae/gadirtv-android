@@ -55,12 +55,37 @@ Guía completa de instalación: [INSTALL_TV.md](INSTALL_TV.md)
 
 ### Local build (optional, requires Flutter + Android SDK)
 
+**Requisitos:** Flutter 3.24+, JDK 17, Android SDK (compileSdk 35).
+
 ```bash
 cd gadirtv_android
 flutter pub get
 flutter build apk --release
 # Output: build/app/outputs/flutter-apk/app-release.apk
 ```
+
+**Emulador Android Studio (x86_64):**
+```bash
+cd gadirtv_android
+./scripts/build-emulator-apk.sh          # Linux/macOS
+# scripts\build-emulator-apk.bat       # Windows CMD
+# .\scripts\build-emulator-apk.ps1     # Windows PowerShell
+```
+
+**TV Box (ARM):**
+```bash
+cd gadirtv_android
+./scripts/build-tv-apk.sh arm            # 32-bit — la mayoría de TVs
+./scripts/build-tv-apk.sh arm64          # Shield / TVs 64-bit
+```
+
+Si `flutter pub get` falla o la compilación da errores de plugins, restaura el registrant mínimo antes de compilar:
+```bash
+cp android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.minimal.java \
+   android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+```
+
+Guía completa: [INSTALL_TV.md](INSTALL_TV.md)
 
 ## Roadmap
 
