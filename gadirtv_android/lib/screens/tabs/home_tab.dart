@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/media.dart';
@@ -11,6 +10,7 @@ import '../../services/trailer_launcher.dart';
 import '../../theme.dart';
 import '../../utils/tv_layout.dart';
 import '../../utils/xtream_utils.dart';
+import '../../widgets/detail_hero_widgets.dart';
 import '../../widgets/gtv_focusable.dart';
 import '../../widgets/poster_card.dart';
 
@@ -253,15 +253,15 @@ class _HomeTabState extends State<HomeTab> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final railH = TvLayout.compactRailBlockHeight(context, maxHeight: constraints.maxHeight) * 0.9;
-        final resumeExtra = _resume.isEmpty ? 0.0 : railH * 0.8;
-        final heroH = constraints.maxHeight - railH * 2 - resumeExtra - 4;
+        final railH = TvLayout.compactRailBlockHeight(context, maxHeight: constraints.maxHeight) * 0.88;
+        final resumeExtra = _resume.isEmpty ? 0.0 : railH * 0.75;
+        final heroH = (constraints.maxHeight * 0.58) - resumeExtra * 0.3;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              height: heroH.clamp(240.0, constraints.maxHeight * 0.72),
+              height: heroH.clamp(280.0, constraints.maxHeight * 0.78),
               child: _buildGoogleTvHero(context),
             ),
             if (_resume.isNotEmpty) ...[
@@ -323,45 +323,10 @@ class _HomeTabState extends State<HomeTab> {
           duration: const Duration(milliseconds: 600),
           child: KeyedSubtree(
             key: ValueKey('$idx-$backdrop'),
-            child: backdrop.isEmpty
-                ? Container(color: GtvTheme.surface)
-                : CachedNetworkImage(
-                    imageUrl: backdrop,
-                    fit: BoxFit.cover,
-                    alignment: Alignment.center,
-                    errorWidget: (_, __, ___) => Container(color: GtvTheme.surface),
-                  ),
+            child: GtvHeroBackdrop(imageUrl: backdrop),
           ),
         ),
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [
-                Colors.black.withOpacity(0.82),
-                Colors.black.withOpacity(0.45),
-                Colors.black.withOpacity(0.25),
-                Colors.black.withOpacity(0.55),
-              ],
-              stops: const [0, 0.35, 0.62, 1],
-            ),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withOpacity(0.2),
-                Colors.transparent,
-                GtvTheme.bg.withOpacity(0.92),
-              ],
-              stops: const [0, 0.55, 1],
-            ),
-          ),
-        ),
+        const GtvHeroGradients(),
         Positioned(
           right: 12,
           top: 0,
@@ -421,34 +386,19 @@ class _HomeTabState extends State<HomeTab> {
                     const SizedBox(height: 18),
                     Row(
                       children: [
-                        GtvFocusable(
+                        GtvHeroActionButton(
                           focusNode: _playFocus,
                           autofocus: true,
+                          label: 'REPRODUCIR',
+                          icon: Icons.play_arrow_rounded,
                           onTap: item.onPlay,
-                          borderRadius: BorderRadius.circular(999),
-                          child: ElevatedButton.icon(
-                            onPressed: item.onPlay,
-                            icon: const Icon(Icons.play_arrow_rounded, size: 24),
-                            label: const Text('REPRODUCIR', style: TextStyle(fontWeight: FontWeight.w800)),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-                            ),
-                          ),
                         ),
                         if (_heroTrailer != null) ...[
                           const SizedBox(width: 12),
-                          GtvFocusable(
+                          GtvHeroActionButton(
+                            label: 'TRÁILER',
+                            icon: Icons.ondemand_video_rounded,
                             onTap: _openTrailer,
-                            borderRadius: BorderRadius.circular(999),
-                            child: OutlinedButton.icon(
-                              onPressed: _openTrailer,
-                              icon: const Icon(Icons.ondemand_video_rounded, size: 20, color: Colors.white),
-                              label: const Text('TRÁILER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Colors.white60),
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                              ),
-                            ),
                           ),
                         ],
                       ],
@@ -456,43 +406,14 @@ class _HomeTabState extends State<HomeTab> {
                   ],
                 ),
               ),
-              const SizedBox(width: 28),
+              const SizedBox(width: 20),
               Expanded(
                 flex: 4,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Sinopsis',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: TvLayout.sp(context, 14),
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    if (_heroMetaLoading)
-                      const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: GtvTheme.red),
-                      )
-                    else
-                      Expanded(
-                        child: SingleChildScrollView(
-                          child: Text(
-                            _heroPlot.isNotEmpty ? _heroPlot : 'Sinopsis no disponible.',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.82),
-                              fontSize: TvLayout.sp(context, 14),
-                              height: 1.55,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+                child: GtvSynopsisPanel(
+                  title: 'Sinopsis',
+                  text: _heroPlot.isNotEmpty ? _heroPlot : 'Sinopsis no disponible.',
+                  loading: _heroMetaLoading,
+                  padding: const EdgeInsets.only(left: 16),
                 ),
               ),
             ],

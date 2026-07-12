@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/dev_defaults.dart';
+
 /// Persists the login form between app sessions so users can switch VPN
 /// and retry without re-typing credentials.
 class LoginDraftStore {
@@ -12,6 +14,22 @@ class LoginDraftStore {
 
   Future<LoginDraft> load() async {
     final prefs = await SharedPreferences.getInstance();
+    final hasSaved = prefs.containsKey(_kHost) ||
+        prefs.containsKey(_kUser) ||
+        prefs.containsKey(_kPass) ||
+        prefs.containsKey(_kName);
+
+    if (!hasSaved && DevDefaults.enabled) {
+      return const LoginDraft(
+        mode: 'xtream',
+        host: DevDefaults.host,
+        username: DevDefaults.username,
+        password: DevDefaults.password,
+        name: DevDefaults.profileName,
+        m3uUrl: '',
+      );
+    }
+
     return LoginDraft(
       mode: prefs.getString(_kMode) ?? 'xtream',
       host: prefs.getString(_kHost) ?? '',

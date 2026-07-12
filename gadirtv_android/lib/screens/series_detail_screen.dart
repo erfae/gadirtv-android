@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -13,7 +12,7 @@ import '../services/trailer_launcher.dart';
 import '../theme.dart';
 import '../utils/tv_layout.dart';
 import '../utils/xtream_utils.dart';
-import '../widgets/gtv_focusable.dart';
+import '../widgets/detail_hero_widgets.dart';
 
 /// Series detail — Google TV layout with season chips + inline episodes.
 class SeriesDetailScreen extends StatefulWidget {
@@ -31,6 +30,7 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
   final _resume = ResumeStore();
   final _playFocus = FocusNode();
   final _seasonFocusNodes = <FocusNode>[];
+  final _episodeFocusNodes = <FocusNode>[];
 
   Map<String, dynamic> _info = const {};
   List<String> _seasons = const [];
@@ -53,7 +53,27 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
     for (final n in _seasonFocusNodes) {
       n.dispose();
     }
+    for (final n in _episodeFocusNodes) {
+      n.dispose();
+    }
     super.dispose();
+  }
+
+  void _rebuildFocusNodes() {
+    for (final n in _seasonFocusNodes) {
+      n.dispose();
+    }
+    for (final n in _episodeFocusNodes) {
+      n.dispose();
+    }
+    _seasonFocusNodes
+      ..clear()
+      ..addAll(List.generate(_seasons.length, (i) => FocusNode(debugLabel: 'season-$i')));
+
+    final eps = _episodesFor(_currentSeason);
+    _episodeFocusNodes
+      ..clear()
+      ..addAll(List.generate(eps.length, (i) => FocusNode(debugLabel: 'episode-$i')));
   }
 
   Future<void> _load() async {
@@ -63,22 +83,10 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
     ]);
     if (!mounted) return;
     final info = results[0] as Map<String, dynamic>;
-    final ep = info['episodes'];
-    final seasons = <String>[];
-    if (ep is Map) {
-      seasons.addAll(ep.keys.cast<String>());
-      seasons.sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
-    }
+    final seasons = parseSeasonKeys(info);
     final meta = info['info'] is Map
         ? Map<String, dynamic>.from(info['info'] as Map)
         : <String, dynamic>{};
-
-    for (final n in _seasonFocusNodes) {
-      n.dispose();
-    }
-    _seasonFocusNodes
-      ..clear()
-      ..addAll(List.generate(seasons.length, (i) => FocusNode(debugLabel: 'season-$i')));
 
     setState(() {
       _info = info;
@@ -90,20 +98,16 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
       _loading = false;
     });
 
+    _rebuildFocusNodes();
+    setState(() {});
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _seasonFocusNodes.isNotEmpty) {
-        _seasonFocusNodes[_selectedSeason.clamp(0, _seasonFocusNodes.length - 1)].requestFocus();
-      }
+      if (mounted) _playFocus.requestFocus();
     });
   }
 
-  List<Map<String, dynamic>> _episodesFor(String season) {
-    final ep = _info['episodes'];
-    if (ep is! Map) return const [];
-    final list = ep[season];
-    if (list is! List) return const [];
-    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-  }
+  List<Map<String, dynamic>> _episodesFor(String season) =>
+      episodesForSeason(_info, season);
 
   String get _currentSeason =>
       _seasons.isEmpty ? '' : _seasons[_selectedSeason.clamp(0, _seasons.length - 1)];
@@ -150,13 +154,24 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
   Future<void> _openTrailer() async {
     final url = _trailer;
     if (url == null) return;
-    await TrailerLauncher.open(context, url);
+    await TrailerLauncher.open(context, url, title: widget.series.name);
   }
 
   void _selectSeason(int index) {
     if (index < 0 || index >= _seasons.length) return;
     setState(() => _selectedSeason = index);
-    _seasonFocusNodes[index].requestFocus();
+    _rebuildFocusNodes();
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && index < _seasonFocusNodes.length) {
+        _seasonFocusNodes[index].requestFocus();
+      }
+    });
+  }
+
+  void _focusFirstEpisode() {
+    if (_episodeFocusNodes.isEmpty) return;
+    _episodeFocusNodes.first.requestFocus();
   }
 
   @override
@@ -189,23 +204,8 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (_backdrop.isNotEmpty)
-                  CachedNetworkImage(imageUrl: _backdrop, fit: BoxFit.cover)
-                else
-                  Container(color: GtvTheme.surface),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        Colors.black.withOpacity(0.88),
-                        Colors.black.withOpacity(0.5),
-                        Colors.black.withOpacity(0.35),
-                      ],
-                    ),
-                  ),
-                ),
+                GtvHeroBackdrop(imageUrl: _backdrop),
+                const GtvHeroGradients(),
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 20, 16),
@@ -258,28 +258,19 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
                               const SizedBox(height: 14),
                               Row(
                                 children: [
-                                  GtvFocusable(
+                                  GtvHeroActionButton(
                                     focusNode: _playFocus,
                                     autofocus: true,
+                                    label: 'REPRODUCIR',
+                                    icon: Icons.play_arrow_rounded,
                                     onTap: _playFirstEpisode,
-                                    borderRadius: BorderRadius.circular(999),
-                                    child: ElevatedButton.icon(
-                                      onPressed: _playFirstEpisode,
-                                      icon: const Icon(Icons.play_arrow_rounded, size: 22),
-                                      label: const Text('REPRODUCIR'),
-                                    ),
                                   ),
                                   if (_trailer != null) ...[
                                     const SizedBox(width: 10),
-                                    GtvFocusable(
+                                    GtvHeroActionButton(
+                                      label: 'TRÁILER',
+                                      icon: Icons.ondemand_video_rounded,
                                       onTap: _openTrailer,
-                                      borderRadius: BorderRadius.circular(999),
-                                      child: OutlinedButton.icon(
-                                        onPressed: _openTrailer,
-                                        icon: const Icon(Icons.ondemand_video_rounded, color: Colors.white, size: 18),
-                                        label: const Text('TRÁILER', style: TextStyle(color: Colors.white)),
-                                        style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white54)),
-                                      ),
                                     ),
                                   ],
                                 ],
@@ -287,33 +278,13 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 20),
+                        const SizedBox(width: 16),
                         Expanded(
                           flex: 4,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Text(t.synopsis,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: TvLayout.sp(context, 14),
-                                    fontWeight: FontWeight.w800,
-                                  )),
-                              const SizedBox(height: 8),
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  child: Text(
-                                    plot.isEmpty ? t.noSynopsis : plot,
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: TvLayout.sp(context, 13),
-                                      height: 1.55,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                          child: GtvSynopsisPanel(
+                            title: t.synopsis,
+                            text: plot.isEmpty ? t.noSynopsis : plot,
+                            padding: const EdgeInsets.only(left: 16),
                           ),
                         ),
                       ],
@@ -350,7 +321,7 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
                   child: _seasons.isEmpty
                       ? Text(t.noSeasons, style: const TextStyle(color: GtvTheme.textDim))
                       : SizedBox(
-                          height: 44,
+                          height: 48,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: _seasons.length,
@@ -362,6 +333,7 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
                               onTap: () => _selectSeason(i),
                               onMoveLeft: i > 0 ? () => _selectSeason(i - 1) : null,
                               onMoveRight: i < _seasons.length - 1 ? () => _selectSeason(i + 1) : null,
+                              onMoveDown: _focusFirstEpisode,
                             ),
                           ),
                         ),
@@ -377,9 +349,13 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
                     itemCount: episodes.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (_, i) => _EpisodeTile(
+                      focusNode: i < _episodeFocusNodes.length ? _episodeFocusNodes[i] : null,
                       episode: episodes[i],
                       resume: _resumeMap['series:${episodeStreamId(episodes[i])}'],
                       onTap: () => _playEpisode(episodes[i]),
+                      onMoveUp: i == 0 && _seasonFocusNodes.isNotEmpty
+                          ? () => _seasonFocusNodes[_selectedSeason].requestFocus()
+                          : null,
                     ),
                   ),
           ),
@@ -403,7 +379,7 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
   }
 }
 
-class _SeasonChip extends StatelessWidget {
+class _SeasonChip extends StatefulWidget {
   const _SeasonChip({
     required this.focusNode,
     required this.season,
@@ -411,6 +387,7 @@ class _SeasonChip extends StatelessWidget {
     required this.onTap,
     this.onMoveLeft,
     this.onMoveRight,
+    this.onMoveDown,
   });
 
   final FocusNode focusNode;
@@ -419,43 +396,88 @@ class _SeasonChip extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onMoveLeft;
   final VoidCallback? onMoveRight;
+  final VoidCallback? onMoveDown;
+
+  @override
+  State<_SeasonChip> createState() => _SeasonChipState();
+}
+
+class _SeasonChipState extends State<_SeasonChip> {
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_onFocus);
+  }
+
+  @override
+  void didUpdateWidget(covariant _SeasonChip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode.removeListener(_onFocus);
+      widget.focusNode.addListener(_onFocus);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocus);
+    super.dispose();
+  }
+
+  void _onFocus() {
+    if (mounted) setState(() => _focused = widget.focusNode.hasFocus);
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = AppI18n.of(context);
     return Focus(
-      focusNode: focusNode,
+      focusNode: widget.focusNode,
       onKeyEvent: (node, event) {
         if (event is! KeyDownEvent) return KeyEventResult.ignored;
-        if (event.logicalKey == LogicalKeyboardKey.arrowLeft && onMoveLeft != null) {
-          onMoveLeft!();
+        if (event.logicalKey == LogicalKeyboardKey.arrowLeft && widget.onMoveLeft != null) {
+          widget.onMoveLeft!();
           return KeyEventResult.handled;
         }
-        if (event.logicalKey == LogicalKeyboardKey.arrowRight && onMoveRight != null) {
-          onMoveRight!();
+        if (event.logicalKey == LogicalKeyboardKey.arrowRight && widget.onMoveRight != null) {
+          widget.onMoveRight!();
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowDown && widget.onMoveDown != null) {
+          widget.onMoveDown!();
           return KeyEventResult.handled;
         }
         if (event.logicalKey == LogicalKeyboardKey.select ||
             event.logicalKey == LogicalKeyboardKey.enter) {
-          onTap();
+          widget.onTap();
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
       },
-      child: GtvFocusable(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? GtvTheme.red : GtvTheme.surface,
+            color: widget.selected ? GtvTheme.red : GtvTheme.surface,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: selected ? GtvTheme.redHi : GtvTheme.border),
+            border: Border.all(
+              color: _focused
+                  ? GtvTheme.redHi
+                  : (widget.selected ? GtvTheme.redHi : GtvTheme.border),
+              width: _focused ? 2 : 1,
+            ),
+            boxShadow: _focused
+                ? [BoxShadow(color: GtvTheme.red.withOpacity(0.35), blurRadius: 12)]
+                : null,
           ),
           child: Text(
-            '${t.season} $season',
+            '${t.season} ${widget.season}',
             style: TextStyle(
-              color: selected ? Colors.white : Colors.white70,
+              color: widget.selected || _focused ? Colors.white : Colors.white70,
               fontSize: TvLayout.sp(context, 14),
               fontWeight: FontWeight.w700,
             ),
@@ -466,82 +488,144 @@ class _SeasonChip extends StatelessWidget {
   }
 }
 
-class _EpisodeTile extends StatelessWidget {
-  const _EpisodeTile({required this.episode, required this.onTap, this.resume});
+class _EpisodeTile extends StatefulWidget {
+  const _EpisodeTile({
+    required this.episode,
+    required this.onTap,
+    this.focusNode,
+    this.resume,
+    this.onMoveUp,
+  });
 
   final Map<String, dynamic> episode;
   final VoidCallback onTap;
+  final FocusNode? focusNode;
   final ResumeEntry? resume;
+  final VoidCallback? onMoveUp;
+
+  @override
+  State<_EpisodeTile> createState() => _EpisodeTileState();
+}
+
+class _EpisodeTileState extends State<_EpisodeTile> {
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode?.addListener(_onFocus);
+  }
+
+  @override
+  void didUpdateWidget(covariant _EpisodeTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode?.removeListener(_onFocus);
+      widget.focusNode?.addListener(_onFocus);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode?.removeListener(_onFocus);
+    super.dispose();
+  }
+
+  void _onFocus() {
+    if (mounted) setState(() => _focused = widget.focusNode?.hasFocus ?? false);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final e = episode;
+    final e = widget.episode;
     final num = (e['episode_num'] ?? '').toString();
     final title = (e['title'] ?? e['name'] ?? 'Episodio $num').toString();
     final info = e['info'] is Map ? Map<String, dynamic>.from(e['info'] as Map) : <String, dynamic>{};
     final plot = extractPlot(info);
-    final progress = resume?.progress ?? 0;
+    final progress = widget.resume?.progress ?? 0;
 
-    return GtvFocusable(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: GtvTheme.surface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: GtvTheme.border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: GtvTheme.red.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(num, style: const TextStyle(color: GtvTheme.red, fontWeight: FontWeight.w800)),
+    return Focus(
+      focusNode: widget.focusNode,
+      onKeyEvent: (node, event) {
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        if (event.logicalKey == LogicalKeyboardKey.arrowUp && widget.onMoveUp != null) {
+          widget.onMoveUp!();
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.select ||
+            event.logicalKey == LogicalKeyboardKey.enter) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: GtvTheme.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _focused ? GtvTheme.red : GtvTheme.border,
+              width: _focused ? 2 : 1,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: TvLayout.sp(context, 15),
-                        fontWeight: FontWeight.w700,
-                      )),
-                  if (plot.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(plot,
+            boxShadow: _focused
+                ? [BoxShadow(color: GtvTheme.red.withOpacity(0.3), blurRadius: 10)]
+                : null,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: GtvTheme.red.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(num, style: const TextStyle(color: GtvTheme.red, fontWeight: FontWeight.w800)),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: GtvTheme.textDim, fontSize: TvLayout.sp(context, 12))),
-                  ],
-                  if (progress > 0 && progress < 1) ...[
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(2),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 3,
-                        backgroundColor: Colors.white12,
-                        color: GtvTheme.red,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: TvLayout.sp(context, 15),
+                          fontWeight: FontWeight.w700,
+                        )),
+                    if (plot.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(plot,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: GtvTheme.textDim, fontSize: TvLayout.sp(context, 12))),
+                    ],
+                    if (progress > 0 && progress < 1) ...[
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(2),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 3,
+                          backgroundColor: Colors.white12,
+                          color: GtvTheme.red,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 26),
-          ],
+              const SizedBox(width: 10),
+              const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 26),
+            ],
+          ),
         ),
       ),
     );

@@ -76,14 +76,20 @@ class _ExoPlayerScreenState extends State<ExoPlayerScreen> {
 
   Future<void> _initPlayer() async {
     try {
+      final uri = Uri.parse(widget.playable.url);
       final c = VideoPlayerController.networkUrl(
-        Uri.parse(widget.playable.url),
-        httpHeaders: {'User-Agent': ApiService.activeUserAgent},
+        uri,
+        httpHeaders: {
+          'User-Agent': ApiService.activeUserAgent,
+          'Accept': '*/*',
+          'Connection': 'keep-alive',
+          'Referer': '${uri.scheme}://${uri.host}/',
+        },
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
       );
       _controller = c;
       c.addListener(_onUpdate);
-      await c.initialize();
+      await c.initialize().timeout(const Duration(seconds: 20));
       if (!mounted) return;
 
       if (widget.playable.initialPositionMs > 0 && !widget.playable.isLive) {
@@ -93,8 +99,17 @@ class _ExoPlayerScreenState extends State<ExoPlayerScreen> {
       await c.play();
       _armNoSignalTimer();
       _saveTimer = Timer.periodic(const Duration(seconds: 10), (_) => _saveResume());
-      setState(() => _buffering = false);
+      setState(() {
+        _buffering = false;
+        _fatalError = null;
+      });
     } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _buffering = false;
+        _fatalError = e.toString();
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
       await _fallbackToVlc();
     }

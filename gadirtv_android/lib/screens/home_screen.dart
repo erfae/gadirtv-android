@@ -13,6 +13,7 @@ import '../services/plugins_bootstrap.dart';
 import '../services/profile_store.dart';
 import '../services/gtv_tv_focus_registry.dart';
 import '../theme.dart';
+import '../utils/tv_layout.dart';
 import '../utils/xtream_utils.dart';
 import '../widgets/gtv_focusable.dart';
 import 'movie_detail_screen.dart';
@@ -792,13 +793,21 @@ class _M3UChannelListState extends State<_M3UChannelList> {
       itemBuilder: (_, i) {
         final group = entries[i];
         return ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
           title: Text(
             group.key,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: TvLayout.labelFont(context, 15),
+              height: 1.15,
+            ),
           ),
           subtitle: Text(
             '${group.value.length} canales',
-            style: const TextStyle(color: GtvTheme.textDim, fontSize: 12),
+            style: TextStyle(color: GtvTheme.textDim, fontSize: TvLayout.sp(context, 12)),
           ),
           collapsedIconColor: Colors.white54,
           iconColor: Colors.white70,

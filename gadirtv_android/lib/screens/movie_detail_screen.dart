@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../i18n/strings.dart';
@@ -12,7 +11,7 @@ import '../services/trailer_launcher.dart';
 import '../theme.dart';
 import '../utils/tv_layout.dart';
 import '../utils/xtream_utils.dart';
-import '../widgets/gtv_focusable.dart';
+import '../widgets/detail_hero_widgets.dart';
 
 /// Movie detail — Google TV layout: backdrop hero, synopsis right, play + trailer.
 class MovieDetailScreen extends StatefulWidget {
@@ -100,7 +99,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Future<void> _openTrailer() async {
     final url = _trailer;
     if (url == null) return;
-    await TrailerLauncher.open(context, url);
+    await TrailerLauncher.open(context, url, title: widget.movie.name);
   }
 
   @override
@@ -133,23 +132,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (_backdrop.isNotEmpty)
-                  CachedNetworkImage(imageUrl: _backdrop, fit: BoxFit.cover)
-                else
-                  Container(color: GtvTheme.surface),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        Colors.black.withOpacity(0.88),
-                        Colors.black.withOpacity(0.5),
-                        Colors.black.withOpacity(0.35),
-                      ],
-                    ),
-                  ),
-                ),
+                GtvHeroBackdrop(imageUrl: _backdrop),
+                const GtvHeroGradients(),
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 20, 16),
@@ -203,43 +187,27 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                               const SizedBox(height: 14),
                               Row(
                                 children: [
-                                  GtvFocusable(
+                                  GtvHeroActionButton(
                                     focusNode: _playFocus,
                                     autofocus: true,
+                                    label: hasResume ? t.resume : t.watchNow,
+                                    icon: Icons.play_arrow_rounded,
                                     onTap: () => _play(fromStart: !hasResume),
-                                    borderRadius: BorderRadius.circular(999),
-                                    child: ElevatedButton.icon(
-                                      onPressed: () => _play(fromStart: !hasResume),
-                                      icon: const Icon(Icons.play_arrow_rounded, size: 22),
-                                      label: Text(hasResume ? t.resume : t.watchNow),
-                                    ),
                                   ),
                                   if (hasResume) ...[
                                     const SizedBox(width: 10),
-                                    GtvFocusable(
+                                    GtvHeroActionButton(
+                                      label: t.watchNow,
+                                      icon: Icons.replay_rounded,
                                       onTap: () => _play(fromStart: true),
-                                      borderRadius: BorderRadius.circular(999),
-                                      child: OutlinedButton(
-                                        onPressed: () => _play(fromStart: true),
-                                        style: OutlinedButton.styleFrom(
-                                          side: const BorderSide(color: GtvTheme.border),
-                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-                                        ),
-                                        child: const Icon(Icons.replay_rounded, size: 20, color: Colors.white),
-                                      ),
                                     ),
                                   ],
                                   if (_trailer != null) ...[
                                     const SizedBox(width: 10),
-                                    GtvFocusable(
+                                    GtvHeroActionButton(
+                                      label: 'TRÁILER',
+                                      icon: Icons.ondemand_video_rounded,
                                       onTap: _openTrailer,
-                                      borderRadius: BorderRadius.circular(999),
-                                      child: OutlinedButton.icon(
-                                        onPressed: _openTrailer,
-                                        icon: const Icon(Icons.ondemand_video_rounded, color: Colors.white, size: 18),
-                                        label: const Text('TRÁILER', style: TextStyle(color: Colors.white)),
-                                        style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white54)),
-                                      ),
                                     ),
                                   ],
                                 ],
@@ -247,33 +215,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 20),
+                        const SizedBox(width: 16),
                         Expanded(
                           flex: 4,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Text(t.synopsis,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: TvLayout.sp(context, 14),
-                                    fontWeight: FontWeight.w800,
-                                  )),
-                              const SizedBox(height: 8),
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  child: Text(
-                                    plot.isEmpty ? t.noSynopsis : plot,
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: TvLayout.sp(context, 13),
-                                      height: 1.55,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                          child: GtvSynopsisPanel(
+                            title: t.synopsis,
+                            text: plot.isEmpty ? t.noSynopsis : plot,
+                            padding: const EdgeInsets.only(left: 16),
                           ),
                         ),
                       ],

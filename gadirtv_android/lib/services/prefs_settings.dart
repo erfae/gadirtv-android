@@ -1,6 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../utils/tv_utils.dart';
 import 'player_constants.dart';
 
 /// Persists user preferences that live outside profiles / favorites —
@@ -49,8 +48,7 @@ class PrefsSettings {
     if (v == PlayerEngine.exo || v == PlayerEngine.vlc || v == PlayerEngine.external) {
       return v!;
     }
-    // IPTV panels often ship AC3/EAC3/MKV — libVLC is more reliable on TV boxes.
-    if (await TvUtils.isAndroidTv()) return PlayerEngine.vlc;
+    // ExoPlayer is the default on all devices; libVLC remains available in settings.
     return PlayerEngine.defaultEngine;
   }
 

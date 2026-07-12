@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+
+import '../screens/trailer_screen.dart';
+import '../utils/tv_utils.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../utils/tv_utils.dart';
-
-/// Opens YouTube trailers on Android TV without relying on [canLaunchUrl],
-/// which often returns false on leanback devices even when YouTube is installed.
+/// Opens YouTube trailers in-app (embedded WebView). Falls back to external
+/// player only for non-YouTube URLs.
 class TrailerLauncher {
   TrailerLauncher._();
 
@@ -42,18 +43,20 @@ class TrailerLauncher {
     return null;
   }
 
-  static Future<bool> open(BuildContext context, String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null) return false;
-
+  static Future<bool> open(BuildContext context, String url, {String title = 'Tráiler'}) async {
     final videoId = extractYoutubeId(url);
     if (videoId != null) {
-      final native = await TvUtils.openExternalUrl('vnd.youtube:$videoId');
-      if (native) return true;
-
-      final watch = await TvUtils.openExternalUrl('https://www.youtube.com/watch?v=$videoId');
-      if (watch) return true;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TrailerScreen(videoId: videoId, title: title),
+          fullscreenDialog: true,
+        ),
+      );
+      return true;
     }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
 
     try {
       final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -64,9 +67,7 @@ class TrailerLauncher {
     if (!fallback && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'No se pudo abrir el tráiler. Instala YouTube en tu TV o abre el enlace desde otro dispositivo.',
-          ),
+          content: Text('No se pudo abrir el tráiler.'),
           duration: Duration(seconds: 4),
         ),
       );

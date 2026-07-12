@@ -97,3 +97,29 @@ String? extractTrailer(Map<String, dynamic> meta) {
   }
   return null;
 }
+
+int parseSeasonNumber(String key) {
+  final match = RegExp(r'\d+').firstMatch(key);
+  return int.tryParse(match?.group(0) ?? '') ?? 0;
+}
+
+/// Sorted season keys from Xtream `episodes` map (handles "1", "Season 1", etc.).
+List<String> parseSeasonKeys(Map<String, dynamic> info) {
+  final ep = info['episodes'];
+  if (ep is! Map) return const [];
+  final keys = ep.keys.map((k) => k.toString()).toList();
+  keys.sort((a, b) => parseSeasonNumber(a).compareTo(parseSeasonNumber(b)));
+  return keys;
+}
+
+List<Map<String, dynamic>> episodesForSeason(Map<String, dynamic> info, String season) {
+  final ep = info['episodes'];
+  if (ep is! Map) return const [];
+  dynamic list = ep[season];
+  if (list == null) {
+    final n = int.tryParse(season);
+    if (n != null) list = ep[n];
+  }
+  if (list is! List) return const [];
+  return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+}

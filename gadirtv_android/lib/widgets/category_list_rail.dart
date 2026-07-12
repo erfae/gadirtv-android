@@ -63,6 +63,8 @@ class _CategoryRowState extends State<_CategoryRow> {
 
   @override
   Widget build(BuildContext context) {
+    final fontSize = TvLayout.labelFont(context, 15);
+
     return FocusableActionDetector(
       autofocus: widget.autofocus,
       onShowFocusHighlight: (v) {
@@ -89,7 +91,8 @@ class _CategoryRowState extends State<_CategoryRow> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
             color: widget.selected
                 ? GtvTheme.red.withOpacity(0.15)
@@ -105,17 +108,20 @@ class _CategoryRowState extends State<_CategoryRow> {
               ),
             ),
           ),
-          child: Text(
-            widget.name,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: _focused
-                  ? GtvTheme.redHi
-                  : (widget.selected ? GtvTheme.red.withOpacity(0.9) : Colors.white70),
-              fontSize: TvLayout.labelFont(context, 16),
-              fontWeight: _focused || widget.selected ? FontWeight.w800 : FontWeight.w500,
-              height: 1.15,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              widget.name,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: _focused
+                    ? GtvTheme.redHi
+                    : (widget.selected ? GtvTheme.red.withOpacity(0.9) : Colors.white70),
+                fontSize: fontSize,
+                fontWeight: _focused || widget.selected ? FontWeight.w800 : FontWeight.w500,
+                height: 1.12,
+              ),
             ),
           ),
         ),
