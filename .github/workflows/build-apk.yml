@@ -215,17 +215,17 @@ jobs:
           if-no-files-found: error
 
       # Android Studio emulator (x86_64) — los APK TV arm NO arrancan aquí.
-      - name: Build EMULATOR APK x64 release (Android Studio)
-        run: flutter build apk --release --target-platform=android-x64 -PgtvEmulatorBuild=true
+      - name: Build EMULATOR APK universal release (ARM64 + x86_64)
+        run: flutter build apk --release --target-platform=android-arm64,android-x64 -PgtvEmulatorBuild=true
 
-      - name: Rename emulator x64 release
-        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/GadirTV-emulator-x64-release.apk
+      - name: Rename emulator universal release
+        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/GadirTV-emulator.apk
 
-      - name: Upload emulator x64 release
+      - name: Upload emulator universal release
         uses: actions/upload-artifact@v4
         with:
-          name: GadirTV-emulator-x64-release
-          path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-emulator-x64-release.apk
+          name: GadirTV-emulator
+          path: gadirtv_android/build/app/outputs/flutter-apk/GadirTV-emulator.apk
           if-no-files-found: error
 
       - name: Build EMULATOR APK x64 debug (Android Studio)
@@ -297,10 +297,10 @@ jobs:
           name: GadirTV-AndroidTV-DEBUG-armv7a
           path: release-assets
 
-      - name: Download emulator x64 release
+      - name: Download emulator universal release
         uses: actions/download-artifact@v4
         with:
-          name: GadirTV-emulator-x64-release
+          name: GadirTV-emulator
           path: release-assets
 
       - name: Download emulator x64 debug
@@ -345,11 +345,10 @@ jobs:
             | `GadirTV-arm64.apk` | Móvil/tablet arm64 |
             | `GadirTV-universal-phone.apk` | Cualquier Android (más pesado) |
             | `GadirTV-AndroidTV-DEBUG-armv7a.apk` | Si crashea en TV — muestra error en pantalla roja |
-            | `GadirTV-emulator-x64-release.apk` | **Emulador Android Studio x86_64 (recomendado)** |
-            | `GadirTV-emulator-x64-debug.apk` | Emulador x86_64 debug (más lento al arrancar) |
+            | `GadirTV-emulator.apk` | **Emulador Android Studio (ARM64 + x86_64)** |
+            | `GadirTV-emulator-x64-debug.apk` | Emulador debug (más lento al arrancar) |
 
-            > **Emulador:** no uses `GadirTV-AndroidTV.apk` en Android Studio — es ARM y no arranca.
-            > Instala `GadirTV-emulator-x64-release.apk`.
+            > **Emulador:** instala `GadirTV-emulator.apk` (un solo archivo para cualquier emulador).
           files: release-assets/*
           make_latest: true
           overwrite_files: true
