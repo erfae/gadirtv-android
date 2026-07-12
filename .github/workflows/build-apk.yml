@@ -59,7 +59,10 @@ jobs:
       - name: Verify deferred plugin registration (no VLC at cold start)
         run: |
           grep -q GadirPluginRegistrant android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
-          grep -q 'provideFlutterEngine' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
+          if grep -q 'provideFlutterEngine' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
+            echo "ERROR: use default FlutterActivity engine for reliable TV DPAD keys"
+            exit 1
+          fi
           if grep -qE '^import .*FlutterVlcPlayerPlugin' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
             echo "ERROR: MainActivity must not import FlutterVlcPlayerPlugin directly"
             exit 1
@@ -137,7 +140,10 @@ jobs:
       - name: Verify deferred plugin registration (no VLC at cold start)
         run: |
           grep -q GadirPluginRegistrant android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
-          grep -q 'provideFlutterEngine' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
+          if grep -q 'provideFlutterEngine' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
+            echo "ERROR: use default FlutterActivity engine for reliable TV DPAD keys"
+            exit 1
+          fi
           if grep -qE '^import .*FlutterVlcPlayerPlugin' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
             echo "ERROR: MainActivity must not import FlutterVlcPlayerPlugin directly"
             exit 1

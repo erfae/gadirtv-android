@@ -51,6 +51,9 @@ Future<void> main() async {
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } catch (_) {}
 
+    // Global DPAD handler — backup when Shortcuts scope does not receive keys.
+    GtvTvKeyHandler.install();
+
     // Warm TV detection cache so focus-heavy screens can adapt if needed.
     unawaited(TvUtils.isAndroidTv());
 
@@ -132,12 +135,13 @@ class _GadirTvAppState extends State<GadirTvApp> {
         builder: (_, __) {
           return Directionality(
             textDirection: _i18n.isRtl ? TextDirection.rtl : TextDirection.ltr,
-            child: GtvTvShortcuts(
-              child: MaterialApp.router(
-                title: 'GadirTV',
-                debugShowCheckedModeBanner: false,
-                theme: GtvTheme.build(),
-                routerConfig: _router,
+            child: MaterialApp.router(
+              title: 'GadirTV',
+              debugShowCheckedModeBanner: false,
+              theme: GtvTheme.build(),
+              routerConfig: _router,
+              builder: (context, child) => GtvTvShell(
+                child: child ?? const SizedBox.shrink(),
               ),
             ),
           );
