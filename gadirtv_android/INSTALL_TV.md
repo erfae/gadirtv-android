@@ -88,6 +88,43 @@ adb uninstall com.gadir.tv
 adb install -r GadirTV-emulator-x64-release.apk
 ```
 
+### Error `INSTALL_FAILED_NO_MATCHING_ABIS`
+
+Significa que el APK **no coincide con la CPU** del dispositivo al que apunta `adb`.
+
+**1. Comprueba a qué dispositivo instalas** (muy habitual con el móvil conectado por USB):
+
+```cmd
+adb devices
+adb shell getprop ro.product.cpu.abi
+```
+
+| CPU que devuelve `getprop` | APK correcto |
+|---|---|
+| `x86_64` | `GadirTV-emulator-x64-release.apk` |
+| `armeabi-v7a` | `GadirTV-AndroidTV-armv7a.apk` (o `GadirTV-AndroidTV.apk`) |
+| `arm64-v8a` | `GadirTV-AndroidTV-arm64.apk` o universal |
+
+Si tienes **móvil/TV y emulador** conectados a la vez, especifica el destino:
+
+```cmd
+adb -e install -r GadirTV-emulator-x64-release.apk
+```
+(`-e` = solo emulador; `-d` = solo dispositivo físico)
+
+**2. Verifica que el APK es el de emulador** (debe pesar ~15 MB, no ~50 MB):
+
+Abre el `.apk` con 7-Zip → debe existir la carpeta `lib/x86_64/libflutter.so`.
+Si solo ves `lib/armeabi-v7a` o `lib/arm64-v8a`, es un APK de TV — no sirve en emulador x86_64.
+
+**3. Emulador con imagen ARM** (p. ej. "ARM 64" en AVD Manager):
+
+No uses el APK x64. Instala `GadirTV-AndroidTV-arm64.apk` desde la [release](https://github.com/erfae/gadirtv-android/releases).
+
+**4. TV Box o móvil real por USB:**
+
+Usa `GadirTV-AndroidTV.apk`, **no** el de emulador.
+
 O compila en el proyecto (desde la carpeta `gadirtv_android`):
 
 **Linux / macOS:**
