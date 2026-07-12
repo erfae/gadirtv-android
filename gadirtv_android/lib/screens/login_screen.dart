@@ -8,10 +8,11 @@ import '../services/m3u_cache.dart';
 import '../services/profile_store.dart';
 import '../theme.dart';
 import '../widgets/gtv_focusable.dart';
+import '../widgets/gtv_tv_text_field.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v2.1.5';
+const String kAppVersionLabel = 'v2.1.6';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -377,11 +378,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // ── Field groups (rendered conditionally by mode) ────────────
   List<Widget> _xtreamFields() => [
-        TextField(
+        GtvTvTextField(
           controller: _host,
           keyboardType: TextInputType.url,
           enabled: !_busy,
-          style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
             hintText: 'Servidor (http://tu-servidor.com:8080)',
             helperText: 'Compatible con cualquier servidor Xtream Codes. '
@@ -391,22 +391,20 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        TextField(
+        GtvTvTextField(
           controller: _user,
           autocorrect: false,
           enableSuggestions: false,
           enabled: !_busy,
-          style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(hintText: 'Usuario'),
         ),
         const SizedBox(height: 14),
-        TextField(
+        GtvTvTextField(
           controller: _pass,
           obscureText: !_passVisible,
           autocorrect: false,
           enableSuggestions: false,
           enabled: !_busy,
-          style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
             hintText: 'Contraseña',
             suffixIcon: IconButton(
@@ -420,20 +418,18 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        TextField(
+        GtvTvTextField(
           controller: _name,
           enabled: !_busy,
-          style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(hintText: 'Nombre del perfil (opcional)'),
         ),
       ];
 
   List<Widget> _m3uFields() => [
-        TextField(
+        GtvTvTextField(
           controller: _m3uUrl,
           keyboardType: TextInputType.url,
           enabled: !_busy,
-          style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
             hintText: 'URL M3U (http://…/get.php?…&type=m3u_plus)',
             helperText: 'Pega la URL completa de tu playlist M3U/M3U8. '
@@ -443,10 +439,9 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        TextField(
+        GtvTvTextField(
           controller: _name,
           enabled: !_busy,
-          style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(hintText: 'Nombre del perfil (opcional)'),
         ),
       ];
