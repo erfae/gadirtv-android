@@ -3,7 +3,7 @@
 # flutter pub get overwrites it with the full plugin list.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$ROOT/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.minimal.java"
+SRC="$ROOT/scripts/templates/GeneratedPluginRegistrant.minimal.java"
 DST="$ROOT/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java"
 if [[ ! -f "$SRC" ]]; then
   echo "ERROR: missing $SRC" >&2

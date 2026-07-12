@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 Write-Host '=== GadirTV: APK emulador x86_64 ==='
 flutter pub get
-$src = 'android\app\src\main\java\io\flutter\plugins\GeneratedPluginRegistrant.minimal.java'
+$src = 'scripts\templates\GeneratedPluginRegistrant.minimal.java'
 $dst = 'android\app\src\main\java\io\flutter\plugins\GeneratedPluginRegistrant.java'
 Copy-Item -Force $src $dst
 flutter build apk --release --target-platform=android-x64 -PgtvEmulatorBuild=true

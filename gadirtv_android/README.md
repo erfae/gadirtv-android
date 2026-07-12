@@ -81,7 +81,7 @@ cd gadirtv_android
 
 Si `flutter pub get` falla o la compilación da errores de plugins, restaura el registrant mínimo antes de compilar:
 ```bash
-cp android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.minimal.java \
+cp scripts/templates/GeneratedPluginRegistrant.minimal.java \
    android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
 ```
 

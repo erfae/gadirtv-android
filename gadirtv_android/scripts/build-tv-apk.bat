@@ -6,7 +6,7 @@ if "%ABI%"=="" set ABI=arm
 echo === GadirTV: APK Android TV (%ABI%) ===
 call flutter pub get
 if errorlevel 1 goto :fail
-copy /Y "android\app\src\main\java\io\flutter\plugins\GeneratedPluginRegistrant.minimal.java" "android\app\src\main\java\io\flutter\plugins\GeneratedPluginRegistrant.java" >nul
+copy /Y "scripts\templates\GeneratedPluginRegistrant.minimal.java" "android\app\src\main\java\io\flutter\plugins\GeneratedPluginRegistrant.java" >nul
 if errorlevel 1 goto :fail
 if /I "%ABI%"=="arm64" goto :arm64
 if /I "%ABI%"=="64" goto :arm64

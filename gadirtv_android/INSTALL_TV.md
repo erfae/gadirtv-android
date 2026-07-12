@@ -150,7 +150,7 @@ cd gadirtv_android
 cd gadirtv_android
 flutter pub get
 # Restaurar registrant mínimo (sin libVLC al arrancar):
-cp android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.minimal.java \
+cp scripts/templates/GeneratedPluginRegistrant.minimal.java \
    android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
 flutter build apk --release --target-platform=android-x64 -PgtvEmulatorBuild=true
 ```
