@@ -104,9 +104,17 @@ android {
     // flutter_vlc_player (libVLC) ships its own libc++_shared.so which
     // can conflict with other native plugins. Tell the packager to just
     // pick the first copy — they are ABI-compatible.
+    def gtvEmulatorBuild = System.getenv('GTV_EMULATOR_BUILD') == 'true'
     packagingOptions {
         pickFirst 'lib/**/libc++_shared.so'
         pickFirst 'lib/**/libjsc.so'
+        if (gtvEmulatorBuild) {
+            // Emulator APK: sin libVLC (~100 MB menos, arranque mucho más rápido).
+            exclude 'lib/x86_64/libvlc.so'
+            exclude 'lib/x86_64/libvlcjni.so'
+            exclude 'lib/x86/libvlc.so'
+            exclude 'lib/x86/libvlcjni.so'
+        }
         // Force extracted native libs. Some older Android TV box
         // firmwares (Amlogic S905/S912 / Xiaomi Mi TV Box) fail to
         // install APKs whose .so files are packed uncompressed, which

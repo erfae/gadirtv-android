@@ -3,6 +3,7 @@ package com.gadir.tv
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
@@ -58,6 +59,7 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "isAndroidTv" -> result.success(isTvDevice())
+                    "isEmulator" -> result.success(isEmulator())
                     "openUrl" -> openExternalUrl(call.argument("url"), result)
                     else -> result.notImplemented()
                 }
@@ -175,6 +177,18 @@ class MainActivity : FlutterActivity() {
         val pm = packageManager
         return pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
             || pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
+    }
+
+    /** Android Studio emulator / sdk_gphone — not a real TV Box. */
+    private fun isEmulator(): Boolean {
+        val fp = Build.FINGERPRINT.lowercase()
+        return fp.contains("generic")
+            || fp.contains("emulator")
+            || Build.MODEL.contains("Emulator", ignoreCase = true)
+            || Build.MODEL.contains("Android SDK built for", ignoreCase = true)
+            || Build.HARDWARE.contains("goldfish", ignoreCase = true)
+            || Build.HARDWARE.contains("ranchu", ignoreCase = true)
+            || Build.PRODUCT.contains("sdk", ignoreCase = true)
     }
 
     /** VIEW intent for trailers / external links — prefers YouTube TV on leanback. */

@@ -216,7 +216,7 @@ jobs:
 
       # Android Studio emulator (x86_64) — los APK TV arm NO arrancan aquí.
       - name: Build EMULATOR APK x64 release (Android Studio)
-        run: flutter build apk --release --target-platform=android-x64
+        run: GTV_EMULATOR_BUILD=true flutter build apk --release --target-platform=android-x64
 
       - name: Rename emulator x64 release
         run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/GadirTV-emulator-x64-release.apk
@@ -229,7 +229,7 @@ jobs:
           if-no-files-found: error
 
       - name: Build EMULATOR APK x64 debug (Android Studio)
-        run: flutter build apk --debug --target-platform=android-x64
+        run: GTV_EMULATOR_BUILD=true flutter build apk --debug --target-platform=android-x64
 
       - name: Rename emulator x64 debug
         run: mv build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/GadirTV-emulator-x64-debug.apk

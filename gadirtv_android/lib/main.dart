@@ -38,32 +38,12 @@ Future<void> main() async {
     // required. This is the same engine XCIPTV Player uses, verified to run
     // on the Xiaomi Amlogic TV boxes where libmpv (media_kit) crashed.
 
-    // IPTV apps are landscape-first — matches the Windows client and gives
-    // TV Box remotes a natural layout. Skipped on Android TV, whose display
-    // is hardware-locked to landscape and rejects orientation overrides
-    // (calling this throws a PlatformException on some Sony / Xiaomi TVs).
-    try {
-      await SystemChrome.setPreferredOrientations(const [
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
-    } catch (_) {}
-    try {
-      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    } catch (_) {}
-
-    // Native Android TV boxes often never deliver KeyEvents to Flutter; MainActivity
-    // forwards DPAD presses over MethodChannel and we inject them here.
+    // IPTV apps are landscape-first on real TV boxes. On emulators and phones
+    // skip orientation lock — forcing landscape on a phone AVD freezes System UI.
     GtvTvKeyBridge.install();
+    runApp(const GadirTvApp());
+    unawaited(_configureDisplayForTv());
 
-    // Warm TV detection cache so focus-heavy screens can adapt if needed.
-    unawaited(TvUtils.isAndroidTv());
-
-    String initialLang = 'es';
-    try {
-      initialLang = await PrefsSettings().getLanguage();
-    } catch (_) {}
-    runApp(GadirTvApp(initialLanguage: initialLang));
   }, (error, stack) {
     debugPrint('GadirTV uncaught: $error\n$stack');
     runApp(MaterialApp(
@@ -71,6 +51,20 @@ Future<void> main() async {
       home: _FatalErrorScreen(message: error.toString(), stack: stack),
     ));
   });
+}
+
+Future<void> _configureDisplayForTv() async {
+  if (await TvUtils.isEmulator()) return;
+  if (!await TvUtils.isAndroidTv()) return;
+  try {
+    await SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+  } catch (_) {}
+  try {
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  } catch (_) {}
 }
 
 /// Full-screen error panel used when a widget fails to build. On Android TV
@@ -117,16 +111,22 @@ class _FatalErrorScreen extends StatelessWidget {
 }
 
 class GadirTvApp extends StatefulWidget {
-  const GadirTvApp({super.key, required this.initialLanguage});
-
-  final String initialLanguage;
+  const GadirTvApp({super.key});
 
   @override
   State<GadirTvApp> createState() => _GadirTvAppState();
 }
 
 class _GadirTvAppState extends State<GadirTvApp> {
-  late final AppI18nController _i18n = AppI18nController(widget.initialLanguage);
+  late final AppI18nController _i18n = AppI18nController('es');
+
+  @override
+  void initState() {
+    super.initState();
+    PrefsSettings().getLanguage().then((code) {
+      if (mounted) _i18n.setLocale(code);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -77,7 +77,11 @@ Los APK de TV (`GadirTV-AndroidTV.apk`, universal, arm64…) son **ARM** y en el
 | **`GadirTV-emulator-x64-release.apk`** | **Emulador Android Studio x86_64 — usa este** |
 | `GadirTV-emulator-x64-debug.apk` | Mismo emulador, build debug (arranque más lento) |
 
+> Si aparece **"System UI isn't responding"**, pulsa **Wait** (no Close app).
+> El primer arranque puede tardar 15–30 s en emuladores lentos.
+
 ```bash
+adb uninstall com.gadir.tv
 adb install -r GadirTV-emulator-x64-release.apk
 adb shell am start -n com.gadir.tv/.MainActivity
 ```
