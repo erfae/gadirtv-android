@@ -1,6 +1,5 @@
 package com.gadir.tv
 
-import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
@@ -25,21 +24,10 @@ class MainActivity : FlutterActivity() {
         return FlutterShellArgs(arrayOf("--enable-impeller=false"))
     }
 
-    /**
-     * Build the engine ourselves with [automaticallyRegisterPlugins] = false so
-     * GeneratedPluginRegistrant never loads libVLC at cold start. Many Amlogic
-     * TV boxes crash before Dart main() if VLC native libs initialise early.
-     */
-    override fun provideFlutterEngine(context: Context): FlutterEngine {
-        return FlutterEngine(
-            context,
-            getFlutterShellArgs().toArray(),
-            false,
-        )
-    }
-
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-        // Do NOT call super — it would invoke GeneratedPluginRegistrant.
+        // Do NOT call super — it would invoke GeneratedPluginRegistrant with libVLC.
+        // Use the default FlutterActivity engine (not provideFlutterEngine) so DPAD
+        // key events reach Flutter reliably on TV boxes.
         GadirPluginRegistrant.registerWith(flutterEngine)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PLUGINS_CHANNEL)
@@ -68,7 +56,6 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Some TV firmwares leave a system nav bar overlay; keep content edge-to-edge.
         if (isTvDevice()) {
             window.decorView.systemUiVisibility = (
                 android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
@@ -78,6 +65,14 @@ class MainActivity : FlutterActivity() {
                     or android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
                     or android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                 )
+        }
+    }
+
+    override fun onPostResume() {
+        super.onPostResume()
+        // Leanback devices only deliver DPAD keys when the window has focus.
+        if (isTvDevice()) {
+            window.decorView.post { window.decorView.requestFocus() }
         }
     }
 
@@ -118,6 +113,4 @@ class MainActivity : FlutterActivity() {
         return pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
             || pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
     }
-
-    // D-pad keys are handled by Flutter's focus system — do not intercept here.
 }

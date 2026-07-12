@@ -75,9 +75,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 32),
-            child: FocusTraversalGroup(
-              policy: OrderedTraversalPolicy(),
-              child: Column(
+            child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                 const Text(
@@ -132,7 +130,6 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                   ),
                 ],
               ),
-            ),
           ),
         ),
       ),

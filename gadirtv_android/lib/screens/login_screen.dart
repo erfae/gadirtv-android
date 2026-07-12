@@ -11,7 +11,7 @@ import '../widgets/gtv_focusable.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v2.1.3';
+const String kAppVersionLabel = 'v2.1.4';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -216,9 +216,7 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
-            child: FocusTraversalGroup(
-              policy: OrderedTraversalPolicy(),
-              child: Column(
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                 const Text(
@@ -374,7 +372,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-    ),
     );
   }
 
