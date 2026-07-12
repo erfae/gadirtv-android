@@ -6,6 +6,7 @@ import '../../models/profile.dart';
 import '../../services/api_service.dart';
 import '../../services/favorites_store.dart';
 import '../../theme.dart';
+import '../../utils/tv_layout.dart';
 import '../../widgets/category_list_rail.dart';
 import '../../widgets/poster_card.dart';
 
@@ -143,7 +144,7 @@ class _SeriesTabState extends State<SeriesTab> {
     return Row(
       children: [
         SizedBox(
-          width: 150,
+          width: TvLayout.categoryRailWidth(context),
           child: CategoryListRail(
             categories: chips,
             selectedId: _selected,

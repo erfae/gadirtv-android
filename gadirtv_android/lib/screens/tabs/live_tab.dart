@@ -13,6 +13,7 @@ import '../../services/favorites_store.dart';
 import '../../services/vlc_bootstrap.dart';
 import '../../services/vlc_device_profile.dart';
 import '../../theme.dart';
+import '../../utils/tv_layout.dart';
 import '../../widgets/category_list_rail.dart';
 import '../../widgets/gtv_focusable.dart';
 import '../../widgets/no_signal_test_card.dart';
@@ -154,12 +155,16 @@ class _LiveTabState extends State<LiveTab> {
   }
 
   final _miniKey = GlobalKey<_MiniPlayerState>();
+  final _miniFocus = FocusNode();
 
   Future<void> _preview(LiveChannel c) async {
     setState(() {
       _current = c;
       _epgNow = null;
       _epgNext = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _miniFocus.requestFocus();
     });
     try {
       final ep = await _api.shortEpg(widget.profile, c.streamId, limit: 2);
@@ -190,6 +195,12 @@ class _LiveTabState extends State<LiveTab> {
   }
 
   @override
+  void dispose() {
+    _miniFocus.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = AppI18n.of(context);
     if (_loadingCats) {
@@ -212,6 +223,7 @@ class _LiveTabState extends State<LiveTab> {
 
       final miniBox = _MiniPlayer(
         key: _miniKey,
+        focusNode: _miniFocus,
         streamUrl: streamUrl,
         title: _current?.name ?? t.selectChannel,
         onFullscreen: _fullscreen,
@@ -226,7 +238,7 @@ class _LiveTabState extends State<LiveTab> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              width: 170,
+              width: TvLayout.categoryRailWidth(context),
               child: CategoryListRail(
                 categories: categories,
                 selectedId: _selected,
@@ -280,7 +292,7 @@ class _LiveTabState extends State<LiveTab> {
             child: Row(
               children: [
                 SizedBox(
-                  width: 150,
+                  width: TvLayout.categoryRailWidth(context),
                   child: CategoryListRail(
                     categories: categories,
                     selectedId: _selected,
@@ -340,11 +352,13 @@ class _LiveTabState extends State<LiveTab> {
 class _MiniPlayer extends StatefulWidget {
   const _MiniPlayer({
     super.key,
+    this.focusNode,
     required this.streamUrl,
     required this.title,
     required this.onFullscreen,
   });
 
+  final FocusNode? focusNode;
   final String? streamUrl;
   final String title;
   final VoidCallback onFullscreen;
@@ -533,8 +547,11 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final t = AppI18n.of(context);
-    return GestureDetector(
+    return GtvFocusable(
+      focusNode: widget.focusNode,
       onTap: widget.streamUrl != null ? widget.onFullscreen : null,
+      enabled: widget.streamUrl != null,
+      borderRadius: BorderRadius.circular(8),
       child: Container(
         color: Colors.black,
         child: Stack(
@@ -614,14 +631,14 @@ class _MiniBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.black.withOpacity(0.55),
-        shape: const CircleBorder(),
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const CircleBorder(),
+    return GtvFocusable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Tooltip(
+        message: tooltip,
+        child: Material(
+          color: Colors.black.withOpacity(0.55),
+          shape: const CircleBorder(),
           child: Container(
             width: 36, height: 36,
             alignment: Alignment.center,
@@ -726,7 +743,12 @@ class _ChannelRowState extends State<_ChannelRow> {
       actions: {
         ActivateIntent: CallbackAction<ActivateIntent>(
           onInvoke: (_) {
-            widget.onTap();
+            // TV remote: first OK previews, second OK on same channel → fullscreen.
+            if (widget.selected) {
+              widget.onDoubleTap();
+            } else {
+              widget.onTap();
+            }
             return null;
           },
         ),
@@ -758,10 +780,28 @@ class _ChannelRowState extends State<_ChannelRow> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(widget.channel.name,
-                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.channel.name,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: TvLayout.labelFont(context, 14),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                    if (widget.selected)
+                      Text(
+                        'Pulsa OK de nuevo → pantalla completa',
+                        style: TextStyle(
+                          color: GtvTheme.redHi,
+                          fontSize: TvLayout.labelFont(context, 10),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                  ],
+                ),
               ),
               GtvFocusable(
                 borderRadius: BorderRadius.circular(999),

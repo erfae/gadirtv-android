@@ -8,6 +8,8 @@ import '../models/profile.dart';
 import '../services/api_service.dart';
 import '../services/resume_store.dart';
 import '../theme.dart';
+import '../utils/xtream_utils.dart';
+import '../widgets/gtv_focusable.dart';
 import 'player_screen.dart';
 
 /// Series detail — mobile-first stacked layout.
@@ -104,7 +106,7 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
     final info = _info['info'] is Map
         ? Map<String, dynamic>.from(_info['info'] as Map)
         : <String, dynamic>{};
-    final plot = (info['plot'] ?? widget.series.plot).toString();
+    final plot = extractPlot(info, fallback: widget.series.plot);
     final cast = (info['cast'] ?? '').toString();
     final director = (info['director'] ?? '').toString();
     final genre = (info['genre'] ?? '').toString();
@@ -127,7 +129,17 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
       ),
       body: LayoutBuilder(builder: (context, cons) {
         final t = AppI18n.of(context);
-        final wide = cons.maxWidth >= 700;
+
+        Widget synopsisBlock() => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(t.synopsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                Text(plot.isEmpty ? t.noSynopsis : plot,
+                    style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.6)),
+              ],
+            );
 
         Widget leftBlock() => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -195,6 +207,8 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
                   const SizedBox(height: 6),
                   _labelValue(t.director, director),
                 ],
+                const SizedBox(height: 22),
+                synopsisBlock(),
                 const SizedBox(height: 20),
                 Text(t.seasons,
                     style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
@@ -210,50 +224,15 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
               ],
             );
 
-        Widget synopsisBlock() => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(t.synopsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 8),
-                Text(plot.isEmpty ? t.noSynopsis : plot,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.6)),
-              ],
-            );
-
-        if (wide) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 5, child: SingleChildScrollView(child: leftBlock())),
-                const SizedBox(width: 20),
-                Container(width: 1, height: 400, color: GtvTheme.border),
-                const SizedBox(width: 20),
-                Expanded(flex: 4, child: SingleChildScrollView(child: synopsisBlock())),
-              ],
-            ),
-          );
-        }
-
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              leftBlock(),
-              const SizedBox(height: 22),
-              synopsisBlock(),
-              const SizedBox(height: 40),
-            ],
-          ),
+          child: leftBlock(),
         );
       }),
     );
   }
 
-  String _firstBackdrop(Map<String, dynamic> info) => '';
+  String _firstBackdropUnused(Map<String, dynamic> info) => '';
 
   Widget _stars(double rating) {
     return Row(mainAxisSize: MainAxisSize.min, children: List.generate(5, (i) {
@@ -296,7 +275,7 @@ class _SeasonRow extends StatelessWidget {
     final t = AppI18n.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
+      child: GtvFocusable(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
@@ -323,7 +302,9 @@ class _SeasonRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('${t.season} $season',
-                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 2),
                   Text('$episodeCount ${t.episodes}',
                       style: const TextStyle(color: GtvTheme.textDim, fontSize: 12)),
@@ -366,8 +347,9 @@ class _SeasonEpisodesScreenState extends State<SeasonEpisodesScreen> {
   final _api = ApiService();
 
   void _play(Map<String, dynamic> episode) {
-    final id = (episode['id'] ?? '').toString();
-    final ext = (episode['container_extension'] ?? 'mp4').toString();
+    final id = episodeStreamId(episode);
+    if (id.isEmpty) return;
+    final ext = pickContainerExt(episode, null, fallback: 'mp4');
     final title = (episode['title'] ?? episode['name'] ?? '').toString();
     final epNum = (episode['episode_num'] ?? '').toString();
     final url = _api.streamUrl(
@@ -456,7 +438,7 @@ class _SeasonEpisodesScreenState extends State<SeasonEpisodesScreen> {
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (_, i) => _EpisodeTile(
                         episode: widget.episodes[i],
-                        resume: widget.resumeMap['series:${widget.episodes[i]['id']}'],
+                        resume: widget.resumeMap['series:${episodeStreamId(widget.episodes[i])}'],
                         onTap: () => _play(widget.episodes[i]),
                       ),
                     ),
@@ -470,7 +452,7 @@ class _SeasonEpisodesScreenState extends State<SeasonEpisodesScreen> {
 
 // ─────────────────────────────────────────────────────────────
 
-class _EpisodeTile extends StatefulWidget {
+class _EpisodeTile extends StatelessWidget {
   const _EpisodeTile({required this.episode, required this.onTap, this.resume});
 
   final Map<String, dynamic> episode;
@@ -478,89 +460,70 @@ class _EpisodeTile extends StatefulWidget {
   final ResumeEntry? resume;
 
   @override
-  State<_EpisodeTile> createState() => _EpisodeTileState();
-}
-
-class _EpisodeTileState extends State<_EpisodeTile> {
-  bool _focused = false;
-
-  @override
   Widget build(BuildContext context) {
-    final e = widget.episode;
+    final e = episode;
     final num = (e['episode_num'] ?? '').toString();
     final title = (e['title'] ?? e['name'] ?? 'Episodio $num').toString();
     final info = e['info'] is Map ? Map<String, dynamic>.from(e['info'] as Map) : <String, dynamic>{};
-    final plot = (info['plot'] ?? info['overview'] ?? '').toString();
-    final progress = widget.resume?.progress ?? 0;
+    final plot = extractPlot(info);
+    final progress = resume?.progress ?? 0;
 
-    return FocusableActionDetector(
-      onShowFocusHighlight: (v) => setState(() => _focused = v),
-      onShowHoverHighlight: (v) => setState(() => _focused = v),
-      actions: {
-        ActivateIntent: CallbackAction<ActivateIntent>(
-          onInvoke: (_) {
-            widget.onTap();
-            return null;
-          },
+    return GtvFocusable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: GtvTheme.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: GtvTheme.border),
         ),
-      },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: GtvTheme.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: _focused ? GtvTheme.red : GtvTheme.border, width: _focused ? 2 : 1),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40, height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: GtvTheme.red.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(num,
-                    style: const TextStyle(color: GtvTheme.red, fontWeight: FontWeight.w800)),
+        child: Row(
+          children: [
+            Container(
+              width: 40, height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: GtvTheme.red.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                        maxLines: 1,
+              child: Text(num,
+                  style: const TextStyle(color: GtvTheme.red, fontWeight: FontWeight.w800)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                  if (plot.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(plot,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-                    if (plot.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(plot,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: GtvTheme.textDim, fontSize: 12)),
-                    ],
-                    if (progress > 0 && progress < 1) ...[
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 3,
-                          backgroundColor: Colors.white12,
-                          color: GtvTheme.red,
-                        ),
-                      ),
-                    ],
+                        style: const TextStyle(color: GtvTheme.textDim, fontSize: 12)),
                   ],
-                ),
+                  if (progress > 0 && progress < 1) ...[
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 3,
+                        backgroundColor: Colors.white12,
+                        color: GtvTheme.red,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(width: 10),
-              const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 26),
-            ],
-          ),
+            ),
+            const SizedBox(width: 10),
+            const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 26),
+          ],
         ),
       ),
     );

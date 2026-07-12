@@ -12,6 +12,7 @@ import '../services/m3u_cache.dart';
 import '../services/plugins_bootstrap.dart';
 import '../services/profile_store.dart';
 import '../theme.dart';
+import '../utils/xtream_utils.dart';
 import '../widgets/gtv_focusable.dart';
 import '../widgets/quick_actions_sheet.dart';
 import 'movie_detail_screen.dart';
@@ -88,9 +89,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Direct movie play — used both by the quick-actions sheet and the
   /// hero "VER AHORA" button which skip the detail screen.
-  void _playMovie(Movie m) {
-    final ext = m.containerExt.isEmpty ? 'mp4' : m.containerExt;
-    final url = _api.streamUrl(_profile!, kind: 'movie', streamId: m.streamId, ext: ext);
+  Future<void> _playMovie(Movie m) async {
+    Map<String, dynamic> info = const {};
+    try {
+      info = await _api.vodInfo(_profile!, m.streamId);
+    } catch (_) {}
+    final md = info['movie_data'] is Map
+        ? Map<String, dynamic>.from(info['movie_data'] as Map)
+        : <String, dynamic>{};
+    final meta = info['info'] is Map
+        ? Map<String, dynamic>.from(info['info'] as Map)
+        : <String, dynamic>{};
+    final ext = pickContainerExt(md, meta, fallback: m.containerExt);
+    final sid = movieStreamId(info, m.streamId);
+    final url = _api.streamUrl(_profile!, kind: 'movie', streamId: sid, ext: ext);
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PlayerScreen(
@@ -123,8 +136,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (list is! List || list.isEmpty) return;
     final ep = Map<String, dynamic>.from(list.first as Map);
 
-    final id = (ep['id'] ?? '').toString();
-    final ext = (ep['container_extension'] ?? 'mp4').toString();
+    final id = episodeStreamId(ep);
+    if (id.isEmpty) return;
+    final ext = pickContainerExt(ep, null, fallback: 'mp4');
     final epNum = (ep['episode_num'] ?? '1').toString();
     final url = _api.streamUrl(_profile!, kind: 'series', streamId: id, ext: ext);
     Navigator.of(context).push(
@@ -328,7 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final tabs = <Widget Function()>[
-      () => KeyedSubtree(key: ValueKey('home-$_reloadTick'), child: HomeTab(profile: p, onOpenMovie: _openMovie, onOpenSeries: _openSeries)),
+      () => KeyedSubtree(key: ValueKey('home-$_reloadTick'), child: HomeTab(profile: p, onOpenMovie: _openMovie, onOpenSeries: _openSeries, onPlayMovie: _playMovie)),
       () => KeyedSubtree(key: ValueKey('live-$_reloadTick'), child: LiveTab(profile: p, onPlay: _playChannel, active: _tab == 1)),
       () => KeyedSubtree(key: ValueKey('movies-$_reloadTick'), child: MoviesTab(profile: p, onOpen: _openMovie)),
       () => KeyedSubtree(key: ValueKey('series-$_reloadTick'), child: SeriesTab(profile: p, onOpen: _openSeries)),

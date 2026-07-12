@@ -12,7 +12,7 @@ import '../widgets/gtv_tv_text_field.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v2.1.9';
+const String kAppVersionLabel = 'v2.2.0';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
