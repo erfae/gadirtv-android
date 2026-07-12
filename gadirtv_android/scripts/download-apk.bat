@@ -1,23 +1,31 @@
 @echo off
 setlocal
-echo === Descargar GadirTV v2.3.9 ===
+echo === Descargar GadirTV (TV Box) ===
 set DEST=%USERPROFILE%\Downloads
 if not "%~1"=="" set DEST=%~1
 echo Guardando en: %DEST%
 echo.
-echo [1/1] TV Box APK (~52 MB)...
-curl.exe -fL --retry 3 --retry-delay 2 -o "%DEST%\GadirTV-AndroidTV.apk" "https://github.com/erfae/gadirtv-android/releases/download/v2.3.9/GadirTV-AndroidTV.apk"
+
+set URL=https://github.com/erfae/gadirtv-android/releases/latest/download/GadirTV-AndroidTV.apk
+echo Descargando desde: %URL%
+curl.exe -fL --retry 5 --retry-delay 3 -o "%DEST%\GadirTV-AndroidTV.apk" "%URL%"
+if not errorlevel 1 goto :ok
+
+echo.
+echo Reintento con v2.3.8...
+set URL=https://github.com/erfae/gadirtv-android/releases/download/v2.3.8/GadirTV-AndroidTV.apk
+curl.exe -fL --retry 5 --retry-delay 3 -o "%DEST%\GadirTV-AndroidTV.apk" "%URL%"
 if errorlevel 1 goto :fail
+
+:ok
 echo.
 echo OK: %DEST%\GadirTV-AndroidTV.apk
-echo.
-echo Instalar en TV:
-echo   adb -d uninstall com.gadir.tv
-echo   adb -d install -r "%DEST%\GadirTV-AndroidTV.apk"
+echo Instalar: adb -d install -r "%DEST%\GadirTV-AndroidTV.apk"
 goto :eof
+
 :fail
 echo.
-echo ERROR: no se pudo descargar. Prueba:
-echo   1. Abre en el navegador: github.com/erfae/gadirtv-android/releases
-echo   2. Clic en GadirTV 2.3.9 -^> GadirTV-AndroidTV.apk
+echo ERROR 404 — abre en el navegador:
+echo   https://github.com/erfae/gadirtv-android/releases
+echo y descarga GadirTV-AndroidTV.apk manualmente.
 exit /b 1

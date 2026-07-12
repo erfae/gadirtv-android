@@ -245,7 +245,7 @@ jobs:
   # the Downloader app (artifact zips from Actions are not usable there).
   publish-release:
     name: Publish GitHub Release (Downloader-friendly URL)
-    needs: [build, build-tv]
+    needs: [build-tv]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     steps:
@@ -278,12 +278,14 @@ jobs:
           path: release-assets
 
       - name: Download universal APK
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: GadirTV-release-apk
           path: release-assets
 
       - name: Download arm64 phone APK
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: GadirTV-release-split-apks
