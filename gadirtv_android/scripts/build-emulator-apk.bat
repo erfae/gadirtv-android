@@ -6,7 +6,7 @@ call flutter pub get
 if errorlevel 1 goto :fail
 copy /Y "scripts\templates\GeneratedPluginRegistrant.minimal.java" "android\app\src\main\java\io\flutter\plugins\GeneratedPluginRegistrant.java" >nul
 if errorlevel 1 goto :fail
-call flutter build apk --release --target-platform=android-arm64,android-x64 -PgtvEmulatorBuild=true
+call flutter build apk --release --target-platform=android-arm,android-arm64,android-x64 -PgtvEmulatorBuild=true
 if errorlevel 1 goto :fail
 copy /Y "build\app\outputs\flutter-apk\app-release.apk" "build\app\outputs\flutter-apk\GadirTV-emulator.apk"
 if errorlevel 1 goto :fail

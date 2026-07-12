@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 flutter pub get
 ./scripts/restore-minimal-registrant.sh
-flutter build apk --release --target-platform=android-arm64,android-x64 -PgtvEmulatorBuild=true
+flutter build apk --release --target-platform=android-arm,android-arm64,android-x64 -PgtvEmulatorBuild=true
 cp -f build/app/outputs/flutter-apk/app-release.apk \
   build/app/outputs/flutter-apk/GadirTV-emulator.apk
 ls -lh build/app/outputs/flutter-apk/GadirTV-emulator.apk

@@ -216,7 +216,7 @@ jobs:
 
       # Android Studio emulator (x86_64) — los APK TV arm NO arrancan aquí.
       - name: Build EMULATOR APK universal release (ARM64 + x86_64)
-        run: flutter build apk --release --target-platform=android-arm64,android-x64 -PgtvEmulatorBuild=true
+        run: flutter build apk --release --target-platform=android-arm,android-arm64,android-x64 -PgtvEmulatorBuild=true
 
       - name: Rename emulator universal release
         run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/GadirTV-emulator.apk

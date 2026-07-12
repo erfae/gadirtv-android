@@ -70,8 +70,8 @@ android {
         // or gtv.emulator.build=true in local.properties.
         ndk {
             if (gtvEmulatorBuild) {
-                // Universal emulator: ARM64 (emuladores nuevos) + x86_64 (clásicos).
-                abiFilters 'arm64-v8a', 'x86_64'
+                // Universal emulator: 32-bit ARM (TV emulator) + ARM64 + x86_64.
+                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
             } else {
                 abiFilters 'armeabi-v7a', 'arm64-v8a'
             }
@@ -132,6 +132,8 @@ android {
             exclude 'lib/x86/libvlcjni.so'
             exclude 'lib/arm64-v8a/libvlc.so'
             exclude 'lib/arm64-v8a/libvlcjni.so'
+            exclude 'lib/armeabi-v7a/libvlc.so'
+            exclude 'lib/armeabi-v7a/libvlcjni.so'
         } else {
             // Evita que libVLC meta .so x86 en APK TV — instalaba en emulador sin libflutter.
             exclude 'lib/x86/**'
