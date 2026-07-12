@@ -25,9 +25,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-        // Do NOT call super — it would invoke GeneratedPluginRegistrant with libVLC.
-        // Use the default FlutterActivity engine (not provideFlutterEngine) so DPAD
-        // key events reach Flutter reliably on TV boxes.
+        // Do NOT call super — avoids GeneratedPluginRegistrant loading libVLC at cold start.
         GadirPluginRegistrant.registerWith(flutterEngine)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PLUGINS_CHANNEL)
