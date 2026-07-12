@@ -14,7 +14,7 @@ import '../../utils/xtream_utils.dart';
 import '../../widgets/gtv_focusable.dart';
 import '../../widgets/poster_card.dart';
 
-/// Home tab — Netflix-style hero + compact content rails.
+/// Home tab — Google TV hero (full-bleed backdrop + synopsis right) + rails.
 class HomeTab extends StatefulWidget {
   const HomeTab({
     super.key,
@@ -22,12 +22,14 @@ class HomeTab extends StatefulWidget {
     required this.onOpenMovie,
     required this.onOpenSeries,
     this.onPlayMovie,
+    this.onPlaySeries,
   });
 
   final Profile profile;
   final ValueChanged<Movie> onOpenMovie;
   final ValueChanged<Series> onOpenSeries;
   final ValueChanged<Movie>? onPlayMovie;
+  final ValueChanged<Series>? onPlaySeries;
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -49,6 +51,7 @@ class _HomeTabState extends State<HomeTab> {
   Timer? _heroTimer;
 
   String _heroPlot = '';
+  String _heroBackdrop = '';
   String? _heroTrailer;
   bool _heroMetaLoading = false;
 
@@ -127,7 +130,13 @@ class _HomeTabState extends State<HomeTab> {
               rating: s.rating,
               isMovie: false,
               series: s,
-              onPlay: () => widget.onOpenSeries(s),
+              onPlay: () {
+                if (widget.onPlaySeries != null) {
+                  widget.onPlaySeries!(s);
+                } else {
+                  widget.onOpenSeries(s);
+                }
+              },
               onOpen: () => widget.onOpenSeries(s),
             )),
       ];
@@ -158,7 +167,7 @@ class _HomeTabState extends State<HomeTab> {
   void _startHeroRotation() {
     _heroTimer?.cancel();
     if (_heroPool.length <= 1) return;
-    _heroTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+    _heroTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (!mounted) return;
       final next = (_heroIndex + 1) % _heroPool.length;
       setState(() => _heroIndex = next);
@@ -172,6 +181,7 @@ class _HomeTabState extends State<HomeTab> {
     setState(() {
       _heroMetaLoading = true;
       _heroPlot = item.isMovie ? '' : (item.series?.plot ?? '');
+      _heroBackdrop = item.imageUrl;
       _heroTrailer = null;
     });
 
@@ -187,7 +197,8 @@ class _HomeTabState extends State<HomeTab> {
             : <String, dynamic>{};
         setState(() {
           _heroPlot = extractPlot(meta, extra: md);
-          _heroTrailer = _pickTrailer(meta);
+          _heroBackdrop = extractBackdrop(meta, fallback: item.imageUrl);
+          _heroTrailer = extractTrailer(meta);
           _heroMetaLoading = false;
         });
       } else if (item.series != null) {
@@ -198,7 +209,8 @@ class _HomeTabState extends State<HomeTab> {
             : <String, dynamic>{};
         setState(() {
           _heroPlot = extractPlot(meta, fallback: item.series!.plot);
-          _heroTrailer = _pickTrailer(meta);
+          _heroBackdrop = extractBackdrop(meta, fallback: item.imageUrl);
+          _heroTrailer = extractTrailer(meta);
           _heroMetaLoading = false;
         });
       } else if (mounted) {
@@ -207,16 +219,6 @@ class _HomeTabState extends State<HomeTab> {
     } catch (_) {
       if (mounted) setState(() => _heroMetaLoading = false);
     }
-  }
-
-  String? _pickTrailer(Map<String, dynamic> meta) {
-    for (final key in ['youtube_trailer', 'trailer', 'youtube_id']) {
-      final v = (meta[key] ?? '').toString().trim();
-      if (v.isEmpty) continue;
-      if (v.startsWith('http')) return v;
-      if (v.length >= 8) return 'https://www.youtube.com/watch?v=$v';
-    }
-    return null;
   }
 
   Future<void> _openTrailer() async {
@@ -251,18 +253,19 @@ class _HomeTabState extends State<HomeTab> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final railH = TvLayout.compactRailBlockHeight(context, maxHeight: constraints.maxHeight);
-        final heroH = constraints.maxHeight - railH * 2 - (_resume.isEmpty ? 0 : railH * 0.85) - 8;
+        final railH = TvLayout.compactRailBlockHeight(context, maxHeight: constraints.maxHeight) * 0.9;
+        final resumeExtra = _resume.isEmpty ? 0.0 : railH * 0.8;
+        final heroH = constraints.maxHeight - railH * 2 - resumeExtra - 4;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              height: heroH.clamp(200.0, constraints.maxHeight * 0.58),
+              height: heroH.clamp(240.0, constraints.maxHeight * 0.72),
               child: _buildGoogleTvHero(context),
             ),
             if (_resume.isNotEmpty) ...[
-              SizedBox(height: railH * 0.75, child: _buildResumeRail(railH * 0.75)),
+              SizedBox(height: railH * 0.72, child: _buildResumeRail(railH * 0.72)),
               const SizedBox(height: 4),
             ],
             SizedBox(
@@ -311,18 +314,19 @@ class _HomeTabState extends State<HomeTab> {
     }
     final idx = _heroIndex % _heroPool.length;
     final item = _heroPool[idx];
+    final backdrop = _heroBackdrop.isNotEmpty ? _heroBackdrop : item.imageUrl;
 
     return Stack(
       fit: StackFit.expand,
       children: [
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 500),
+          duration: const Duration(milliseconds: 600),
           child: KeyedSubtree(
-            key: ValueKey(idx),
-            child: item.imageUrl.isEmpty
+            key: ValueKey('$idx-$backdrop'),
+            child: backdrop.isEmpty
                 ? Container(color: GtvTheme.surface)
                 : CachedNetworkImage(
-                    imageUrl: item.imageUrl,
+                    imageUrl: backdrop,
                     fit: BoxFit.cover,
                     alignment: Alignment.center,
                     errorWidget: (_, __, ___) => Container(color: GtvTheme.surface),
@@ -332,20 +336,34 @@ class _HomeTabState extends State<HomeTab> {
         Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                Colors.black.withOpacity(0.82),
+                Colors.black.withOpacity(0.45),
+                Colors.black.withOpacity(0.25),
+                Colors.black.withOpacity(0.55),
+              ],
+              stops: const [0, 0.35, 0.62, 1],
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Colors.black.withOpacity(0.25),
+                Colors.black.withOpacity(0.2),
                 Colors.transparent,
-                Colors.black.withOpacity(0.35),
-                GtvTheme.bg.withOpacity(0.95),
+                GtvTheme.bg.withOpacity(0.92),
               ],
-              stops: const [0, 0.4, 0.72, 1],
+              stops: const [0, 0.55, 1],
             ),
           ),
         ),
         Positioned(
-          right: 16,
+          right: 12,
           top: 0,
           bottom: 0,
           child: Column(
@@ -358,91 +376,124 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(32, 16, 72, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.end,
+          padding: const EdgeInsets.fromLTRB(36, 20, 64, 24),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                'GadirTV',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.65),
-                  fontSize: TvLayout.sp(context, 11),
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.4,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                item.badge,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.75),
-                  fontSize: TvLayout.sp(context, 12),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                item.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: TvLayout.sp(context, 30),
-                  fontWeight: FontWeight.w700,
-                  height: 1.05,
-                ),
-              ),
-              const SizedBox(height: 10),
-              if (_heroMetaLoading)
-                const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: GtvTheme.red),
-                )
-              else
-                Text(
-                  _heroMetaLine(item),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.78),
-                    fontSize: TvLayout.sp(context, 13),
-                    height: 1.4,
-                  ),
-                ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  GtvFocusable(
-                    focusNode: _playFocus,
-                    autofocus: true,
-                    onTap: item.onPlay,
-                    borderRadius: BorderRadius.circular(999),
-                    child: ElevatedButton.icon(
-                      onPressed: item.onPlay,
-                      icon: const Icon(Icons.play_arrow_rounded, size: 22),
-                      label: const Text('VER'),
-                    ),
-                  ),
-                  if (_heroTrailer != null) ...[
-                    const SizedBox(width: 12),
-                    GtvFocusable(
-                      onTap: _openTrailer,
-                      borderRadius: BorderRadius.circular(999),
-                      child: OutlinedButton.icon(
-                        onPressed: _openTrailer,
-                        icon: const Icon(Icons.ondemand_video_rounded,
-                            size: 18, color: Colors.white),
-                        label: const Text('TRÁILER', style: TextStyle(color: Colors.white)),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.white54),
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                        ),
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      item.badge,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: TvLayout.sp(context, 13),
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
                       ),
                     ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: TvLayout.sp(context, 34),
+                        fontWeight: FontWeight.w800,
+                        height: 1.05,
+                        shadows: const [Shadow(color: Colors.black54, blurRadius: 12)],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (item.rating > 0)
+                      Text(
+                        '★ ${item.rating.toStringAsFixed(1)}',
+                        style: TextStyle(
+                          color: const Color(0xFFFACC15),
+                          fontSize: TvLayout.sp(context, 15),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        GtvFocusable(
+                          focusNode: _playFocus,
+                          autofocus: true,
+                          onTap: item.onPlay,
+                          borderRadius: BorderRadius.circular(999),
+                          child: ElevatedButton.icon(
+                            onPressed: item.onPlay,
+                            icon: const Icon(Icons.play_arrow_rounded, size: 24),
+                            label: const Text('REPRODUCIR', style: TextStyle(fontWeight: FontWeight.w800)),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                            ),
+                          ),
+                        ),
+                        if (_heroTrailer != null) ...[
+                          const SizedBox(width: 12),
+                          GtvFocusable(
+                            onTap: _openTrailer,
+                            borderRadius: BorderRadius.circular(999),
+                            child: OutlinedButton.icon(
+                              onPressed: _openTrailer,
+                              icon: const Icon(Icons.ondemand_video_rounded, size: 20, color: Colors.white),
+                              label: const Text('TRÁILER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.white60),
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
-                ],
+                ),
+              ),
+              const SizedBox(width: 28),
+              Expanded(
+                flex: 4,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Sinopsis',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: TvLayout.sp(context, 14),
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (_heroMetaLoading)
+                      const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: GtvTheme.red),
+                      )
+                    else
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Text(
+                            _heroPlot.isNotEmpty ? _heroPlot : 'Sinopsis no disponible.',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.82),
+                              fontSize: TvLayout.sp(context, 14),
+                              height: 1.55,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -451,31 +502,21 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  String _heroMetaLine(_HeroItem item) {
-    final parts = <String>[];
-    if (item.rating > 0) {
-      parts.add('★ ${item.rating.toStringAsFixed(1)}');
-    }
-    parts.add(item.isMovie ? 'Película' : 'Serie');
-    if (_heroPlot.isNotEmpty) {
-      parts.add(_heroPlot);
-    } else {
-      parts.add('Sinopsis no disponible.');
-    }
-    return parts.join(' • ');
-  }
-
   Widget _buildResumeRail(double height) {
     final cardW = TvLayout.compactPosterWidth(context);
     final innerH = height - 28;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 28),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Text(
             'Continuar viendo',
-            style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: TvLayout.sp(context, 17),
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         const SizedBox(height: 6),
@@ -520,7 +561,11 @@ class _HomeTabState extends State<HomeTab> {
           padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Text(
             title,
-            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: TvLayout.sp(context, 17),
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         const SizedBox(height: 6),

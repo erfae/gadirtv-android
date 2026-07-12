@@ -169,8 +169,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Pick the first episode (season 1, ep 1) of a series and play it. This
-  /// is the Netflix behaviour when the user hits PLAY on a series poster.
+  /// Play first episode of a series (hero REPRODUCIR).
+  Future<void> _playSeries(Series s) async {
+    Map<String, dynamic> info = const {};
+    try {
+      info = await _api.seriesInfo(_profile!, s.seriesId);
+    } catch (_) {}
+    await _playFirstEpisode(s, info);
+  }
   Future<void> _playFirstEpisode(Series s, Map<String, dynamic> info) async {
     final episodes = info['episodes'];
     if (episodes is! Map || episodes.isEmpty) {
@@ -387,7 +393,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final tabs = <Widget Function()>[
-      () => KeyedSubtree(key: ValueKey('home-$_reloadTick'), child: HomeTab(profile: p, onOpenMovie: _openMovie, onOpenSeries: _openSeries, onPlayMovie: _playMovie)),
+      () => KeyedSubtree(key: ValueKey('home-$_reloadTick'), child: HomeTab(profile: p, onOpenMovie: _openMovie, onOpenSeries: _openSeries, onPlayMovie: _playMovie, onPlaySeries: _playSeries)),
       () => KeyedSubtree(key: ValueKey('live-$_reloadTick'), child: LiveTab(profile: p, onPlay: _playChannel, active: _tab == 1)),
       () => KeyedSubtree(key: ValueKey('movies-$_reloadTick'), child: MoviesTab(profile: p, onOpen: _openMovie)),
       () => KeyedSubtree(key: ValueKey('series-$_reloadTick'), child: SeriesTab(profile: p, onOpen: _openSeries)),

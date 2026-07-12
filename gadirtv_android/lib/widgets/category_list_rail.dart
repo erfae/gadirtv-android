@@ -113,7 +113,7 @@ class _CategoryRowState extends State<_CategoryRow> {
               color: _focused
                   ? GtvTheme.redHi
                   : (widget.selected ? GtvTheme.red.withOpacity(0.9) : Colors.white70),
-              fontSize: TvLayout.labelFont(context, 11),
+              fontSize: TvLayout.labelFont(context, 16),
               fontWeight: _focused || widget.selected ? FontWeight.w800 : FontWeight.w500,
               height: 1.15,
             ),
