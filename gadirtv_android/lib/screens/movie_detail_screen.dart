@@ -147,6 +147,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 subtitle: metaLine.isEmpty ? null : metaLine,
                 synopsis: plot.isEmpty ? t.noSynopsis : plot,
                 synopsisTitle: t.synopsis,
+                synopsisSide: GtvHeroSynopsisSide.right,
                 posterUrl: _poster,
                 backdropUrl: _backdrop,
                 backButton: GtvDpadFocus(

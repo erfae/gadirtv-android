@@ -439,7 +439,7 @@ class _HomeTabState extends State<HomeTab> {
     final idx = _heroIndex % _heroPool.length;
     final item = _heroPool[idx];
     final poster = _heroPoster.isNotEmpty ? _heroPoster : item.imageUrl;
-    final backdrop = _heroBackdrop.isNotEmpty ? _heroBackdrop : poster;
+    final backdrop = _heroBackdrop.isNotEmpty ? _heroBackdrop : '';
     final hasTrailer = _heroTrailer.hasAny;
 
     return Stack(
@@ -448,15 +448,16 @@ class _HomeTabState extends State<HomeTab> {
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 500),
           child: KeyedSubtree(
-            key: ValueKey('$idx-$poster'),
+            key: ValueKey('$idx-$backdrop-$poster'),
             child: GtvAndroidTvHeroLayout(
               badge: item.badge,
               title: item.title,
               rating: item.rating,
               synopsis: _heroPlot.isNotEmpty ? _heroPlot : 'Sinopsis no disponible.',
               synopsisLoading: _heroMetaLoading,
+              synopsisSide: GtvHeroSynopsisSide.left,
               posterUrl: poster,
-              backdropUrl: backdrop,
+              backdropUrl: backdrop.isNotEmpty ? backdrop : poster,
               actions: Row(
                 children: [
                   GtvHeroActionButton(

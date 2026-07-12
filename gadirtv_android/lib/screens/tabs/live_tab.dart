@@ -9,6 +9,7 @@ import '../../models/media.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
 import '../../services/favorites_store.dart';
+import '../../services/live_preview_guard.dart';
 import '../../services/player_constants.dart';
 import '../../services/vlc_bootstrap.dart';
 import '../../services/vlc_device_profile.dart';
@@ -223,12 +224,17 @@ class _LiveTabState extends State<LiveTab> {
   }
 
   Future<void> _playFullscreen(LiveChannel ch) async {
+    final target = ch;
+    setState(() {
+      _current = null;
+      _epgNow = null;
+      _epgNext = null;
+    });
+    await WidgetsBinding.instance.endOfFrame;
     await _miniKey.currentState?.releaseForFullscreen();
+    await LivePreviewGuard.stopAndWait();
     if (!mounted) return;
-    setState(() => _current = null);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    widget.onPlay(ch);
+    widget.onPlay(target);
   }
 
   @override
@@ -452,6 +458,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   bool _buffering = false;
   bool _opening = false;
   bool _noSignal = false;
+  bool _blocked = false;
   Duration _lastPos = Duration.zero;
   Timer? _noSignalTimer;
   String? _openedUrl;
@@ -461,6 +468,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    LivePreviewGuard.register(releaseForFullscreen);
     final url = widget.streamUrl;
     if (url != null && url.isNotEmpty) {
       _initController(url);
@@ -468,6 +476,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   }
 
   void _initController(String url) async {
+    if (_blocked) return;
     try {
       await VlcBootstrap.ensureReady();
     } catch (_) {
@@ -525,7 +534,12 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   @override
   void didUpdateWidget(covariant _MiniPlayer old) {
     super.didUpdateWidget(old);
-    if (old.streamUrl != widget.streamUrl) _scheduleOpen();
+    if (old.streamUrl != widget.streamUrl) {
+      if (widget.streamUrl != null && widget.streamUrl!.isNotEmpty) {
+        _blocked = false;
+      }
+      _scheduleOpen();
+    }
   }
 
   /// Debounce rapid channel taps — otherwise every tap queues an
@@ -546,6 +560,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   }
 
   Future<void> _open() async {
+    if (_blocked) return;
     // Serialize open calls — VLC can lock up if two setMediaFromNetwork
     // calls run in parallel (rapid channel taps used to freeze the app).
     if (_opening) return;
@@ -594,6 +609,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
   /// Release the mini player before full-screen ExoPlayer starts.
   /// Stops VLC cleanly so native decoders are not contended on TV boxes.
   Future<void> releaseForFullscreen() async {
+    _blocked = true;
     _debounce?.cancel();
     _noSignalTimer?.cancel();
     try {
@@ -601,7 +617,10 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
     } catch (_) {}
     _controller?.removeListener(_onControllerUpdate);
     try {
-      await _controller?.stop().timeout(const Duration(seconds: 2), onTimeout: () {});
+      await _controller?.stop().timeout(const Duration(seconds: 3), onTimeout: () {});
+    } catch (_) {}
+    try {
+      await _controller?.pause();
     } catch (_) {}
     try {
       await _controller?.dispose();
@@ -627,6 +646,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    LivePreviewGuard.unregister();
     _debounce?.cancel();
     _noSignalTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);

@@ -5,6 +5,7 @@ import '../models/profile.dart';
 import '../screens/exo_player_screen.dart';
 import '../screens/player_screen.dart';
 import 'external_player.dart';
+import 'live_preview_guard.dart';
 import 'player_constants.dart';
 import 'prefs_settings.dart';
 
@@ -19,6 +20,11 @@ class PlaybackLauncher {
     int? liveStreamId,
   }) async {
     var engine = await PrefsSettings().getPlayerEngine();
+
+    if (playable.isLive) {
+      await LivePreviewGuard.stopAndWait();
+      if (!context.mounted) return;
+    }
 
     if (engine == PlayerEngine.external) {
       final ok = await ExternalPlayer.launch(playable.url);

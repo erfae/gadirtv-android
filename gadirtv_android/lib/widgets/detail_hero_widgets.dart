@@ -5,7 +5,16 @@ import '../theme.dart';
 import '../utils/tv_layout.dart';
 import 'gtv_focusable.dart';
 
-/// Android TV hero — Google TV style: cinematic backdrop right, text left.
+/// Where the synopsis block is rendered in the hero.
+enum GtvHeroSynopsisSide {
+  /// Home tab — synopsis under the title on the left.
+  left,
+
+  /// Movie / series detail — synopsis on the right under the poster.
+  right,
+}
+
+/// Android TV hero — cinematic backdrop, metadata, poster stamp, actions.
 class GtvAndroidTvHeroLayout extends StatelessWidget {
   const GtvAndroidTvHeroLayout({
     super.key,
@@ -18,6 +27,7 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
     this.subtitle,
     this.synopsisTitle = 'Sinopsis',
     this.synopsisLoading = false,
+    this.synopsisSide = GtvHeroSynopsisSide.left,
     this.backButton,
     this.backdropUrl,
   });
@@ -27,6 +37,7 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
   final String synopsis;
   final String synopsisTitle;
   final bool synopsisLoading;
+  final GtvHeroSynopsisSide synopsisSide;
   final String posterUrl;
   final String? backdropUrl;
   final double rating;
@@ -36,7 +47,9 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = (backdropUrl ?? posterUrl).trim();
+    final backdrop = (backdropUrl ?? '').trim();
+    final poster = posterUrl.trim();
+    final bg = backdrop.isNotEmpty ? backdrop : poster;
 
     return Stack(
       fit: StackFit.expand,
@@ -46,7 +59,7 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
             child: CachedNetworkImage(
               imageUrl: bg,
               fit: BoxFit.cover,
-              alignment: Alignment.centerRight,
+              alignment: Alignment.center,
               errorWidget: (_, __, ___) => const SizedBox.shrink(),
             ),
           ),
@@ -55,123 +68,211 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: [
-                GtvTheme.bg,
-                GtvTheme.bg.withOpacity(0.88),
-                GtvTheme.bg.withOpacity(0.40),
-                Colors.transparent,
-              ],
-              stops: const [0, 0.28, 0.50, 1],
+              colors: synopsisSide == GtvHeroSynopsisSide.right
+                  ? [
+                      GtvTheme.bg,
+                      GtvTheme.bg.withOpacity(0.92),
+                      GtvTheme.bg.withOpacity(0.55),
+                      GtvTheme.bg.withOpacity(0.20),
+                    ]
+                  : [
+                      GtvTheme.bg,
+                      GtvTheme.bg.withOpacity(0.88),
+                      GtvTheme.bg.withOpacity(0.40),
+                      Colors.transparent,
+                    ],
+              stops: synopsisSide == GtvHeroSynopsisSide.right
+                  ? const [0, 0.32, 0.58, 1]
+                  : const [0, 0.28, 0.50, 1],
             ),
           ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(36, 20, 28, 24),
-          child: Row(
+          child: synopsisSide == GtvHeroSynopsisSide.right
+              ? _buildDetailLayout(context, poster)
+              : _buildHomeLayout(context, poster),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHomeLayout(BuildContext context, String poster) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          flex: 11,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ..._metaBlock(context, includeSynopsis: true),
+              const SizedBox(height: 16),
+              actions,
+            ],
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          flex: 9,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: _LargePoster(posterUrl: poster),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailLayout(BuildContext context, String poster) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          flex: 10,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ..._metaBlock(context, includeSynopsis: false),
+              const Spacer(),
+              actions,
+            ],
+          ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          flex: 10,
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                flex: 11,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (backButton != null) ...[
-                      backButton!,
-                      const SizedBox(height: 4),
-                    ],
-                    Text(
-                      badge,
-                      style: TextStyle(
-                        color: GtvTheme.redHi,
-                        fontSize: TvLayout.sp(context, 12),
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: TvLayout.sp(context, 34),
-                        fontWeight: FontWeight.w800,
-                        height: 1.05,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    if (rating > 0) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        '★ ${rating.toStringAsFixed(1)}',
-                        style: TextStyle(
-                          color: const Color(0xFFFACC15),
-                          fontSize: TvLayout.sp(context, 15),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                    if (subtitle != null && subtitle!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        subtitle!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.75),
-                          fontSize: TvLayout.sp(context, 13),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    if (synopsisLoading)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8),
-                        child: SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: GtvTheme.red),
-                        ),
-                      )
-                    else
-                      Expanded(
-                        child: Text(
-                          synopsis,
-                          maxLines: 5,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.82),
-                            fontSize: TvLayout.sp(context, 14),
-                            height: 1.5,
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 16),
-                    actions,
-                  ],
+              Align(
+                alignment: Alignment.topRight,
+                child: _LargePoster(posterUrl: poster, maxHeight: 220),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                synopsisTitle,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: TvLayout.sp(context, 14),
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 9,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: _LargePoster(posterUrl: posterUrl),
+              const SizedBox(height: 8),
+              if (synopsisLoading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: GtvTheme.red),
+                  ),
+                )
+              else
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Text(
+                      synopsis,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: TvLayout.sp(context, 14),
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
             ],
           ),
         ),
       ],
     );
   }
+
+  List<Widget> _metaBlock(BuildContext context, {required bool includeSynopsis}) {
+    return [
+      if (backButton != null) ...[
+        backButton!,
+        const SizedBox(height: 4),
+      ],
+      Text(
+        badge,
+        style: TextStyle(
+          color: GtvTheme.redHi,
+          fontSize: TvLayout.sp(context, 12),
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.8,
+        ),
+      ),
+      const SizedBox(height: 10),
+      Text(
+        title,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: TvLayout.sp(context, 34),
+          fontWeight: FontWeight.w800,
+          height: 1.05,
+          letterSpacing: -0.5,
+        ),
+      ),
+      if (rating > 0) ...[
+        const SizedBox(height: 10),
+        Text(
+          '★ ${rating.toStringAsFixed(1)}',
+          style: TextStyle(
+            color: const Color(0xFFFACC15),
+            fontSize: TvLayout.sp(context, 15),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+      if (subtitle != null && subtitle!.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Text(
+          subtitle!,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.75),
+            fontSize: TvLayout.sp(context, 13),
+          ),
+        ),
+      ],
+      if (includeSynopsis) ...[
+        const SizedBox(height: 16),
+        if (synopsisLoading)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: SizedBox(
+              height: 24,
+              width: 24,
+              child: CircularProgressIndicator(strokeWidth: 2, color: GtvTheme.red),
+            ),
+          )
+        else
+          Expanded(
+            child: Text(
+              synopsis,
+              maxLines: 5,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.82),
+                fontSize: TvLayout.sp(context, 14),
+                height: 1.5,
+              ),
+            ),
+          ),
+      ],
+    ];
+  }
 }
 
 class _LargePoster extends StatelessWidget {
-  const _LargePoster({required this.posterUrl});
+  const _LargePoster({required this.posterUrl, this.maxHeight = 360});
 
   final String posterUrl;
+  final double maxHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -191,8 +292,10 @@ class _LargePoster extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final h = constraints.maxHeight.isFinite ? constraints.maxHeight : 360.0;
-        final w = (h * 2 / 3).clamp(150.0, 380.0);
+        final h = constraints.maxHeight.isFinite
+            ? constraints.maxHeight.clamp(120.0, maxHeight)
+            : maxHeight;
+        final w = (h * 2 / 3).clamp(120.0, 320.0);
         return Container(
           height: h,
           width: w,
