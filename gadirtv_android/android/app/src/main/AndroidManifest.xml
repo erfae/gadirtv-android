@@ -153,5 +153,7 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="vnd.youtube" />
         </intent>
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.google.android.youtube.tv" />
     </queries>
 </manifest>

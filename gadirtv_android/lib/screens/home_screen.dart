@@ -366,17 +366,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ? Stack(
                   fit: StackFit.expand,
                   children: [
-                    Column(
-                      children: [
-                        Expanded(child: tabs[_tab]()),
-                        _buildBottomNav(),
-                      ],
-                    ),
+                    tabs[_tab](),
                     Positioned(
-                      top: 0,
                       left: 0,
                       right: 0,
-                      child: _buildNetflixTopBar(p),
+                      bottom: 0,
+                      child: _buildBottomNav(netflixStyle: true),
                     ),
                   ],
                 )
@@ -424,30 +419,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Minimal overlay bar on the Netflix-style home tab — logo + profile only.
-  Widget _buildNetflixTopBar(Profile p) {
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Colors.black.withOpacity(0.75), Colors.transparent],
-        ),
-      ),
-      child: Row(
-        children: [
-          Image.asset(
-            'assets/gadirtv_logo.png',
-            height: 34,
-            fit: BoxFit.contain,
-          ),
-          const Spacer(),
-          _buildProfileChip(p),
-        ],
-      ),
-    );
-  }
+  // Removed: home tab is full-bleed Netflix UI with floating bottom nav only.
 
   Widget _buildProfileChip(Profile p) {
     return GtvFocusable(
@@ -474,7 +446,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBottomNav() {
+  Widget _buildBottomNav({bool netflixStyle = false}) {
     final t = AppI18n.of(context);
     final items = <_NavItem>[
       _NavItem(icon: Icons.home_rounded, label: t.tabHome),
@@ -484,11 +456,24 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return Container(
-      decoration: const BoxDecoration(
-        color: GtvTheme.bg,
-        border: Border(top: BorderSide(color: GtvTheme.border)),
+      decoration: BoxDecoration(
+        gradient: netflixStyle
+            ? LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  GtvTheme.bg.withOpacity(0.98),
+                  GtvTheme.bg.withOpacity(0.75),
+                  Colors.transparent,
+                ],
+              )
+            : null,
+        color: netflixStyle ? null : GtvTheme.bg,
+        border: netflixStyle
+            ? null
+            : const Border(top: BorderSide(color: GtvTheme.border)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: EdgeInsets.fromLTRB(8, netflixStyle ? 18 : 6, 8, netflixStyle ? 10 : 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
@@ -496,6 +481,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _NavButton(
               item: items[i],
               selected: _tab == i,
+              compact: netflixStyle,
               onTap: () => setState(() => _tab = i),
             ),
         ],
@@ -542,11 +528,17 @@ class _NavItem {
 }
 
 class _NavButton extends StatefulWidget {
-  const _NavButton({required this.item, required this.selected, required this.onTap});
+  const _NavButton({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+    this.compact = false,
+  });
 
   final _NavItem item;
   final bool selected;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
   State<_NavButton> createState() => _NavButtonState();
@@ -558,6 +550,7 @@ class _NavButtonState extends State<_NavButton> {
   @override
   Widget build(BuildContext context) {
     final on = widget.selected;
+    final compact = widget.compact;
     return FocusableActionDetector(
       onShowFocusHighlight: (v) => setState(() => _focused = v),
       onShowHoverHighlight: (v) => setState(() => _focused = v),
@@ -574,22 +567,29 @@ class _NavButtonState extends State<_NavButton> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 14 : 18,
+            vertical: compact ? 10 : 12,
+          ),
           decoration: BoxDecoration(
-            color: on ? GtvTheme.red.withOpacity(0.15) : Colors.transparent,
+            color: on ? GtvTheme.red.withOpacity(compact ? 0.22 : 0.15) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: _focused ? GtvTheme.red : Colors.transparent, width: 2),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.item.icon, color: on ? GtvTheme.red : GtvTheme.textDim, size: 28),
+              Icon(
+                widget.item.icon,
+                color: on ? GtvTheme.red : (compact ? Colors.white70 : GtvTheme.textDim),
+                size: compact ? 24 : 28,
+              ),
               const SizedBox(width: 10),
               Text(
                 widget.item.label,
                 style: TextStyle(
-                  color: on ? Colors.white : GtvTheme.textDim,
-                  fontSize: 15,
+                  color: on ? Colors.white : (compact ? Colors.white70 : GtvTheme.textDim),
+                  fontSize: compact ? 13 : 15,
                   fontWeight: on ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),

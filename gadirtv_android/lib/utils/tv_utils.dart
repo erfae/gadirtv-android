@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Platform helpers for Android TV / Fire TV / Google TV.
 class TvUtils {
@@ -27,4 +28,23 @@ class TvUtils {
 
   /// True when a software keyboard is unlikely (TV remote, gamepad).
   static Future<bool> prefersDpadNavigation() => isAndroidTv();
+
+  /// Opens a URL via Android VIEW intent (YouTube TV app when available).
+  static Future<bool> openExternalUrl(String url) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      final uri = Uri.tryParse(url);
+      if (uri == null) return false;
+      try {
+        return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {
+        return false;
+      }
+    }
+    try {
+      final result = await _channel.invokeMethod<bool>('openUrl', {'url': url});
+      return result ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 }

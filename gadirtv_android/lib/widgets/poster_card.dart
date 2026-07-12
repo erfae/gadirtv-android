@@ -154,9 +154,13 @@ class _PosterCardState extends State<PosterCard> {
                         Positioned(
                           top: 6,
                           left: 6,
-                          child: _FavoriteStar(
-                            active: widget.isFavorite!,
-                            onTap: widget.onToggleFavorite!,
+                          child: Focus(
+                            canRequestFocus: false,
+                            skipTraversal: true,
+                            child: _FavoriteStar(
+                              active: widget.isFavorite!,
+                              onTap: widget.onToggleFavorite!,
+                            ),
                           ),
                         ),
                     ],
