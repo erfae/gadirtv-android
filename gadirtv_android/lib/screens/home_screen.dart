@@ -14,7 +14,6 @@ import '../services/profile_store.dart';
 import '../theme.dart';
 import '../utils/xtream_utils.dart';
 import '../widgets/gtv_focusable.dart';
-import '../widgets/quick_actions_sheet.dart';
 import 'movie_detail_screen.dart';
 import '../services/playback_launcher.dart';
 import 'search_screen.dart';
@@ -353,8 +352,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // tabs (including LiveTab's VLC imports) even when the user was on Inicio.
 
     // Wrapping the shell in a FocusTraversalGroup gives predictable
-    // left/right/up/down navigation across the top-bar, content and
-    // bottom-nav — critical for the Android TV remote experience.
+    // left/right/up/down navigation across content and bottom nav.
     return Focus(
       onKeyEvent: _onTabShortcut,
       child: FocusTraversalGroup(
@@ -362,64 +360,58 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Scaffold(
         backgroundColor: GtvTheme.bg,
         body: SafeArea(
-          child: _tab == 0
-              ? Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    tabs[_tab](),
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: _buildBottomNav(netflixStyle: true),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: FocusTraversalOrder(
+                      order: const NumericFocusOrder(1),
+                      child: tabs[_tab](),
                     ),
-                  ],
-                )
-              : Column(
-                  children: [
-                    _buildTopBar(p),
-                    Expanded(child: tabs[_tab]()),
-                    _buildBottomNav(),
-                  ],
-                ),
+                  ),
+                  FocusTraversalOrder(
+                    order: const NumericFocusOrder(100),
+                    child: _buildBottomNav(immersive: _tab == 0),
+                  ),
+                ],
+              ),
+              Positioned(
+                top: 8,
+                right: 12,
+                child: _buildQuickActions(p),
+              ),
+            ],
+          ),
         ),
       ),
       ),
     );
   }
 
-  Widget _buildTopBar(Profile p) {
-    return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: const BoxDecoration(
-        color: GtvTheme.bg,
-        border: Border(bottom: BorderSide(color: GtvTheme.border)),
-      ),
-      child: Row(
-        children: [
-          Image.asset(
-            'assets/gadirtv_logo.png',
-            height: 42,
-            fit: BoxFit.contain,
-          ),
-          const Spacer(),
-          GtvIconButton(icon: Icons.search_rounded, tooltip: 'Buscar', onTap: _openSearch),
-          const SizedBox(width: 8),
-          GtvIconButton(icon: Icons.refresh_rounded, tooltip: 'Recargar', onTap: _reloadPlaylist),
-          const SizedBox(width: 8),
-          GtvIconButton(icon: Icons.settings_rounded, tooltip: 'Ajustes', onTap: _openSettings),
-          const SizedBox(width: 8),
-          GtvIconButton(icon: Icons.power_settings_new_rounded, tooltip: 'Salir', onTap: _confirmExit),
-          const SizedBox(width: 12),
-          _buildProfileChip(p),
-        ],
-      ),
+  /// Compact top-right icons — no full menu bar (Google TV style).
+  Widget _buildQuickActions(Profile p) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GtvIconButton(
+          icon: Icons.search_rounded,
+          tooltip: 'Buscar',
+          onTap: _openSearch,
+        ),
+        const SizedBox(width: 6),
+        GtvIconButton(
+          icon: Icons.settings_rounded,
+          tooltip: 'Ajustes',
+          onTap: _openSettings,
+        ),
+        const SizedBox(width: 6),
+        _buildProfileChip(p),
+      ],
     );
   }
-
-  /// Minimal overlay bar on the Netflix-style home tab — logo + profile only.
-  // Removed: home tab is full-bleed Netflix UI with floating bottom nav only.
 
   Widget _buildProfileChip(Profile p) {
     return GtvFocusable(
@@ -446,7 +438,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBottomNav({bool netflixStyle = false}) {
+  Widget _buildBottomNav({bool immersive = false}) {
     final t = AppI18n.of(context);
     final items = <_NavItem>[
       _NavItem(icon: Icons.home_rounded, label: t.tabHome),
@@ -457,34 +449,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        gradient: netflixStyle
+        gradient: immersive
             ? LinearGradient(
                 begin: Alignment.bottomCenter,
                 end: Alignment.topCenter,
                 colors: [
                   GtvTheme.bg.withOpacity(0.98),
-                  GtvTheme.bg.withOpacity(0.75),
+                  GtvTheme.bg.withOpacity(0.7),
                   Colors.transparent,
                 ],
               )
             : null,
-        color: netflixStyle ? null : GtvTheme.bg,
-        border: netflixStyle
+        color: immersive ? null : GtvTheme.bg,
+        border: immersive
             ? null
             : const Border(top: BorderSide(color: GtvTheme.border)),
       ),
-      padding: EdgeInsets.fromLTRB(8, netflixStyle ? 18 : 6, 8, netflixStyle ? 10 : 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          for (var i = 0; i < items.length; i++)
-            _NavButton(
-              item: items[i],
-              selected: _tab == i,
-              compact: netflixStyle,
-              onTap: () => setState(() => _tab = i),
-            ),
-        ],
+      padding: EdgeInsets.fromLTRB(8, immersive ? 14 : 6, 8, immersive ? 8 : 6),
+      child: FocusTraversalGroup(
+        policy: OrderedTraversalPolicy(),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            for (var i = 0; i < items.length; i++)
+              FocusTraversalOrder(
+                order: NumericFocusOrder(i.toDouble()),
+                child: _NavButton(
+                  item: items[i],
+                  selected: _tab == i,
+                  compact: immersive,
+                  onTap: () => setState(() => _tab = i),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -495,10 +493,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildM3UScreen(Profile p) {
     return Scaffold(
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            _buildTopBar(p),
-            Expanded(child: _M3UChannelList(profile: p, onPlay: _playM3UChannel)),
+            Column(
+              children: [
+                Expanded(child: _M3UChannelList(profile: p, onPlay: _playM3UChannel)),
+              ],
+            ),
+            Positioned(
+              top: 8,
+              right: 12,
+              child: _buildQuickActions(p),
+            ),
           ],
         ),
       ),
@@ -546,12 +552,37 @@ class _NavButton extends StatefulWidget {
 
 class _NavButtonState extends State<_NavButton> {
   bool _focused = false;
+  late final FocusNode _node = FocusNode(debugLabel: widget.item.label);
+
+  @override
+  void dispose() {
+    _node.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      return node.focusInDirection(TraversalDirection.left)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      return node.focusInDirection(TraversalDirection.right)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    return KeyEventResult.ignored;
+  }
 
   @override
   Widget build(BuildContext context) {
     final on = widget.selected;
     final compact = widget.compact;
-    return FocusableActionDetector(
+    return Focus(
+      focusNode: _node,
+      onKeyEvent: _onKey,
+      child: FocusableActionDetector(
       onShowFocusHighlight: (v) => setState(() => _focused = v),
       onShowHoverHighlight: (v) => setState(() => _focused = v),
       mouseCursor: SystemMouseCursors.click,
@@ -596,6 +627,7 @@ class _NavButtonState extends State<_NavButton> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

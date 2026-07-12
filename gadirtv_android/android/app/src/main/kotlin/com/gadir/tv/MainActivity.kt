@@ -106,7 +106,11 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN && forwardKeyToFlutter(event.keyCode)) {
+        // Only consume DPAD on leanback/TV — on phone emulators Flutter handles keys.
+        if (isTvDevice() &&
+            event.action == KeyEvent.ACTION_DOWN &&
+            forwardKeyToFlutter(event.keyCode)
+        ) {
             return true
         }
         return super.dispatchKeyEvent(event)

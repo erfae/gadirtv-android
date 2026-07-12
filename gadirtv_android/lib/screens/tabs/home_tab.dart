@@ -254,14 +254,12 @@ class _HomeTabState extends State<HomeTab> {
         final railH = TvLayout.compactRailBlockHeight(context, maxHeight: constraints.maxHeight);
         final heroH = constraints.maxHeight - railH * 2 - (_resume.isEmpty ? 0 : railH * 0.85) - 8;
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 72),
-          child: Column(
+        return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              height: heroH.clamp(200.0, constraints.maxHeight * 0.56),
-              child: _buildNetflixHero(context),
+              height: heroH.clamp(200.0, constraints.maxHeight * 0.58),
+              child: _buildGoogleTvHero(context),
             ),
             if (_resume.isNotEmpty) ...[
               SizedBox(height: railH * 0.75, child: _buildResumeRail(railH * 0.75)),
@@ -302,13 +300,12 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ),
           ],
-          ),
         );
       },
     );
   }
 
-  Widget _buildNetflixHero(BuildContext context) {
+  Widget _buildGoogleTvHero(BuildContext context) {
     if (_heroPool.isEmpty) {
       return Container(color: GtvTheme.surface);
     }
@@ -338,30 +335,17 @@ class _HomeTabState extends State<HomeTab> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
+                Colors.black.withOpacity(0.25),
+                Colors.transparent,
                 Colors.black.withOpacity(0.35),
-                Colors.transparent,
-                GtvTheme.bg.withOpacity(0.92),
+                GtvTheme.bg.withOpacity(0.95),
               ],
-              stops: const [0, 0.35, 1],
-            ),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [
-                GtvTheme.bg.withOpacity(0.88),
-                GtvTheme.bg.withOpacity(0.45),
-                Colors.transparent,
-              ],
-              stops: const [0, 0.35, 0.72],
+              stops: const [0, 0.4, 0.72, 1],
             ),
           ),
         ),
         Positioned(
-          right: 12,
+          right: 16,
           top: 0,
           bottom: 0,
           child: Column(
@@ -374,162 +358,111 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(28, 20, 20, 20),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          padding: const EdgeInsets.fromLTRB(32, 16, 72, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Expanded(
-                flex: 6,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: GtvTheme.red,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        item.badge,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          letterSpacing: 1.2,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: TvLayout.sp(context, 26),
-                        fontWeight: FontWeight.w900,
-                        height: 1.05,
-                      ),
-                    ),
-                    if (item.rating > 0) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.star_rounded, color: Color(0xFFFACC15), size: 18),
-                          const SizedBox(width: 4),
-                          Text(item.rating.toStringAsFixed(1),
-                              style: const TextStyle(color: Colors.white, fontSize: 13)),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        GtvFocusable(
-                          focusNode: _playFocus,
-                          autofocus: true,
-                          onTap: item.onPlay,
-                          borderRadius: BorderRadius.circular(999),
-                          child: ElevatedButton.icon(
-                            onPressed: item.onPlay,
-                            icon: const Icon(Icons.play_arrow_rounded, size: 22),
-                            label: Text(item.isMovie ? 'REPRODUCIR' : 'VER SERIE'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        GtvFocusable(
-                          onTap: item.onOpen,
-                          borderRadius: BorderRadius.circular(999),
-                          child: OutlinedButton.icon(
-                            onPressed: item.onOpen,
-                            icon: const Icon(Icons.info_outline_rounded, size: 18, color: Colors.white),
-                            label: const Text('MÁS INFO', style: TextStyle(color: Colors.white)),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Colors.white54),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            ),
-                          ),
-                        ),
-                        if (_heroTrailer != null) ...[
-                          const SizedBox(width: 10),
-                          GtvFocusable(
-                            onTap: _openTrailer,
-                            borderRadius: BorderRadius.circular(999),
-                            child: OutlinedButton.icon(
-                              onPressed: _openTrailer,
-                              icon: const Icon(Icons.ondemand_video_rounded,
-                                  size: 18, color: Colors.white),
-                              label: const Text('TRÁILER', style: TextStyle(color: Colors.white)),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Colors.white54),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
+              Text(
+                'GadirTV',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.65),
+                  fontSize: TvLayout.sp(context, 11),
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.4,
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 3,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 340),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.55),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'Sinopsis',
-                          style: TextStyle(
-                            color: GtvTheme.redHi,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.1,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        if (_heroMetaLoading)
-                          const SizedBox(
-                            height: 22,
-                            width: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: GtvTheme.red),
-                          )
-                        else
-                          Text(
-                            _heroPlot.isEmpty
-                                ? 'Sinopsis no disponible para este título.'
-                                : _heroPlot,
-                            maxLines: 9,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                              height: 1.55,
-                            ),
-                          ),
-                      ],
-                    ),
+              const SizedBox(height: 6),
+              Text(
+                item.badge,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.75),
+                  fontSize: TvLayout.sp(context, 12),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                item.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: TvLayout.sp(context, 30),
+                  fontWeight: FontWeight.w700,
+                  height: 1.05,
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (_heroMetaLoading)
+                const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: GtvTheme.red),
+                )
+              else
+                Text(
+                  _heroMetaLine(item),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.78),
+                    fontSize: TvLayout.sp(context, 13),
+                    height: 1.4,
                   ),
                 ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  GtvFocusable(
+                    focusNode: _playFocus,
+                    autofocus: true,
+                    onTap: item.onPlay,
+                    borderRadius: BorderRadius.circular(999),
+                    child: ElevatedButton.icon(
+                      onPressed: item.onPlay,
+                      icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                      label: const Text('VER'),
+                    ),
+                  ),
+                  if (_heroTrailer != null) ...[
+                    const SizedBox(width: 12),
+                    GtvFocusable(
+                      onTap: _openTrailer,
+                      borderRadius: BorderRadius.circular(999),
+                      child: OutlinedButton.icon(
+                        onPressed: _openTrailer,
+                        icon: const Icon(Icons.ondemand_video_rounded,
+                            size: 18, color: Colors.white),
+                        label: const Text('TRÁILER', style: TextStyle(color: Colors.white)),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.white54),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(width: 48),
             ],
           ),
         ),
       ],
     );
+  }
+
+  String _heroMetaLine(_HeroItem item) {
+    final parts = <String>[];
+    if (item.rating > 0) {
+      parts.add('★ ${item.rating.toStringAsFixed(1)}');
+    }
+    parts.add(item.isMovie ? 'Película' : 'Serie');
+    if (_heroPlot.isNotEmpty) {
+      parts.add(_heroPlot);
+    } else {
+      parts.add('Sinopsis no disponible.');
+    }
+    return parts.join(' • ');
   }
 
   Widget _buildResumeRail(double height) {

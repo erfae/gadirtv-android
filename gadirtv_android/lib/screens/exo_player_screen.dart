@@ -11,6 +11,7 @@ import '../services/api_service.dart';
 import '../services/player_constants.dart';
 import '../services/resume_store.dart';
 import '../theme.dart';
+import 'player_screen.dart';
 import '../widgets/gtv_focusable.dart';
 import '../widgets/no_signal_test_card.dart';
 
@@ -95,11 +96,21 @@ class _ExoPlayerScreenState extends State<ExoPlayerScreen> {
       setState(() => _buffering = false);
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _fatalError = e.toString();
-        _buffering = false;
-      });
+      // ExoPlayer often fails on x86 emulators — fall back to libVLC automatically.
+      await _fallbackToVlc();
     }
+  }
+
+  Future<void> _fallbackToVlc() async {
+    if (!mounted) return;
+    final route = MaterialPageRoute(
+      builder: (_) => PlayerScreen(
+        playable: widget.playable,
+        liveProfile: widget.liveProfile,
+        liveStreamId: widget.liveStreamId,
+      ),
+    );
+    await Navigator.of(context).pushReplacement(route);
   }
 
   void _onUpdate() {

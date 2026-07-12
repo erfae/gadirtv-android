@@ -53,16 +53,16 @@ class GtvTvKeyBridge {
 
     switch (keyCode) {
       case 19:
-        focus.focusInDirection(TraversalDirection.up);
+        _moveFocus(focus, TraversalDirection.up);
         break;
       case 20:
-        focus.focusInDirection(TraversalDirection.down);
+        _moveFocus(focus, TraversalDirection.down);
         break;
       case 21:
-        focus.focusInDirection(TraversalDirection.left);
+        _moveFocus(focus, TraversalDirection.left);
         break;
       case 22:
-        focus.focusInDirection(TraversalDirection.right);
+        _moveFocus(focus, TraversalDirection.right);
         break;
       case 23:
       case 66:
@@ -71,6 +71,58 @@ class GtvTvKeyBridge {
       default:
         break;
     }
+  }
+
+  static void _moveFocus(FocusNode from, TraversalDirection dir) {
+    final before = FocusManager.instance.primaryFocus;
+    from.focusInDirection(dir);
+    final after = FocusManager.instance.primaryFocus;
+    if (after == before) {
+      _focusNearestInDirection(from, dir);
+    }
+  }
+
+  /// When [focusInDirection] cannot find a target (common with horizontal
+  /// [ListView]s above a bottom nav bar), pick the closest focusable below.
+  static void _focusNearestInDirection(FocusNode from, TraversalDirection dir) {
+    final ctx = from.context;
+    if (ctx == null) return;
+    final fromBox = from.context?.findRenderObject() as RenderBox?;
+    if (fromBox == null || !fromBox.hasSize) return;
+
+    final origin = fromBox.localToGlobal(fromBox.size.center(Offset.zero));
+    FocusNode? best;
+    double bestDist = double.infinity;
+
+    void walk(FocusNode node) {
+      if (node.canRequestFocus && node != from) {
+        final ro = node.context?.findRenderObject();
+        if (ro is RenderBox && ro.hasSize && ro.attached) {
+          final center = ro.localToGlobal(ro.size.center(Offset.zero));
+          final dx = center.dx - origin.dx;
+          final dy = center.dy - origin.dy;
+          final ok = switch (dir) {
+            TraversalDirection.down => dy > 8,
+            TraversalDirection.up => dy < -8,
+            TraversalDirection.right => dx > 8,
+            TraversalDirection.left => dx < -8,
+          };
+          if (ok) {
+            final dist = (center - origin).distanceSquared;
+            if (dist < bestDist) {
+              bestDist = dist;
+              best = node;
+            }
+          }
+        }
+      }
+      for (final child in node.children) {
+        walk(child);
+      }
+    }
+
+    walk(FocusManager.instance.rootScope);
+    best?.requestFocus();
   }
 
   static void _ensureInitialFocus() {
