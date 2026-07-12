@@ -195,7 +195,13 @@ class _HomeTabState extends State<HomeTab> {
             'PELÍCULA',
             m.rating,
             true,
-            () => widget.onPlayMovie?.call(m) ?? widget.onOpenMovie(m),
+            () {
+              if (widget.onPlayMovie != null) {
+                widget.onPlayMovie!(m);
+              } else {
+                widget.onOpenMovie(m);
+              }
+            },
           )),
       ...series.map((s) => (
             s.name,
