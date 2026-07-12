@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 
 import '../../i18n/strings.dart';
@@ -16,6 +15,7 @@ import '../../services/vlc_device_profile.dart';
 import '../../theme.dart';
 import '../../utils/tv_layout.dart';
 import '../../widgets/category_list_rail.dart';
+import '../../widgets/gtv_dpad_focus.dart';
 import '../../widgets/gtv_focusable.dart';
 import '../../widgets/no_signal_test_card.dart';
 
@@ -106,6 +106,10 @@ class _LiveTabState extends State<LiveTab> {
         _channels = list;
         _loadingChans = false;
       });
+      _syncChannelFocus(list.length);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _railKey.currentState?.focusSelected();
+      });
       return;
     }
 
@@ -120,6 +124,10 @@ class _LiveTabState extends State<LiveTab> {
         _channels = parsed;
         _loadingChans = false;
         if (id == _allId) _allChannels = parsed;
+      });
+      _syncChannelFocus(parsed.length);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _railKey.currentState?.focusSelected();
       });
     } catch (_) {
       if (!mounted) return;
@@ -157,6 +165,8 @@ class _LiveTabState extends State<LiveTab> {
 
   final _miniKey = GlobalKey<_MiniPlayerState>();
   final _miniFocus = FocusNode();
+  final _railKey = GlobalKey<CategoryListRailState>();
+  final _channelFocus = <FocusNode>[];
 
   Future<void> _preview(LiveChannel c) async {
     setState(() {
@@ -191,17 +201,34 @@ class _LiveTabState extends State<LiveTab> {
 
   Future<void> _fullscreen() async {
     if (_current == null) return;
-    final ch = _current!;
-    await _miniKey.currentState?.releaseForFullscreen();
-    await Future.delayed(const Duration(milliseconds: 650));
-    if (!mounted) return;
-    widget.onPlay(ch);
+    await _playFullscreen(_current!);
   }
 
   @override
   void dispose() {
     _miniFocus.dispose();
+    for (final n in _channelFocus) {
+      n.dispose();
+    }
     super.dispose();
+  }
+
+  void _syncChannelFocus(int count) {
+    while (_channelFocus.length < count) {
+      _channelFocus.add(FocusNode(debugLabel: 'ch-${_channelFocus.length}'));
+    }
+    while (_channelFocus.length > count) {
+      _channelFocus.removeLast().dispose();
+    }
+  }
+
+  Future<void> _playFullscreen(LiveChannel ch) async {
+    await _miniKey.currentState?.releaseForFullscreen();
+    if (!mounted) return;
+    setState(() => _current = null);
+    await Future.delayed(const Duration(milliseconds: 900));
+    if (!mounted) return;
+    widget.onPlay(ch);
   }
 
   @override
@@ -250,9 +277,13 @@ class _LiveTabState extends State<LiveTab> {
               child: SizedBox(
               width: TvLayout.categoryRailWidth(context),
               child: CategoryListRail(
+                key: _railKey,
                 categories: categories,
                 selectedId: _selected,
                 onSelected: _loadChannels,
+                onMoveRight: () {
+                  if (_channelFocus.isNotEmpty) _channelFocus.first.requestFocus();
+                },
               ),
             ),
             ),
@@ -319,9 +350,13 @@ class _LiveTabState extends State<LiveTab> {
                   child: SizedBox(
                   width: TvLayout.categoryRailWidth(context),
                   child: CategoryListRail(
+                    key: _railKey,
                     categories: categories,
                     selectedId: _selected,
                     onSelected: _loadChannels,
+                    onMoveRight: () {
+                      if (_channelFocus.isNotEmpty) _channelFocus.first.requestFocus();
+                    },
                   ),
                 ),
                 ),
@@ -365,14 +400,26 @@ class _LiveTabState extends State<LiveTab> {
       itemBuilder: (_, i) {
         final c = _channels[i];
         final selected = _current?.streamId == c.streamId;
+        final node = i < _channelFocus.length ? _channelFocus[i] : null;
+        if (node == null) return const SizedBox.shrink();
         return _ChannelRow(
           channel: c,
+          focusNode: node,
           isFavorite: _favoriteIds.contains(c.streamId),
           selected: selected,
-          onTap: () => _preview(c),
+          onTap: () {
+            if (selected) {
+              _playFullscreen(c);
+            } else {
+              _preview(c);
+            }
+          },
           onFocus: () => _preview(c),
-          onDoubleTap: () => widget.onPlay(c),
           onToggleFavorite: () => _toggleFavorite(c),
+          onMoveLeft: () => _railKey.currentState?.focusSelected(),
+          onMoveUp: i > 0 ? () => _channelFocus[i - 1].requestFocus() : null,
+          onMoveDown: i < _channels.length - 1 ? () => _channelFocus[i + 1].requestFocus() : null,
+          onMoveRight: () => _miniFocus.requestFocus(),
         );
       },
     );
@@ -770,80 +817,102 @@ class _EpgBar extends StatelessWidget {
 class _ChannelRow extends StatefulWidget {
   const _ChannelRow({
     required this.channel,
+    required this.focusNode,
     required this.isFavorite,
     required this.selected,
     required this.onTap,
-    required this.onDoubleTap,
     required this.onToggleFavorite,
     this.onFocus,
+    this.onMoveLeft,
+    this.onMoveUp,
+    this.onMoveDown,
+    this.onMoveRight,
   });
 
   final LiveChannel channel;
+  final FocusNode focusNode;
   final bool isFavorite;
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback? onFocus;
-  final VoidCallback onDoubleTap;
   final VoidCallback onToggleFavorite;
+  final VoidCallback? onMoveLeft;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
+  final VoidCallback? onMoveRight;
 
   @override
   State<_ChannelRow> createState() => _ChannelRowState();
 }
 
 class _ChannelRowState extends State<_ChannelRow> {
-  bool _focused = false;
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_onFocus);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ChannelRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode.removeListener(_onFocus);
+      widget.focusNode.addListener(_onFocus);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_onFocus);
+    super.dispose();
+  }
+
+  void _onFocus() {
+    if (widget.focusNode.hasFocus) {
+      widget.onFocus?.call();
+      Scrollable.ensureVisible(
+        context,
+        alignment: 0.35,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
-    return FocusableActionDetector(
-      onShowFocusHighlight: (v) {
-        setState(() => _focused = v);
-        if (v) {
-          widget.onFocus?.call();
-          Scrollable.ensureVisible(
-            context,
-            alignment: 0.35,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-          );
-        }
-      },
-      onShowHoverHighlight: (v) => setState(() => _focused = v),
-      mouseCursor: SystemMouseCursors.click,
-      actions: {
-        ActivateIntent: CallbackAction<ActivateIntent>(
-          onInvoke: (_) {
-            if (widget.selected) {
-              widget.onDoubleTap();
-            } else {
-              widget.onTap();
-            }
-            return null;
-          },
-        ),
-      },
+    final focused = widget.focusNode.hasFocus;
+    return GtvDpadFocus(
+      focusNode: widget.focusNode,
+      onTap: widget.onTap,
+      onMoveLeft: widget.onMoveLeft,
+      onMoveUp: widget.onMoveUp,
+      onMoveDown: widget.onMoveDown,
+      onMoveRight: widget.onMoveRight,
+      showRing: false,
+      borderRadius: BorderRadius.circular(8),
       child: GestureDetector(
-        onTap: widget.onTap,
-        onDoubleTap: widget.onDoubleTap,
         onLongPress: widget.onToggleFavorite,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           decoration: BoxDecoration(
             color: widget.selected
                 ? GtvTheme.red.withOpacity(0.32)
-                : (_focused ? GtvTheme.red.withOpacity(0.12) : GtvTheme.surface),
+                : (focused ? GtvTheme.red.withOpacity(0.12) : GtvTheme.surface),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: widget.selected
                   ? GtvTheme.red
-                  : (_focused ? GtvTheme.redHi : GtvTheme.border),
-              width: widget.selected || _focused ? 2 : 1,
+                  : (focused ? GtvTheme.redHi : GtvTheme.border),
+              width: widget.selected || focused ? 2 : 1,
             ),
           ),
           child: Row(
             children: [
               Container(
-                width: 34, height: 34,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: widget.selected ? GtvTheme.red.withOpacity(0.2) : GtvTheme.bg,
                   borderRadius: BorderRadius.circular(6),

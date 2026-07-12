@@ -11,6 +11,7 @@ import '../services/resume_store.dart';
 import '../services/trailer_launcher.dart';
 import '../theme.dart';
 import '../utils/xtream_utils.dart';
+import '../widgets/gtv_dpad_focus.dart';
 import '../widgets/detail_hero_widgets.dart';
 
 /// Movie detail — Google TV layout: backdrop hero, synopsis right, play + trailer.
@@ -28,6 +29,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   final _api = ApiService();
   final _resume = ResumeStore();
   final _playFocus = FocusNode();
+  final _backFocus = FocusNode();
+  final _trailerFocus = FocusNode();
 
   Map<String, dynamic> _info = const {};
   Map<String, dynamic> _mvInfo = const {};
@@ -46,6 +49,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   @override
   void dispose() {
     _playFocus.dispose();
+    _backFocus.dispose();
+    _trailerFocus.dispose();
     super.dispose();
   }
 
@@ -144,9 +149,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 synopsisTitle: t.synopsis,
                 posterUrl: _poster,
                 backdropUrl: _backdrop,
-                backButton: IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                  onPressed: () => Navigator.of(context).pop(),
+                backButton: GtvDpadFocus(
+                  focusNode: _backFocus,
+                  onTap: () => Navigator.of(context).pop(),
+                  onMoveDown: () => _playFocus.requestFocus(),
+                  borderRadius: BorderRadius.circular(999),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
+                  ),
                 ),
                 actions: Row(
                   children: [
@@ -156,6 +167,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                       label: hasResume ? t.resume : t.watchNow,
                       icon: Icons.play_arrow_rounded,
                       onTap: () => _play(fromStart: !hasResume),
+                      onMoveUp: () => _backFocus.requestFocus(),
+                      onMoveRight: _trailerInfo.hasAny ? () => _trailerFocus.requestFocus() : null,
                     ),
                     if (hasResume) ...[
                       const SizedBox(width: 10),
@@ -168,9 +181,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     if (_trailerInfo.hasAny) ...[
                       const SizedBox(width: 10),
                       GtvHeroActionButton(
+                        focusNode: _trailerFocus,
                         label: 'TRÁILER',
                         icon: Icons.ondemand_video_rounded,
                         onTap: _openTrailer,
+                        onMoveLeft: () => _playFocus.requestFocus(),
+                        onMoveUp: () => _backFocus.requestFocus(),
                       ),
                     ],
                   ],

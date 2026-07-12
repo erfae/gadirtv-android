@@ -63,6 +63,7 @@ class _HomeTabState extends State<HomeTab> {
   String _heroPoster = '';
   TrailerInfo _heroTrailer = const TrailerInfo();
   bool _heroMetaLoading = false;
+  final _heroMetaCache = <String, _CachedHeroMeta>{};
 
   @override
   void initState() {
@@ -98,17 +99,20 @@ class _HomeTabState extends State<HomeTab> {
     });
 
     try {
-      final results = await Future.wait([
-        _api.vodStreams(widget.profile),
-        _api.seriesList(widget.profile),
-        _resumeStore.loadAll(),
-      ]);
+      final moviesFuture = _api.vodStreams(widget.profile);
+      final seriesFuture = _api.seriesList(widget.profile);
+      final resumeFuture = _resumeStore.loadAll();
 
-      final movies = (results[0] as List).map((e) => Movie.fromJson(e as Map<String, dynamic>)).toList()
+      final resumeMap = await resumeFuture;
+      if (!mounted) return;
+
+      final moviesRaw = await moviesFuture;
+      if (!mounted) return;
+
+      final movies = moviesRaw
+          .map((e) => Movie.fromJson(e as Map<String, dynamic>))
+          .toList()
         ..sort((a, b) => b.addedTs.compareTo(a.addedTs));
-      final series = (results[1] as List).map((e) => Series.fromJson(e as Map<String, dynamic>)).toList()
-        ..sort((a, b) => b.lastModifiedTs.compareTo(a.lastModifiedTs));
-      final resumeMap = results[2] as Map<String, ResumeEntry>;
 
       final movieById = {for (final m in movies) m.streamId.toString(): m};
       final resumeItems = <_ResumeItem>[];
@@ -129,8 +133,30 @@ class _HomeTabState extends State<HomeTab> {
         }
       }
 
+      final recentMovies = movies.take(24).toList();
+      final poolMovies = movies.take(12).toList();
+
+      if (!mounted) return;
+      setState(() {
+        _recentMovies = recentMovies;
+        _resume = resumeItems.take(8).toList();
+        _loading = false;
+      });
+
+      _resumeFocus.rebuild(_resume.length);
+      _moviesFocus.rebuild(recentMovies.length);
+
+      final seriesRaw = await seriesFuture;
+      if (!mounted) return;
+
+      final series = seriesRaw
+          .map((e) => Series.fromJson(e as Map<String, dynamic>))
+          .toList()
+        ..sort((a, b) => b.lastModifiedTs.compareTo(a.lastModifiedTs));
+
+      final recentSeries = series.take(24).toList();
       final pool = <_HeroItem>[
-        ...movies.take(12).map((m) => _HeroItem(
+        ...poolMovies.map((m) => _HeroItem(
               title: m.name,
               imageUrl: m.icon,
               badge: 'PELÍCULA',
@@ -164,26 +190,17 @@ class _HomeTabState extends State<HomeTab> {
             )),
       ]..shuffle(_rng);
 
-      if (!mounted) return;
-      final recentMovies = movies.take(24).toList();
-      final recentSeries = series.take(24).toList();
-      final resume = resumeItems.take(8).toList();
-
       setState(() {
-        _recentMovies = recentMovies;
         _recentSeries = recentSeries;
-        _resume = resume;
         _heroPool = pool.take(20).toList();
         _heroIndex = 0;
-        _loading = false;
       });
 
-      _resumeFocus.rebuild(resume.length);
-      _moviesFocus.rebuild(recentMovies.length);
       _seriesFocus.rebuild(recentSeries.length);
-
+      _applyHeroMetaFromCache(0);
       _startHeroRotation();
-      _loadHeroMeta(_heroIndex);
+      _loadHeroMeta(0);
+      _prefetchHeroMeta();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _playFocus.requestFocus();
       });
@@ -196,10 +213,42 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
+  void _applyHeroMetaFromCache(int index) {
+    if (_heroPool.isEmpty) return;
+    final item = _heroPool[index % _heroPool.length];
+    final cached = _heroMetaCache[_heroCacheKey(item)];
+    if (cached != null) {
+      setState(() {
+        _heroPlot = cached.plot;
+        _heroBackdrop = cached.backdrop;
+        _heroPoster = cached.poster;
+        _heroTrailer = cached.trailer;
+        _heroMetaLoading = false;
+      });
+    } else {
+      setState(() {
+        _heroMetaLoading = true;
+        _heroPlot = item.isMovie ? '' : (item.series?.plot ?? '');
+        _heroBackdrop = item.imageUrl;
+        _heroPoster = item.imageUrl;
+        _heroTrailer = const TrailerInfo();
+      });
+    }
+  }
+
+  Future<void> _prefetchHeroMeta() async {
+    for (var i = 0; i < _heroPool.length && i < 8; i++) {
+      if (!mounted) return;
+      final key = _heroCacheKey(_heroPool[i]);
+      if (_heroMetaCache.containsKey(key)) continue;
+      await _loadHeroMeta(i, prefetch: true);
+    }
+  }
+
   void _startHeroRotation() {
     _heroTimer?.cancel();
     if (_heroPool.length <= 1) return;
-    _heroTimer = Timer.periodic(const Duration(seconds: 12), (_) => _shiftHeroRandom());
+    _heroTimer = Timer.periodic(const Duration(seconds: 15), (_) => _shiftHeroRandom());
   }
 
   void _shiftHeroRandom() {
@@ -211,59 +260,105 @@ class _HomeTabState extends State<HomeTab> {
       }
     }
     setState(() => _heroIndex = next);
+    _applyHeroMetaFromCache(next);
     _loadHeroMeta(next);
     _playFocus.requestFocus();
   }
 
-  Future<void> _loadHeroMeta(int index) async {
+  Future<void> _loadHeroMeta(int index, {bool prefetch = false}) async {
     if (_heroPool.isEmpty) return;
     final item = _heroPool[index % _heroPool.length];
-    setState(() {
-      _heroMetaLoading = true;
-      _heroPlot = item.isMovie ? '' : (item.series?.plot ?? '');
-      _heroBackdrop = item.imageUrl;
-      _heroPoster = item.imageUrl;
-      _heroTrailer = const TrailerInfo();
-    });
+    final cacheKey = _heroCacheKey(item);
+    final cached = _heroMetaCache[cacheKey];
+    if (cached != null) {
+      if (!mounted || (!prefetch && _heroIndex % _heroPool.length != index)) return;
+      if (!prefetch) {
+        setState(() {
+          _heroPlot = cached.plot;
+          _heroBackdrop = cached.backdrop;
+          _heroPoster = cached.poster;
+          _heroTrailer = cached.trailer;
+          _heroMetaLoading = false;
+        });
+      }
+      return;
+    }
+
+    if (!prefetch) {
+      setState(() {
+        _heroMetaLoading = true;
+        _heroPlot = item.isMovie ? '' : (item.series?.plot ?? '');
+        _heroBackdrop = item.imageUrl;
+        _heroPoster = item.imageUrl;
+      });
+    }
 
     try {
       if (item.isMovie && item.movie != null) {
         final info = await _api.vodInfo(widget.profile, item.movie!.streamId);
-        if (!mounted || _heroIndex % _heroPool.length != index) return;
+        if (!mounted || (!prefetch && _heroIndex % _heroPool.length != index)) return;
         final meta = info['info'] is Map
             ? Map<String, dynamic>.from(info['info'] as Map)
             : <String, dynamic>{};
         final md = info['movie_data'] is Map
             ? Map<String, dynamic>.from(info['movie_data'] as Map)
             : <String, dynamic>{};
-        setState(() {
-          _heroPlot = extractPlot(meta, extra: md);
-          _heroBackdrop = extractBackdrop(meta, fallback: item.imageUrl);
-          _heroPoster = (meta['cover'] ?? meta['cover_big'] ?? meta['movie_image'] ?? item.imageUrl).toString();
-          if (_heroPoster.isEmpty) _heroPoster = item.imageUrl;
-          _heroTrailer = extractTrailerInfo(meta);
-          _heroMetaLoading = false;
-        });
+        final plot = extractPlot(meta, extra: md);
+        final backdrop = extractBackdrop(meta, fallback: item.imageUrl);
+        final poster = (meta['cover'] ?? meta['cover_big'] ?? meta['movie_image'] ?? item.imageUrl).toString();
+        final trailer = extractTrailerInfo(meta);
+        _heroMetaCache[cacheKey] = _CachedHeroMeta(
+          plot: plot,
+          backdrop: backdrop.isNotEmpty ? backdrop : item.imageUrl,
+          poster: poster.isNotEmpty ? poster : item.imageUrl,
+          trailer: trailer,
+        );
+        if (!prefetch) {
+          setState(() {
+            _heroPlot = plot;
+            _heroBackdrop = backdrop.isNotEmpty ? backdrop : item.imageUrl;
+            _heroPoster = poster.isNotEmpty ? poster : item.imageUrl;
+            _heroTrailer = trailer;
+            _heroMetaLoading = false;
+          });
+        }
       } else if (item.series != null) {
         final info = await _api.seriesInfo(widget.profile, item.series!.seriesId);
-        if (!mounted || _heroIndex % _heroPool.length != index) return;
+        if (!mounted || (!prefetch && _heroIndex % _heroPool.length != index)) return;
         final meta = info['info'] is Map
             ? Map<String, dynamic>.from(info['info'] as Map)
             : <String, dynamic>{};
-        setState(() {
-          _heroPlot = extractPlot(meta, fallback: item.series!.plot);
-          _heroBackdrop = extractBackdrop(meta, fallback: item.imageUrl);
-          _heroPoster = (meta['cover'] ?? meta['cover_big'] ?? item.imageUrl).toString();
-          if (_heroPoster.isEmpty) _heroPoster = item.imageUrl;
-          _heroTrailer = extractTrailerInfo(meta);
-          _heroMetaLoading = false;
-        });
-      } else if (mounted) {
+        final plot = extractPlot(meta, fallback: item.series!.plot);
+        final backdrop = extractBackdrop(meta, fallback: item.imageUrl);
+        final poster = (meta['cover'] ?? meta['cover_big'] ?? item.imageUrl).toString();
+        final trailer = extractTrailerInfo(meta);
+        _heroMetaCache[cacheKey] = _CachedHeroMeta(
+          plot: plot,
+          backdrop: backdrop.isNotEmpty ? backdrop : item.imageUrl,
+          poster: poster.isNotEmpty ? poster : item.imageUrl,
+          trailer: trailer,
+        );
+        if (!prefetch) {
+          setState(() {
+            _heroPlot = plot;
+            _heroBackdrop = backdrop.isNotEmpty ? backdrop : item.imageUrl;
+            _heroPoster = poster.isNotEmpty ? poster : item.imageUrl;
+            _heroTrailer = trailer;
+            _heroMetaLoading = false;
+          });
+        }
+      } else if (mounted && !prefetch) {
         setState(() => _heroMetaLoading = false);
       }
     } catch (_) {
-      if (mounted) setState(() => _heroMetaLoading = false);
+      if (mounted && !prefetch) setState(() => _heroMetaLoading = false);
     }
+  }
+
+  String _heroCacheKey(_HeroItem item) {
+    if (item.isMovie && item.movie != null) return 'm:${item.movie!.streamId}';
+    if (item.series != null) return 's:${item.series!.seriesId}';
+    return 'x:${item.title}';
   }
 
   Future<void> _openTrailer() async {
@@ -277,6 +372,7 @@ class _HomeTabState extends State<HomeTab> {
     _heroTimer?.cancel();
     final next = (_heroIndex + delta) % _heroPool.length;
     setState(() => _heroIndex = next < 0 ? _heroPool.length + next : next);
+    _applyHeroMetaFromCache(_heroIndex);
     _loadHeroMeta(_heroIndex);
     _startHeroRotation();
     _playFocus.requestFocus();
@@ -564,6 +660,20 @@ class _HomeTabState extends State<HomeTab> {
       ],
     );
   }
+}
+
+class _CachedHeroMeta {
+  const _CachedHeroMeta({
+    required this.plot,
+    required this.backdrop,
+    required this.poster,
+    required this.trailer,
+  });
+
+  final String plot;
+  final String backdrop;
+  final String poster;
+  final TrailerInfo trailer;
 }
 
 class _HeroItem {

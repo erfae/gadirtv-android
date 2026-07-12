@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 
 import 'gtv_tv_focus_registry.dart';
 import 'gtv_tv_focus_navigation.dart';
@@ -72,6 +72,11 @@ class GtvTvKeyBridge {
       case 66:
         if (GtvTvFocusNavigation.activate(focus)) return;
         Actions.invoke(context, const ActivateIntent());
+        break;
+      case 4:
+        if (Navigator.maybeOf(context)?.canPop() ?? false) {
+          Navigator.maybePop(context);
+        }
         break;
       default:
         break;

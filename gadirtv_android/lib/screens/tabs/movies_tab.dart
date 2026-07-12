@@ -76,6 +76,11 @@ class _MoviesTabState extends State<MoviesTab> {
         _loadingCats = false;
       });
       await _load(_allId);
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _railKey.currentState?.focusSelected();
+        });
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -100,6 +105,9 @@ class _MoviesTabState extends State<MoviesTab> {
         _loading = false;
       });
       _gridFocus.rebuild(list.length);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && list.isNotEmpty) _railKey.currentState?.focusSelected();
+      });
       return;
     }
 
@@ -117,6 +125,9 @@ class _MoviesTabState extends State<MoviesTab> {
         if (id == _allId) _allMovies = list;
       });
       _gridFocus.rebuild(list.length);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _railKey.currentState?.focusSelected();
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() {

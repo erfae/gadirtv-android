@@ -57,11 +57,11 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
               end: Alignment.centerRight,
               colors: [
                 GtvTheme.bg,
-                GtvTheme.bg.withOpacity(0.92),
-                GtvTheme.bg.withOpacity(0.55),
-                Colors.black.withOpacity(0.15),
+                GtvTheme.bg.withOpacity(0.88),
+                GtvTheme.bg.withOpacity(0.40),
+                Colors.transparent,
               ],
-              stops: const [0, 0.35, 0.62, 1],
+              stops: const [0, 0.28, 0.50, 1],
             ),
           ),
         ),
@@ -235,6 +235,7 @@ class GtvHeroActionButton extends StatelessWidget {
     this.onMoveDown,
     this.onMoveRight,
     this.onMoveLeft,
+    this.onMoveUp,
   });
 
   final String label;
@@ -245,6 +246,7 @@ class GtvHeroActionButton extends StatelessWidget {
   final VoidCallback? onMoveDown;
   final VoidCallback? onMoveRight;
   final VoidCallback? onMoveLeft;
+  final VoidCallback? onMoveUp;
 
   @override
   Widget build(BuildContext context) {
@@ -255,6 +257,7 @@ class GtvHeroActionButton extends StatelessWidget {
       onMoveDown: onMoveDown,
       onMoveRight: onMoveRight,
       onMoveLeft: onMoveLeft,
+      onMoveUp: onMoveUp,
       borderRadius: BorderRadius.circular(999),
       child: ElevatedButton.icon(
         onPressed: onTap,

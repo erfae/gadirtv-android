@@ -141,7 +141,8 @@ class MainActivity : FlutterActivity() {
             KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_NUMPAD_ENTER,
             KeyEvent.KEYCODE_BUTTON_A,
-            KeyEvent.KEYCODE_BUTTON_SELECT -> true
+            KeyEvent.KEYCODE_BUTTON_SELECT,
+            KeyEvent.KEYCODE_BACK -> true
             else -> false
         }
     }

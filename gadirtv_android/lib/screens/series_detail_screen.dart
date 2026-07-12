@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../i18n/strings.dart';
 import '../models/media.dart';
@@ -14,6 +13,7 @@ import '../theme.dart';
 import '../utils/tv_layout.dart';
 import '../utils/xtream_utils.dart';
 import '../widgets/detail_hero_widgets.dart';
+import '../widgets/gtv_dpad_focus.dart';
 
 /// Series detail — Google TV layout with season chips + inline episodes.
 class SeriesDetailScreen extends StatefulWidget {
@@ -30,6 +30,8 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
   final _api = ApiService();
   final _resume = ResumeStore();
   final _playFocus = FocusNode();
+  final _backFocus = FocusNode();
+  final _trailerFocus = FocusNode();
   final _seasonFocusNodes = <FocusNode>[];
   final _episodeFocusNodes = <FocusNode>[];
 
@@ -52,6 +54,8 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
   @override
   void dispose() {
     _playFocus.dispose();
+    _backFocus.dispose();
+    _trailerFocus.dispose();
     for (final n in _seasonFocusNodes) {
       n.dispose();
     }
@@ -217,9 +221,15 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
                 synopsisTitle: t.synopsis,
                 posterUrl: _poster,
                 backdropUrl: _backdrop,
-                backButton: IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                  onPressed: () => Navigator.of(context).pop(),
+                backButton: GtvDpadFocus(
+                  focusNode: _backFocus,
+                  onTap: () => Navigator.of(context).pop(),
+                  onMoveDown: () => _playFocus.requestFocus(),
+                  borderRadius: BorderRadius.circular(999),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
+                  ),
                 ),
                 actions: Row(
                   children: [
@@ -229,13 +239,23 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
                       label: 'REPRODUCIR',
                       icon: Icons.play_arrow_rounded,
                       onTap: _playFirstEpisode,
+                      onMoveUp: () => _backFocus.requestFocus(),
+                      onMoveDown: _seasons.isNotEmpty && _seasonFocusNodes.isNotEmpty
+                          ? () => _seasonFocusNodes[_selectedSeason].requestFocus()
+                          : null,
+                      onMoveRight: _trailerInfo.hasAny ? () => _trailerFocus.requestFocus() : null,
                     ),
                     if (_trailerInfo.hasAny) ...[
                       const SizedBox(width: 10),
                       GtvHeroActionButton(
+                        focusNode: _trailerFocus,
                         label: 'TRÁILER',
                         icon: Icons.ondemand_video_rounded,
                         onTap: _openTrailer,
+                        onMoveLeft: () => _playFocus.requestFocus(),
+                        onMoveDown: _seasons.isNotEmpty && _seasonFocusNodes.isNotEmpty
+                            ? () => _seasonFocusNodes[_selectedSeason].requestFocus()
+                            : null,
                       ),
                     ],
                   ],
@@ -280,6 +300,7 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
                               season: _seasons[i],
                               selected: i == _selectedSeason,
                               onTap: () => _selectSeason(i),
+                              onMoveUp: () => _playFocus.requestFocus(),
                               onMoveLeft: i > 0 ? () => _selectSeason(i - 1) : null,
                               onMoveRight: i < _seasons.length - 1 ? () => _selectSeason(i + 1) : null,
                               onMoveDown: _focusFirstEpisode,
@@ -302,8 +323,15 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
                       episode: episodes[i],
                       resume: _resumeMap['series:${episodeStreamId(episodes[i])}'],
                       onTap: () => _playEpisode(episodes[i]),
-                      onMoveUp: i == 0 && _seasonFocusNodes.isNotEmpty
-                          ? () => _seasonFocusNodes[_selectedSeason].requestFocus()
+                      onMoveUp: () {
+                        if (i > 0) {
+                          _episodeFocusNodes[i - 1].requestFocus();
+                        } else if (_seasonFocusNodes.isNotEmpty) {
+                          _seasonFocusNodes[_selectedSeason].requestFocus();
+                        }
+                      },
+                      onMoveDown: i < episodes.length - 1
+                          ? () => _episodeFocusNodes[i + 1].requestFocus()
                           : null,
                     ),
                   ),
@@ -328,7 +356,7 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
   }
 }
 
-class _SeasonChip extends StatefulWidget {
+class _SeasonChip extends StatelessWidget {
   const _SeasonChip({
     required this.focusNode,
     required this.season,
@@ -336,6 +364,7 @@ class _SeasonChip extends StatefulWidget {
     required this.onTap,
     this.onMoveLeft,
     this.onMoveRight,
+    this.onMoveUp,
     this.onMoveDown,
   });
 
@@ -345,91 +374,35 @@ class _SeasonChip extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback? onMoveLeft;
   final VoidCallback? onMoveRight;
+  final VoidCallback? onMoveUp;
   final VoidCallback? onMoveDown;
-
-  @override
-  State<_SeasonChip> createState() => _SeasonChipState();
-}
-
-class _SeasonChipState extends State<_SeasonChip> {
-  bool _focused = false;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.focusNode.addListener(_onFocus);
-  }
-
-  @override
-  void didUpdateWidget(covariant _SeasonChip oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.focusNode != widget.focusNode) {
-      oldWidget.focusNode.removeListener(_onFocus);
-      widget.focusNode.addListener(_onFocus);
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.focusNode.removeListener(_onFocus);
-    super.dispose();
-  }
-
-  void _onFocus() {
-    if (mounted) setState(() => _focused = widget.focusNode.hasFocus);
-  }
 
   @override
   Widget build(BuildContext context) {
     final t = AppI18n.of(context);
-    return Focus(
-      focusNode: widget.focusNode,
-      onKeyEvent: (node, event) {
-        if (event is! KeyDownEvent) return KeyEventResult.ignored;
-        if (event.logicalKey == LogicalKeyboardKey.arrowLeft && widget.onMoveLeft != null) {
-          widget.onMoveLeft!();
-          return KeyEventResult.handled;
-        }
-        if (event.logicalKey == LogicalKeyboardKey.arrowRight && widget.onMoveRight != null) {
-          widget.onMoveRight!();
-          return KeyEventResult.handled;
-        }
-        if (event.logicalKey == LogicalKeyboardKey.arrowDown && widget.onMoveDown != null) {
-          widget.onMoveDown!();
-          return KeyEventResult.handled;
-        }
-        if (event.logicalKey == LogicalKeyboardKey.select ||
-            event.logicalKey == LogicalKeyboardKey.enter) {
-          widget.onTap();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          decoration: BoxDecoration(
-            color: widget.selected ? GtvTheme.red : GtvTheme.surface,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: _focused
-                  ? GtvTheme.redHi
-                  : (widget.selected ? GtvTheme.redHi : GtvTheme.border),
-              width: _focused ? 2 : 1,
-            ),
-            boxShadow: _focused
-                ? [BoxShadow(color: GtvTheme.red.withOpacity(0.35), blurRadius: 12)]
-                : null,
+    return GtvDpadFocus(
+      focusNode: focusNode,
+      onTap: onTap,
+      onMoveLeft: onMoveLeft,
+      onMoveRight: onMoveRight,
+      onMoveUp: onMoveUp,
+      onMoveDown: onMoveDown,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? GtvTheme.red : GtvTheme.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? GtvTheme.redHi : GtvTheme.border,
           ),
-          child: Text(
-            '${t.season} ${widget.season}',
-            style: TextStyle(
-              color: widget.selected || _focused ? Colors.white : Colors.white70,
-              fontSize: TvLayout.sp(context, 14),
-              fontWeight: FontWeight.w700,
-            ),
+        ),
+        child: Text(
+          '${t.season} $season',
+          style: TextStyle(
+            color: selected ? Colors.white : Colors.white70,
+            fontSize: TvLayout.sp(context, 14),
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -437,13 +410,14 @@ class _SeasonChipState extends State<_SeasonChip> {
   }
 }
 
-class _EpisodeTile extends StatefulWidget {
+class _EpisodeTile extends StatelessWidget {
   const _EpisodeTile({
     required this.episode,
     required this.onTap,
     this.focusNode,
     this.resume,
     this.onMoveUp,
+    this.onMoveDown,
   });
 
   final Map<String, dynamic> episode;
@@ -451,130 +425,80 @@ class _EpisodeTile extends StatefulWidget {
   final FocusNode? focusNode;
   final ResumeEntry? resume;
   final VoidCallback? onMoveUp;
-
-  @override
-  State<_EpisodeTile> createState() => _EpisodeTileState();
-}
-
-class _EpisodeTileState extends State<_EpisodeTile> {
-  bool _focused = false;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.focusNode?.addListener(_onFocus);
-  }
-
-  @override
-  void didUpdateWidget(covariant _EpisodeTile oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.focusNode != widget.focusNode) {
-      oldWidget.focusNode?.removeListener(_onFocus);
-      widget.focusNode?.addListener(_onFocus);
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.focusNode?.removeListener(_onFocus);
-    super.dispose();
-  }
-
-  void _onFocus() {
-    if (mounted) setState(() => _focused = widget.focusNode?.hasFocus ?? false);
-  }
+  final VoidCallback? onMoveDown;
 
   @override
   Widget build(BuildContext context) {
-    final e = widget.episode;
+    final e = episode;
     final num = (e['episode_num'] ?? '').toString();
     final title = (e['title'] ?? e['name'] ?? 'Episodio $num').toString();
     final info = e['info'] is Map ? Map<String, dynamic>.from(e['info'] as Map) : <String, dynamic>{};
     final plot = extractPlot(info);
-    final progress = widget.resume?.progress ?? 0;
+    final progress = resume?.progress ?? 0;
 
-    return Focus(
-      focusNode: widget.focusNode,
-      onKeyEvent: (node, event) {
-        if (event is! KeyDownEvent) return KeyEventResult.ignored;
-        if (event.logicalKey == LogicalKeyboardKey.arrowUp && widget.onMoveUp != null) {
-          widget.onMoveUp!();
-          return KeyEventResult.handled;
-        }
-        if (event.logicalKey == LogicalKeyboardKey.select ||
-            event.logicalKey == LogicalKeyboardKey.enter) {
-          widget.onTap();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: GtvTheme.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: _focused ? GtvTheme.red : GtvTheme.border,
-              width: _focused ? 2 : 1,
-            ),
-            boxShadow: _focused
-                ? [BoxShadow(color: GtvTheme.red.withOpacity(0.3), blurRadius: 10)]
-                : null,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: GtvTheme.red.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(num, style: const TextStyle(color: GtvTheme.red, fontWeight: FontWeight.w800)),
+    return GtvDpadFocus(
+      focusNode: focusNode,
+      onTap: onTap,
+      onMoveUp: onMoveUp,
+      onMoveDown: onMoveDown,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: GtvTheme.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: GtvTheme.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: GtvTheme.red.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
+              child: Text(num, style: const TextStyle(color: GtvTheme.red, fontWeight: FontWeight.w800)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: TvLayout.sp(context, 15),
+                        fontWeight: FontWeight.w700,
+                      )),
+                  if (plot.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(plot,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: TvLayout.sp(context, 15),
-                          fontWeight: FontWeight.w700,
-                        )),
-                    if (plot.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(plot,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: GtvTheme.textDim, fontSize: TvLayout.sp(context, 12))),
-                    ],
-                    if (progress > 0 && progress < 1) ...[
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 3,
-                          backgroundColor: Colors.white12,
-                          color: GtvTheme.red,
-                        ),
-                      ),
-                    ],
+                        style: TextStyle(color: GtvTheme.textDim, fontSize: TvLayout.sp(context, 12))),
                   ],
-                ),
+                  if (progress > 0 && progress < 1) ...[
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 3,
+                        backgroundColor: Colors.white12,
+                        color: GtvTheme.red,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(width: 10),
-              const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 26),
-            ],
-          ),
+            ),
+            const SizedBox(width: 10),
+            const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 26),
+          ],
         ),
       ),
     );
