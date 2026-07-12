@@ -67,3 +67,19 @@ Instala **AIDA64** desde Play Store en el TV → CPU → Instruction set:
 - `arm64` / `aarch64` en modo 64-bit → prueba **arm64**
 
 En la práctica, si no tienes Nvidia Shield, casi siempre es **armv7a**.
+
+## 7. Emulador Android Studio (PC)
+
+Los APK de TV (`GadirTV-AndroidTV.apk`, universal, arm64…) son **ARM** y en el emulador x86_64 **se instalan pero no arrancan**.
+
+| Artefacto | Cuándo usarlo |
+|---|---|
+| **`GadirTV-emulator-x64-release.apk`** | **Emulador Android Studio x86_64 — usa este** |
+| `GadirTV-emulator-x64-debug.apk` | Mismo emulador, build debug (arranque más lento) |
+
+```bash
+adb install -r GadirTV-emulator-x64-release.apk
+adb shell am start -n com.gadir.tv/.MainActivity
+```
+
+> El debug puede tardar 1–2 minutos en la primera pantalla negra/splash; el **release** arranca mucho más rápido.
