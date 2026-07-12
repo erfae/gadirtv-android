@@ -45,7 +45,7 @@ class TvLayout {
 
   static double categoryRailWidth(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
-    return (w * 0.16).clamp(140.0, 220.0);
+    return (w * 0.18).clamp(160.0, 260.0);
   }
 
   static double labelFont(BuildContext context, double base) => sp(context, base);

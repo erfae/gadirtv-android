@@ -67,3 +67,33 @@ String episodeStreamId(Map<String, dynamic> episode) {
       .trim();
   return id;
 }
+
+/// Best backdrop / fanart URL for hero screens (falls back to poster/cover).
+String extractBackdrop(
+  Map<String, dynamic> info, {
+  String fallback = '',
+}) {
+  for (final key in [
+    'backdrop_path',
+    'movie_image',
+    'cover_big',
+    'backdrop',
+    'fanart',
+    'stream_icon',
+    'cover',
+  ]) {
+    final v = (info[key] ?? '').toString().trim();
+    if (v.isNotEmpty) return v;
+  }
+  return fallback.trim();
+}
+
+String? extractTrailer(Map<String, dynamic> meta) {
+  for (final key in ['youtube_trailer', 'trailer', 'youtube_id']) {
+    final v = (meta[key] ?? '').toString().trim();
+    if (v.isEmpty) continue;
+    if (v.startsWith('http')) return v;
+    if (v.length >= 8) return 'https://www.youtube.com/watch?v=$v';
+  }
+  return null;
+}
