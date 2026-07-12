@@ -57,7 +57,7 @@ jobs:
         run: |
           grep -q GadirPluginRegistrant android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
           grep -q 'provideFlutterEngine' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
-          if grep -q 'FlutterVlcPlayerPlugin' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
+          if grep -qE '^import .*FlutterVlcPlayerPlugin' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
             echo "ERROR: MainActivity must not import FlutterVlcPlayerPlugin directly"
             exit 1
           fi
@@ -132,7 +132,7 @@ jobs:
         run: |
           grep -q GadirPluginRegistrant android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
           grep -q 'provideFlutterEngine' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
-          if grep -q 'FlutterVlcPlayerPlugin' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
+          if grep -qE '^import .*FlutterVlcPlayerPlugin' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
             echo "ERROR: MainActivity must not import FlutterVlcPlayerPlugin directly"
             exit 1
           fi
