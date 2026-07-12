@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../i18n/strings.dart';
 import '../models/media.dart';
+import '../models/trailer_info.dart';
 import '../models/playable.dart';
 import '../models/profile.dart';
 import '../services/api_service.dart';
@@ -36,8 +37,9 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
   List<String> _seasons = const [];
   Map<String, ResumeEntry> _resumeMap = {};
   int _selectedSeason = 0;
-  String? _trailer;
+  TrailerInfo _trailerInfo = const TrailerInfo();
   String _backdrop = '';
+  String _poster = '';
 
   bool _loading = true;
 
@@ -93,8 +95,10 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
       _seasons = seasons;
       _resumeMap = results[1] as Map<String, ResumeEntry>;
       _selectedSeason = 0;
-      _trailer = extractTrailer(meta);
+      _trailerInfo = extractTrailerInfo(meta);
       _backdrop = extractBackdrop(meta, fallback: widget.series.cover);
+      _poster = (meta['cover'] ?? meta['cover_big'] ?? widget.series.cover).toString();
+      if (_poster.isEmpty) _poster = widget.series.cover;
       _loading = false;
     });
 
@@ -152,9 +156,8 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
   }
 
   Future<void> _openTrailer() async {
-    final url = _trailer;
-    if (url == null) return;
-    await TrailerLauncher.open(context, url, title: widget.series.name);
+    if (!_trailerInfo.hasAny) return;
+    await TrailerLauncher.openFromInfo(context, _trailerInfo, title: widget.series.name);
   }
 
   void _selectSeason(int index) {
@@ -195,103 +198,49 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
     final rating = widget.series.rating;
     final episodes = _episodesFor(_currentSeason);
 
+    final metaLine = [if (year.isNotEmpty) year, if (genre.isNotEmpty) genre].join(' · ');
+
     return Scaffold(
       backgroundColor: GtvTheme.bg,
       body: Column(
         children: [
           SizedBox(
-            height: (MediaQuery.sizeOf(context).height * 0.38).clamp(200.0, 320.0),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                GtvHeroBackdrop(imageUrl: _backdrop),
-                const GtvHeroGradients(),
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 20, 16),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                        Expanded(
-                          flex: 5,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              const Text('SERIE',
-                                  style: TextStyle(
-                                      color: GtvTheme.redHi,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 1)),
-                              const SizedBox(height: 6),
-                              Text(widget.series.name,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: TvLayout.sp(context, 26),
-                                    fontWeight: FontWeight.w800,
-                                    height: 1.1,
-                                  )),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 10,
-                                runSpacing: 4,
-                                children: [
-                                  if (rating > 0)
-                                    Text('★ ${rating.toStringAsFixed(1)}',
-                                        style: const TextStyle(color: Color(0xFFFACC15), fontWeight: FontWeight.w700)),
-                                  if (year.isNotEmpty)
-                                    Text(year, style: const TextStyle(color: GtvTheme.textDim)),
-                                  if (genre.isNotEmpty)
-                                    Text(genre,
-                                        style: const TextStyle(color: GtvTheme.textDim),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis),
-                                ],
-                              ),
-                              const SizedBox(height: 14),
-                              Row(
-                                children: [
-                                  GtvHeroActionButton(
-                                    focusNode: _playFocus,
-                                    autofocus: true,
-                                    label: 'REPRODUCIR',
-                                    icon: Icons.play_arrow_rounded,
-                                    onTap: _playFirstEpisode,
-                                  ),
-                                  if (_trailer != null) ...[
-                                    const SizedBox(width: 10),
-                                    GtvHeroActionButton(
-                                      label: 'TRÁILER',
-                                      icon: Icons.ondemand_video_rounded,
-                                      onTap: _openTrailer,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          flex: 4,
-                          child: GtvSynopsisPanel(
-                            title: t.synopsis,
-                            text: plot.isEmpty ? t.noSynopsis : plot,
-                            padding: const EdgeInsets.only(left: 16),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+            height: (MediaQuery.sizeOf(context).height * 0.44).clamp(240.0, 360.0),
+            child: SafeArea(
+              bottom: false,
+              child: GtvAndroidTvHeroLayout(
+                badge: 'SERIE',
+                title: widget.series.name,
+                rating: rating,
+                subtitle: metaLine.isEmpty ? null : metaLine,
+                synopsis: plot.isEmpty ? t.noSynopsis : plot,
+                synopsisTitle: t.synopsis,
+                posterUrl: _poster,
+                backdropUrl: _backdrop,
+                backButton: IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
-              ],
+                actions: Row(
+                  children: [
+                    GtvHeroActionButton(
+                      focusNode: _playFocus,
+                      autofocus: true,
+                      label: 'REPRODUCIR',
+                      icon: Icons.play_arrow_rounded,
+                      onTap: _playFirstEpisode,
+                    ),
+                    if (_trailerInfo.hasAny) ...[
+                      const SizedBox(width: 10),
+                      GtvHeroActionButton(
+                        label: 'TRÁILER',
+                        icon: Icons.ondemand_video_rounded,
+                        onTap: _openTrailer,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
           if (cast.isNotEmpty || director.isNotEmpty)

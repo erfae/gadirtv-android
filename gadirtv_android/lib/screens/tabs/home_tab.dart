@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../models/media.dart';
+import '../../models/trailer_info.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
 import '../../services/resume_store.dart';
@@ -52,7 +53,8 @@ class _HomeTabState extends State<HomeTab> {
 
   String _heroPlot = '';
   String _heroBackdrop = '';
-  String? _heroTrailer;
+  String _heroPoster = '';
+  TrailerInfo _heroTrailer = const TrailerInfo();
   bool _heroMetaLoading = false;
 
   @override
@@ -182,7 +184,8 @@ class _HomeTabState extends State<HomeTab> {
       _heroMetaLoading = true;
       _heroPlot = item.isMovie ? '' : (item.series?.plot ?? '');
       _heroBackdrop = item.imageUrl;
-      _heroTrailer = null;
+      _heroPoster = item.imageUrl;
+      _heroTrailer = const TrailerInfo();
     });
 
     try {
@@ -198,7 +201,9 @@ class _HomeTabState extends State<HomeTab> {
         setState(() {
           _heroPlot = extractPlot(meta, extra: md);
           _heroBackdrop = extractBackdrop(meta, fallback: item.imageUrl);
-          _heroTrailer = extractTrailer(meta);
+          _heroPoster = (meta['cover'] ?? meta['cover_big'] ?? meta['movie_image'] ?? item.imageUrl).toString();
+          if (_heroPoster.isEmpty) _heroPoster = item.imageUrl;
+          _heroTrailer = extractTrailerInfo(meta);
           _heroMetaLoading = false;
         });
       } else if (item.series != null) {
@@ -210,7 +215,9 @@ class _HomeTabState extends State<HomeTab> {
         setState(() {
           _heroPlot = extractPlot(meta, fallback: item.series!.plot);
           _heroBackdrop = extractBackdrop(meta, fallback: item.imageUrl);
-          _heroTrailer = extractTrailer(meta);
+          _heroPoster = (meta['cover'] ?? meta['cover_big'] ?? item.imageUrl).toString();
+          if (_heroPoster.isEmpty) _heroPoster = item.imageUrl;
+          _heroTrailer = extractTrailerInfo(meta);
           _heroMetaLoading = false;
         });
       } else if (mounted) {
@@ -222,9 +229,9 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _openTrailer() async {
-    final url = _heroTrailer;
-    if (url == null) return;
-    await TrailerLauncher.open(context, url);
+    if (!_heroTrailer.hasAny) return;
+    final item = _heroPool[_heroIndex % _heroPool.length];
+    await TrailerLauncher.openFromInfo(context, _heroTrailer, title: item.title);
   }
 
   void _shiftHero(int delta) {
@@ -255,13 +262,13 @@ class _HomeTabState extends State<HomeTab> {
       builder: (context, constraints) {
         final railH = TvLayout.compactRailBlockHeight(context, maxHeight: constraints.maxHeight) * 0.88;
         final resumeExtra = _resume.isEmpty ? 0.0 : railH * 0.75;
-        final heroH = (constraints.maxHeight * 0.58) - resumeExtra * 0.3;
+        final heroH = (constraints.maxHeight * 0.62) - resumeExtra * 0.25;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              height: heroH.clamp(280.0, constraints.maxHeight * 0.78),
+              height: heroH.clamp(300.0, constraints.maxHeight * 0.82),
               child: _buildGoogleTvHero(context),
             ),
             if (_resume.isNotEmpty) ...[
@@ -314,21 +321,48 @@ class _HomeTabState extends State<HomeTab> {
     }
     final idx = _heroIndex % _heroPool.length;
     final item = _heroPool[idx];
-    final backdrop = _heroBackdrop.isNotEmpty ? _heroBackdrop : item.imageUrl;
+    final poster = _heroPoster.isNotEmpty ? _heroPoster : item.imageUrl;
+    final backdrop = _heroBackdrop.isNotEmpty ? _heroBackdrop : poster;
 
     return Stack(
       fit: StackFit.expand,
       children: [
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 600),
+          duration: const Duration(milliseconds: 500),
           child: KeyedSubtree(
-            key: ValueKey('$idx-$backdrop'),
-            child: GtvHeroBackdrop(imageUrl: backdrop),
+            key: ValueKey('$idx-$poster'),
+            child: GtvAndroidTvHeroLayout(
+              badge: item.badge,
+              title: item.title,
+              rating: item.rating,
+              synopsis: _heroPlot.isNotEmpty ? _heroPlot : 'Sinopsis no disponible.',
+              synopsisLoading: _heroMetaLoading,
+              posterUrl: poster,
+              backdropUrl: backdrop,
+              actions: Row(
+                children: [
+                  GtvHeroActionButton(
+                    focusNode: _playFocus,
+                    autofocus: true,
+                    label: 'REPRODUCIR',
+                    icon: Icons.play_arrow_rounded,
+                    onTap: item.onPlay,
+                  ),
+                  if (_heroTrailer.hasAny) ...[
+                    const SizedBox(width: 12),
+                    GtvHeroActionButton(
+                      label: 'TRÁILER',
+                      icon: Icons.ondemand_video_rounded,
+                      onTap: _openTrailer,
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
-        const GtvHeroGradients(),
         Positioned(
-          right: 12,
+          right: 8,
           top: 0,
           bottom: 0,
           child: Column(
@@ -337,85 +371,6 @@ class _HomeTabState extends State<HomeTab> {
               _HeroArrow(icon: Icons.chevron_left_rounded, onTap: () => _shiftHero(-1)),
               const SizedBox(height: 8),
               _HeroArrow(icon: Icons.chevron_right_rounded, onTap: () => _shiftHero(1)),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(36, 20, 64, 24),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                flex: 5,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      item.badge,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: TvLayout.sp(context, 13),
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: TvLayout.sp(context, 34),
-                        fontWeight: FontWeight.w800,
-                        height: 1.05,
-                        shadows: const [Shadow(color: Colors.black54, blurRadius: 12)],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (item.rating > 0)
-                      Text(
-                        '★ ${item.rating.toStringAsFixed(1)}',
-                        style: TextStyle(
-                          color: const Color(0xFFFACC15),
-                          fontSize: TvLayout.sp(context, 15),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        GtvHeroActionButton(
-                          focusNode: _playFocus,
-                          autofocus: true,
-                          label: 'REPRODUCIR',
-                          icon: Icons.play_arrow_rounded,
-                          onTap: item.onPlay,
-                        ),
-                        if (_heroTrailer != null) ...[
-                          const SizedBox(width: 12),
-                          GtvHeroActionButton(
-                            label: 'TRÁILER',
-                            icon: Icons.ondemand_video_rounded,
-                            onTap: _openTrailer,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                flex: 4,
-                child: GtvSynopsisPanel(
-                  title: 'Sinopsis',
-                  text: _heroPlot.isNotEmpty ? _heroPlot : 'Sinopsis no disponible.',
-                  loading: _heroMetaLoading,
-                  padding: const EdgeInsets.only(left: 16),
-                ),
-              ),
             ],
           ),
         ),

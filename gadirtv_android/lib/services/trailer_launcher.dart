@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../models/trailer_info.dart';
 import '../screens/trailer_screen.dart';
+import '../theme.dart';
 import '../utils/tv_utils.dart';
+import '../widgets/gtv_focusable.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Opens YouTube trailers in-app (embedded WebView). Falls back to external
@@ -43,12 +46,86 @@ class TrailerLauncher {
     return null;
   }
 
-  static Future<bool> open(BuildContext context, String url, {String title = 'Tráiler'}) async {
+  /// Shows Español / Versión original when both URLs exist; otherwise plays directly.
+  static Future<bool> openFromInfo(
+    BuildContext context,
+    TrailerInfo info, {
+    String title = 'Tráiler',
+  }) async {
+    if (!info.hasAny) return false;
+
+    if (info.hasLanguageChoice) {
+      final spanish = await _pickLanguage(context, title: title);
+      if (spanish == null || !context.mounted) return false;
+      final url = info.urlFor(spanish: spanish);
+      if (url == null) return false;
+      return open(context, url, title: title, spanish: spanish);
+    }
+
+    final url = info.originalUrl ?? info.spanishUrl;
+    if (url == null) return false;
+
+    // Single URL — still let user pick audio preference (same video, different embed params).
+    final spanish = await _pickLanguage(context, title: title, singleVideo: true);
+    if (spanish == null || !context.mounted) return false;
+    return open(context, url, title: title, spanish: spanish);
+  }
+
+  static Future<bool?> _pickLanguage(
+    BuildContext context, {
+    required String title,
+    bool singleVideo = false,
+  }) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: GtvTheme.surface,
+        title: Text(
+          singleVideo ? 'Tráiler — idioma' : 'Elegir tráiler',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+        ),
+        content: Text(
+          singleVideo
+              ? 'Elige cómo reproducir el tráiler de «$title».'
+              : 'Hay tráiler en español y en versión original.',
+          style: const TextStyle(color: GtvTheme.textDim),
+        ),
+        actions: [
+          GtvFocusable(
+            autofocus: true,
+            onTap: () => Navigator.of(ctx).pop(true),
+            child: TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('ESPAÑOL', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ),
+          GtvFocusable(
+            onTap: () => Navigator.of(ctx).pop(false),
+            child: TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('VERSIÓN ORIGINAL', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Future<bool> open(
+    BuildContext context,
+    String url, {
+    String title = 'Tráiler',
+    bool spanish = true,
+  }) async {
     final videoId = extractYoutubeId(url);
     if (videoId != null) {
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => TrailerScreen(videoId: videoId, title: title),
+          builder: (_) => TrailerScreen(
+            videoId: videoId,
+            title: title,
+            spanish: spanish,
+          ),
           fullscreenDialog: true,
         ),
       );

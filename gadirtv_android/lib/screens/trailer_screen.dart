@@ -7,10 +7,16 @@ import '../widgets/gtv_focusable.dart';
 
 /// In-app YouTube trailer — embedded player (no external YouTube app).
 class TrailerScreen extends StatefulWidget {
-  const TrailerScreen({super.key, required this.videoId, this.title = 'Tráiler'});
+  const TrailerScreen({
+    super.key,
+    required this.videoId,
+    this.title = 'Tráiler',
+    this.spanish = true,
+  });
 
   final String videoId;
   final String title;
+  final bool spanish;
 
   @override
   State<TrailerScreen> createState() => _TrailerScreenState();
@@ -25,8 +31,9 @@ class _TrailerScreenState extends State<TrailerScreen> {
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    final lang = widget.spanish ? 'es' : 'en';
     final embed =
-        'https://www.youtube.com/embed/${widget.videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1';
+        'https://www.youtube.com/embed/${widget.videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&hl=$lang&cc_lang=$lang&cc_load_policy=1';
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)

@@ -1,5 +1,7 @@
 /// Shared helpers for Xtream API field variance across panels.
 
+import '../models/trailer_info.dart';
+
 /// Strip simple HTML tags some panels embed in plot fields.
 String stripHtml(String raw) {
   if (raw.isEmpty) return raw;
@@ -89,13 +91,41 @@ String extractBackdrop(
 }
 
 String? extractTrailer(Map<String, dynamic> meta) {
-  for (final key in ['youtube_trailer', 'trailer', 'youtube_id']) {
+  final info = extractTrailerInfo(meta);
+  return info.originalUrl ?? info.spanishUrl;
+}
+
+String? _readTrailerField(Map<String, dynamic> meta, List<String> keys) {
+  for (final key in keys) {
     final v = (meta[key] ?? '').toString().trim();
     if (v.isEmpty) continue;
     if (v.startsWith('http')) return v;
     if (v.length >= 8) return 'https://www.youtube.com/watch?v=$v';
   }
   return null;
+}
+
+TrailerInfo extractTrailerInfo(Map<String, dynamic> meta) {
+  final spanish = _readTrailerField(meta, [
+    'youtube_trailer_es',
+    'trailer_es',
+    'trailer_spanish',
+    'trailer_latino',
+    'trailer_doblado',
+    'trailer_castellano',
+  ]);
+  final original = _readTrailerField(meta, [
+    'youtube_trailer',
+    'trailer',
+    'youtube_id',
+    'trailer_en',
+    'trailer_original',
+    'trailer_vo',
+  ]);
+  return TrailerInfo(
+    originalUrl: original ?? spanish,
+    spanishUrl: spanish ?? original,
+  );
 }
 
 int parseSeasonNumber(String key) {
