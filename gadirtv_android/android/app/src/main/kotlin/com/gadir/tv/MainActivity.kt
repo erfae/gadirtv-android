@@ -226,7 +226,15 @@ class MainActivity : FlutterActivity() {
                 result.success(response)
             } catch (e: Exception) {
                 Log.e(TAG, "OkHttp failed ($method): ${e.message}")
-                result.error("HTTP_ERROR", e.message, null)
+                result.success(
+                    mapOf(
+                        "status" to 0,
+                        "body" to "",
+                        "client" to "OkHttp",
+                        "method" to method.uppercase(),
+                        "error" to (e.message ?: e.javaClass.simpleName),
+                    ),
+                )
             }
         }.start()
     }
