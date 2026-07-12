@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/profile.dart';
 import 'http_factory.dart';
+import 'native_http.dart';
 
 /// Thin wrapper around Xtream Codes' `player_api.php`.
 ///
@@ -153,20 +154,21 @@ class ApiService {
   /// Also captures full diagnostic info (URL, HTTP status, response snippet,
   /// exception class) into [LoginResult.diagnostic] so the UI can show it.
   static const List<String> _userAgents = [
-    // 1. XCIPTV — confirmed working with your provider.
-    'XCIPTV',
-    // 2. OkHttp — the HTTP client XCIPTV uses under the hood (some servers
-    //    key on this instead of the app-level User-Agent).
-    'okhttp/4.9.3',
-    // 3. IPTVSmarters — widely whitelisted by Xtream panels.
-    'IPTVSmartersPlayer',
-    // 4. Legacy VLC (kept as fallback for lenient servers).
+    // 1. VLC — same as the working Windows/Electron client.
     'VLC/3.0.20 LibVLC/3.0.20',
+    // 2. XCIPTV — confirmed working with gadir.co on Android IPTV apps.
+    'XCIPTV',
+    // 3. OkHttp — HTTP stack XCIPTV uses under the hood.
+    'okhttp/4.9.3',
+    // 4. IPTVSmarters — widely whitelisted by Xtream panels.
+    'IPTVSmartersPlayer',
     // 5. TiviMate — accepted on many premium panels.
     'TiviMate/4.6.0 (Linux;Android 12)',
-    // 6. Generic ffmpeg.
+    // 6. GSE Smart IPTV.
+    'GSE SMART IPTV/Pro',
+    // 7. Generic ffmpeg.
     'Lavf/59.27.100',
-    // 7. Generic Android WebView as last resort.
+    // 8. Android WebView last resort.
     'Mozilla/5.0 (Linux; Android 12; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
   ];
 
@@ -448,35 +450,25 @@ class ApiService {
         // before we ever get to send HTTP headers. Cronet mimics Chrome
         // at the socket level and is generally allowed through.
         onProgress?.call(attempt, totalAttempts, 'Enviando petición HTTP');
-        final client = await HttpFactory.get();
-        diag.writeln('HTTP client: ${HttpFactory.isCronet ? "Cronet" : "IOClient"}');
+        final httpResult = await _loginHttpGet(parsedUri, ua);
+        diag.writeln('HTTP client: ${httpResult.clientLabel}');
 
-        final req = http.Request('GET', parsedUri)
-          ..headers['User-Agent'] = ua
-          ..headers['Accept'] = 'application/json, text/plain, */*'
-          ..headers['Accept-Encoding'] = 'identity'
-          ..headers['Connection'] = 'keep-alive'
-          ..followRedirects = true;
-
-        onProgress?.call(attempt, totalAttempts, 'Esperando respuesta');
-        final streamed = await client
-            .send(req)
-            .timeout(const Duration(seconds: 10));
+        final streamed = httpResult.streamed;
         diag.writeln('HTTP status (${sw.elapsedMilliseconds} ms): ${streamed.statusCode}');
         diag.writeln('Content-Type: ${streamed.headers['content-type']}');
 
         onProgress?.call(attempt, totalAttempts, 'Recibiendo datos');
-        final bytes = await streamed.stream
-            .toBytes()
-            .timeout(const Duration(seconds: 6));
-        final body = utf8.decode(bytes, allowMalformed: true);
+        final body = httpResult.body;
         final snippet = body.length > 400 ? '${body.substring(0, 400)}…' : body;
         diag.writeln('Body ${body.length} bytes (${sw.elapsedMilliseconds} ms): $snippet');
 
         if (streamed.statusCode >= 500) {
           lastDiag = diag.toString();
           if (attempt < totalAttempts) {
-            final backoff = Duration(milliseconds: 500 * attempt);
+            // Longer pause after 512 — server anti-abuse cooldown.
+            final backoff = streamed.statusCode == 512
+                ? Duration(milliseconds: 1200 * attempt)
+                : Duration(milliseconds: 500 * attempt);
             await Future.delayed(backoff);
             continue;
           }
@@ -587,6 +579,48 @@ class ApiService {
       ok: false,
       error: 'No se pudo iniciar sesión tras $totalAttempts intentos con distintos User-Agents',
       diagnostic: lastDiag,
+    );
+  }
+
+  /// Login HTTP — prefers Android [HttpURLConnection] (native stack), falls
+  /// back to dart:io [IOClient] when native is unavailable.
+  Future<({http.StreamedResponse streamed, String body, String clientLabel})>
+      _loginHttpGet(Uri uri, String ua) async {
+    if (Platform.isAndroid) {
+      try {
+        final native = await NativeHttp.get(
+          uri.toString(),
+          userAgent: ua,
+        ).timeout(const Duration(seconds: 12));
+        return (
+          streamed: http.StreamedResponse(
+            Stream.value(utf8.encode(native.body)),
+            native.status,
+            headers: {'content-type': 'application/json'},
+          ),
+          body: native.body,
+          clientLabel: 'NativeHttp',
+        );
+      } catch (_) {
+        // Fall through to IOClient.
+      }
+    }
+
+    final client = await HttpFactory.get();
+    final req = http.Request('GET', uri)
+      ..headers['User-Agent'] = ua
+      ..headers['Accept'] = 'application/json, text/plain, */*'
+      ..headers['Accept-Encoding'] = 'identity'
+      ..headers['Connection'] = 'keep-alive'
+      ..followRedirects = true;
+
+    final streamed = await client.send(req).timeout(const Duration(seconds: 10));
+    final bytes = await streamed.stream.toBytes().timeout(const Duration(seconds: 6));
+    final body = utf8.decode(bytes, allowMalformed: true);
+    return (
+      streamed: streamed,
+      body: body,
+      clientLabel: HttpFactory.isCronet ? 'Cronet' : 'IOClient',
     );
   }
 

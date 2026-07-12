@@ -14,6 +14,9 @@ class GtvTvKeyBridge {
   static String? lastKeyLabel;
   static final ValueNotifier<int?> lastKeyNotifier = ValueNotifier<int?>(null);
 
+  /// When true, [_ensureInitialFocus] is skipped (e.g. moving between fields).
+  static bool suppressInitialFocus = false;
+
   static void install() {
     if (_installed) return;
     _installed = true;
@@ -71,6 +74,7 @@ class GtvTvKeyBridge {
   }
 
   static void _ensureInitialFocus() {
+    if (suppressInitialFocus) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _requestInitialFocus(FocusManager.instance.rootScope);
     });

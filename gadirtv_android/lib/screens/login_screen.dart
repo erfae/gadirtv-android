@@ -12,7 +12,7 @@ import '../widgets/gtv_tv_text_field.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v2.1.6';
+const String kAppVersionLabel = 'v2.1.7';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -34,6 +34,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final _api = ApiService();
   final _store = ProfileStore();
+  final _scrollController = ScrollController();
+
+  final _hostBrowse = FocusNode();
+  final _userBrowse = FocusNode();
+  final _passBrowse = FocusNode();
+  final _nameBrowse = FocusNode();
+  final _m3uBrowse = FocusNode();
+  final _m3uNameBrowse = FocusNode();
 
   /// 'xtream' or 'm3u'
   String _mode = 'xtream';
@@ -46,6 +54,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
+    _hostBrowse.dispose();
+    _userBrowse.dispose();
+    _passBrowse.dispose();
+    _nameBrowse.dispose();
+    _m3uBrowse.dispose();
+    _m3uNameBrowse.dispose();
     _host.dispose();
     _user.dispose();
     _pass.dispose();
@@ -199,7 +214,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -212,12 +230,15 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-      body: Center(
+      body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Column(
+          controller: _scrollController,
+          padding: EdgeInsets.fromLTRB(48, 24, 48, 24 + bottomInset),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                 const Text(
@@ -375,11 +396,12 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-  // ── Field groups (rendered conditionally by mode) ────────────
   List<Widget> _xtreamFields() => [
         GtvTvTextField(
           controller: _host,
+          browseFocusNode: _hostBrowse,
+          onAdvance: () => _userBrowse.requestFocus(),
+          textInputAction: TextInputAction.next,
           keyboardType: TextInputType.url,
           enabled: !_busy,
           decoration: const InputDecoration(
@@ -393,6 +415,9 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 14),
         GtvTvTextField(
           controller: _user,
+          browseFocusNode: _userBrowse,
+          onAdvance: () => _passBrowse.requestFocus(),
+          textInputAction: TextInputAction.next,
           autocorrect: false,
           enableSuggestions: false,
           enabled: !_busy,
@@ -401,6 +426,9 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 14),
         GtvTvTextField(
           controller: _pass,
+          browseFocusNode: _passBrowse,
+          onAdvance: () => _nameBrowse.requestFocus(),
+          textInputAction: TextInputAction.next,
           obscureText: !_passVisible,
           autocorrect: false,
           enableSuggestions: false,
@@ -420,6 +448,8 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 14),
         GtvTvTextField(
           controller: _name,
+          browseFocusNode: _nameBrowse,
+          textInputAction: TextInputAction.done,
           enabled: !_busy,
           decoration: const InputDecoration(hintText: 'Nombre del perfil (opcional)'),
         ),
@@ -428,6 +458,9 @@ class _LoginScreenState extends State<LoginScreen> {
   List<Widget> _m3uFields() => [
         GtvTvTextField(
           controller: _m3uUrl,
+          browseFocusNode: _m3uBrowse,
+          onAdvance: () => _m3uNameBrowse.requestFocus(),
+          textInputAction: TextInputAction.next,
           keyboardType: TextInputType.url,
           enabled: !_busy,
           decoration: const InputDecoration(
@@ -441,6 +474,8 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 14),
         GtvTvTextField(
           controller: _name,
+          browseFocusNode: _m3uNameBrowse,
+          textInputAction: TextInputAction.done,
           enabled: !_busy,
           decoration: const InputDecoration(hintText: 'Nombre del perfil (opcional)'),
         ),
