@@ -17,6 +17,7 @@ class MainActivity : FlutterActivity() {
         private const val PLUGINS_CHANNEL = "com.gadir.tv/plugins"
         private const val PLATFORM_CHANNEL = "com.gadir.tv/platform"
         private const val KEYS_CHANNEL = "com.gadir.tv/keys"
+        private const val HTTP_CHANNEL = "com.gadir.tv/http"
     }
 
     private var coreRegistered = false
@@ -55,6 +56,22 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "isAndroidTv" -> result.success(isTvDevice())
+                    else -> result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, HTTP_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "get" -> {
+                        val url = call.argument<String>("url")
+                        val ua = call.argument<String>("userAgent") ?: "XCIPTV"
+                        if (url.isNullOrBlank()) {
+                            result.error("BAD_ARGS", "url required", null)
+                            return@setMethodCallHandler
+                        }
+                        httpGet(url, ua, result)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -151,5 +168,32 @@ class MainActivity : FlutterActivity() {
         val pm = packageManager
         return pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
             || pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
+    }
+
+    /** Native HTTP for Xtream login — same stack XCIPTV / OkHttp use on Android. */
+    private fun httpGet(url: String, userAgent: String, result: MethodChannel.Result) {
+        Thread {
+            var conn: java.net.HttpURLConnection? = null
+            try {
+                conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.instanceFollowRedirects = true
+                conn.connectTimeout = 6000
+                conn.readTimeout = 10000
+                conn.setRequestProperty("User-Agent", userAgent)
+                conn.setRequestProperty("Accept", "application/json, text/plain, */*")
+                conn.setRequestProperty("Accept-Encoding", "identity")
+                conn.setRequestProperty("Connection", "keep-alive")
+                val status = conn.responseCode
+                val stream = if (status >= 400) conn.errorStream else conn.inputStream
+                val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
+                result.success(mapOf("status" to status, "body" to body))
+            } catch (e: Exception) {
+                Log.e(TAG, "Native HTTP failed: ${e.message}")
+                result.error("HTTP_ERROR", e.message, null)
+            } finally {
+                conn?.disconnect()
+            }
+        }.start()
     }
 }
