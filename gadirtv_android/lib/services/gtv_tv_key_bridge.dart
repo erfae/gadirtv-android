@@ -46,7 +46,7 @@ class GtvTvKeyBridge {
     }
 
     final context = focus.context;
-    if (!context.mounted) return;
+    if (context == null || !context.mounted) return;
 
     switch (keyCode) {
       case 19:
@@ -72,11 +72,18 @@ class GtvTvKeyBridge {
 
   static void _ensureInitialFocus() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final scope = FocusManager.instance.rootScope;
-      if (scope.focusedChild == null) {
-        scope.firstFocus();
-      }
+      _requestInitialFocus(FocusManager.instance.rootScope);
     });
+  }
+
+  static void _requestInitialFocus(FocusScopeNode scope) {
+    if (scope.focusedChild != null) return;
+    for (final node in scope.descendants) {
+      if (node.canRequestFocus) {
+        node.requestFocus();
+        return;
+      }
+    }
   }
 
   static String _labelForKeyCode(int keyCode) {

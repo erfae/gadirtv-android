@@ -66,7 +66,12 @@ class _GtvTvInitialFocusState extends State<GtvTvInitialFocus> {
     if (!mounted) return;
     final scope = FocusScope.of(context);
     if (scope.focusedChild != null) return;
-    scope.firstFocus();
+    for (final node in scope.descendants) {
+      if (node.canRequestFocus) {
+        node.requestFocus();
+        return;
+      }
+    }
   }
 
   @override
