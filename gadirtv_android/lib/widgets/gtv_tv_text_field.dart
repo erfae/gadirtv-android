@@ -28,6 +28,13 @@ class GtvTvTextField extends StatefulWidget {
     this.onToggleObscure,
     this.scrollController,
     this.keyboardLift = 320,
+    this.onMoveUp,
+    this.onMoveDown,
+    this.onMoveLeft,
+    this.onMoveRight,
+    this.onToggleMoveUp,
+    this.onToggleMoveDown,
+    this.onToggleMoveLeft,
   });
 
   final TextEditingController controller;
@@ -48,6 +55,13 @@ class GtvTvTextField extends StatefulWidget {
   final ScrollController? scrollController;
   /// Extra scroll lift on TV when the soft keyboard covers lower fields.
   final double keyboardLift;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
+  final VoidCallback? onMoveLeft;
+  final VoidCallback? onMoveRight;
+  final VoidCallback? onToggleMoveUp;
+  final VoidCallback? onToggleMoveDown;
+  final VoidCallback? onToggleMoveLeft;
 
   @override
   State<GtvTvTextField> createState() => _GtvTvTextFieldState();
@@ -178,6 +192,9 @@ class _GtvTvTextFieldState extends State<GtvTvTextField> {
         focusNode: widget.toggleFocusNode,
         enabled: widget.enabled,
         onTap: widget.onToggleObscure,
+        onMoveUp: widget.onToggleMoveUp ?? widget.onMoveUp,
+        onMoveLeft: widget.onToggleMoveLeft ?? widget.onMoveLeft,
+        onMoveDown: widget.onToggleMoveDown ?? widget.onMoveDown,
         borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
@@ -218,6 +235,10 @@ class _GtvTvTextFieldState extends State<GtvTvTextField> {
               focusNode: widget.browseFocusNode,
               enabled: widget.enabled,
               onTap: _startEditing,
+              onMoveUp: widget.onMoveUp,
+              onMoveDown: widget.onMoveDown,
+              onMoveLeft: widget.onMoveLeft,
+              onMoveRight: widget.onMoveRight,
               borderRadius: BorderRadius.circular(12),
               child: InputDecorator(
                 isFocused: false,

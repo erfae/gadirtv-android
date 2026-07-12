@@ -16,7 +16,7 @@ import '../widgets/gtv_tv_text_field.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v2.4.5';
+const String kAppVersionLabel = 'v2.4.6';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -48,6 +48,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _nameBrowse = FocusNode();
   final _m3uBrowse = FocusNode();
   final _m3uNameBrowse = FocusNode();
+  final _backFocus = FocusNode(debugLabel: 'login-back');
+  final _xtreamModeFocus = FocusNode(debugLabel: 'login-xtream');
+  final _m3uModeFocus = FocusNode(debugLabel: 'login-m3u');
+  final _connectFocus = FocusNode(debugLabel: 'login-connect');
+  final _clearFocus = FocusNode(debugLabel: 'login-clear');
 
   /// 'xtream' or 'm3u'
   String _mode = 'xtream';
@@ -79,6 +84,15 @@ class _LoginScreenState extends State<LoginScreen> {
       _pass.text = draft.password;
       _name.text = draft.name;
       _m3uUrl.text = draft.m3uUrl;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        if (_mode == 'm3u') {
+          _m3uModeFocus.requestFocus();
+        } else {
+          _xtreamModeFocus.requestFocus();
+        }
+      }
     });
   }
 
@@ -127,6 +141,11 @@ class _LoginScreenState extends State<LoginScreen> {
     _nameBrowse.dispose();
     _m3uBrowse.dispose();
     _m3uNameBrowse.dispose();
+    _backFocus.dispose();
+    _xtreamModeFocus.dispose();
+    _m3uModeFocus.dispose();
+    _connectFocus.dispose();
+    _clearFocus.dispose();
     _host.dispose();
     _user.dispose();
     _pass.dispose();
@@ -289,8 +308,16 @@ class _LoginScreenState extends State<LoginScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: GtvFocusable(
+          focusNode: _backFocus,
           borderRadius: BorderRadius.circular(999),
           onTap: () => context.canPop() ? context.pop() : context.go('/'),
+          onMoveDown: () {
+            if (_mode == 'm3u') {
+              _m3uModeFocus.requestFocus();
+            } else {
+              _xtreamModeFocus.requestFocus();
+            }
+          },
           child: const Padding(
             padding: EdgeInsets.all(8),
             child: Icon(Icons.arrow_back_rounded, color: Colors.white),
@@ -298,7 +325,9 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(),
+          child: SingleChildScrollView(
           controller: _scrollController,
           padding: EdgeInsets.fromLTRB(48, 24, 48, 24 + bottomInset + keyboardPad),
           child: Align(
@@ -353,17 +382,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Row(
                     children: [
                       Expanded(child: _ModeChip(
+                        focusNode: _xtreamModeFocus,
                         label: 'Xtream Codes',
                         selected: _mode == 'xtream',
                         enabled: !_busy,
                         autofocus: true,
                         onTap: () => setState(() => _mode = 'xtream'),
+                        onMoveUp: () => _backFocus.requestFocus(),
+                        onMoveRight: () => _m3uModeFocus.requestFocus(),
+                        onMoveDown: () => _hostBrowse.requestFocus(),
                       )),
                       Expanded(child: _ModeChip(
+                        focusNode: _m3uModeFocus,
                         label: 'Playlist M3U',
                         selected: _mode == 'm3u',
                         enabled: !_busy,
                         onTap: () => setState(() => _mode = 'm3u'),
+                        onMoveUp: () => _backFocus.requestFocus(),
+                        onMoveLeft: () => _xtreamModeFocus.requestFocus(),
+                        onMoveDown: () => _m3uBrowse.requestFocus(),
                       )),
                     ],
                   ),
@@ -435,8 +472,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     Expanded(
                       flex: 2,
                       child: GtvFocusable(
+                        focusNode: _connectFocus,
                         enabled: !_busy,
                         onTap: _busy ? null : _connect,
+                        onMoveUp: () {
+                          if (_mode == 'm3u') {
+                            _m3uNameBrowse.requestFocus();
+                          } else {
+                            _nameBrowse.requestFocus();
+                          }
+                        },
+                        onMoveRight: () => _clearFocus.requestFocus(),
                         borderRadius: BorderRadius.circular(999),
                         child: ElevatedButton(
                           onPressed: _busy ? null : _connect,
@@ -464,8 +510,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: GtvFocusable(
+                        focusNode: _clearFocus,
                         enabled: !_busy,
                         onTap: _busy ? null : _clearDraft,
+                        onMoveUp: () {
+                          if (_mode == 'm3u') {
+                            _m3uNameBrowse.requestFocus();
+                          } else {
+                            _nameBrowse.requestFocus();
+                          }
+                        },
+                        onMoveLeft: () => _connectFocus.requestFocus(),
                         borderRadius: BorderRadius.circular(999),
                         child: OutlinedButton.icon(
                           onPressed: _busy ? null : _clearDraft,
@@ -485,6 +540,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+        ),
       ),
     );
   }
@@ -496,6 +552,8 @@ class _LoginScreenState extends State<LoginScreen> {
           scrollController: _scrollController,
           onEditingChanged: (v) => setState(() => _fieldEditing = v),
           onAdvance: () => _userBrowse.requestFocus(),
+          onMoveUp: () => _xtreamModeFocus.requestFocus(),
+          onMoveDown: () => _userBrowse.requestFocus(),
           textInputAction: TextInputAction.next,
           keyboardType: TextInputType.url,
           enabled: !_busy,
@@ -514,6 +572,8 @@ class _LoginScreenState extends State<LoginScreen> {
           scrollController: _scrollController,
           onEditingChanged: (v) => setState(() => _fieldEditing = v),
           onAdvance: () => _passBrowse.requestFocus(),
+          onMoveUp: () => _hostBrowse.requestFocus(),
+          onMoveDown: () => _passBrowse.requestFocus(),
           textInputAction: TextInputAction.next,
           autocorrect: false,
           enableSuggestions: false,
@@ -530,6 +590,12 @@ class _LoginScreenState extends State<LoginScreen> {
           onEditingChanged: (v) => setState(() => _fieldEditing = v),
           onAdvance: () => _nameBrowse.requestFocus(),
           onToggleObscure: _busy ? null : () => setState(() => _passVisible = !_passVisible),
+          onMoveUp: () => _userBrowse.requestFocus(),
+          onMoveDown: () => _nameBrowse.requestFocus(),
+          onMoveRight: () => _passToggleBrowse.requestFocus(),
+          onToggleMoveLeft: () => _passBrowse.requestFocus(),
+          onToggleMoveUp: () => _passBrowse.requestFocus(),
+          onToggleMoveDown: () => _nameBrowse.requestFocus(),
           textInputAction: TextInputAction.next,
           obscureText: !_passVisible,
           autocorrect: false,
@@ -546,6 +612,8 @@ class _LoginScreenState extends State<LoginScreen> {
           scrollController: _scrollController,
           keyboardLift: 400,
           onEditingChanged: (v) => setState(() => _fieldEditing = v),
+          onMoveUp: () => _passToggleBrowse.requestFocus(),
+          onMoveDown: () => _connectFocus.requestFocus(),
           textInputAction: TextInputAction.done,
           enabled: !_busy,
           decoration: const InputDecoration(hintText: 'Nombre del perfil (opcional)'),
@@ -559,6 +627,8 @@ class _LoginScreenState extends State<LoginScreen> {
           scrollController: _scrollController,
           onEditingChanged: (v) => setState(() => _fieldEditing = v),
           onAdvance: () => _m3uNameBrowse.requestFocus(),
+          onMoveUp: () => _m3uModeFocus.requestFocus(),
+          onMoveDown: () => _m3uNameBrowse.requestFocus(),
           textInputAction: TextInputAction.next,
           keyboardType: TextInputType.url,
           enabled: !_busy,
@@ -577,6 +647,8 @@ class _LoginScreenState extends State<LoginScreen> {
           scrollController: _scrollController,
           keyboardLift: 380,
           onEditingChanged: (v) => setState(() => _fieldEditing = v),
+          onMoveUp: () => _m3uBrowse.requestFocus(),
+          onMoveDown: () => _connectFocus.requestFocus(),
           textInputAction: TextInputAction.done,
           enabled: !_busy,
           decoration: const InputDecoration(hintText: 'Nombre del perfil (opcional)'),
@@ -591,6 +663,11 @@ class _ModeChip extends StatelessWidget {
   final bool enabled;
   final bool autofocus;
   final VoidCallback onTap;
+  final FocusNode? focusNode;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
+  final VoidCallback? onMoveLeft;
+  final VoidCallback? onMoveRight;
 
   const _ModeChip({
     required this.label,
@@ -598,14 +675,24 @@ class _ModeChip extends StatelessWidget {
     required this.enabled,
     required this.onTap,
     this.autofocus = false,
+    this.focusNode,
+    this.onMoveUp,
+    this.onMoveDown,
+    this.onMoveLeft,
+    this.onMoveRight,
   });
 
   @override
   Widget build(BuildContext context) {
     return GtvFocusable(
+      focusNode: focusNode,
       autofocus: autofocus,
       enabled: enabled,
       onTap: enabled ? onTap : null,
+      onMoveUp: onMoveUp,
+      onMoveDown: onMoveDown,
+      onMoveLeft: onMoveLeft,
+      onMoveRight: onMoveRight,
       borderRadius: BorderRadius.circular(999),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
