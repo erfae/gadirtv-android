@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
-import android.view.KeyEvent
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterShellArgs
@@ -120,12 +119,5 @@ class MainActivity : FlutterActivity() {
             || pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
     }
 
-    // Forward D-pad / remote keys to Flutter so Focus widgets receive them.
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (isTvDevice() && event.keyCode != KeyEvent.KEYCODE_BACK) {
-            val handled = super.dispatchKeyEvent(event)
-            if (handled) return true
-        }
-        return super.dispatchKeyEvent(event)
-    }
+    // D-pad keys are handled by Flutter's focus system — do not intercept here.
 }

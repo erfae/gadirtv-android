@@ -7,10 +7,11 @@ import '../services/api_service.dart';
 import '../services/m3u_cache.dart';
 import '../services/profile_store.dart';
 import '../theme.dart';
+import '../widgets/gtv_focusable.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v2.1.2';
+const String kAppVersionLabel = 'v2.1.3';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -201,9 +202,13 @@ class _LoginScreenState extends State<LoginScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => context.canPop() ? context.pop() : context.go('/'),
+        leading: GtvFocusable(
+          borderRadius: BorderRadius.circular(999),
+          onTap: () => context.canPop() ? context.pop() : context.go('/'),
+          child: const Padding(
+            padding: EdgeInsets.all(8),
+            child: Icon(Icons.arrow_back_rounded, color: Colors.white),
+          ),
         ),
       ),
       body: Center(
@@ -264,6 +269,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         label: 'Xtream Codes',
                         selected: _mode == 'xtream',
                         enabled: !_busy,
+                        autofocus: true,
                         onTap: () => setState(() => _mode = 'xtream'),
                       )),
                       Expanded(child: _ModeChip(
@@ -337,16 +343,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ],
                 const SizedBox(height: 24),
-                FocusableActionDetector(
-                  autofocus: true,
-                  actions: {
-                    ActivateIntent: CallbackAction<ActivateIntent>(
-                      onInvoke: (_) {
-                        if (!_busy) _connect();
-                        return null;
-                      },
-                    ),
-                  },
+                GtvFocusable(
+                  enabled: !_busy,
+                  onTap: _busy ? null : _connect,
+                  borderRadius: BorderRadius.circular(999),
                   child: ElevatedButton(
                     onPressed: _busy ? null : _connect,
                     child: _busy
@@ -460,6 +460,7 @@ class _ModeChip extends StatelessWidget {
   final String label;
   final bool selected;
   final bool enabled;
+  final bool autofocus;
   final VoidCallback onTap;
 
   const _ModeChip({
@@ -467,45 +468,34 @@ class _ModeChip extends StatelessWidget {
     required this.selected,
     required this.enabled,
     required this.onTap,
+    this.autofocus = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return FocusableActionDetector(
+    return GtvFocusable(
+      autofocus: autofocus,
       enabled: enabled,
-      onShowFocusHighlight: (_) {},
-      actions: enabled
-          ? {
-              ActivateIntent: CallbackAction<ActivateIntent>(
-                onInvoke: (_) {
-                  onTap();
-                  return null;
-                },
-              ),
-            }
-          : const {},
-      child: GestureDetector(
-        onTap: enabled ? onTap : null,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? GtvTheme.red : Colors.transparent,
-            borderRadius: BorderRadius.circular(999),
-            boxShadow: selected
-                ? [BoxShadow(color: GtvTheme.red.withOpacity(0.45), blurRadius: 12, spreadRadius: 1)]
-                : null,
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? Colors.white : Colors.white70,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              letterSpacing: 0.3,
-            ),
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(999),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? GtvTheme.red : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: selected
+              ? [BoxShadow(color: GtvTheme.red.withOpacity(0.45), blurRadius: 12, spreadRadius: 1)]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : Colors.white70,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            letterSpacing: 0.3,
           ),
         ),
       ),
