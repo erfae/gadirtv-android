@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, session, globalShortcut, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, Menu, session, globalShortcut, ipcMain, screen, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -47,6 +47,24 @@ function killMpvAndWait(ms = 250) {
 }
 
 ipcMain.handle('mpv:kill', () => { killMpv(); return { ok: true }; });
+
+ipcMain.handle('shell:openExternal', async (_evt, url) => {
+  try {
+    if (!url || typeof url !== 'string') return { ok: false, error: 'invalid url' };
+    await shell.openExternal(url);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+function readNativeHwnd(win) {
+  if (!win || win.isDestroyed()) return null;
+  const buf = win.getNativeWindowHandle();
+  if (!buf || buf.length < 4) return null;
+  if (buf.length >= 8) return Number(buf.readBigUInt64LE(0));
+  return buf.readUInt32LE(0);
+}
 
 // Native Node HTTP client used to talk to the Xtream server. This
 // completely bypasses Chromium's networking stack (which was silently
@@ -324,14 +342,15 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
     try { pw.setAlwaysOnTop(true, 'screen-saver'); } catch (_) {}
     try { pw.setIgnoreMouseEvents(true, { forward: true }); } catch (_) {}
     updatePlayerBounds();
-    setTimeout(() => { try { pw.focus(); } catch (_) {} }, 50);
+    // Let the overlay window finish painting before mpv embeds into its HWND.
+    await new Promise(r => setTimeout(r, 200));
+    updatePlayerBounds();
+    try { pw.focus(); } catch (_) {}
     // Track main-window bounds and mirror them.
     if (playerBoundsTracker) clearInterval(playerBoundsTracker);
     playerBoundsTracker = setInterval(updatePlayerBounds, 300);
-    // Read native HWND
-    const hwndBuf = pw.getNativeWindowHandle();
-    // On Windows x64 HWND fits in 32 bits.
-    const hwnd = hwndBuf.readInt32LE(0);
+    const hwnd = readNativeHwnd(pw);
+    if (!hwnd) return { ok: false, error: 'no se pudo obtener HWND del reproductor' };
     // IPC named pipe for controlling mpv from Node (play/pause/seek/volume).
     mpvIpcPath = `\\\\.\\pipe\\gadirmpv-${process.pid}-${Date.now()}`;
     const args = [

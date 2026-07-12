@@ -191,8 +191,11 @@ class _LiveTabState extends State<LiveTab> {
 
   Future<void> _fullscreen() async {
     if (_current == null) return;
+    final ch = _current!;
     await _miniKey.currentState?.pause();
-    widget.onPlay(_current!);
+    await Future.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
+    widget.onPlay(ch);
   }
 
   @override
@@ -738,7 +741,17 @@ class _ChannelRowState extends State<_ChannelRow> {
   @override
   Widget build(BuildContext context) {
     return FocusableActionDetector(
-      onShowFocusHighlight: (v) => setState(() => _focused = v),
+      onShowFocusHighlight: (v) {
+        setState(() => _focused = v);
+        if (v) {
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.35,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
+      },
       onShowHoverHighlight: (v) => setState(() => _focused = v),
       mouseCursor: SystemMouseCursors.click,
       actions: {

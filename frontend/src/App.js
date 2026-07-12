@@ -9,6 +9,48 @@ import "./App.css";
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const IMG_FB = "https://images.unsplash.com/photo-1489599328109-c6b8b7cfd3aa?w=400";
 
+function stripHtml(raw) {
+  if (!raw) return "";
+  return String(raw)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .trim();
+}
+
+function extractPlot(info, extra, fallback = "") {
+  const sources = [info, extra].filter(Boolean);
+  for (const map of sources) {
+    for (const key of ["plot", "description", "overview", "synopsis", "bio", "storyline", "summary"]) {
+      const v = stripHtml(map[key]);
+      if (v) return v;
+    }
+  }
+  return stripHtml(fallback);
+}
+
+function pickTrailer(meta) {
+  if (!meta) return null;
+  for (const key of ["youtube_trailer", "trailer", "youtube_id"]) {
+    const v = String(meta[key] || "").trim();
+    if (!v) continue;
+    if (v.startsWith("http")) return v;
+    if (v.length >= 8) return `https://www.youtube.com/watch?v=${v}`;
+  }
+  return null;
+}
+
+async function openTrailerUrl(url) {
+  if (!url) return;
+  if (window.electronAPI && window.electronAPI.openExternal) {
+    const res = await window.electronAPI.openExternal(url);
+    if (!res || !res.ok) alert("No se pudo abrir el tráiler: " + ((res && res.error) || "error desconocido"));
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 // Silence noisy but harmless media errors that bubble to the console
 // ("play() request was interrupted by pause()", "MediaError:", etc.).
 if (typeof window !== "undefined" && !window.__gadirConsoleSilenced) {
@@ -204,13 +246,24 @@ function BottomNav({ tab, setTab }) {
     {id:"movies",icon:Film,label:"Películas"},
     {id:"series",icon:Clapperboard,label:"Series"},
   ];
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+      const idx = items.findIndex(it => it.id === tab);
+      if (e.key === "ArrowLeft" && idx > 0) { e.preventDefault(); setTab(items[idx - 1].id); }
+      else if (e.key === "ArrowRight" && idx < items.length - 1) { e.preventDefault(); setTab(items[idx + 1].id); }
+      else if (e.key >= "1" && e.key <= "4") { setTab(items[parseInt(e.key, 10) - 1].id); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tab, setTab]);
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 backdrop-blur-2xl bg-black/90 border-t border-white/10">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 backdrop-blur-2xl bg-black/90 border-t border-white/10" data-testid="bottom-nav">
       <div className="flex justify-around max-w-5xl mx-auto py-3">
         {items.map(it => {
           const I = it.icon; const active = tab === it.id;
           return (
-            <button key={it.id} onClick={()=>setTab(it.id)} data-testid={`nav-${it.id}`} className={"flex flex-col items-center gap-1 md:gap-1.5 px-4 md:px-6 lg:px-8 py-2 md:py-3 rounded-2xl transition-all duration-200 " + (active?"bg-red-600/15 text-red-500 scale-105":"text-neutral-400 hover:text-white hover:bg-white/5")}>
+            <button key={it.id} onClick={()=>setTab(it.id)} data-testid={`nav-${it.id}`} className={"flex flex-col items-center gap-1 md:gap-1.5 px-4 md:px-6 lg:px-8 py-2 md:py-3 rounded-2xl transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 " + (active?"bg-red-600/15 text-red-500 scale-105":"text-neutral-400 hover:text-white hover:bg-white/5")}>
               <I className="w-6 h-6 md:w-7 md:h-7" strokeWidth={active?2.5:2}/>
               <span className="text-xs md:text-sm font-medium">{it.label}</span>
             </button>
@@ -237,7 +290,7 @@ function ItemCard({ item, onSelect, big, sm, xl, onHover }) {
       onMouseEnter={()=>onHover && onHover(proxied)}
       onMouseLeave={()=>onHover && onHover(null)}
       data-testid={`card-${item.stream_id||item.series_id}`}
-      className={"shrink-0 group " + sizeCls}
+      className={"shrink-0 group focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded-md " + sizeCls}
     >
       <div className="aspect-[2/3] rounded-md overflow-hidden bg-neutral-900 group-hover:ring-2 ring-red-600 group-hover:scale-110 group-hover:z-20 relative transition-all duration-300 shadow-xl">
         <img src={proxied} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="w-full h-full object-cover" loading="lazy" alt=""/>
@@ -271,7 +324,7 @@ function Rail({ title, items, onSelect, big, sm, xl, onHover }) {
   );
 }
 
-function CategorySection({ kind, profile, onSelect, livePreview, onHover }) {
+function CategorySection({ kind, profile, onSelect, livePreview, onHover, selectedChannelId }) {
   const [cats, setCats] = useState([]);
   const [byCat, setByCat] = useState({});
   const [active, setActive] = useState(null);
@@ -344,22 +397,26 @@ function CategorySection({ kind, profile, onSelect, livePreview, onHover }) {
             {active && <h2 className="text-base text-neutral-400 mb-3">{active.category_name} <span className="text-neutral-600">· {filtered.length}</span></h2>}
             {kind === "live" ? (
               <div className="space-y-0.5 max-h-[calc(100vh-200px)] overflow-y-auto pr-2 scrollbar-thin">
-                {filtered.map((it, i) => (
+                {filtered.map((it, i) => {
+                  const selected = selectedChannelId != null && String(it.stream_id) === String(selectedChannelId);
+                  return (
                   <button
                     key={i}
                     onClick={()=>onSelect(it, kind)}
                     onDoubleClick={()=>onSelect(it, "live_fs")}
                     data-testid={`card-${it.stream_id}`}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left hover:bg-white/5 transition-colors group"
+                    className={"w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors group border " + (selected ? "bg-red-600/15 border-red-600/50 text-white" : "border-transparent hover:bg-white/5 text-neutral-300")}
                     title="Clic: previsualizar · Doble clic: pantalla completa"
                   >
-                    <div className="w-9 h-9 rounded bg-neutral-900 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                    <div className={"w-9 h-9 rounded overflow-hidden flex-shrink-0 flex items-center justify-center " + (selected ? "bg-red-600/20" : "bg-neutral-900")}>
                       <img src={api.proxyImg(it.stream_icon) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="w-full h-full object-contain" loading="lazy" alt=""/>
                     </div>
-                    <span className="text-neutral-300 group-hover:text-white text-sm truncate flex-1">{it.name}</span>
-                    <Play size={13} className="text-neutral-600 group-hover:text-red-500 flex-shrink-0"/>
+                    <span className={"text-sm truncate flex-1 " + (selected ? "text-white font-medium" : "group-hover:text-white")}>{it.name}</span>
+                    {selected && <span className="text-[10px] text-red-400 shrink-0 hidden lg:inline">Doble clic → pantalla completa</span>}
+                    <Play size={13} className={(selected ? "text-red-400" : "text-neutral-600 group-hover:text-red-500") + " flex-shrink-0"}/>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin pr-2 pt-2">
@@ -379,12 +436,15 @@ function CategorySection({ kind, profile, onSelect, livePreview, onHover }) {
   );
 }
 
-function HomeTab({ profile, onSelect, onHover }) {
+function HomeTab({ profile, onSelect, onHover, onPlayMovie }) {
   const [recentMovies, setRM] = useState([]);
   const [recentSeries, setRS] = useState([]);
   const [heroIdx, setHeroIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
+  const [heroPlot, setHeroPlot] = useState("");
+  const [heroTrailer, setHeroTrailer] = useState(null);
+  const [heroMetaLoading, setHeroMetaLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -414,8 +474,6 @@ function HomeTab({ profile, onSelect, onHover }) {
       ]);
       if (cancelled) return;
       let vodFinal = vod;
-      // Retry once for movies if we got nothing (gadir.co occasionally
-      // returns empty responses on the first cold hit).
       if (!vod.length) {
         await new Promise(r => setTimeout(r, 800));
         if (cancelled) return;
@@ -438,37 +496,102 @@ function HomeTab({ profile, onSelect, onHover }) {
     return () => { cancelled = true; };
   }, [profile]);
 
-  const heroList = [...recentMovies.slice(0,5), ...recentSeries.slice(0,5)];
+  const heroList = [...recentMovies.slice(0,6), ...recentSeries.slice(0,6)];
+  const hero = heroList[heroIdx];
+  const heroIsSeries = !!(hero && hero.series_id);
+
   useEffect(() => {
     if (!heroList.length) return;
-    const t = setInterval(()=>setHeroIdx(i=>(i+1)%heroList.length), 7000);
+    const t = setInterval(()=>setHeroIdx(i=>(i+1)%heroList.length), 8000);
     return ()=>clearInterval(t);
   }, [heroList.length]);
-  const hero = heroList[heroIdx];
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!hero) { setHeroPlot(""); setHeroTrailer(null); return; }
+    (async () => {
+      setHeroMetaLoading(true);
+      setHeroPlot(heroIsSeries ? (hero.plot || "") : "");
+      setHeroTrailer(null);
+      try {
+        if (heroIsSeries) {
+          const info = await api.seriesInfo(profile, hero.series_id);
+          if (cancelled) return;
+          const meta = (info && info.info) || {};
+          setHeroPlot(extractPlot(meta, null, hero.plot));
+          setHeroTrailer(pickTrailer(meta));
+        } else {
+          const info = await api.vodInfo(profile, hero.stream_id);
+          if (cancelled) return;
+          const meta = (info && info.info) || {};
+          const md = (info && info.movie_data) || {};
+          setHeroPlot(extractPlot(meta, md));
+          setHeroTrailer(pickTrailer(meta));
+        }
+      } catch (_) {}
+      if (!cancelled) setHeroMetaLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [hero, heroIdx, heroIsSeries, profile]);
+
+  const shiftHero = (delta) => {
+    if (!heroList.length) return;
+    setHeroIdx(i => {
+      const next = (i + delta) % heroList.length;
+      return next < 0 ? heroList.length + next : next;
+    });
+  };
+
+  const playHero = () => {
+    if (!hero) return;
+    if (heroIsSeries) onSelect(hero, "series");
+    else if (onPlayMovie) onPlayMovie(hero);
+    else onSelect(hero, "movie");
+  };
 
   return (
     <div className="flex flex-col h-screen pb-24 overflow-hidden" data-testid="home-tab">
       {hero && (
-        <div className="relative flex-shrink-0" data-testid="hero-banner" style={{height:"38vh", minHeight:"220px", maxHeight:"420px"}}>
-          <button
-            onClick={()=>onSelect(hero, hero.series_id?"series":"movie")}
-            data-testid="hero-play-btn"
-            className="w-full text-left h-full relative overflow-hidden group cursor-pointer"
-            title="Ver detalle"
-          >
+        <div className="relative flex-shrink-0" data-testid="hero-banner" style={{height:"52vh", minHeight:"260px", maxHeight:"480px"}}>
           <img src={api.proxyImg(hero.stream_icon||hero.cover) || IMG_FB} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover animate-slow-zoom" alt=""/>
-          <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/30 to-transparent"/>
-          <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent"/>
-          <div className="absolute bottom-3 right-4 md:right-8 flex gap-2 z-10">
+          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/45 to-transparent"/>
+          <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-black/20"/>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-10">
+            <button onClick={()=>shiftHero(-1)} className="w-10 h-10 rounded-full bg-black/50 border border-white/20 text-white hover:bg-red-600/80 transition-colors flex items-center justify-center" title="Anterior"><ChevronLeft size={22}/></button>
+            <button onClick={()=>shiftHero(1)} className="w-10 h-10 rounded-full bg-black/50 border border-white/20 text-white hover:bg-red-600/80 transition-colors flex items-center justify-center" title="Siguiente"><ChevronRight size={22}/></button>
+          </div>
+          <div className="absolute bottom-4 left-6 right-6 z-10 flex flex-col lg:flex-row lg:items-end gap-5">
+            <div className="flex-1 min-w-0">
+              <span className="inline-block px-2.5 py-1 rounded bg-red-600 text-white text-[10px] font-bold tracking-widest uppercase mb-2">{heroIsSeries ? "Serie" : "Película"}</span>
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight text-white mb-3 drop-shadow-lg" style={{fontFamily:"'Outfit',sans-serif"}}>{hero.name}</h1>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={playHero} data-testid="hero-play-btn" className="flex items-center gap-2 bg-white text-black hover:bg-neutral-200 px-5 py-2.5 rounded font-semibold text-sm transition-colors">
+                  <Play size={18} fill="black"/> {heroIsSeries ? "VER SERIE" : "REPRODUCIR"}
+                </button>
+                <button onClick={()=>onSelect(hero, heroIsSeries?"series":"movie")} className="flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white px-5 py-2.5 rounded font-semibold text-sm border border-white/30 transition-colors">
+                  MÁS INFO
+                </button>
+                {heroTrailer && (
+                  <button onClick={()=>openTrailerUrl(heroTrailer)} data-testid="hero-trailer-btn" className="flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white px-5 py-2.5 rounded font-semibold text-sm border border-white/30 transition-colors">
+                    TRÁILER
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="w-full lg:w-[38%] xl:w-[34%] shrink-0 rounded-xl bg-black/50 border border-white/10 p-4 backdrop-blur-sm" data-testid="hero-synopsis">
+              <div className="text-red-400 text-[11px] font-bold tracking-widest uppercase mb-2">Sinopsis</div>
+              {heroMetaLoading ? (
+                <div className="text-neutral-500 text-sm">Cargando…</div>
+              ) : (
+                <p className="text-neutral-200 text-sm leading-relaxed line-clamp-6">{heroPlot || "Sinopsis no disponible para este título."}</p>
+              )}
+            </div>
+          </div>
+          <div className="absolute bottom-3 right-6 flex gap-2 z-10">
             {heroList.map((_, i) => (
-              <span key={i} className={"h-1 rounded-full transition-all " + (i===heroIdx?"w-8 bg-red-600":"w-4 bg-white/30")} data-testid={`hero-dot-${i}`}/>
+              <button key={i} onClick={()=>setHeroIdx(i)} className={"h-1 rounded-full transition-all " + (i===heroIdx?"w-8 bg-red-600":"w-4 bg-white/30")} data-testid={`hero-dot-${i}`}/>
             ))}
           </div>
-          <div className="absolute bottom-3 md:bottom-4 left-4 md:left-8 max-w-xl z-10 pr-4">
-            <p className="text-red-500 text-[10px] md:text-[11px] font-medium tracking-[0.3em] uppercase mb-1 md:mb-1.5">{hero.series_id?"Serie":"Película"} · Reciente en GadirTV</p>
-            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-medium tracking-tight drop-shadow-2xl group-hover:text-red-400 transition-colors" style={{fontFamily:"'Outfit',sans-serif"}}>{hero.name}</h1>
-          </div>
-          </button>
         </div>
       )}
       <div className="flex-1 min-h-0 grid grid-rows-2 gap-1 overflow-hidden pt-2">
@@ -476,8 +599,8 @@ function HomeTab({ profile, onSelect, onHover }) {
         {!loading && msg && <div className="text-center text-red-400 py-6 text-sm px-8 col-span-full" data-testid="home-msg">{msg}</div>}
         {!loading && !msg && (
           <>
-            <div className="min-h-0 overflow-hidden"><Rail title="Añadidos recientemente · Películas" items={recentMovies} onSelect={i=>onSelect(i,"movie")} onHover={onHover} sm/></div>
-            <div className="min-h-0 overflow-hidden"><Rail title="Añadidas recientemente · Series"   items={recentSeries} onSelect={i=>onSelect(i,"series")} onHover={onHover} sm/></div>
+            <div className="min-h-0 overflow-hidden"><Rail title="Recientes Películas" items={recentMovies} onSelect={i=>onSelect(i,"movie")} onHover={onHover} sm/></div>
+            <div className="min-h-0 overflow-hidden"><Rail title="Recientes Series" items={recentSeries} onSelect={i=>onSelect(i,"series")} onHover={onHover} sm/></div>
           </>
         )}
       </div>
@@ -672,25 +795,32 @@ function SeriesDetail({ series, profile, onClose, onPlay }) {
   return (
     <div className="fixed inset-0 z-[90] bg-[#050505] overflow-y-auto" data-testid="series-detail">
       <button onClick={onClose} data-testid="close-series-btn" className="fixed top-6 right-6 z-10 w-11 h-11 rounded-full bg-black/70 hover:bg-black/90 flex items-center justify-center text-white border border-white/10"><X size={20}/></button>
-      <div className="relative h-[45vh]">
+      <div className="relative h-[45vh] min-h-[280px]">
         <img src={cover} onError={e=>{if(e.target.src!==IMG_FB) e.target.src=IMG_FB;}} className="absolute inset-0 w-full h-full object-cover" alt=""/>
         <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent"/>
         <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent"/>
-        <div className="absolute bottom-6 left-8 max-w-2xl">
-          <h1 className="text-3xl md:text-4xl font-medium tracking-tight mb-2" style={{fontFamily:"'Outfit',sans-serif"}}>{series.name}</h1>
-          <div className="text-sm text-neutral-400 flex flex-wrap items-center gap-3 mb-2">
-            <span className="text-red-500 text-[11px] font-medium tracking-widest uppercase">Serie</span>
-            {meta.releaseDate && <span>{String(meta.releaseDate).slice(0,4)}</span>}
-            {meta.genre && <span className="truncate max-w-[220px]">{meta.genre}</span>}
+        <div className="absolute bottom-6 left-8 right-8 flex flex-col lg:flex-row lg:items-end gap-6">
+          <div className="flex-1 min-w-0 max-w-2xl">
+            <h1 className="text-3xl md:text-4xl font-medium tracking-tight mb-2" style={{fontFamily:"'Outfit',sans-serif"}}>{series.name}</h1>
+            <div className="text-sm text-neutral-400 flex flex-wrap items-center gap-3 mb-2">
+              <span className="text-red-500 text-[11px] font-medium tracking-widest uppercase">Serie</span>
+              {meta.releaseDate && <span>{String(meta.releaseDate).slice(0,4)}</span>}
+              {meta.genre && <span className="truncate max-w-[220px]">{meta.genre}</span>}
+            </div>
+            {(meta.rating_5based || meta.rating) && <div className="mb-2"><StarRating value={meta.rating_5based || meta.rating}/></div>}
+            {(meta.director || meta.cast) && (
+              <div className="text-xs text-neutral-500 mb-2 space-y-0.5">
+                {meta.director && <div><span className="text-neutral-500">Director: </span><span className="text-neutral-300">{meta.director}</span></div>}
+                {meta.cast && <div className="line-clamp-1"><span className="text-neutral-500">Reparto: </span><span className="text-neutral-300">{meta.cast}</span></div>}
+              </div>
+            )}
           </div>
-          {(meta.rating_5based || meta.rating) && <div className="mb-2"><StarRating value={meta.rating_5based || meta.rating}/></div>}
-          {(meta.director || meta.cast) && (
-            <div className="text-xs text-neutral-500 mb-2 space-y-0.5">
-              {meta.director && <div><span className="text-neutral-500">Director: </span><span className="text-neutral-300">{meta.director}</span></div>}
-              {meta.cast && <div className="line-clamp-1"><span className="text-neutral-500">Reparto: </span><span className="text-neutral-300">{meta.cast}</span></div>}
+          {meta.plot && (
+            <div className="w-full lg:w-[36%] shrink-0 rounded-xl bg-black/50 border border-white/10 p-4 backdrop-blur-sm" data-testid="series-plot-panel">
+              <div className="text-red-400 text-[11px] font-bold tracking-widest uppercase mb-2">Sinopsis</div>
+              <p className="text-neutral-200 text-sm leading-relaxed line-clamp-8" data-testid="series-plot">{meta.plot}</p>
             </div>
           )}
-          {meta.plot && <p className="mt-3 text-neutral-300 text-sm max-w-xl line-clamp-4" data-testid="series-plot">{meta.plot}</p>}
         </div>
       </div>
 
@@ -1082,12 +1212,16 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
   const playLiveInMpv = async (item, fullscreen) => {
     const url = api.streamUrl(profile, { stream_id: item.stream_id, kind: "live", ext: "ts" });
     stopInAppMedia();
+    await new Promise(r => setTimeout(r, 150));
     if (window.electronAPI && window.electronAPI.showPlayer) {
       const res = await window.electronAPI.showPlayer({ url, name: item.name });
-      if (!res || !res.ok) alert("No se pudo lanzar el reproductor: " + (res && res.error));
+      if (!res || !res.ok) {
+        if (fullscreen !== false) onPlay(item, "live");
+        else alert("No se pudo lanzar el reproductor: " + (res && res.error));
+      }
     } else if (window.electronAPI && window.electronAPI.playInMpv) {
       const res = await window.electronAPI.playInMpv({ url, name: item.name, fullscreen });
-      if (!res || !res.ok) alert("No se pudo lanzar mpv: " + (res && res.error));
+      if (!res || !res.ok) onPlay(item, "live");
     } else {
       onPlay(item, "live");
     }
@@ -1121,10 +1255,12 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
         </div>
       )}
 
-      {/* Top-left logo (all screens except player) */}
+      {/* Top-left logo hidden on home for a clean Netflix-style hero */}
+      {tab !== "home" && (
       <div className="fixed top-11 left-6 z-30 flex items-center gap-3">
         <img src="./gadir-logo.png" alt="GadirTV" className="h-9 w-auto drop-shadow-lg" onError={e=>e.target.style.display='none'}/>
       </div>
+      )}
 
       <div className="fixed top-11 right-6 z-30 flex items-center gap-3">
         <button onClick={onSwitch} data-testid="switch-profile-btn" title="Cambiar perfil" className="w-9 h-9 rounded-lg bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center font-medium text-white shadow-lg">{profile.name.charAt(0).toUpperCase()}</button>
@@ -1132,8 +1268,8 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
       </div>
 
       <div className="relative" style={{zIndex: 1}}>
-        {tab==="home" && <HomeTab profile={profile} onSelect={handleSelect} onHover={setHoverBg}/>}
-        {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={handleSelect} onHover={setHoverBg} livePreview={<LivePreview channel={liveChannel} profile={profile} fsSignal={fsSignal} onClose={()=>setLiveChannel(null)} onFullscreen={()=>liveChannel && playLiveInMpv(liveChannel, true)}/>}/>}
+        {tab==="home" && <HomeTab profile={profile} onSelect={handleSelect} onHover={setHoverBg} onPlayMovie={(m)=>onPlay(m,"movie")}/>}
+        {tab==="live" && <CategorySection kind="live" profile={profile} onSelect={handleSelect} onHover={setHoverBg} selectedChannelId={liveChannel?.stream_id} livePreview={<LivePreview channel={liveChannel} profile={profile} fsSignal={fsSignal} onClose={()=>setLiveChannel(null)} onFullscreen={()=>liveChannel && playLiveInMpv(liveChannel, true)}/>}/>}
         {tab==="movies" && <CategorySection kind="movie" profile={profile} onSelect={handleSelect} onHover={setHoverBg}/>}
         {tab==="series" && <CategorySection kind="series" profile={profile} onSelect={handleSelect} onHover={setHoverBg}/>}
       </div>
