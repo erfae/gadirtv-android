@@ -1,18 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/profile.dart';
 import '../services/api_service.dart';
+import '../services/login_draft_store.dart';
 import '../services/m3u_cache.dart';
 import '../services/profile_store.dart';
 import '../theme.dart';
+import '../utils/url_utils.dart';
 import '../widgets/gtv_focusable.dart';
 import '../widgets/gtv_tv_text_field.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v2.2.0';
+const String kAppVersionLabel = 'v2.2.1';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -34,6 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final _api = ApiService();
   final _store = ProfileStore();
+  final _draftStore = LoginDraftStore();
   final _scrollController = ScrollController();
 
   final _hostBrowse = FocusNode();
@@ -53,9 +58,67 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
   String? _progress;
   String? _diagnostic;
+  Timer? _draftTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDraft();
+    for (final c in [_host, _user, _pass, _name, _m3uUrl]) {
+      c.addListener(_scheduleDraftSave);
+    }
+  }
+
+  Future<void> _loadDraft() async {
+    final draft = await _draftStore.load();
+    if (!mounted) return;
+    setState(() {
+      _mode = draft.mode == 'm3u' ? 'm3u' : 'xtream';
+      _host.text = draft.host;
+      _user.text = draft.username;
+      _pass.text = draft.password;
+      _name.text = draft.name;
+      _m3uUrl.text = draft.m3uUrl;
+    });
+  }
+
+  void _scheduleDraftSave() {
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 350), _saveDraft);
+  }
+
+  Future<void> _saveDraft() async {
+    await _draftStore.save(LoginDraft(
+      mode: _mode,
+      host: _host.text,
+      username: _user.text,
+      password: _pass.text,
+      name: _name.text,
+      m3uUrl: _m3uUrl.text,
+    ));
+  }
+
+  Future<void> _clearDraft() async {
+    _draftTimer?.cancel();
+    await _draftStore.clear();
+    if (!mounted) return;
+    setState(() {
+      _host.clear();
+      _user.clear();
+      _pass.clear();
+      _name.clear();
+      _m3uUrl.clear();
+      _error = null;
+      _diagnostic = null;
+      _progress = null;
+    });
+    _hostBrowse.requestFocus();
+  }
 
   @override
   void dispose() {
+    _draftTimer?.cancel();
+    _saveDraft();
     _scrollController.dispose();
     _hostBrowse.dispose();
     _userBrowse.dispose();
@@ -123,13 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } else {
       // ── Xtream mode ─────────────────────────────────────────
-      var host = _host.text.trim();
-      while (host.endsWith('/')) {
-        host = host.substring(0, host.length - 1);
-      }
-      if (host.isNotEmpty && !host.startsWith('http://') && !host.startsWith('https://')) {
-        host = 'http://$host';
-      }
+      final host = normalizeXtreamHost(_host.text);
       final user = _user.text.trim();
       final pass = _pass.text.trim();
 
@@ -142,6 +199,12 @@ class _LoginScreenState extends State<LoginScreen> {
         _api.onProgress = null;
         return;
       }
+
+      // Show corrected URL in the field (e.g. http// → http://).
+      if (_host.text != host) {
+        _host.text = host;
+      }
+      await _saveDraft();
 
       profile = Profile(
         mode: 'xtream',
@@ -367,31 +430,55 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ],
                 const SizedBox(height: 24),
-                GtvFocusable(
-                  enabled: !_busy,
-                  onTap: _busy ? null : _connect,
-                  borderRadius: BorderRadius.circular(999),
-                  child: ElevatedButton(
-                    onPressed: _busy ? null : _connect,
-                    child: _busy
-                      ? Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              _progress ?? 'Conectando…',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        )
-                      : const Text('CONECTAR'),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: GtvFocusable(
+                        enabled: !_busy,
+                        onTap: _busy ? null : _connect,
+                        borderRadius: BorderRadius.circular(999),
+                        child: ElevatedButton(
+                          onPressed: _busy ? null : _connect,
+                          child: _busy
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      _progress ?? 'Conectando…',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                )
+                              : const Text('CONECTAR'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GtvFocusable(
+                        enabled: !_busy,
+                        onTap: _busy ? null : _clearDraft,
+                        borderRadius: BorderRadius.circular(999),
+                        child: OutlinedButton.icon(
+                          onPressed: _busy ? null : _clearDraft,
+                          icon: const Icon(Icons.clear_all_rounded, size: 18, color: Colors.white70),
+                          label: const Text('BORRAR', style: TextStyle(color: Colors.white70)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: GtvTheme.border),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
               ),
