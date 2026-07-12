@@ -100,9 +100,8 @@ class MainActivity : FlutterActivity() {
 
     override fun onPostResume() {
         super.onPostResume()
-        if (isTvDevice()) {
-            window.decorView.post { window.decorView.requestFocus() }
-        }
+        // Do not call decorView.requestFocus() — it steals focus from Flutter
+        // widgets on Android TV and breaks D-pad navigation after resume.
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {

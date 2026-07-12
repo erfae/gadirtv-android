@@ -11,6 +11,7 @@ import '../services/backup_service.dart';
 import '../services/m3u_cache.dart';
 import '../services/plugins_bootstrap.dart';
 import '../services/profile_store.dart';
+import '../services/gtv_tv_focus_registry.dart';
 import '../theme.dart';
 import '../utils/xtream_utils.dart';
 import '../widgets/gtv_focusable.dart';
@@ -41,6 +42,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Profile? _profile;
   int _tab = 0;
   int _reloadTick = 0;
+  late final List<FocusNode> _navFocusNodes = List.generate(
+    4,
+    (i) => FocusNode(debugLabel: 'bottom-nav-$i'),
+  );
 
   @override
   void initState() {
@@ -48,13 +53,53 @@ class _HomeScreenState extends State<HomeScreen> {
     _boot();
   }
 
+  @override
+  void dispose() {
+    for (final n in _navFocusNodes) {
+      n.dispose();
+    }
+    GtvTvFocusRegistry.clear();
+    super.dispose();
+  }
+
+  void _syncTvFocusRegistry() {
+    GtvTvFocusRegistry.setBottomNav(_navFocusNodes, selectedIndex: _tab);
+    GtvTvFocusRegistry.focusPrimaryContent = _focusPrimaryInContent;
+  }
+
+  void _focusPrimaryInContent() {
+    if (!mounted) return;
+    final h = MediaQuery.sizeOf(context).height;
+    for (final node in FocusManager.instance.rootScope.descendants) {
+      if (!node.canRequestFocus) continue;
+      if (_navFocusNodes.contains(node)) continue;
+      final ro = node.context?.findRenderObject();
+      if (ro is! RenderBox || !ro.hasSize || !ro.attached) continue;
+      final top = ro.localToGlobal(Offset.zero).dy;
+      final bottom = ro.localToGlobal(Offset(0, ro.size.height)).dy;
+      // Skip top quick-actions and bottom navigation strip.
+      if (top < 48 || bottom > h - 96) continue;
+      node.requestFocus();
+      return;
+    }
+  }
+
+  void _selectTab(int index) {
+    setState(() => _tab = index);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncTvFocusRegistry();
+      _navFocusNodes[index].requestFocus();
+    });
+  }
+
   KeyEventResult _onTabShortcut(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final n = event.logicalKey;
-    if (n == LogicalKeyboardKey.digit1) { setState(() => _tab = 0); return KeyEventResult.handled; }
-    if (n == LogicalKeyboardKey.digit2) { setState(() => _tab = 1); return KeyEventResult.handled; }
-    if (n == LogicalKeyboardKey.digit3) { setState(() => _tab = 2); return KeyEventResult.handled; }
-    if (n == LogicalKeyboardKey.digit4) { setState(() => _tab = 3); return KeyEventResult.handled; }
+    if (n == LogicalKeyboardKey.digit1) { _selectTab(0); return KeyEventResult.handled; }
+    if (n == LogicalKeyboardKey.digit2) { _selectTab(1); return KeyEventResult.handled; }
+    if (n == LogicalKeyboardKey.digit3) { _selectTab(2); return KeyEventResult.handled; }
+    if (n == LogicalKeyboardKey.digit4) { _selectTab(3); return KeyEventResult.handled; }
     return KeyEventResult.ignored;
   }
 
@@ -351,6 +396,10 @@ class _HomeScreenState extends State<HomeScreen> {
     // Build only the active tab — IndexedStack eagerly constructed all four
     // tabs (including LiveTab's VLC imports) even when the user was on Inicio.
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncTvFocusRegistry();
+    });
+
     // Wrapping the shell in a FocusTraversalGroup gives predictable
     // left/right/up/down navigation across content and bottom nav.
     return Focus(
@@ -475,10 +524,12 @@ class _HomeScreenState extends State<HomeScreen> {
               FocusTraversalOrder(
                 order: NumericFocusOrder(i.toDouble()),
                 child: _NavButton(
+                  focusNode: _navFocusNodes[i],
+                  navIndex: i,
                   item: items[i],
                   selected: _tab == i,
                   compact: immersive,
-                  onTap: () => setState(() => _tab = i),
+                  onTap: () => _selectTab(i),
                 ),
               ),
           ],
@@ -535,12 +586,16 @@ class _NavItem {
 
 class _NavButton extends StatefulWidget {
   const _NavButton({
+    required this.focusNode,
+    required this.navIndex,
     required this.item,
     required this.selected,
     required this.onTap,
     this.compact = false,
   });
 
+  final FocusNode focusNode;
+  final int navIndex;
   final _NavItem item;
   final bool selected;
   final VoidCallback onTap;
@@ -552,37 +607,13 @@ class _NavButton extends StatefulWidget {
 
 class _NavButtonState extends State<_NavButton> {
   bool _focused = false;
-  late final FocusNode _node = FocusNode(debugLabel: widget.item.label);
-
-  @override
-  void dispose() {
-    _node.dispose();
-    super.dispose();
-  }
-
-  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-      return node.focusInDirection(TraversalDirection.left)
-          ? KeyEventResult.handled
-          : KeyEventResult.ignored;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-      return node.focusInDirection(TraversalDirection.right)
-          ? KeyEventResult.handled
-          : KeyEventResult.ignored;
-    }
-    return KeyEventResult.ignored;
-  }
 
   @override
   Widget build(BuildContext context) {
     final on = widget.selected;
     final compact = widget.compact;
-    return Focus(
-      focusNode: _node,
-      onKeyEvent: _onKey,
-      child: FocusableActionDetector(
+    return FocusableActionDetector(
+      focusNode: widget.focusNode,
       onShowFocusHighlight: (v) => setState(() => _focused = v),
       onShowHoverHighlight: (v) => setState(() => _focused = v),
       mouseCursor: SystemMouseCursors.click,
@@ -627,7 +658,6 @@ class _NavButtonState extends State<_NavButton> {
             ],
           ),
         ),
-      ),
       ),
     );
   }

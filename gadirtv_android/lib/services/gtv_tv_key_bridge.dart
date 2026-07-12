@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'gtv_tv_focus_registry.dart';
+
 /// Receives DPAD / Enter key events from Android [MainActivity] when the
 /// Flutter engine does not deliver them through [HardwareKeyboard].
 class GtvTvKeyBridge {
@@ -75,16 +77,43 @@ class GtvTvKeyBridge {
 
   static void _moveFocus(FocusNode from, TraversalDirection dir) {
     final before = FocusManager.instance.primaryFocus;
+
+    // Leanback / Android TV: bottom nav uses an explicit ordered rail.
+    if (GtvTvFocusRegistry.isBottomNavFocused(before)) {
+      switch (dir) {
+        case TraversalDirection.left:
+          if (GtvTvFocusRegistry.moveBottomNav(-1)) return;
+          break;
+        case TraversalDirection.right:
+          if (GtvTvFocusRegistry.moveBottomNav(1)) return;
+          break;
+        case TraversalDirection.up:
+          GtvTvFocusRegistry.focusPrimaryContent?.call();
+          if (before != FocusManager.instance.primaryFocus) return;
+          break;
+        case TraversalDirection.down:
+          break;
+      }
+    }
+
     from.focusInDirection(dir);
     final after = FocusManager.instance.primaryFocus;
-    if (after == before) {
-      _focusNearestInDirection(from, dir);
+    if (after != before) return;
+
+    if (dir == TraversalDirection.down && GtvTvFocusRegistry.focusBottomNav()) {
+      return;
     }
+
+    _focusNearestInDirection(from, dir);
   }
 
   /// When [focusInDirection] cannot find a target (common with horizontal
   /// [ListView]s above a bottom nav bar), pick the closest focusable below.
   static void _focusNearestInDirection(FocusNode from, TraversalDirection dir) {
+    if (dir == TraversalDirection.down && GtvTvFocusRegistry.focusBottomNav()) {
+      return;
+    }
+
     final ctx = from.context;
     if (ctx == null) return;
     final fromBox = from.context?.findRenderObject() as RenderBox?;
