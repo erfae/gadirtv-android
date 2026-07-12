@@ -1,5 +1,6 @@
 package com.gadir.tv
 
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
@@ -7,8 +8,8 @@ import android.view.KeyEvent
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterShellArgs
+import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodChannel
-import software.solid.fluttervlcplayer.FlutterVlcPlayerPlugin
 
 class MainActivity : FlutterActivity() {
 
@@ -25,9 +26,21 @@ class MainActivity : FlutterActivity() {
         return FlutterShellArgs(arrayOf("--enable-impeller=false"))
     }
 
+    /**
+     * Build the engine ourselves with [automaticallyRegisterPlugins] = false so
+     * GeneratedPluginRegistrant never loads libVLC at cold start. Many Amlogic
+     * TV boxes crash before Dart main() if VLC native libs initialise early.
+     */
+    override fun provideFlutterEngine(context: Context): FlutterEngine {
+        return FlutterEngine(
+            context,
+            getFlutterShellArgs().toArray(),
+            false,
+        )
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-        // Do NOT call GeneratedPluginRegistrant — it auto-includes libVLC and
-        // crashes many TV boxes at cold start. We control registration here.
+        // Do NOT call super — it would invoke GeneratedPluginRegistrant.
         GadirPluginRegistrant.registerWith(flutterEngine)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PLUGINS_CHANNEL)
@@ -87,10 +100,13 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    /** Load libVLC via reflection so the JVM does not touch VLC classes at startup. */
     private fun registerVlcPlugin(engine: FlutterEngine) {
         if (vlcRegistered) return
         try {
-            engine.plugins.add(FlutterVlcPlayerPlugin())
+            val clazz = Class.forName("software.solid.fluttervlcplayer.FlutterVlcPlayerPlugin")
+            val plugin = clazz.getDeclaredConstructor().newInstance() as FlutterPlugin
+            engine.plugins.add(plugin)
             vlcRegistered = true
             Log.i(TAG, "libVLC plugin registered on demand")
         } catch (t: Throwable) {

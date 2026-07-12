@@ -9,6 +9,7 @@ import '../models/profile.dart';
 import '../services/api_service.dart';
 import '../services/backup_service.dart';
 import '../services/m3u_cache.dart';
+import '../services/plugins_bootstrap.dart';
 import '../services/profile_store.dart';
 import '../theme.dart';
 import '../widgets/gtv_focusable.dart';
@@ -44,6 +45,16 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _boot();
+  }
+
+  Future<void> _boot() async {
+    try {
+      await PluginsBootstrap.ensureCore();
+    } catch (e) {
+      debugPrint('GadirTV: core plugins deferred ($e)');
+    }
+    if (!mounted) return;
     _load();
   }
 

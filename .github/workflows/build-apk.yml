@@ -56,6 +56,15 @@ jobs:
       - name: Verify deferred plugin registration (no VLC at cold start)
         run: |
           grep -q GadirPluginRegistrant android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
+          grep -q 'provideFlutterEngine' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
+          if grep -q 'FlutterVlcPlayerPlugin' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
+            echo "ERROR: MainActivity must not import FlutterVlcPlayerPlugin directly"
+            exit 1
+          fi
+          if grep -q 'fluttervlcplayer' android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java; then
+            echo "ERROR: GeneratedPluginRegistrant must not register libVLC at cold start"
+            exit 1
+          fi
           if grep -q 'GeneratedPluginRegistrant.registerWith' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
             echo "ERROR: MainActivity must not call GeneratedPluginRegistrant"
             exit 1
@@ -122,6 +131,15 @@ jobs:
       - name: Verify deferred plugin registration (no VLC at cold start)
         run: |
           grep -q GadirPluginRegistrant android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
+          grep -q 'provideFlutterEngine' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
+          if grep -q 'FlutterVlcPlayerPlugin' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
+            echo "ERROR: MainActivity must not import FlutterVlcPlayerPlugin directly"
+            exit 1
+          fi
+          if grep -q 'fluttervlcplayer' android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java; then
+            echo "ERROR: GeneratedPluginRegistrant must not register libVLC at cold start"
+            exit 1
+          fi
           if grep -q 'GeneratedPluginRegistrant.registerWith' android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt; then
             echo "ERROR: MainActivity must not call GeneratedPluginRegistrant"
             exit 1
