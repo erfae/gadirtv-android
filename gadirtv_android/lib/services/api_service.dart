@@ -154,22 +154,17 @@ class ApiService {
   /// Also captures full diagnostic info (URL, HTTP status, response snippet,
   /// exception class) into [LoginResult.diagnostic] so the UI can show it.
   static const List<String> _userAgents = [
-    // 1. VLC — same as the working Windows/Electron client.
-    'VLC/3.0.20 LibVLC/3.0.20',
-    // 2. XCIPTV — confirmed working with gadir.co on Android IPTV apps.
+    // IPTV apps confirmed on Xtream / reseller panels.
     'XCIPTV',
-    // 3. OkHttp — HTTP stack XCIPTV uses under the hood.
     'okhttp/4.9.3',
-    // 4. IPTVSmarters — widely whitelisted by Xtream panels.
+    'VLC/3.0.20 LibVLC/3.0.20',
     'IPTVSmartersPlayer',
-    // 5. TiviMate — accepted on many premium panels.
+    'IPTV Smarters Pro',
     'TiviMate/4.6.0 (Linux;Android 12)',
-    // 6. GSE Smart IPTV.
     'GSE SMART IPTV/Pro',
-    // 7. Generic ffmpeg.
+    'OTT Navigator/1.6.0',
+    'Dalvik/2.1.0 (Linux; U; Android 11; MIBOX4 Build/PI)',
     'Lavf/59.27.100',
-    // 8. Android WebView last resort.
-    'Mozilla/5.0 (Linux; Android 12; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
   ];
 
   /// Downloads an M3U playlist and returns its raw text. Uses the same 4-UA
@@ -450,47 +445,55 @@ class ApiService {
         // before we ever get to send HTTP headers. Cronet mimics Chrome
         // at the socket level and is generally allowed through.
         onProgress?.call(attempt, totalAttempts, 'Enviando petición HTTP');
-        final httpResult = await _loginHttpGet(parsedUri, ua);
-        diag.writeln('HTTP client: ${httpResult.clientLabel}');
+        var httpResult = await _loginHttpGet(parsedUri, ua);
+        diag.writeln('HTTP client: ${httpResult.clientLabel} (${httpResult.method})');
 
-        final streamed = httpResult.streamed;
-        diag.writeln('HTTP status (${sw.elapsedMilliseconds} ms): ${streamed.statusCode}');
-        diag.writeln('Content-Type: ${streamed.headers['content-type']}');
+        // Some panels return 512 on GET but accept POST with the same credentials.
+        if (httpResult.statusCode == 512 && httpResult.method == 'GET') {
+          onProgress?.call(attempt, totalAttempts, 'Reintentando con POST');
+          diag.writeln('GET → 512, probando POST…');
+          httpResult = await _loginHttpGet(parsedUri, ua, method: 'POST');
+          diag.writeln('POST client: ${httpResult.clientLabel} (${httpResult.method})');
+        }
+
+        diag.writeln('HTTP status (${sw.elapsedMilliseconds} ms): ${httpResult.statusCode}');
+        diag.writeln('Content-Type: ${httpResult.contentType ?? "(none)"}');
 
         onProgress?.call(attempt, totalAttempts, 'Recibiendo datos');
         final body = httpResult.body;
         final snippet = body.length > 400 ? '${body.substring(0, 400)}…' : body;
         diag.writeln('Body ${body.length} bytes (${sw.elapsedMilliseconds} ms): $snippet');
 
-        if (streamed.statusCode >= 500) {
+        if (httpResult.statusCode >= 500) {
           lastDiag = diag.toString();
           if (attempt < totalAttempts) {
-            // Longer pause after 512 — server anti-abuse cooldown.
-            final backoff = streamed.statusCode == 512
-                ? Duration(milliseconds: 1200 * attempt)
-                : Duration(milliseconds: 500 * attempt);
+            final backoff = httpResult.statusCode == 512
+                ? Duration(milliseconds: 2000 * attempt)
+                : Duration(milliseconds: 600 * attempt);
             await Future.delayed(backoff);
             continue;
           }
           return LoginResult(
             ok: false,
-            error: 'Servidor devuelve ${streamed.statusCode} con todos los User-Agents probados. '
-                'El servidor está rechazando este dispositivo. '
-                'Prueba con VPN o espera unos minutos.',
+            error: 'Servidor devuelve ${httpResult.statusCode} con todos los User-Agents probados.\n\n'
+                'Comprueba que usuario y contraseña sean exactos (mayúsculas/minúsculas). '
+                'Si tu proveedor te dio un link M3U, prueba el modo "Playlist M3U". '
+                'Algunos paneles bloquean apps no registradas — contacta a tu proveedor.',
             diagnostic: lastDiag,
           );
         }
-        if (streamed.statusCode == 401 || streamed.statusCode == 403) {
+        if (httpResult.statusCode == 401 || httpResult.statusCode == 403) {
           return LoginResult(
             ok: false,
-            error: 'Credenciales incorrectas (${streamed.statusCode})',
+            error: 'Credenciales incorrectas (${httpResult.statusCode}). '
+                'Revisa usuario y contraseña.',
             diagnostic: diag.toString(),
           );
         }
-        if (streamed.statusCode != 200) {
+        if (httpResult.statusCode != 200) {
           return LoginResult(
             ok: false,
-            error: 'El servidor devolvió ${streamed.statusCode}',
+            error: 'El servidor devolvió ${httpResult.statusCode}',
             diagnostic: diag.toString(),
           );
         }
@@ -582,32 +585,40 @@ class ApiService {
     );
   }
 
-  /// Login HTTP — prefers Android [HttpURLConnection] (native stack), falls
-  /// back to dart:io [IOClient] when native is unavailable.
-  Future<({http.StreamedResponse streamed, String body, String clientLabel})>
-      _loginHttpGet(Uri uri, String ua) async {
+  /// Login HTTP — Android uses OkHttp natively; falls back to dart:io IOClient.
+  Future<({
+    int statusCode,
+    String body,
+    String clientLabel,
+    String method,
+    String? contentType,
+  })> _loginHttpGet(
+    Uri uri,
+    String ua, {
+    String method = 'GET',
+  }) async {
     if (Platform.isAndroid) {
       try {
-        final native = await NativeHttp.get(
+        final native = await NativeHttp.request(
           uri.toString(),
           userAgent: ua,
-        ).timeout(const Duration(seconds: 12));
+          method: method,
+        ).timeout(const Duration(seconds: 15));
         return (
-          streamed: http.StreamedResponse(
-            Stream.value(utf8.encode(native.body)),
-            native.status,
-            headers: {'content-type': 'application/json'},
-          ),
+          statusCode: native.status,
           body: native.body,
-          clientLabel: 'NativeHttp',
+          clientLabel: native.client,
+          method: native.method,
+          contentType: 'application/json',
         );
       } catch (_) {
-        // Fall through to IOClient.
+        if (method == 'POST') rethrow;
+        // Fall through to IOClient for GET only.
       }
     }
 
     final client = await HttpFactory.get();
-    final req = http.Request('GET', uri)
+    final req = http.Request(method, uri)
       ..headers['User-Agent'] = ua
       ..headers['Accept'] = 'application/json, text/plain, */*'
       ..headers['Accept-Encoding'] = 'identity'
@@ -618,9 +629,11 @@ class ApiService {
     final bytes = await streamed.stream.toBytes().timeout(const Duration(seconds: 6));
     final body = utf8.decode(bytes, allowMalformed: true);
     return (
-      streamed: streamed,
+      statusCode: streamed.statusCode,
       body: body,
       clientLabel: HttpFactory.isCronet ? 'Cronet' : 'IOClient',
+      method: method,
+      contentType: streamed.headers['content-type'],
     );
   }
 

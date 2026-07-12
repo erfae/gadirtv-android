@@ -2,23 +2,24 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
-/// Android [HttpURLConnection] — same network stack as native IPTV apps (XCIPTV).
-/// Avoids dart:io TLS/TCP fingerprints that some Xtream panels block with HTTP 512.
+/// Android OkHttp — same HTTP stack XCIPTV / IPTV Smarters use.
 class NativeHttp {
   NativeHttp._();
 
   static const MethodChannel _channel = MethodChannel('com.gadir.tv/http');
 
-  static Future<NativeHttpResponse> get(
+  static Future<NativeHttpResponse> request(
     String url, {
     required String userAgent,
+    String method = 'GET',
   }) async {
     if (!Platform.isAndroid) {
       throw UnsupportedError('NativeHttp is Android-only');
     }
-    final result = await _channel.invokeMapMethod<String, dynamic>('get', {
+    final result = await _channel.invokeMapMethod<String, dynamic>('request', {
       'url': url,
       'userAgent': userAgent,
+      'method': method,
     });
     if (result == null) {
       throw StateError('Native HTTP returned null');
@@ -26,13 +27,22 @@ class NativeHttp {
     return NativeHttpResponse(
       status: result['status'] as int,
       body: (result['body'] as String?) ?? '',
+      client: (result['client'] as String?) ?? 'OkHttp',
+      method: (result['method'] as String?) ?? method,
     );
   }
 }
 
 class NativeHttpResponse {
-  const NativeHttpResponse({required this.status, required this.body});
+  const NativeHttpResponse({
+    required this.status,
+    required this.body,
+    required this.client,
+    required this.method,
+  });
 
   final int status;
   final String body;
+  final String client;
+  final String method;
 }

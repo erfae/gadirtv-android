@@ -122,4 +122,7 @@ flutter {
     source '../..'
 }
 
-dependencies {}
+dependencies {
+    // Same HTTP library XCIPTV / IPTV Smarters ship — panels fingerprint the stack.
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+}
