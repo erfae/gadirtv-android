@@ -53,6 +53,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Restore minimal GeneratedPluginRegistrant (pub get rewrites it with libVLC)
+        run: git checkout HEAD -- android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+
       - name: Verify deferred plugin registration (no VLC at cold start)
         run: |
           grep -q GadirPluginRegistrant android/app/src/main/kotlin/com/gadir/tv/MainActivity.kt
@@ -127,6 +130,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Restore minimal GeneratedPluginRegistrant (pub get rewrites it with libVLC)
+        run: git checkout HEAD -- android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
 
       - name: Verify deferred plugin registration (no VLC at cold start)
         run: |
