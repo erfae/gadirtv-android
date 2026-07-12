@@ -16,7 +16,7 @@ import '../widgets/gtv_tv_text_field.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v2.3.2';
+const String kAppVersionLabel = 'v2.3.3';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -215,12 +215,12 @@ class _LoginScreenState extends State<LoginScreen> {
         avatarSeed: all.length,
       );
       res = await _api.login(profile).timeout(
-        const Duration(seconds: 50),
+        const Duration(seconds: 60),
         onTimeout: () => const LoginResult(
           ok: false,
-          error: 'Tiempo agotado (>50s). El servidor no responde o la app '
+          error: 'Tiempo agotado (>60s). El servidor no responde o la app '
               'no puede llegar. Prueba con otra red o proveedor.',
-          diagnostic: 'Global timeout de 50 s alcanzado en login Xtream',
+          diagnostic: 'Global timeout de 60 s alcanzado en login Xtream',
         ),
       );
     }

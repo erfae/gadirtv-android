@@ -142,12 +142,12 @@ class ApiService {
   /// Also captures full diagnostic info (URL, HTTP status, response snippet,
   /// exception class) into [LoginResult.diagnostic] so the UI can show it.
   static const List<String> _userAgents = [
-    // IPTV apps confirmed on Xtream / reseller panels.
-    'XCIPTV',
+    // OkHttp first — same stack as NativeHttpClient on Android.
     'okhttp/4.9.3',
-    'VLC/3.0.20 LibVLC/3.0.20',
+    'XCIPTV',
     'IPTVSmartersPlayer',
     'IPTV Smarters Pro',
+    'VLC/3.0.20 LibVLC/3.0.20',
     'TiviMate/4.6.0 (Linux;Android 12)',
     'GSE SMART IPTV/Pro',
     'OTT Navigator/1.6.0',
@@ -437,9 +437,22 @@ class ApiService {
         diag.writeln('HTTP client: ${httpResult.clientLabel} (${httpResult.method})');
 
         // Some panels return 512 on GET but accept POST with the same credentials.
-        if (httpResult.statusCode == 512 && httpResult.method == 'GET') {
+        if ((httpResult.statusCode == 512 ||
+                httpResult.statusCode == 405 ||
+                httpResult.statusCode == 403) &&
+            httpResult.method == 'GET') {
           onProgress?.call(attempt, totalAttempts, 'Reintentando con POST');
-          diag.writeln('GET → 512, probando POST…');
+          diag.writeln('GET → ${httpResult.statusCode}, probando POST…');
+          httpResult = await _loginHttpGet(parsedUri, ua, method: 'POST');
+          diag.writeln('POST client: ${httpResult.clientLabel} (${httpResult.method})');
+        }
+
+        // Empty 200 body — anti-bot quirk; POST often works.
+        if (httpResult.statusCode == 200 &&
+            httpResult.body.trim().isEmpty &&
+            httpResult.method == 'GET') {
+          onProgress?.call(attempt, totalAttempts, 'Reintentando con POST');
+          diag.writeln('GET → 200 vacío, probando POST…');
           httpResult = await _loginHttpGet(parsedUri, ua, method: 'POST');
           diag.writeln('POST client: ${httpResult.clientLabel} (${httpResult.method})');
         }
@@ -452,6 +465,19 @@ class ApiService {
         final snippet = body.length > 400 ? '${body.substring(0, 400)}…' : body;
         diag.writeln('Body ${body.length} bytes (${sw.elapsedMilliseconds} ms): $snippet');
 
+        if (httpResult.statusCode == 0) {
+          lastDiag = diag.toString();
+          if (attempt < totalAttempts) {
+            await Future.delayed(Duration(milliseconds: 400 * attempt));
+            continue;
+          }
+          return LoginResult(
+            ok: false,
+            error: 'No hubo respuesta del servidor. Comprueba la URL (http://servidor:puerto), '
+                'tu conexión a Internet y si necesitas VPN.',
+            diagnostic: lastDiag,
+          );
+        }
         if (httpResult.statusCode >= 500) {
           lastDiag = diag.toString();
           if (attempt < totalAttempts) {
@@ -585,41 +611,55 @@ class ApiService {
     String ua, {
     String method = 'GET',
   }) async {
+    Object? nativeError;
     if (Platform.isAndroid) {
       try {
         final native = await NativeHttp.request(
           uri.toString(),
           userAgent: ua,
           method: method,
-        ).timeout(const Duration(seconds: 15));
-        return (
-          statusCode: native.status,
-          body: native.body,
-          clientLabel: native.client,
-          method: native.method,
-          contentType: 'application/json',
-        );
-      } catch (_) {
-        if (method == 'POST') rethrow;
-        // Fall through to IOClient for GET only.
+        ).timeout(const Duration(seconds: 12));
+        if (native.error != null && native.error!.isNotEmpty) {
+          nativeError = native.error;
+        } else {
+          return (
+            statusCode: native.status,
+            body: native.body,
+            clientLabel: native.client,
+            method: native.method,
+            contentType: 'application/json',
+          );
+        }
+      } catch (e) {
+        nativeError = e;
       }
     }
 
     final client = await HttpFactory.get();
-    final req = http.Request(method, uri)
+    final postUri = method == 'POST'
+        ? uri.replace(queryParameters: const {})
+        : uri;
+    final req = http.Request(method, postUri)
       ..headers['User-Agent'] = ua
       ..headers['Accept'] = 'application/json, text/plain, */*'
       ..headers['Accept-Encoding'] = 'identity'
+      ..headers['Accept-Language'] = 'en-US,en;q=0.9'
       ..headers['Connection'] = 'keep-alive'
+      ..headers['Referer'] = '${uri.scheme}://${uri.host}${uri.hasPort && uri.port != 80 && uri.port != 443 ? ':${uri.port}' : ''}/'
       ..followRedirects = true;
+    if (method == 'POST') {
+      req.bodyFields = Map<String, String>.from(uri.queryParameters);
+    }
 
-    final streamed = await client.send(req).timeout(const Duration(seconds: 10));
-    final bytes = await streamed.stream.toBytes().timeout(const Duration(seconds: 6));
+    final streamed = await client.send(req).timeout(const Duration(seconds: 12));
+    final bytes = await streamed.stream.toBytes().timeout(const Duration(seconds: 8));
     final body = utf8.decode(bytes, allowMalformed: true);
     return (
       statusCode: streamed.statusCode,
       body: body,
-      clientLabel: HttpFactory.isCronet ? 'Cronet' : 'IOClient',
+      clientLabel: nativeError != null
+          ? 'IOClient (OkHttp falló: $nativeError)'
+          : (HttpFactory.isCronet ? 'Cronet' : 'IOClient'),
       method: method,
       contentType: streamed.headers['content-type'],
     );
