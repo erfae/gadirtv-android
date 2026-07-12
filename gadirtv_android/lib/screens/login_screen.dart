@@ -390,12 +390,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+
   List<Widget> _xtreamFields() => [
         GtvTvTextField(
           controller: _host,
