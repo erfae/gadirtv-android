@@ -8,6 +8,8 @@ import '../models/profile.dart';
 import '../services/api_service.dart';
 import '../services/resume_store.dart';
 import '../theme.dart';
+import '../utils/xtream_utils.dart';
+import '../widgets/gtv_focusable.dart';
 import 'player_screen.dart';
 
 /// Movie detail — mobile-first: backdrop hero + poster overlay + synopsis +
@@ -54,11 +56,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   void _play({bool fromStart = false}) {
     final meta = _info['info'] is Map ? Map<String, dynamic>.from(_info['info'] as Map) : <String, dynamic>{};
-    final ext = (_mvInfo['container_extension'] ?? widget.movie.containerExt).toString();
+    final ext = pickContainerExt(_mvInfo, meta, fallback: widget.movie.containerExt);
+    final sid = movieStreamId(_info, widget.movie.streamId);
     final url = _api.streamUrl(
       widget.profile,
       kind: 'movie',
-      streamId: widget.movie.streamId,
+      streamId: sid,
       ext: ext,
     );
     Navigator.of(context).push(
@@ -97,7 +100,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final info = _info['info'] is Map
         ? Map<String, dynamic>.from(_info['info'] as Map)
         : <String, dynamic>{};
-    final plot = (info['plot'] ?? info['description'] ?? '').toString();
+    final plot = extractPlot(info, extra: _mvInfo);
     final cast = (info['cast'] ?? '').toString();
     final director = (info['director'] ?? '').toString();
     final genre = (info['genre'] ?? '').toString();
@@ -182,21 +185,29 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _play(fromStart: !hasResume),
-                        icon: const Icon(Icons.play_arrow_rounded, size: 22),
-                        label: Text(hasResume ? t.resume : t.watchNow),
+                      child: GtvFocusable(
+                        onTap: () => _play(fromStart: !hasResume),
+                        borderRadius: BorderRadius.circular(999),
+                        child: ElevatedButton.icon(
+                          onPressed: () => _play(fromStart: !hasResume),
+                          icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                          label: Text(hasResume ? t.resume : t.watchNow),
+                        ),
                       ),
                     ),
                     if (hasResume) ...[
                       const SizedBox(width: 10),
-                      OutlinedButton(
-                        onPressed: () => _play(fromStart: true),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: GtvTheme.border),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                      GtvFocusable(
+                        onTap: () => _play(fromStart: true),
+                        borderRadius: BorderRadius.circular(999),
+                        child: OutlinedButton(
+                          onPressed: () => _play(fromStart: true),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: GtvTheme.border),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                          ),
+                          child: const Icon(Icons.replay_rounded, size: 20, color: Colors.white),
                         ),
-                        child: const Icon(Icons.replay_rounded, size: 20, color: Colors.white),
                       ),
                     ],
                   ],
@@ -223,38 +234,32 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               ],
             );
 
+        // Always show synopsis below metadata on TV — side column hides it.
+        final body = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            leftBlock(),
+            const SizedBox(height: 22),
+            synopsisBlock(),
+          ],
+        );
+
         if (wide) {
           return Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 5, child: SingleChildScrollView(child: leftBlock())),
-                const SizedBox(width: 20),
-                Container(width: 1, height: 400, color: GtvTheme.border),
-                const SizedBox(width: 20),
-                Expanded(flex: 4, child: SingleChildScrollView(child: synopsisBlock())),
-              ],
-            ),
+            child: SingleChildScrollView(child: body),
           );
         }
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              leftBlock(),
-              const SizedBox(height: 22),
-              synopsisBlock(),
-            ],
-          ),
+          child: body,
         );
       }),
     );
   }
 
-  String _firstBackdrop(Map<String, dynamic> info) => '';
+  String _firstBackdropUnused(Map<String, dynamic> info) => '';
 
   Widget _stars(double rating) {
     return Row(mainAxisSize: MainAxisSize.min, children: List.generate(5, (i) {

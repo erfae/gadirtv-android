@@ -8,6 +8,8 @@ import '../../models/profile.dart';
 import '../../services/api_service.dart';
 import '../../services/resume_store.dart';
 import '../../theme.dart';
+import '../../utils/tv_layout.dart';
+import '../../widgets/gtv_focusable.dart';
 import '../../widgets/poster_card.dart';
 
 /// Home tab — mirrors the Windows client:
@@ -20,11 +22,13 @@ class HomeTab extends StatefulWidget {
     required this.profile,
     required this.onOpenMovie,
     required this.onOpenSeries,
+    this.onPlayMovie,
   });
 
   final Profile profile;
   final ValueChanged<Movie> onOpenMovie;
   final ValueChanged<Series> onOpenSeries;
+  final ValueChanged<Movie>? onPlayMovie;
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -142,10 +146,10 @@ class _HomeTabState extends State<HomeTab> {
     }
 
     return ListView(
-      padding: const EdgeInsets.only(bottom: 40),
+      padding: EdgeInsets.only(bottom: TvLayout.sp(context, 40)),
       children: [
-        _buildHero(),
-        const SizedBox(height: 28),
+        _buildHero(context),
+        SizedBox(height: TvLayout.sp(context, 16)),
         if (_resume.isNotEmpty) ...[
           _buildResumeRail(),
           const SizedBox(height: 24),
@@ -181,19 +185,40 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildHero() {
+  Widget _buildHero(BuildContext context) {
     final movies = _recentMovies.take(4).toList();
     final series = _recentSeries.take(4).toList();
-    final pool = <(String, String, String, double, VoidCallback)>[
-      ...movies.map((m) => (m.name, m.icon, 'PELÍCULA', m.rating, () => widget.onOpenMovie(m))),
-      ...series.map((s) => (s.name, s.cover, 'SERIE', s.rating, () => widget.onOpenSeries(s))),
+    final pool = <(String, String, String, double, bool, VoidCallback)>[
+      ...movies.map((m) => (
+            m.name,
+            m.icon,
+            'PELÍCULA',
+            m.rating,
+            true,
+            () {
+              if (widget.onPlayMovie != null) {
+                widget.onPlayMovie!(m);
+              } else {
+                widget.onOpenMovie(m);
+              }
+            },
+          )),
+      ...series.map((s) => (
+            s.name,
+            s.cover,
+            'SERIE',
+            s.rating,
+            false,
+            () => widget.onOpenSeries(s),
+          )),
     ];
-    if (pool.isEmpty) return const SizedBox(height: 200);
+    if (pool.isEmpty) return SizedBox(height: TvLayout.heroHeight(context) * 0.75);
     final idx = _heroIndex % pool.length;
-    final (name, image, badge, rating, onTap) = pool[idx];
+    final (name, image, badge, rating, isMovie, onTap) = pool[idx];
+    final heroH = TvLayout.heroHeight(context);
 
     return SizedBox(
-      height: 260,
+      height: heroH,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -278,14 +303,14 @@ class _HomeTabState extends State<HomeTab> {
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
-                    width: 480,
+                    width: MediaQuery.sizeOf(context).width * 0.45,
                     child: Text(
                       name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 32,
+                        fontSize: TvLayout.sp(context, 28),
                         fontWeight: FontWeight.w900,
                         height: 1.1,
                       ),
@@ -305,10 +330,14 @@ class _HomeTabState extends State<HomeTab> {
                     ),
                   ],
                   const SizedBox(height: 14),
-                  ElevatedButton.icon(
-                    onPressed: onTap,
-                    icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                    label: const Text('VER AHORA'),
+                  GtvFocusable(
+                    onTap: onTap,
+                    borderRadius: BorderRadius.circular(999),
+                    child: ElevatedButton.icon(
+                      onPressed: onTap,
+                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                      label: Text(isMovie ? 'REPRODUCIR' : 'VER SERIE'),
+                    ),
                   ),
                 ],
               ),
@@ -320,6 +349,8 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildResumeRail() {
+    final cardW = TvLayout.posterWidth(context);
+    final railH = TvLayout.posterRailHeight(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -332,7 +363,7 @@ class _HomeTabState extends State<HomeTab> {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 200,
+          height: railH,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -341,7 +372,7 @@ class _HomeTabState extends State<HomeTab> {
             itemBuilder: (_, i) {
               final r = _resume[i];
               return SizedBox(
-                width: 130,
+                width: cardW,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -378,6 +409,8 @@ class _HomeTabState extends State<HomeTab> {
     required Widget Function(int index) builder,
   }) {
     if (count == 0) return const SizedBox.shrink();
+    final cardW = TvLayout.posterWidth(context);
+    final railH = TvLayout.posterRailHeight(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -394,13 +427,13 @@ class _HomeTabState extends State<HomeTab> {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 200,
+          height: railH,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 32),
             itemCount: count,
             separatorBuilder: (_, __) => const SizedBox(width: 14),
-            itemBuilder: (_, i) => SizedBox(width: 130, child: builder(i)),
+            itemBuilder: (_, i) => SizedBox(width: cardW, child: builder(i)),
           ),
         ),
       ],

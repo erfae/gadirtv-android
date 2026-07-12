@@ -6,13 +6,11 @@ import '../models/media.dart';
 import '../models/profile.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
+import '../widgets/gtv_focusable.dart';
+import '../widgets/gtv_tv_text_field.dart';
 import '../widgets/poster_card.dart';
 
 /// Global search — filters channels, movies and series by name substring.
-///
-/// The three catalogues are fetched once on open (~2 s on a fast link) and
-/// filtered client-side with a 250 ms debounce. Selection callbacks bubble
-/// back up so the caller decides what to open (player / detail / etc).
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
     super.key,
@@ -34,7 +32,8 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final _api = ApiService();
   final _controller = TextEditingController();
-  final _focus = FocusNode();
+  final _searchBrowse = FocusNode();
+  final _scrollController = ScrollController();
 
   List<LiveChannel> _channels = const [];
   List<Movie> _movies = const [];
@@ -45,15 +44,20 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Series> _seriesResults = const [];
 
   bool _loading = true;
+  String? _bootstrapError;
   String _query = '';
   Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
+    _controller.addListener(_onControllerChanged);
     _bootstrap();
-    // Autofocus the text field so the software keyboard shows immediately.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
+  }
+
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
+    _onQueryChanged(_controller.text);
   }
 
   Future<void> _bootstrap() async {
@@ -70,9 +74,12 @@ class _SearchScreenState extends State<SearchScreen> {
         _series = results[2].map(Series.fromJson).toList();
         _loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _bootstrapError = 'No se pudo cargar el catálogo: $e';
+      });
     }
   }
 
@@ -99,8 +106,10 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _controller.removeListener(_onControllerChanged);
     _controller.dispose();
-    _focus.dispose();
+    _searchBrowse.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -112,7 +121,9 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             _buildBar(),
             const SizedBox(height: 8),
-            Expanded(child: _buildBody()),
+            Expanded(
+              child: _buildBody(),
+            ),
           ],
         ),
       ),
@@ -124,34 +135,40 @@ class _SearchScreenState extends State<SearchScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-            onPressed: () => Navigator.of(context).maybePop(),
+          GtvFocusable(
+            borderRadius: BorderRadius.circular(999),
+            onTap: () => Navigator.of(context).maybePop(),
+            child: const Padding(
+              padding: EdgeInsets.all(8),
+              child: Icon(Icons.arrow_back_rounded, color: Colors.white),
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: TextField(
+            child: GtvTvTextField(
               controller: _controller,
-              focusNode: _focus,
-              onChanged: _onQueryChanged,
-              autofocus: true,
-              style: const TextStyle(color: Colors.white),
-              cursorColor: GtvTheme.red,
-              decoration: InputDecoration(
+              browseFocusNode: _searchBrowse,
+              scrollController: _scrollController,
+              textInputAction: TextInputAction.search,
+              onSubmitted: _onQueryChanged,
+              decoration: const InputDecoration(
                 hintText: 'Buscar canales, películas o series…',
-                prefixIcon: const Icon(Icons.search_rounded, color: GtvTheme.textDim),
-                suffixIcon: _query.isEmpty
-                    ? null
-                    : IconButton(
-                        icon: const Icon(Icons.clear_rounded, color: GtvTheme.textDim),
-                        onPressed: () {
-                          _controller.clear();
-                          _onQueryChanged('');
-                        },
-                      ),
+                prefixIcon: Icon(Icons.search_rounded, color: GtvTheme.textDim),
               ),
             ),
           ),
+          if (_controller.text.isNotEmpty)
+            GtvFocusable(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () {
+                _controller.clear();
+                _onQueryChanged('');
+              },
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(Icons.clear_rounded, color: GtvTheme.textDim),
+              ),
+            ),
         ],
       ),
     );
@@ -161,10 +178,19 @@ class _SearchScreenState extends State<SearchScreen> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator(color: GtvTheme.red));
     }
+    if (_bootstrapError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(_bootstrapError!, textAlign: TextAlign.center, style: const TextStyle(color: GtvTheme.redHi)),
+        ),
+      );
+    }
     if (_query.isEmpty) {
       return const Center(
         child: Text(
-          'Empieza a escribir para buscar en el catálogo completo',
+          'Selecciona el campo de búsqueda y pulsa OK para escribir',
+          textAlign: TextAlign.center,
           style: TextStyle(color: GtvTheme.textDim),
         ),
       );

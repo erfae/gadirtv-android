@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme.dart';
+import '../utils/tv_layout.dart';
 
 /// Vertical category list — used as the left rail in Live TV, Movies
 /// and Series tabs. Each row is a full-width tap target with a red
@@ -94,10 +95,13 @@ class _CategoryRowState extends State<_CategoryRow> {
           ),
           child: Text(
             widget.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: widget.selected ? GtvTheme.redHi : Colors.white,
-              fontSize: 13,
+              fontSize: TvLayout.labelFont(context, 13),
               fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
+              height: 1.2,
             ),
           ),
         ),

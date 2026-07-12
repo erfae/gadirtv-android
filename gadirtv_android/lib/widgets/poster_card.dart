@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import '../utils/tv_layout.dart';
 
 /// A poster / logo card used across Movies, Series and Live grids.
 ///
@@ -156,12 +157,13 @@ class _PosterCardState extends State<PosterCard> {
                   color: GtvTheme.surface,
                   child: Text(
                     widget.title,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 12,
+                      fontSize: TvLayout.sp(context, 12),
                       fontWeight: FontWeight.w600,
+                      height: 1.15,
                     ),
                   ),
                 ),
