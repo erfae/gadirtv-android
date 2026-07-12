@@ -8,6 +8,7 @@ import '../models/playable.dart';
 import '../models/profile.dart';
 import '../services/api_service.dart';
 import '../services/resume_store.dart';
+import '../services/player_constants.dart';
 import '../services/vlc_bootstrap.dart';
 import '../services/vlc_device_profile.dart';
 import '../theme.dart';
@@ -85,11 +86,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
       autoPlay: true,
       options: VlcPlayerOptions(
         advanced: VlcAdvancedOptions([
-          // 1500 ms of network cache — enough to smooth over Wi-Fi
-          // hiccups on TV boxes without adding perceptible zap delay.
-          VlcAdvancedOptions.networkCaching(1500),
-          VlcAdvancedOptions.liveCaching(1500),
-          VlcAdvancedOptions.fileCaching(1500),
+          VlcAdvancedOptions.networkCaching(
+            widget.playable.isLive
+                ? PlayerConstants.vlcLiveCacheMs
+                : PlayerConstants.vlcVodCacheMs,
+          ),
+          VlcAdvancedOptions.liveCaching(PlayerConstants.vlcLiveCacheMs),
+          VlcAdvancedOptions.fileCaching(PlayerConstants.vlcVodCacheMs),
         ]),
         http: VlcHttpOptions([
           VlcHttpOptions.httpReconnect(true),
@@ -218,7 +221,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // reports a few hundred ms of position while priming its demuxer,
     // even on dead streams.
     final startPos = _position;
-    _noSignalTimer = Timer(const Duration(seconds: 10), () {
+    _noSignalTimer = Timer(PlayerConstants.noSignalDelay, () {
       if (!mounted) return;
       if (_position - startPos < const Duration(seconds: 1)) {
         setState(() => _noSignal = true);

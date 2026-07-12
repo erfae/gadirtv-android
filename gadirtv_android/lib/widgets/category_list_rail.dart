@@ -79,12 +79,14 @@ class _CategoryRowState extends State<_CategoryRow> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           decoration: BoxDecoration(
-            color: widget.selected ? GtvTheme.red.withOpacity(0.15) : Colors.transparent,
+            color: widget.selected
+                ? GtvTheme.red.withOpacity(0.15)
+                : (_focused ? GtvTheme.red.withOpacity(0.08) : Colors.transparent),
             border: Border(
               left: BorderSide(
-                color: widget.selected ? GtvTheme.red : Colors.transparent,
+                color: widget.selected || _focused ? GtvTheme.red : Colors.transparent,
                 width: 3,
               ),
               right: BorderSide(
@@ -95,13 +97,15 @@ class _CategoryRowState extends State<_CategoryRow> {
           ),
           child: Text(
             widget.name,
-            maxLines: 2,
+            maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: widget.selected ? GtvTheme.redHi : Colors.white,
-              fontSize: TvLayout.labelFont(context, 13),
-              fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
-              height: 1.2,
+              color: _focused
+                  ? GtvTheme.redHi
+                  : (widget.selected ? GtvTheme.red.withOpacity(0.9) : Colors.white70),
+              fontSize: TvLayout.labelFont(context, 11),
+              fontWeight: _focused || widget.selected ? FontWeight.w800 : FontWeight.w500,
+              height: 1.15,
             ),
           ),
         ),

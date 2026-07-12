@@ -10,7 +10,7 @@ import '../services/resume_store.dart';
 import '../theme.dart';
 import '../utils/xtream_utils.dart';
 import '../widgets/gtv_focusable.dart';
-import 'player_screen.dart';
+import '../services/playback_launcher.dart';
 
 /// Series detail — mobile-first stacked layout.
 ///
@@ -346,7 +346,7 @@ class SeasonEpisodesScreen extends StatefulWidget {
 class _SeasonEpisodesScreenState extends State<SeasonEpisodesScreen> {
   final _api = ApiService();
 
-  void _play(Map<String, dynamic> episode) {
+  Future<void> _play(Map<String, dynamic> episode) async {
     final id = episodeStreamId(episode);
     if (id.isEmpty) return;
     final ext = pickContainerExt(episode, null, fallback: 'mp4');
@@ -359,18 +359,17 @@ class _SeasonEpisodesScreenState extends State<SeasonEpisodesScreen> {
       ext: ext,
     );
     final resumeMs = widget.resumeMap['series:$id']?.positionMs ?? 0;
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => PlayerScreen(
-        playable: Playable(
-          kind: 'series',
-          id: id,
-          title: '${widget.series.name} · T${widget.season} E$epNum',
-          subtitle: title,
-          url: url,
-          initialPositionMs: resumeMs,
-        ),
+    await PlaybackLauncher.launch(
+      context,
+      playable: Playable(
+        kind: 'series',
+        id: id,
+        title: '${widget.series.name} · T${widget.season} E$epNum',
+        subtitle: title,
+        url: url,
+        initialPositionMs: resumeMs,
       ),
-    ));
+    );
   }
 
   @override
