@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/gtv_tv_focus_navigation.dart';
 import '../theme.dart';
 import '../utils/tv_layout.dart';
 
@@ -58,10 +59,79 @@ class _PosterCardState extends State<PosterCard> {
   bool _focused = false;
 
   @override
+  void initState() {
+    super.initState();
+    _registerNav();
+    widget.focusNode?.addListener(_onExternalFocus);
+  }
+
+  @override
+  void didUpdateWidget(covariant PosterCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode?.removeListener(_onExternalFocus);
+      widget.focusNode?.addListener(_onExternalFocus);
+    }
+    _registerNav();
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode?.removeListener(_onExternalFocus);
+    if (widget.focusNode != null) {
+      GtvTvFocusNavigation.unregister(widget.focusNode!);
+    }
+    super.dispose();
+  }
+
+  void _onExternalFocus() {
+    if (mounted) setState(() => _focused = widget.focusNode?.hasFocus ?? false);
+  }
+
+  void _registerNav() {
+    final n = widget.focusNode;
+    if (n == null) return;
+    GtvTvFocusNavigation.register(
+      n,
+      onUp: widget.onMoveUp,
+      onDown: widget.onMoveDown,
+      onLeft: widget.onMoveLeft,
+      onRight: widget.onMoveRight,
+      onActivate: widget.onTap,
+    );
+  }
+
+  KeyEventResult _handleKey(KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final k = event.logicalKey;
+    if (k == LogicalKeyboardKey.arrowLeft && widget.onMoveLeft != null) {
+      widget.onMoveLeft!();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowRight && widget.onMoveRight != null) {
+      widget.onMoveRight!();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowUp && widget.onMoveUp != null) {
+      widget.onMoveUp!();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowDown && widget.onMoveDown != null) {
+      widget.onMoveDown!();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.select || k == LogicalKeyboardKey.enter) {
+      widget.onTap();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final useExternalFocus = widget.focusNode != null;
 
-    Widget card = GestureDetector(
+    final card = GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
@@ -222,32 +292,6 @@ class _PosterCardState extends State<PosterCard> {
       },
       child: card,
     );
-  }
-
-  KeyEventResult _handleKey(KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    final k = event.logicalKey;
-    if (k == LogicalKeyboardKey.arrowLeft && widget.onMoveLeft != null) {
-      widget.onMoveLeft!();
-      return KeyEventResult.handled;
-    }
-    if (k == LogicalKeyboardKey.arrowRight && widget.onMoveRight != null) {
-      widget.onMoveRight!();
-      return KeyEventResult.handled;
-    }
-    if (k == LogicalKeyboardKey.arrowUp && widget.onMoveUp != null) {
-      widget.onMoveUp!();
-      return KeyEventResult.handled;
-    }
-    if (k == LogicalKeyboardKey.arrowDown && widget.onMoveDown != null) {
-      widget.onMoveDown!();
-      return KeyEventResult.handled;
-    }
-    if (k == LogicalKeyboardKey.select || k == LogicalKeyboardKey.enter) {
-      widget.onTap();
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
   }
 
   Widget _buildImage() {

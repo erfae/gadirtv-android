@@ -181,7 +181,7 @@ class _GtvTvTextFieldState extends State<GtvTvTextField> {
     return widget.decoration.hintText ?? '';
   }
 
-  bool get _showBrowseMode => _isTv && !_editing;
+  bool get _showBrowseMode => widget.browseFocusNode != null && !_editing;
 
   Widget? _buildVisibilityToggle() {
     if (widget.onToggleObscure == null) return null;

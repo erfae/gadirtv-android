@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/gtv_tv_focus_navigation.dart';
 import '../theme.dart';
 
 /// D-pad / remote friendly tap target with visible focus ring.
 ///
-/// Wraps any child and wires [ActivateIntent] so the Android TV remote
-/// "OK" button triggers [onTap] the same way a finger tap would.
+/// Registers navigation with [GtvTvFocusNavigation] because Android TV
+/// remotes deliver keys via the native bridge, not [KeyEvent].
 class GtvFocusable extends StatefulWidget {
   const GtvFocusable({
     super.key,
@@ -42,57 +43,87 @@ class GtvFocusable extends StatefulWidget {
 }
 
 class _GtvFocusableState extends State<GtvFocusable> {
+  late final FocusNode _node = widget.focusNode ?? FocusNode();
   bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncNavigation();
+    _node.addListener(_onFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(covariant GtvFocusable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncNavigation();
+  }
+
+  @override
+  void dispose() {
+    _node.removeListener(_onFocusChange);
+    GtvTvFocusNavigation.unregister(_node);
+    if (widget.focusNode == null) {
+      _node.dispose();
+    }
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (mounted) setState(() => _focused = _node.hasFocus);
+  }
+
+  void _syncNavigation() {
+    final enabled = widget.enabled && widget.onTap != null;
+    if (!enabled) {
+      GtvTvFocusNavigation.unregister(_node);
+      return;
+    }
+    GtvTvFocusNavigation.register(
+      _node,
+      onUp: widget.onMoveUp,
+      onDown: widget.onMoveDown,
+      onLeft: widget.onMoveLeft,
+      onRight: widget.onMoveRight,
+      onActivate: widget.onTap,
+    );
+  }
+
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final k = event.logicalKey;
+    if (k == LogicalKeyboardKey.arrowLeft && widget.onMoveLeft != null) {
+      widget.onMoveLeft!();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowRight && widget.onMoveRight != null) {
+      widget.onMoveRight!();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowUp && widget.onMoveUp != null) {
+      widget.onMoveUp!();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowDown && widget.onMoveDown != null) {
+      widget.onMoveDown!();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.select || k == LogicalKeyboardKey.enter) {
+      widget.onTap?.call();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
 
   @override
   Widget build(BuildContext context) {
     final enabled = widget.enabled && widget.onTap != null;
 
     return Focus(
-      focusNode: widget.focusNode,
+      focusNode: _node,
       autofocus: widget.autofocus,
       canRequestFocus: enabled,
-      onKeyEvent: (_, event) {
-        if (event is! KeyDownEvent) return KeyEventResult.ignored;
-        final k = event.logicalKey;
-        if (k == LogicalKeyboardKey.arrowLeft && widget.onMoveLeft != null) {
-          widget.onMoveLeft!();
-          return KeyEventResult.handled;
-        }
-        if (k == LogicalKeyboardKey.arrowRight && widget.onMoveRight != null) {
-          widget.onMoveRight!();
-          return KeyEventResult.handled;
-        }
-        if (k == LogicalKeyboardKey.arrowUp && widget.onMoveUp != null) {
-          widget.onMoveUp!();
-          return KeyEventResult.handled;
-        }
-        if (k == LogicalKeyboardKey.arrowDown && widget.onMoveDown != null) {
-          widget.onMoveDown!();
-          return KeyEventResult.handled;
-        }
-        if (k == LogicalKeyboardKey.select || k == LogicalKeyboardKey.enter) {
-          widget.onTap?.call();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: FocusableActionDetector(
-      autofocus: widget.focusNode == null && widget.autofocus,
-      enabled: enabled,
-      onShowFocusHighlight: (v) => setState(() => _focused = v),
-      onShowHoverHighlight: (v) => setState(() => _focused = v),
-      mouseCursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
-      actions: enabled
-          ? {
-              ActivateIntent: CallbackAction<ActivateIntent>(
-                onInvoke: (_) {
-                  widget.onTap?.call();
-                  return null;
-                },
-              ),
-            }
-          : const {},
+      onKeyEvent: _onKeyEvent,
       child: GestureDetector(
         onTap: enabled ? widget.onTap : null,
         onLongPress: enabled ? widget.onLongPress : null,
@@ -112,7 +143,6 @@ class _GtvFocusableState extends State<GtvFocusable> {
           child: widget.child,
         ),
       ),
-    ),
     );
   }
 }

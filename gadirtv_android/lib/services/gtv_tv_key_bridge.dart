@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'gtv_tv_focus_registry.dart';
+import 'gtv_tv_focus_navigation.dart';
 
 /// Receives DPAD / Enter key events from Android [MainActivity] when the
 /// Flutter engine does not deliver them through [HardwareKeyboard].
@@ -44,10 +45,11 @@ class GtvTvKeyBridge {
   }
 
   static void _handleNavigationKey(int keyCode) {
-    final focus = FocusManager.instance.primaryFocus;
+    var focus = FocusManager.instance.primaryFocus;
     if (focus == null || !focus.hasFocus) {
       _ensureInitialFocus();
-      return;
+      focus = FocusManager.instance.primaryFocus;
+      if (focus == null || !focus.hasFocus) return;
     }
 
     final context = focus.context;
@@ -68,6 +70,7 @@ class GtvTvKeyBridge {
         break;
       case 23:
       case 66:
+        if (GtvTvFocusNavigation.activate(focus)) return;
         Actions.invoke(context, const ActivateIntent());
         break;
       default:
@@ -76,6 +79,8 @@ class GtvTvKeyBridge {
   }
 
   static void _moveFocus(FocusNode from, TraversalDirection dir) {
+    if (GtvTvFocusNavigation.move(from, dir)) return;
+
     final before = FocusManager.instance.primaryFocus;
 
     // Leanback / Android TV: bottom nav uses an explicit ordered rail.

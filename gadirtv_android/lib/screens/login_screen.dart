@@ -16,7 +16,7 @@ import '../widgets/gtv_tv_text_field.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v2.4.6';
+const String kAppVersionLabel = 'v2.4.7';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -72,6 +72,9 @@ class _LoginScreenState extends State<LoginScreen> {
     for (final c in [_host, _user, _pass, _name, _m3uUrl]) {
       c.addListener(_scheduleDraftSave);
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _xtreamModeFocus.requestFocus();
+    });
   }
 
   Future<void> _loadDraft() async {

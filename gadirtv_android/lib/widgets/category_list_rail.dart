@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/gtv_tv_focus_navigation.dart';
 import '../theme.dart';
 import '../utils/tv_layout.dart';
 
@@ -103,6 +104,7 @@ class _CategoryRowState extends State<_CategoryRow> {
   void initState() {
     super.initState();
     widget.focusNode.addListener(_onFocus);
+    _registerNav();
   }
 
   @override
@@ -110,14 +112,25 @@ class _CategoryRowState extends State<_CategoryRow> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.focusNode != widget.focusNode) {
       oldWidget.focusNode.removeListener(_onFocus);
+      GtvTvFocusNavigation.unregister(oldWidget.focusNode);
       widget.focusNode.addListener(_onFocus);
     }
+    _registerNav();
   }
 
   @override
   void dispose() {
     widget.focusNode.removeListener(_onFocus);
+    GtvTvFocusNavigation.unregister(widget.focusNode);
     super.dispose();
+  }
+
+  void _registerNav() {
+    GtvTvFocusNavigation.register(
+      widget.focusNode,
+      onRight: widget.onMoveRight,
+      onActivate: widget.onTap,
+    );
   }
 
   void _onFocus() {
