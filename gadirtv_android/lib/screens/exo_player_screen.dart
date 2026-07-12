@@ -82,7 +82,9 @@ class _ExoPlayerScreenState extends State<ExoPlayerScreen> {
         httpHeaders: {
           'User-Agent': ApiService.activeUserAgent,
           'Accept': '*/*',
+          'Accept-Encoding': 'identity',
           'Connection': 'keep-alive',
+          'Icy-MetaData': '1',
           'Referer': '${uri.scheme}://${uri.host}/',
         },
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
@@ -235,9 +237,42 @@ class _ExoPlayerScreenState extends State<ExoPlayerScreen> {
                   Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
-                      child: Text(_fatalError!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: GtvTheme.redHi)),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Error de reproducción',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _fatalError!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: GtvTheme.textDim, fontSize: 13),
+                          ),
+                          const SizedBox(height: 20),
+                          GtvFocusable(
+                            autofocus: true,
+                            onTap: _fallbackToVlc,
+                            borderRadius: BorderRadius.circular(999),
+                            child: ElevatedButton.icon(
+                              onPressed: _fallbackToVlc,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('Probar con libVLC'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: GtvTheme.red,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 if (_noSignal)

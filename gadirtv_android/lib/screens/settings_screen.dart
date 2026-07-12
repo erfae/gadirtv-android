@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../i18n/strings.dart';
+import '../screens/login_screen.dart';
 import '../services/backup_service.dart';
 import '../services/player_constants.dart';
 import '../services/prefs_settings.dart';
 import '../theme.dart';
 import '../widgets/gtv_focusable.dart';
 
-/// Ajustes globales — copia de seguridad e idioma. Se accede desde el
-/// icono del engranaje del topbar.
+/// Ajustes globales — copia de seguridad, reproductor e idioma.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, this.onLanguageChanged});
 
-  /// Called after the user picks a new language so the caller can
-  /// rebuild affected UI (currently only used for a toast — full
-  /// translation is a follow-up task).
   final ValueChanged<String>? onLanguageChanged;
 
   @override
@@ -24,6 +21,21 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _prefs = PrefsSettings();
   final _backup = BackupService();
+
+  late final FocusNode _backNode = FocusNode(debugLabel: 'settings-back');
+  late final List<FocusNode> _playerNodes = List.generate(
+    3,
+    (i) => FocusNode(debugLabel: 'player-$i'),
+  );
+  late final List<FocusNode> _langNodes = List.generate(
+    PrefsSettings.supportedLocales.length,
+    (i) => FocusNode(debugLabel: 'lang-$i'),
+  );
+  late final FocusNode _backupCreateNode = FocusNode(debugLabel: 'backup-create');
+  late final FocusNode _backupRestoreNode = FocusNode(debugLabel: 'backup-restore');
+
+  static const _engines = [PlayerEngine.exo, PlayerEngine.vlc, PlayerEngine.external];
+
   String _lang = 'es';
   String _player = PlayerEngine.defaultEngine;
   bool _loading = true;
@@ -33,6 +45,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _backNode.dispose();
+    for (final n in _playerNodes) {
+      n.dispose();
+    }
+    for (final n in _langNodes) {
+      n.dispose();
+    }
+    _backupCreateNode.dispose();
+    _backupRestoreNode.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -46,12 +72,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _player = results[1] as String;
       _loading = false;
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _playerNodes.first.requestFocus();
+    });
   }
 
   Future<void> _setPlayer(String engine) async {
     await _prefs.setPlayerEngine(engine);
     if (!mounted) return;
     setState(() => _player = engine);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Reproductor: ${PlayerEngine.labels[engine]}'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _setLanguage(String code) async {
@@ -108,173 +143,209 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(
         backgroundColor: GtvTheme.bg,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+        leading: GtvFocusable(
+          focusNode: _backNode,
+          borderRadius: BorderRadius.circular(999),
+          onTap: () => Navigator.of(context).pop(),
+          onMoveDown: () => _playerNodes.first.requestFocus(),
+          child: const Padding(
+            padding: EdgeInsets.all(8),
+            child: Icon(Icons.arrow_back_rounded, color: Colors.white),
+          ),
         ),
         title: Text(t.settings,
             style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: GtvTheme.red))
-          : ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              children: [
-                const SizedBox(height: 30),
-                _sectionTitle('Reproductor'),
-                const SizedBox(height: 4),
-                Container(
-                  decoration: BoxDecoration(
-                    color: GtvTheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: GtvTheme.border),
+          : FocusTraversalGroup(
+              policy: OrderedTraversalPolicy(),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                children: [
+                  const SizedBox(height: 16),
+                  _sectionTitle('Reproductor'),
+                  const SizedBox(height: 4),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: GtvTheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: GtvTheme.border),
+                    ),
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < _engines.length; i++)
+                          FocusTraversalOrder(
+                            order: NumericFocusOrder(i.toDouble()),
+                            child: GtvFocusable(
+                              focusNode: _playerNodes[i],
+                              autofocus: i == 0,
+                              onTap: () => _setPlayer(_engines[i]),
+                              onMoveUp: i > 0
+                                  ? () => _playerNodes[i - 1].requestFocus()
+                                  : () => _backNode.requestFocus(),
+                              onMoveDown: i < _engines.length - 1
+                                  ? () => _playerNodes[i + 1].requestFocus()
+                                  : () => _langNodes.first.requestFocus(),
+                              borderRadius: BorderRadius.circular(12),
+                              child: _radioRow(
+                                label: PlayerEngine.labels[_engines[i]]!,
+                                selected: _player == _engines[i],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                  child: Column(
-                    children: [
-                      for (final engine in [
-                        PlayerEngine.exo,
-                        PlayerEngine.vlc,
-                        PlayerEngine.external,
-                      ])
-                        GtvFocusable(
-                          onTap: () => _setPlayer(engine),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  _player == engine
-                                      ? Icons.radio_button_checked_rounded
-                                      : Icons.radio_button_unchecked_rounded,
-                                  color: _player == engine ? GtvTheme.red : GtvTheme.textDim,
-                                  size: 22,
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Text(
-                                    PlayerEngine.labels[engine]!,
-                                    style: TextStyle(
-                                      color: _player == engine ? GtvTheme.redHi : Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: _player == engine ? FontWeight.w700 : FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                  const SizedBox(height: 30),
+                  _sectionTitle(t.language),
+                  const SizedBox(height: 4),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: GtvTheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: GtvTheme.border),
+                    ),
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < PrefsSettings.supportedLocales.length; i++)
+                          FocusTraversalOrder(
+                            order: NumericFocusOrder((10 + i).toDouble()),
+                            child: GtvFocusable(
+                              focusNode: _langNodes[i],
+                              onTap: () => _setLanguage(PrefsSettings.supportedLocales[i]),
+                              onMoveUp: i > 0
+                                  ? () => _langNodes[i - 1].requestFocus()
+                                  : () => _playerNodes.last.requestFocus(),
+                              onMoveDown: i < PrefsSettings.supportedLocales.length - 1
+                                  ? () => _langNodes[i + 1].requestFocus()
+                                  : () => _backupCreateNode.requestFocus(),
+                              borderRadius: BorderRadius.circular(12),
+                              child: _radioRow(
+                                label: PrefsSettings.localeNames[PrefsSettings.supportedLocales[i]]!,
+                                selected: _lang == PrefsSettings.supportedLocales[i],
+                                trailing: PrefsSettings.supportedLocales[i] == 'es'
+                                    ? Text(t.languageDefault,
+                                        style: const TextStyle(color: GtvTheme.textDim, fontSize: 11))
+                                    : null,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  _sectionTitle(t.backup),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: GtvTheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: GtvTheme.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(t.backupDescription,
+                            style: const TextStyle(color: GtvTheme.textDim, fontSize: 12, height: 1.5)),
+                        const SizedBox(height: 14),
+                        FocusTraversalOrder(
+                          order: const NumericFocusOrder(30),
+                          child: GtvFocusable(
+                            focusNode: _backupCreateNode,
+                            onTap: _busy ? null : _createBackup,
+                            onMoveUp: () => _langNodes.last.requestFocus(),
+                            onMoveDown: () => _backupRestoreNode.requestFocus(),
+                            borderRadius: BorderRadius.circular(999),
+                            child: ElevatedButton.icon(
+                              onPressed: _busy ? null : _createBackup,
+                              icon: const Icon(Icons.save_alt_rounded, size: 18),
+                              label: Text(t.backupCreate),
                             ),
                           ),
                         ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 30),
-                _sectionTitle(t.language),
-                const SizedBox(height: 4),
-                Container(
-                  decoration: BoxDecoration(
-                    color: GtvTheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: GtvTheme.border),
-                  ),
-                  child: Column(
-                    children: PrefsSettings.supportedLocales.map((code) {
-                      final name = PrefsSettings.localeNames[code]!;
-                      final selected = _lang == code;
-                      return InkWell(
-                        onTap: () => _setLanguage(code),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          child: Row(
-                            children: [
-                              Icon(
-                                selected
-                                    ? Icons.radio_button_checked_rounded
-                                    : Icons.radio_button_unchecked_rounded,
-                                color: selected ? GtvTheme.red : GtvTheme.textDim,
-                                size: 22,
+                        const SizedBox(height: 10),
+                        FocusTraversalOrder(
+                          order: const NumericFocusOrder(31),
+                          child: GtvFocusable(
+                            focusNode: _backupRestoreNode,
+                            onTap: _busy ? null : _restoreBackup,
+                            onMoveUp: () => _backupCreateNode.requestFocus(),
+                            borderRadius: BorderRadius.circular(999),
+                            child: OutlinedButton.icon(
+                              onPressed: _busy ? null : _restoreBackup,
+                              icon: const Icon(Icons.folder_open_rounded, size: 18, color: Colors.white),
+                              label: Text(t.backupRestore, style: const TextStyle(color: Colors.white)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: GtvTheme.border),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: const StadiumBorder(),
                               ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Text(name,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                                    )),
-                              ),
-                              if (code == 'es')
-                                Text(t.languageDefault,
-                                    style: const TextStyle(color: GtvTheme.textDim, fontSize: 11)),
-                            ],
+                            ),
                           ),
                         ),
-                      );
-                    }).toList(),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 30),
-                _sectionTitle(t.backup),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: GtvTheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: GtvTheme.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(t.backupDescription,
-                          style: const TextStyle(color: GtvTheme.textDim, fontSize: 12, height: 1.5)),
-                      const SizedBox(height: 14),
-                      ElevatedButton.icon(
-                        onPressed: _busy ? null : _createBackup,
-                        icon: const Icon(Icons.save_alt_rounded, size: 18),
-                        label: Text(t.backupCreate),
-                      ),
-                      const SizedBox(height: 10),
-                      OutlinedButton.icon(
-                        onPressed: _busy ? null : _restoreBackup,
-                        icon: const Icon(Icons.folder_open_rounded, size: 18, color: Colors.white),
-                        label: Text(t.backupRestore, style: const TextStyle(color: Colors.white)),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: GtvTheme.border),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: const StadiumBorder(),
+                  const SizedBox(height: 30),
+                  _sectionTitle(t.about),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: GtvTheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: GtvTheme.border),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded, color: GtvTheme.textDim, size: 20),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text('GadirTV',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                         ),
-                      ),
-                    ],
+                        Text(kAppVersionLabel,
+                            style: const TextStyle(color: GtvTheme.textDim, fontSize: 12)),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 30),
-                _sectionTitle(t.about),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: GtvTheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: GtvTheme.border),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_outline_rounded, color: GtvTheme.textDim, size: 20),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text('GadirTV',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                      ),
-                      const Text('v2.3.0',
-                          style: TextStyle(color: GtvTheme.textDim, fontSize: 12)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 40),
-              ],
+                  const SizedBox(height: 40),
+                ],
+              ),
             ),
+    );
+  }
+
+  Widget _radioRow({
+    required String label,
+    required bool selected,
+    Widget? trailing,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Icon(
+            selected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+            color: selected ? GtvTheme.red : GtvTheme.textDim,
+            size: 22,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? GtvTheme.redHi : Colors.white,
+                fontSize: 14,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+          if (trailing != null) trailing,
+        ],
+      ),
     );
   }
 

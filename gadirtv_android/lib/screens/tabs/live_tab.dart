@@ -245,6 +245,8 @@ class _LiveTabState extends State<LiveTab> {
           children: [
             FocusTraversalOrder(
               order: const NumericFocusOrder(1),
+              child: Padding(
+              padding: const EdgeInsets.only(left: 12),
               child: SizedBox(
               width: TvLayout.categoryRailWidth(context),
               child: CategoryListRail(
@@ -252,6 +254,7 @@ class _LiveTabState extends State<LiveTab> {
                 selectedId: _selected,
                 onSelected: _loadChannels,
               ),
+            ),
             ),
             ),
             const VerticalDivider(width: 1, color: GtvTheme.border),
@@ -311,6 +314,8 @@ class _LiveTabState extends State<LiveTab> {
               children: [
                 FocusTraversalOrder(
                   order: const NumericFocusOrder(1),
+                  child: Padding(
+                  padding: const EdgeInsets.only(left: 12),
                   child: SizedBox(
                   width: TvLayout.categoryRailWidth(context),
                   child: CategoryListRail(
@@ -318,6 +323,7 @@ class _LiveTabState extends State<LiveTab> {
                     selectedId: _selected,
                     onSelected: _loadChannels,
                   ),
+                ),
                 ),
                 ),
                 const VerticalDivider(width: 1, color: GtvTheme.border),

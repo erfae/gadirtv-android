@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../utils/tv_utils.dart';
 import 'player_constants.dart';
 
 /// Persists user preferences that live outside profiles / favorites —
@@ -48,7 +49,8 @@ class PrefsSettings {
     if (v == PlayerEngine.exo || v == PlayerEngine.vlc || v == PlayerEngine.external) {
       return v!;
     }
-    // ExoPlayer is the default on all devices; libVLC remains available in settings.
+    // libVLC handles more IPTV formats (.ts, .mkv) on TV boxes.
+    if (await TvUtils.isAndroidTv()) return PlayerEngine.vlc;
     return PlayerEngine.defaultEngine;
   }
 

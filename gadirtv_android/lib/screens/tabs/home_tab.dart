@@ -15,8 +15,9 @@ import '../../utils/xtream_utils.dart';
 import '../../widgets/detail_hero_widgets.dart';
 import '../../widgets/gtv_focusable.dart';
 import '../../widgets/poster_card.dart';
+import '../../widgets/poster_rail_focus.dart';
 
-/// Home tab — Google TV hero (full-bleed backdrop + synopsis right) + rails.
+/// Home tab — Google TV hero + focusable content rails.
 class HomeTab extends StatefulWidget {
   const HomeTab({
     super.key,
@@ -40,7 +41,11 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   final _api = ApiService();
   final _resumeStore = ResumeStore();
-  final _playFocus = FocusNode();
+  final _playFocus = FocusNode(debugLabel: 'hero-play');
+  final _trailerFocus = FocusNode(debugLabel: 'hero-trailer');
+  final _resumeFocus = PosterRailFocus();
+  final _moviesFocus = PosterRailFocus();
+  final _seriesFocus = PosterRailFocus();
   final _rng = Random();
 
   List<Movie> _recentMovies = const [];
@@ -69,7 +74,21 @@ class _HomeTabState extends State<HomeTab> {
   void dispose() {
     _heroTimer?.cancel();
     _playFocus.dispose();
+    _trailerFocus.dispose();
+    _resumeFocus.dispose();
+    _moviesFocus.dispose();
+    _seriesFocus.dispose();
     super.dispose();
+  }
+
+  void _focusFirstRailBelowHero() {
+    if (_resume.isNotEmpty && _resumeFocus.nodes.isNotEmpty) {
+      _resumeFocus.focus(0);
+    } else if (_moviesFocus.nodes.isNotEmpty) {
+      _moviesFocus.focus(0);
+    } else if (_seriesFocus.nodes.isNotEmpty) {
+      _seriesFocus.focus(0);
+    }
   }
 
   Future<void> _load() async {
@@ -146,14 +165,22 @@ class _HomeTabState extends State<HomeTab> {
       ]..shuffle(_rng);
 
       if (!mounted) return;
+      final recentMovies = movies.take(24).toList();
+      final recentSeries = series.take(24).toList();
+      final resume = resumeItems.take(8).toList();
+
       setState(() {
-        _recentMovies = movies.take(24).toList();
-        _recentSeries = series.take(24).toList();
-        _resume = resumeItems.take(8).toList();
+        _recentMovies = recentMovies;
+        _recentSeries = recentSeries;
+        _resume = resume;
         _heroPool = pool.take(20).toList();
         _heroIndex = 0;
         _loading = false;
       });
+
+      _resumeFocus.rebuild(resume.length);
+      _moviesFocus.rebuild(recentMovies.length);
+      _seriesFocus.rebuild(recentSeries.length);
 
       _startHeroRotation();
       _loadHeroMeta(_heroIndex);
@@ -272,52 +299,35 @@ class _HomeTabState extends State<HomeTab> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final railH = TvLayout.compactRailBlockHeight(context, maxHeight: constraints.maxHeight) * 0.88;
-        final resumeExtra = _resume.isEmpty ? 0.0 : railH * 0.75;
-        final heroH = (constraints.maxHeight * 0.62) - resumeExtra * 0.25;
+        final heroH = (constraints.maxHeight * 0.58).clamp(280.0, constraints.maxHeight * 0.65);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              height: heroH.clamp(300.0, constraints.maxHeight * 0.82),
+              height: heroH,
               child: _buildGoogleTvHero(context),
             ),
-            if (_resume.isNotEmpty) ...[
-              SizedBox(height: railH * 0.72, child: _buildResumeRail(railH * 0.72)),
-              const SizedBox(height: 4),
-            ],
-            SizedBox(
-              height: railH,
-              child: _buildCompactRail(
-                title: 'Recientes Películas',
-                count: _recentMovies.length,
-                blockHeight: railH,
-                builder: (i) {
-                  final m = _recentMovies[i];
-                  return PosterCard(
-                    title: m.name,
-                    imageUrl: m.icon,
-                    rating: m.rating,
-                    onTap: () => widget.onOpenMovie(m),
-                  );
-                },
-              ),
-            ),
-            SizedBox(
-              height: railH,
-              child: _buildCompactRail(
-                title: 'Recientes Series',
-                count: _recentSeries.length,
-                blockHeight: railH,
-                builder: (i) {
-                  final s = _recentSeries[i];
-                  return PosterCard(
-                    title: s.name,
-                    imageUrl: s.cover,
-                    rating: s.rating,
-                    onTap: () => widget.onOpenSeries(s),
-                  );
-                },
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_resume.isNotEmpty) ...[
+                      SizedBox(height: railH * 0.72, child: _buildResumeRail(railH * 0.72)),
+                      const SizedBox(height: 6),
+                    ],
+                    SizedBox(
+                      height: railH,
+                      child: _buildMoviesRail(railH),
+                    ),
+                    SizedBox(
+                      height: railH,
+                      child: _buildSeriesRail(railH),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -334,6 +344,7 @@ class _HomeTabState extends State<HomeTab> {
     final item = _heroPool[idx];
     final poster = _heroPoster.isNotEmpty ? _heroPoster : item.imageUrl;
     final backdrop = _heroBackdrop.isNotEmpty ? _heroBackdrop : poster;
+    final hasTrailer = _heroTrailer.hasAny;
 
     return Stack(
       fit: StackFit.expand,
@@ -358,13 +369,18 @@ class _HomeTabState extends State<HomeTab> {
                     label: 'REPRODUCIR',
                     icon: Icons.play_arrow_rounded,
                     onTap: item.onPlay,
+                    onMoveDown: _focusFirstRailBelowHero,
+                    onMoveRight: hasTrailer ? () => _trailerFocus.requestFocus() : null,
                   ),
-                  if (_heroTrailer.hasAny) ...[
+                  if (hasTrailer) ...[
                     const SizedBox(width: 12),
                     GtvHeroActionButton(
+                      focusNode: _trailerFocus,
                       label: 'TRÁILER',
                       icon: Icons.ondemand_video_rounded,
                       onTap: _openTrailer,
+                      onMoveDown: _focusFirstRailBelowHero,
+                      onMoveLeft: () => _playFocus.requestFocus(),
                     ),
                   ],
                 ],
@@ -392,11 +408,15 @@ class _HomeTabState extends State<HomeTab> {
   Widget _buildResumeRail(double height) {
     final cardW = TvLayout.compactPosterWidth(context);
     final innerH = height - 28;
+    if (_resumeFocus.nodes.length != _resume.length) {
+      _resumeFocus.rebuild(_resume.length);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
+          padding: const EdgeInsets.symmetric(horizontal: 36),
           child: Text(
             'Continuar viendo',
             style: TextStyle(
@@ -411,17 +431,23 @@ class _HomeTabState extends State<HomeTab> {
           height: innerH,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 28),
+            padding: const EdgeInsets.symmetric(horizontal: 36),
             itemCount: _resume.length,
             separatorBuilder: (_, __) => const SizedBox(width: 10),
             itemBuilder: (_, i) {
               final r = _resume[i];
+              final node = i < _resumeFocus.nodes.length ? _resumeFocus.nodes[i] : null;
               return SizedBox(
                 width: cardW,
                 child: PosterCard(
+                  focusNode: node,
                   title: r.title,
                   imageUrl: r.image,
                   onTap: r.onTap,
+                  onMoveLeft: () => _resumeFocus.moveHorizontal(i, -1),
+                  onMoveRight: () => _resumeFocus.moveHorizontal(i, 1),
+                  onMoveUp: () => _playFocus.requestFocus(),
+                  onMoveDown: () => _moviesFocus.focus(0),
                 ),
               );
             },
@@ -431,12 +457,81 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
+  Widget _buildMoviesRail(double blockHeight) {
+    if (_recentMovies.isEmpty) return const SizedBox.shrink();
+    if (_moviesFocus.nodes.length != _recentMovies.length) {
+      _moviesFocus.rebuild(_recentMovies.length);
+    }
+    return _buildCompactRail(
+      title: 'Recientes Películas',
+      blockHeight: blockHeight,
+      focus: _moviesFocus,
+      onMoveUp: () {
+        if (_resume.isNotEmpty) {
+          _resumeFocus.focus(0);
+        } else {
+          _playFocus.requestFocus();
+        }
+      },
+      onMoveDown: () => _seriesFocus.focus(0),
+      builder: (i) {
+        final m = _recentMovies[i];
+        return PosterCard(
+          focusNode: _moviesFocus.nodes[i],
+          title: m.name,
+          imageUrl: m.icon,
+          rating: m.rating,
+          onTap: () => widget.onOpenMovie(m),
+          onMoveLeft: () => _moviesFocus.moveHorizontal(i, -1),
+          onMoveRight: () => _moviesFocus.moveHorizontal(i, 1),
+          onMoveUp: () {
+            if (_resume.isNotEmpty) {
+              _resumeFocus.focus(0);
+            } else {
+              _playFocus.requestFocus();
+            }
+          },
+          onMoveDown: () => _seriesFocus.focus(0),
+        );
+      },
+    );
+  }
+
+  Widget _buildSeriesRail(double blockHeight) {
+    if (_recentSeries.isEmpty) return const SizedBox.shrink();
+    if (_seriesFocus.nodes.length != _recentSeries.length) {
+      _seriesFocus.rebuild(_recentSeries.length);
+    }
+    return _buildCompactRail(
+      title: 'Recientes Series',
+      blockHeight: blockHeight,
+      focus: _seriesFocus,
+      onMoveUp: () => _moviesFocus.focus(0),
+      builder: (i) {
+        final s = _recentSeries[i];
+        return PosterCard(
+          focusNode: _seriesFocus.nodes[i],
+          title: s.name,
+          imageUrl: s.cover,
+          rating: s.rating,
+          onTap: () => widget.onOpenSeries(s),
+          onMoveLeft: () => _seriesFocus.moveHorizontal(i, -1),
+          onMoveRight: () => _seriesFocus.moveHorizontal(i, 1),
+          onMoveUp: () => _moviesFocus.focus(0),
+        );
+      },
+    );
+  }
+
   Widget _buildCompactRail({
     required String title,
-    required int count,
     required double blockHeight,
+    required PosterRailFocus focus,
     required Widget Function(int index) builder,
+    VoidCallback? onMoveUp,
+    VoidCallback? onMoveDown,
   }) {
+    final count = focus.nodes.length;
     if (count == 0) return const SizedBox.shrink();
     final cardW = TvLayout.compactPosterWidth(context);
     final listH = blockHeight - 30;
@@ -445,7 +540,7 @@ class _HomeTabState extends State<HomeTab> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
+          padding: const EdgeInsets.symmetric(horizontal: 36),
           child: Text(
             title,
             style: TextStyle(
@@ -460,7 +555,7 @@ class _HomeTabState extends State<HomeTab> {
           height: listH,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 28),
+            padding: const EdgeInsets.symmetric(horizontal: 36),
             itemCount: count,
             separatorBuilder: (_, __) => const SizedBox(width: 10),
             itemBuilder: (_, i) => SizedBox(width: cardW, child: builder(i)),

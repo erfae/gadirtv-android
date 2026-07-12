@@ -159,6 +159,8 @@ class _SeriesTabState extends State<SeriesTab> {
       children: [
         FocusTraversalOrder(
           order: const NumericFocusOrder(1),
+          child: Padding(
+          padding: const EdgeInsets.only(left: 12),
           child: SizedBox(
           width: TvLayout.categoryRailWidth(context),
           child: CategoryListRail(
@@ -168,6 +170,7 @@ class _SeriesTabState extends State<SeriesTab> {
             onSelected: _load,
             onMoveRight: () => _gridFocus.focus(0),
           ),
+        ),
         ),
         ),
         const VerticalDivider(width: 1, color: GtvTheme.border),

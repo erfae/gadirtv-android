@@ -5,7 +5,7 @@ import '../theme.dart';
 import '../utils/tv_layout.dart';
 import 'gtv_focusable.dart';
 
-/// Android TV hero — left: title, synopsis, actions. Right: large poster art.
+/// Android TV hero — Google TV style: cinematic backdrop right, text left.
 class GtvAndroidTvHeroLayout extends StatelessWidget {
   const GtvAndroidTvHeroLayout({
     super.key,
@@ -43,38 +43,35 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
       children: [
         if (bg.isNotEmpty)
           Positioned.fill(
-            child: Opacity(
-              opacity: 0.22,
-              child: CachedNetworkImage(
-                imageUrl: bg,
-                fit: BoxFit.cover,
-                alignment: Alignment.centerRight,
-                errorWidget: (_, __, ___) => const SizedBox.shrink(),
-              ),
+            child: CachedNetworkImage(
+              imageUrl: bg,
+              fit: BoxFit.cover,
+              alignment: Alignment.centerRight,
+              errorWidget: (_, __, ___) => const SizedBox.shrink(),
             ),
           ),
-        Container(color: GtvTheme.bg.withOpacity(0.72)),
         Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
               colors: [
-                GtvTheme.bg.withOpacity(0.95),
-                GtvTheme.bg.withOpacity(0.75),
-                Colors.transparent,
+                GtvTheme.bg,
+                GtvTheme.bg.withOpacity(0.92),
+                GtvTheme.bg.withOpacity(0.55),
+                Colors.black.withOpacity(0.15),
               ],
-              stops: const [0, 0.45, 0.85],
+              stops: const [0, 0.35, 0.62, 1],
             ),
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(28, 16, 24, 20),
+          padding: const EdgeInsets.fromLTRB(36, 20, 28, 24),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                flex: 10,
+                flex: 11,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -91,20 +88,21 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
                         letterSpacing: 0.8,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Text(
                       title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: TvLayout.sp(context, 30),
+                        fontSize: TvLayout.sp(context, 34),
                         fontWeight: FontWeight.w800,
                         height: 1.05,
+                        letterSpacing: -0.5,
                       ),
                     ),
                     if (rating > 0) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Text(
                         '★ ${rating.toStringAsFixed(1)}',
                         style: TextStyle(
@@ -115,33 +113,18 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
                       ),
                     ],
                     if (subtitle != null && subtitle!.isNotEmpty) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       Text(
                         subtitle!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: GtvTheme.textDim, fontSize: 13),
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: GtvTheme.red.withOpacity(0.22),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: GtvTheme.red.withOpacity(0.55)),
-                      ),
-                      child: Text(
-                        synopsisTitle,
                         style: TextStyle(
-                          color: GtvTheme.redHi,
-                          fontSize: TvLayout.sp(context, 14),
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
+                          color: Colors.white.withOpacity(0.75),
+                          fontSize: TvLayout.sp(context, 13),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
+                    ],
+                    const SizedBox(height: 16),
                     if (synopsisLoading)
                       const Padding(
                         padding: EdgeInsets.only(top: 8),
@@ -153,25 +136,25 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
                       )
                     else
                       Expanded(
-                        child: SingleChildScrollView(
-                          child: Text(
-                            synopsis,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.88),
-                              fontSize: TvLayout.sp(context, 14),
-                              height: 1.55,
-                            ),
+                        child: Text(
+                          synopsis,
+                          maxLines: 5,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.82),
+                            fontSize: TvLayout.sp(context, 14),
+                            height: 1.5,
                           ),
                         ),
                       ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                     actions,
                   ],
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 16),
               Expanded(
-                flex: 11,
+                flex: 9,
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: _LargePoster(posterUrl: posterUrl),
@@ -209,7 +192,7 @@ class _LargePoster extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final h = constraints.maxHeight.isFinite ? constraints.maxHeight : 360.0;
-        final w = (h * 2 / 3).clamp(160.0, 400.0);
+        final w = (h * 2 / 3).clamp(150.0, 380.0);
         return Container(
           height: h,
           width: w,
@@ -217,9 +200,9 @@ class _LargePoster extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.65),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
+                color: Colors.black.withOpacity(0.7),
+                blurRadius: 32,
+                offset: const Offset(0, 14),
               ),
             ],
           ),
@@ -249,6 +232,9 @@ class GtvHeroActionButton extends StatelessWidget {
     required this.onTap,
     this.focusNode,
     this.autofocus = false,
+    this.onMoveDown,
+    this.onMoveRight,
+    this.onMoveLeft,
   });
 
   final String label;
@@ -256,6 +242,9 @@ class GtvHeroActionButton extends StatelessWidget {
   final VoidCallback onTap;
   final FocusNode? focusNode;
   final bool autofocus;
+  final VoidCallback? onMoveDown;
+  final VoidCallback? onMoveRight;
+  final VoidCallback? onMoveLeft;
 
   @override
   Widget build(BuildContext context) {
@@ -263,6 +252,9 @@ class GtvHeroActionButton extends StatelessWidget {
       focusNode: focusNode,
       autofocus: autofocus,
       onTap: onTap,
+      onMoveDown: onMoveDown,
+      onMoveRight: onMoveRight,
+      onMoveLeft: onMoveLeft,
       borderRadius: BorderRadius.circular(999),
       child: ElevatedButton.icon(
         onPressed: onTap,

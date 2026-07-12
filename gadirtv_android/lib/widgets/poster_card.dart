@@ -59,58 +59,9 @@ class _PosterCardState extends State<PosterCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      focusNode: widget.focusNode,
-      autofocus: widget.autofocus,
-      onKeyEvent: (_, event) {
-        if (event is! KeyDownEvent) return KeyEventResult.ignored;
-        final k = event.logicalKey;
-        if (k == LogicalKeyboardKey.arrowLeft && widget.onMoveLeft != null) {
-          widget.onMoveLeft!();
-          return KeyEventResult.handled;
-        }
-        if (k == LogicalKeyboardKey.arrowRight && widget.onMoveRight != null) {
-          widget.onMoveRight!();
-          return KeyEventResult.handled;
-        }
-        if (k == LogicalKeyboardKey.arrowUp && widget.onMoveUp != null) {
-          widget.onMoveUp!();
-          return KeyEventResult.handled;
-        }
-        if (k == LogicalKeyboardKey.arrowDown && widget.onMoveDown != null) {
-          widget.onMoveDown!();
-          return KeyEventResult.handled;
-        }
-        if (k == LogicalKeyboardKey.select || k == LogicalKeyboardKey.enter) {
-          widget.onTap();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: FocusableActionDetector(
-      autofocus: widget.focusNode == null && widget.autofocus,
-      onShowFocusHighlight: (v) {
-        setState(() => _focused = v);
-        if (v) {
-          Scrollable.ensureVisible(
-            context,
-            alignment: 0.45,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-          );
-        }
-      },
-      onShowHoverHighlight: (v) => setState(() => _focused = v),
-      mouseCursor: SystemMouseCursors.click,
-      actions: {
-        ActivateIntent: CallbackAction<ActivateIntent>(
-          onInvoke: (_) {
-            widget.onTap();
-            return null;
-          },
-        ),
-      },
-      child: GestureDetector(
+    final useExternalFocus = widget.focusNode != null;
+
+    Widget card = GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
@@ -224,9 +175,79 @@ class _PosterCardState extends State<PosterCard> {
             ),
           ),
         ),
-      ),
-    ),
+      );
+
+    if (useExternalFocus) {
+      return Focus(
+        focusNode: widget.focusNode,
+        autofocus: widget.autofocus,
+        onKeyEvent: (_, event) => _handleKey(event),
+        onFocusChange: (v) {
+          setState(() => _focused = v);
+          if (v) {
+            Scrollable.ensureVisible(
+              context,
+              alignment: 0.45,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOut,
+            );
+          }
+        },
+        child: card,
+      );
+    }
+
+    return FocusableActionDetector(
+      autofocus: widget.autofocus,
+      onShowFocusHighlight: (v) {
+        setState(() => _focused = v);
+        if (v) {
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.45,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+          );
+        }
+      },
+      onShowHoverHighlight: (v) => setState(() => _focused = v),
+      mouseCursor: SystemMouseCursors.click,
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            widget.onTap();
+            return null;
+          },
+        ),
+      },
+      child: card,
     );
+  }
+
+  KeyEventResult _handleKey(KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final k = event.logicalKey;
+    if (k == LogicalKeyboardKey.arrowLeft && widget.onMoveLeft != null) {
+      widget.onMoveLeft!();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowRight && widget.onMoveRight != null) {
+      widget.onMoveRight!();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowUp && widget.onMoveUp != null) {
+      widget.onMoveUp!();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.arrowDown && widget.onMoveDown != null) {
+      widget.onMoveDown!();
+      return KeyEventResult.handled;
+    }
+    if (k == LogicalKeyboardKey.select || k == LogicalKeyboardKey.enter) {
+      widget.onTap();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   Widget _buildImage() {

@@ -18,6 +18,10 @@ class GtvFocusable extends StatefulWidget {
     this.borderRadius = const BorderRadius.all(Radius.circular(12)),
     this.padding = EdgeInsets.zero,
     this.enabled = true,
+    this.onMoveLeft,
+    this.onMoveRight,
+    this.onMoveUp,
+    this.onMoveDown,
   });
 
   final Widget child;
@@ -28,6 +32,10 @@ class GtvFocusable extends StatefulWidget {
   final BorderRadius borderRadius;
   final EdgeInsetsGeometry padding;
   final bool enabled;
+  final VoidCallback? onMoveLeft;
+  final VoidCallback? onMoveRight;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
 
   @override
   State<GtvFocusable> createState() => _GtvFocusableState();
@@ -40,9 +48,37 @@ class _GtvFocusableState extends State<GtvFocusable> {
   Widget build(BuildContext context) {
     final enabled = widget.enabled && widget.onTap != null;
 
-    return FocusableActionDetector(
-      autofocus: widget.autofocus,
+    return Focus(
       focusNode: widget.focusNode,
+      autofocus: widget.autofocus,
+      canRequestFocus: enabled,
+      onKeyEvent: (_, event) {
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        final k = event.logicalKey;
+        if (k == LogicalKeyboardKey.arrowLeft && widget.onMoveLeft != null) {
+          widget.onMoveLeft!();
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.arrowRight && widget.onMoveRight != null) {
+          widget.onMoveRight!();
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.arrowUp && widget.onMoveUp != null) {
+          widget.onMoveUp!();
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.arrowDown && widget.onMoveDown != null) {
+          widget.onMoveDown!();
+          return KeyEventResult.handled;
+        }
+        if (k == LogicalKeyboardKey.select || k == LogicalKeyboardKey.enter) {
+          widget.onTap?.call();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: FocusableActionDetector(
+      autofocus: widget.focusNode == null && widget.autofocus,
       enabled: enabled,
       onShowFocusHighlight: (v) => setState(() => _focused = v),
       onShowHoverHighlight: (v) => setState(() => _focused = v),
@@ -76,6 +112,7 @@ class _GtvFocusableState extends State<GtvFocusable> {
           child: widget.child,
         ),
       ),
+    ),
     );
   }
 }

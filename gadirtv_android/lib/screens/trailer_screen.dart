@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../theme.dart';
 import '../widgets/gtv_focusable.dart';
@@ -31,9 +32,15 @@ class _TrailerScreenState extends State<TrailerScreen> {
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    _initWebView();
+  }
+
+  Future<void> _initWebView() async {
     final lang = widget.spanish ? 'es' : 'en';
-    final embed =
-        'https://www.youtube.com/embed/${widget.videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&hl=$lang&cc_lang=$lang&cc_load_policy=1';
+    final id = widget.videoId.trim();
+    final embedUrl =
+        'https://www.youtube-nocookie.com/embed/$id?autoplay=1&rel=0&modestbranding=1&playsinline=1&hl=$lang&cc_lang_pref=$lang&enablejsapi=1&origin=https://www.youtube.com';
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
@@ -46,12 +53,50 @@ class _TrailerScreenState extends State<TrailerScreen> {
             if (!mounted) return;
             setState(() {
               _loading = false;
-              _error = e.description;
+              _error = e.description.isNotEmpty ? e.description : 'Error ${e.errorCode}';
             });
           },
         ),
-      )
-      ..loadRequest(Uri.parse(embed));
+      );
+
+    final platform = _controller.platform;
+    if (platform is AndroidWebViewController) {
+      await platform.setMediaPlaybackRequiresUserGesture(false);
+      await platform.setOnShowFileSelector((_) async => []);
+    }
+
+    final html = '''
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { background: #000; width: 100%; height: 100%; overflow: hidden; }
+    iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+  </style>
+</head>
+<body>
+  <iframe
+    src="$embedUrl"
+    title="Tráiler"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    allowfullscreen>
+  </iframe>
+</body>
+</html>
+''';
+
+    try {
+      await _controller.loadHtmlString(html, baseUrl: 'https://www.youtube.com');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
+    }
   }
 
   @override
@@ -76,10 +121,17 @@ class _TrailerScreenState extends State<TrailerScreen> {
               Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Text(
-                    'No se pudo cargar el tráiler.\n$_error',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: GtvTheme.textDim),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline_rounded, color: GtvTheme.redHi, size: 48),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No se pudo cargar el tráiler.\n$_error',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: GtvTheme.textDim),
+                      ),
+                    ],
                   ),
                 ),
               ),

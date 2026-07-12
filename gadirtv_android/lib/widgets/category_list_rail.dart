@@ -54,6 +54,7 @@ class CategoryListRailState extends State<CategoryListRail> {
     _syncNodes();
     return Container(
       color: GtvTheme.surface,
+      padding: const EdgeInsets.only(left: 20),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 6),
         itemCount: widget.categories.length,
