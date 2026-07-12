@@ -63,14 +63,15 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, HTTP_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "get" -> {
+                    "request" -> {
                         val url = call.argument<String>("url")
                         val ua = call.argument<String>("userAgent") ?: "XCIPTV"
+                        val method = call.argument<String>("method") ?: "GET"
                         if (url.isNullOrBlank()) {
                             result.error("BAD_ARGS", "url required", null)
                             return@setMethodCallHandler
                         }
-                        httpGet(url, ua, result)
+                        httpRequest(url, ua, method, result)
                     }
                     else -> result.notImplemented()
                 }
@@ -170,29 +171,15 @@ class MainActivity : FlutterActivity() {
             || pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
     }
 
-    /** Native HTTP for Xtream login — same stack XCIPTV / OkHttp use on Android. */
-    private fun httpGet(url: String, userAgent: String, result: MethodChannel.Result) {
+    /** OkHttp Xtream login — GET and POST (some panels only accept POST). */
+    private fun httpRequest(url: String, userAgent: String, method: String, result: MethodChannel.Result) {
         Thread {
-            var conn: java.net.HttpURLConnection? = null
             try {
-                conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
-                conn.requestMethod = "GET"
-                conn.instanceFollowRedirects = true
-                conn.connectTimeout = 6000
-                conn.readTimeout = 10000
-                conn.setRequestProperty("User-Agent", userAgent)
-                conn.setRequestProperty("Accept", "application/json, text/plain, */*")
-                conn.setRequestProperty("Accept-Encoding", "identity")
-                conn.setRequestProperty("Connection", "keep-alive")
-                val status = conn.responseCode
-                val stream = if (status >= 400) conn.errorStream else conn.inputStream
-                val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
-                result.success(mapOf("status" to status, "body" to body))
+                val response = NativeHttpClient.request(url, userAgent, method)
+                result.success(response)
             } catch (e: Exception) {
-                Log.e(TAG, "Native HTTP failed: ${e.message}")
+                Log.e(TAG, "OkHttp failed ($method): ${e.message}")
                 result.error("HTTP_ERROR", e.message, null)
-            } finally {
-                conn?.disconnect()
             }
         }.start()
     }
