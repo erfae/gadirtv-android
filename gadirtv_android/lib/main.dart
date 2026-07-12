@@ -12,6 +12,7 @@ import 'services/prefs_settings.dart';
 import 'services/profile_store.dart';
 import 'theme.dart';
 import 'utils/tv_utils.dart';
+import 'services/gtv_tv_key_bridge.dart';
 import 'widgets/gtv_tv_shortcuts.dart';
 
 Future<void> main() async {
@@ -51,8 +52,9 @@ Future<void> main() async {
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } catch (_) {}
 
-    // Global DPAD handler — backup when Shortcuts scope does not receive keys.
-    GtvTvKeyHandler.install();
+    // Native Android TV boxes often never deliver KeyEvents to Flutter; MainActivity
+    // forwards DPAD presses over MethodChannel and we inject them here.
+    GtvTvKeyBridge.install();
 
     // Warm TV detection cache so focus-heavy screens can adapt if needed.
     unawaited(TvUtils.isAndroidTv());
@@ -141,7 +143,15 @@ class _GadirTvAppState extends State<GadirTvApp> {
               theme: GtvTheme.build(),
               routerConfig: _router,
               builder: (context, child) => GtvTvShell(
-                child: child ?? const SizedBox.shrink(),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    GtvTvInitialFocus(
+                      child: child ?? const SizedBox.shrink(),
+                    ),
+                    const GtvTvKeyDebugBanner(),
+                  ],
+                ),
               ),
             ),
           );

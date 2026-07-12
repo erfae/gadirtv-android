@@ -1,106 +1,107 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Installs a global key handler so DPAD events move focus even when the
-/// widget tree / Shortcuts scope misses them (common on Amlogic TV boxes).
-class GtvTvKeyHandler {
-  GtvTvKeyHandler._();
+import '../services/gtv_tv_key_bridge.dart';
 
-  static bool _installed = false;
-
-  static void install() {
-    if (_installed) return;
-    _installed = true;
-    HardwareKeyboard.instance.addHandler(_handle);
-  }
-
-  static bool _handle(KeyEvent event) {
-    if (event is! KeyDownEvent) return false;
-
-    final focus = FocusManager.instance.primaryFocus;
-    final ctx = focus?.context;
-    if (ctx == null) return false;
-
-    final Intent? intent = switch (event.logicalKey) {
-      LogicalKeyboardKey.arrowUp => const DirectionalFocusIntent(TraversalDirection.up),
-      LogicalKeyboardKey.arrowDown => const DirectionalFocusIntent(TraversalDirection.down),
-      LogicalKeyboardKey.arrowLeft => const DirectionalFocusIntent(TraversalDirection.left),
-      LogicalKeyboardKey.arrowRight => const DirectionalFocusIntent(TraversalDirection.right),
-      LogicalKeyboardKey.select ||
-      LogicalKeyboardKey.enter ||
-      LogicalKeyboardKey.numpadEnter =>
-        const ActivateIntent(),
-      _ => null,
-    };
-
-    if (intent == null) return false;
-
-    final result = Actions.maybeInvoke(ctx, intent);
-    return result != null;
-  }
-}
-
-/// Per-route shell: directional navigation mode + D-pad shortcuts + focus trap.
-class GtvTvShell extends StatefulWidget {
+/// TV remote / D-pad: Shortcuts + directional focus traversal.
+///
+/// On many Android TV boxes Flutter never receives [KeyEvent]s from the
+/// platform. [GtvTvKeyBridge] forwards them from [MainActivity]; this widget
+/// maps them to focus actions.
+class GtvTvShell extends StatelessWidget {
   const GtvTvShell({super.key, required this.child});
 
   final Widget child;
 
-  @override
-  State<GtvTvShell> createState() => _GtvTvShellState();
-}
-
-class _GtvTvShellState extends State<GtvTvShell> {
-  final _rootFocus = FocusNode(debugLabel: 'gtv-tv-root');
-
-  static final _shortcuts = <ShortcutActivator, Intent>{
-    SingleActivator(LogicalKeyboardKey.arrowUp): DirectionalFocusIntent(TraversalDirection.up),
-    SingleActivator(LogicalKeyboardKey.arrowDown): DirectionalFocusIntent(TraversalDirection.down),
-    SingleActivator(LogicalKeyboardKey.arrowLeft): DirectionalFocusIntent(TraversalDirection.left),
-    SingleActivator(LogicalKeyboardKey.arrowRight): DirectionalFocusIntent(TraversalDirection.right),
-    SingleActivator(LogicalKeyboardKey.select): ActivateIntent(),
-    SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
-    SingleActivator(LogicalKeyboardKey.numpadEnter): ActivateIntent(),
-    SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+  static final Map<ShortcutActivator, Intent> _tvShortcuts =
+      <ShortcutActivator, Intent>{
+    const SingleActivator(LogicalKeyboardKey.arrowUp): const DirectionalFocusIntent(
+      TraversalDirection.up,
+    ),
+    const SingleActivator(LogicalKeyboardKey.arrowDown):
+        const DirectionalFocusIntent(TraversalDirection.down),
+    const SingleActivator(LogicalKeyboardKey.arrowLeft):
+        const DirectionalFocusIntent(TraversalDirection.left),
+    const SingleActivator(LogicalKeyboardKey.arrowRight):
+        const DirectionalFocusIntent(TraversalDirection.right),
+    const SingleActivator(LogicalKeyboardKey.select): const ActivateIntent(),
+    const SingleActivator(LogicalKeyboardKey.enter): const ActivateIntent(),
+    const SingleActivator(LogicalKeyboardKey.space): const ActivateIntent(),
   };
 
   @override
+  Widget build(BuildContext context) {
+    return Shortcuts(
+      shortcuts: _tvShortcuts,
+      child: Actions(
+        actions: WidgetsApp.defaultActions,
+        child: FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Requests focus on the first focusable descendant after the first frame.
+class GtvTvInitialFocus extends StatefulWidget {
+  const GtvTvInitialFocus({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<GtvTvInitialFocus> createState() => _GtvTvInitialFocusState();
+}
+
+class _GtvTvInitialFocusState extends State<GtvTvInitialFocus> {
+  @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_rootFocus.hasFocus) {
-        _rootFocus.requestFocus();
-      }
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusFirst());
+  }
+
+  void _focusFirst() {
+    if (!mounted) return;
+    final scope = FocusScope.of(context);
+    if (scope.focusedChild != null) return;
+    scope.firstFocus();
   }
 
   @override
-  void dispose() {
-    _rootFocus.dispose();
-    super.dispose();
-  }
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// Debug overlay: last key received (native bridge or Flutter).
+class GtvTvKeyDebugBanner extends StatelessWidget {
+  const GtvTvKeyDebugBanner({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    return MediaQuery(
-      data: mq.copyWith(navigationMode: NavigationMode.directional),
-      child: Shortcuts(
-        shortcuts: _shortcuts,
-        child: Actions(
-          actions: {
-            DirectionalFocusIntent: DirectionalFocusAction(),
-          },
-          child: FocusTraversalGroup(
-            policy: ReadingOrderTraversalPolicy(),
-            child: Focus(
-              focusNode: _rootFocus,
-              autofocus: true,
-              child: widget.child,
+    if (!kDebugMode) return const SizedBox.shrink();
+
+    return ValueListenableBuilder<int?>(
+      valueListenable: GtvTvKeyBridge.lastKeyNotifier,
+      builder: (context, keyCode, _) {
+        if (keyCode == null) return const SizedBox.shrink();
+        final label = GtvTvKeyBridge.lastKeyLabel ?? 'KEY_$keyCode';
+        return Positioned(
+          left: 12,
+          bottom: 12,
+          child: Material(
+            color: Colors.black87,
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Text(
+                'Tecla: $label',
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
