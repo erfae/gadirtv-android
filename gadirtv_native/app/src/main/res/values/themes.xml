@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.GadirTV" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/gtv_bg</item>
+        <item name="colorPrimary">@color/gtv_red</item>
+        <item name="colorPrimaryVariant">@color/gtv_red</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="android:statusBarColor">@color/gtv_bg</item>
+        <item name="android:navigationBarColor">@color/gtv_bg</item>
+    </style>
+
+    <style name="Theme.GadirTV.Player" parent="Theme.GadirTV">
+        <item name="android:windowFullscreen">true</item>
+    </style>
+</resources>
