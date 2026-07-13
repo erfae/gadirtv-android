@@ -522,11 +522,11 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              flex: 55,
+              flex: 50,
               child: _buildGoogleTvHero(context),
             ),
             Expanded(
-              flex: 45,
+              flex: 50,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -539,17 +539,26 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
                       ),
                     ),
                   Expanded(
-                    flex: 3,
-                    child: LayoutBuilder(
-                      builder: (context, railConstraints) =>
-                          _buildMoviesRail(railConstraints.maxHeight),
+                    flex: _resume.isNotEmpty ? 4 : 5,
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        top: _resume.isNotEmpty ? 4 : 8,
+                        bottom: 6,
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, railConstraints) =>
+                            _buildMoviesRail(railConstraints.maxHeight),
+                      ),
                     ),
                   ),
                   Expanded(
-                    flex: 3,
-                    child: LayoutBuilder(
-                      builder: (context, railConstraints) =>
-                          _buildSeriesRail(railConstraints.maxHeight),
+                    flex: _resume.isNotEmpty ? 4 : 5,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 10, bottom: 8),
+                      child: LayoutBuilder(
+                        builder: (context, railConstraints) =>
+                            _buildSeriesRail(railConstraints.maxHeight),
+                      ),
                     ),
                   ),
                 ],
@@ -789,9 +798,10 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
   }) {
     final count = focus.nodes.length;
     if (count == 0) return const SizedBox.shrink();
-    final listH = (blockHeight - 30).clamp(60.0, blockHeight);
-    final maxW = TvLayout.compactPosterWidth(context);
-    final cardW = ((listH - 12) / 1.5).clamp(72.0, maxW);
+    final titleBlock = 34.0;
+    final listH = (blockHeight - titleBlock).clamp(110.0, blockHeight);
+    final maxW = TvLayout.posterWidth(context);
+    final cardW = ((listH - 8) / 1.5).clamp(110.0, maxW);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -802,12 +812,12 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
             title,
             style: TextStyle(
               color: Colors.white,
-              fontSize: TvLayout.sp(context, 17),
+              fontSize: TvLayout.sp(context, 18),
               fontWeight: FontWeight.w700,
             ),
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
         SizedBox(
           height: listH,
           child: ListView.separated(
@@ -815,7 +825,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 36),
             itemCount: count,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            separatorBuilder: (_, __) => const SizedBox(width: 14),
             itemBuilder: (_, i) => SizedBox(width: cardW, child: builder(i)),
           ),
         ),

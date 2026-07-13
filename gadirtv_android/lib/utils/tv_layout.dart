@@ -15,7 +15,7 @@ class TvLayout {
 
   static double posterWidth(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
-    return (w * 0.11).clamp(110.0, 170.0);
+    return (w * 0.12).clamp(120.0, 185.0);
   }
 
   static double posterRailHeight(BuildContext context) {
