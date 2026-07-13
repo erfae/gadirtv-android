@@ -8,6 +8,8 @@ on:
       - 'gradle/**'
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
+      - 'key.properties'
+      - 'app/gadirtv-release.jks'
       - '.github/workflows/gadirtv-native-apk.yml'
   workflow_dispatch:
 
@@ -78,7 +80,8 @@ jobs:
 
             **Package:** `com.gadir.tv`
 
-            Desinstala cualquier versión anterior de GadirTV antes de instalar.
+            Instala encima de GadirTV Flutter (misma firma y versionCode > 84).
+            Si falla, desinstala GadirTV y vuelve a instalar.
           files: release-assets/*
           make_latest: true
           overwrite_files: true
