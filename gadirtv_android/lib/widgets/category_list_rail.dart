@@ -12,12 +12,14 @@ class CategoryListRail extends StatefulWidget {
     required this.selectedId,
     required this.onSelected,
     this.onMoveRight,
+    this.onMoveDown,
   });
 
   final List<(String, String)> categories;
   final String selectedId;
   final ValueChanged<String> onSelected;
   final VoidCallback? onMoveRight;
+  final VoidCallback? onMoveDown;
 
   @override
   State<CategoryListRail> createState() => CategoryListRailState();
@@ -84,7 +86,9 @@ class CategoryListRailState extends State<CategoryListRail> {
             autofocus: i == 0,
             onTap: () => widget.onSelected(id),
             onMoveUp: i > 0 ? () => _rowFocusNodes[i - 1].requestFocus() : null,
-            onMoveDown: i < count - 1 ? () => _rowFocusNodes[i + 1].requestFocus() : null,
+            onMoveDown: i < count - 1
+                ? () => _rowFocusNodes[i + 1].requestFocus()
+                : widget.onMoveDown,
             onMoveRight: widget.onMoveRight,
             showRing: false,
             borderRadius: BorderRadius.circular(4),

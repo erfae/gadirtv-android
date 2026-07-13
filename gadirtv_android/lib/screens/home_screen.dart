@@ -455,8 +455,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     ];
 
-    _syncTvFocusRegistry();
-
     return Focus(
       canRequestFocus: false,
       skipTraversal: true,

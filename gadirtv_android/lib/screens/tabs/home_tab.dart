@@ -329,12 +329,16 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
 
   void _startHeroRotation() {
     _heroTimer?.cancel();
-    if (_heroPool.length <= 1 || _railPreview != null) return;
+    if (_heroPool.length <= 1 || _railPreview != null || _anyRailFocused()) return;
     _heroTimer = Timer.periodic(const Duration(seconds: 15), (_) => _shiftHeroRandom());
   }
 
+  bool _anyRailFocused() =>
+      _resumeFocus.hasFocus || _moviesFocus.hasFocus || _seriesFocus.hasFocus;
+
   void _shiftHeroRandom() {
-    if (_heroPool.isEmpty || _railPreview != null) return;
+    if (_heroPool.isEmpty || _railPreview != null || _anyRailFocused()) return;
+    final keepHeroFocus = _playFocus.hasFocus || _trailerFocus.hasFocus;
     var next = _rng.nextInt(_heroPool.length);
     if (_heroPool.length > 1) {
       while (next == _heroIndex) {
@@ -344,7 +348,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
     setState(() => _heroIndex = next);
     _applyHeroMetaFromCache(next);
     _loadHeroMeta(next);
-    if (_playFocus.hasFocus || _trailerFocus.hasFocus) {
+    if (keepHeroFocus) {
       _playFocus.requestFocus();
     }
   }
@@ -482,6 +486,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
   void _shiftHero(int delta) {
     if (_heroPool.isEmpty) return;
     _heroTimer?.cancel();
+    final keepHeroFocus = _playFocus.hasFocus || _trailerFocus.hasFocus;
     final next = (_heroIndex + delta) % _heroPool.length;
     setState(() {
       _railPreview = null;
@@ -490,7 +495,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
     _applyHeroMetaFromCache(_heroIndex);
     _loadHeroMeta(_heroIndex);
     _startHeroRotation();
-    if (_playFocus.hasFocus || _trailerFocus.hasFocus) {
+    if (keepHeroFocus) {
       _playFocus.requestFocus();
     }
   }
@@ -636,9 +641,6 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
     final listH = (height - 28).clamp(60.0, height);
     final maxW = TvLayout.compactPosterWidth(context);
     final cardW = ((listH - 12) / 1.5).clamp(72.0, maxW);
-    if (_resumeFocus.nodes.length != _resume.length) {
-      _resumeFocus.rebuild(_resume.length);
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -689,9 +691,6 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
 
   Widget _buildMoviesRail(double blockHeight) {
     if (_recentMovies.isEmpty) return const SizedBox.shrink();
-    if (_moviesFocus.nodes.length != _recentMovies.length) {
-      _moviesFocus.rebuild(_recentMovies.length);
-    }
     return _buildCompactRail(
       title: 'Recientes Películas',
       blockHeight: blockHeight,
@@ -743,9 +742,6 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
 
   Widget _buildSeriesRail(double blockHeight) {
     if (_recentSeries.isEmpty) return const SizedBox.shrink();
-    if (_seriesFocus.nodes.length != _recentSeries.length) {
-      _seriesFocus.rebuild(_recentSeries.length);
-    }
     return _buildCompactRail(
       title: 'Recientes Series',
       blockHeight: blockHeight,

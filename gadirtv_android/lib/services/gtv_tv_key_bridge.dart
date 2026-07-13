@@ -5,8 +5,7 @@ import 'package:flutter/services.dart';
 import 'gtv_tv_focus_registry.dart';
 import 'gtv_tv_focus_navigation.dart';
 
-/// Receives DPAD / Enter key events from Android [MainActivity] when the
-/// Flutter engine does not deliver them through [HardwareKeyboard].
+/// Receives DPAD / Enter key events from Android [MainActivity] on TV devices.
 class GtvTvKeyBridge {
   GtvTvKeyBridge._();
 
@@ -17,14 +16,8 @@ class GtvTvKeyBridge {
   static String? lastKeyLabel;
   static final ValueNotifier<int?> lastKeyNotifier = ValueNotifier<int?>(null);
 
-  /// When true, [_ensureInitialFocus] is skipped (e.g. moving between fields).
+  /// When true, initial focus recovery is skipped (e.g. text-field editing).
   static bool suppressInitialFocus = false;
-
-  /// Set while handling a native key — Flutter [KeyEvent] handlers can skip.
-  static bool nativeKeyHandled = false;
-
-  static int? _lastNativeKeyCode;
-  static int _lastNativeKeyMs = 0;
 
   static void install() {
     if (_installed) return;
@@ -38,13 +31,6 @@ class GtvTvKeyBridge {
       final keyCode = args['keyCode'];
       if (keyCode is! int) return;
 
-      final now = DateTime.now().millisecondsSinceEpoch;
-      if (_lastNativeKeyCode == keyCode && now - _lastNativeKeyMs < 60) {
-        return;
-      }
-      _lastNativeKeyCode = keyCode;
-      _lastNativeKeyMs = now;
-
       lastKeyCode = keyCode;
       lastKeyLabel = _labelForKeyCode(keyCode);
       lastKeyNotifier.value = keyCode;
@@ -53,24 +39,17 @@ class GtvTvKeyBridge {
         debugPrint('GtvTvKeyBridge: $lastKeyLabel (keyCode=$keyCode)');
       }
 
-      nativeKeyHandled = true;
-      try {
-        _handleNavigationKey(keyCode);
-      } finally {
-        Future<void>.delayed(const Duration(milliseconds: 50), () {
-          nativeKeyHandled = false;
-        });
-      }
+      _handleNavigationKey(keyCode);
     });
   }
 
   static void _handleNavigationKey(int keyCode) {
-    _recoverFocus();
-    var focus = _effectiveFocusNode(FocusManager.instance.primaryFocus);
-    if (focus == null) {
-      _recoverFocus(force: true);
-      focus = _effectiveFocusNode(FocusManager.instance.primaryFocus);
-      if (focus == null) return;
+    var focus = FocusManager.instance.primaryFocus;
+    if (focus == null || !focus.hasFocus) {
+      if (suppressInitialFocus) return;
+      _focusFirstAvailable();
+      focus = FocusManager.instance.primaryFocus;
+      if (focus == null || !focus.hasFocus) return;
     }
 
     final context = focus.context;
@@ -104,51 +83,23 @@ class GtvTvKeyBridge {
     }
   }
 
-  /// Prefer a node that has explicit D-pad routes registered.
-  static FocusNode? _effectiveFocusNode(FocusNode? node) {
-    if (node != null && node.hasFocus && GtvTvFocusNavigation.hasRoute(node)) {
-      return node;
-    }
-    return _firstRegisteredInTree() ?? node;
-  }
-
-  static FocusNode? _firstRegisteredInTree() {
-    FocusNode? first;
-    void walk(FocusNode n) {
-      if (first != null) return;
-      if (n.canRequestFocus && GtvTvFocusNavigation.hasRoute(n)) {
-        first = n;
+  static void _focusFirstAvailable() {
+    for (final node in FocusManager.instance.rootScope.descendants) {
+      if (node.canRequestFocus && GtvTvFocusNavigation.hasRoute(node)) {
+        node.requestFocus();
         return;
       }
-      for (final c in n.children) {
-        walk(c);
+    }
+    for (final node in FocusManager.instance.rootScope.descendants) {
+      if (node.canRequestFocus) {
+        node.requestFocus();
+        return;
       }
     }
-
-    walk(FocusManager.instance.rootScope);
-    return first;
-  }
-
-  static void _recoverFocus({bool force = false}) {
-    final current = FocusManager.instance.primaryFocus;
-    if (!force && current != null && current.hasFocus && current.canRequestFocus) {
-      return;
-    }
-    if (!force && suppressInitialFocus) return;
-
-    final registered = _firstRegisteredInTree();
-    if (registered != null) {
-      registered.requestFocus();
-      return;
-    }
-
-    _requestInitialFocus(FocusManager.instance.rootScope);
   }
 
   static void _moveFocus(FocusNode from, TraversalDirection dir) {
-    final node = GtvTvFocusNavigation.hasRoute(from) ? from : (_effectiveFocusNode(from) ?? from);
-
-    if (GtvTvFocusNavigation.move(node, dir)) return;
+    if (GtvTvFocusNavigation.move(from, dir)) return;
 
     final before = FocusManager.instance.primaryFocus;
 
@@ -169,7 +120,7 @@ class GtvTvKeyBridge {
       }
     }
 
-    node.focusInDirection(dir);
+    from.focusInDirection(dir);
     final after = FocusManager.instance.primaryFocus;
     if (after != before && after != null) return;
 
@@ -177,7 +128,7 @@ class GtvTvKeyBridge {
       return;
     }
 
-    _focusNearestInDirection(node, dir);
+    _focusNearestInDirection(from, dir);
   }
 
   static void _focusNearestInDirection(FocusNode from, TraversalDirection dir) {
@@ -221,17 +172,6 @@ class GtvTvKeyBridge {
 
     walk(FocusManager.instance.rootScope);
     best?.requestFocus();
-  }
-
-
-  static void _requestInitialFocus(FocusScopeNode scope) {
-    if (scope.focusedChild != null) return;
-    for (final node in scope.descendants) {
-      if (node.canRequestFocus) {
-        node.requestFocus();
-        return;
-      }
-    }
   }
 
   static String _labelForKeyCode(int keyCode) {

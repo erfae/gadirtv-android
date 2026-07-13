@@ -112,12 +112,14 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        // Forward to Dart bridge AND let Flutter try HardwareKeyboard (dual path).
+        // TV remotes: forward to Dart bridge and consume — Flutter KeyEvent path
+        // is unreliable on leanback; dual dispatch causes double navigation.
         if (isTvDevice() &&
             event.action == KeyEvent.ACTION_DOWN &&
             isNavigationKey(event.keyCode)
         ) {
             forwardKeyToFlutter(event.keyCode)
+            return true
         }
         return super.dispatchKeyEvent(event)
     }

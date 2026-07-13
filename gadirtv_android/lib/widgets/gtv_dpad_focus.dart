@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/gtv_tv_focus_navigation.dart';
-import '../services/gtv_tv_key_bridge.dart';
 import '../theme.dart';
 
 /// D-pad focus target — registers with [GtvTvFocusNavigation] for TV remotes.
@@ -99,7 +98,6 @@ class _GtvDpadFocusState extends State<GtvDpadFocus> {
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (GtvTvKeyBridge.nativeKeyHandled) return KeyEventResult.handled;
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final k = event.logicalKey;
     if (k == LogicalKeyboardKey.arrowLeft && widget.onMoveLeft != null) {

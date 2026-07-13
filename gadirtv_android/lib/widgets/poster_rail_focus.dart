@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../services/gtv_tv_focus_navigation.dart';
+
 /// D-pad focus helpers for horizontal poster rails (home tab, etc.).
 class PosterRailFocus {
   PosterRailFocus();
@@ -8,6 +10,7 @@ class PosterRailFocus {
 
   void rebuild(int count) {
     for (final n in nodes) {
+      GtvTvFocusNavigation.unregister(n);
       n.dispose();
     }
     nodes
@@ -17,6 +20,7 @@ class PosterRailFocus {
 
   void dispose() {
     for (final n in nodes) {
+      GtvTvFocusNavigation.unregister(n);
       n.dispose();
     }
     nodes.clear();
@@ -27,6 +31,9 @@ class PosterRailFocus {
       nodes[index].requestFocus();
     }
   }
+
+  bool get hasFocus =>
+      nodes.any((n) => n.hasFocus);
 
   void moveHorizontal(
     int from,

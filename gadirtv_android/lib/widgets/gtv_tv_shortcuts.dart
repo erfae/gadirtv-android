@@ -3,13 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/gtv_tv_key_bridge.dart';
+import '../utils/tv_utils.dart';
 
-/// TV remote / D-pad: Shortcuts + directional focus traversal.
-///
-/// On many Android TV boxes Flutter never receives [KeyEvent]s from the
-/// platform. [GtvTvKeyBridge] forwards them from [MainActivity]; this widget
-/// maps them to focus actions.
-class GtvTvShell extends StatelessWidget {
+/// TV remote / D-pad shell. On Android TV, navigation is handled exclusively
+/// by [GtvTvKeyBridge] — arrow [Shortcuts] are disabled to avoid double moves.
+class GtvTvShell extends StatefulWidget {
   const GtvTvShell({super.key, required this.child});
 
   final Widget child;
@@ -31,14 +29,29 @@ class GtvTvShell extends StatelessWidget {
   };
 
   @override
+  State<GtvTvShell> createState() => _GtvTvShellState();
+}
+
+class _GtvTvShellState extends State<GtvTvShell> {
+  bool _androidTv = false;
+
+  @override
+  void initState() {
+    super.initState();
+    TvUtils.isAndroidTv().then((v) {
+      if (mounted) setState(() => _androidTv = v);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Shortcuts(
-      shortcuts: _tvShortcuts,
+      shortcuts: _androidTv ? const <ShortcutActivator, Intent>{} : GtvTvShell._tvShortcuts,
       child: Actions(
         actions: WidgetsApp.defaultActions,
         child: FocusTraversalGroup(
-          policy: OrderedTraversalPolicy(),
-          child: child,
+          policy: ReadingOrderTraversalPolicy(),
+          child: widget.child,
         ),
       ),
     );
@@ -63,7 +76,7 @@ class _GtvTvInitialFocusState extends State<GtvTvInitialFocus> {
   }
 
   void _focusFirst() {
-    if (!mounted) return;
+    if (!mounted || GtvTvKeyBridge.suppressInitialFocus) return;
     final scope = FocusScope.of(context);
     if (scope.focusedChild != null) return;
     for (final node in scope.descendants) {

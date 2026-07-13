@@ -8,6 +8,7 @@ import '../../i18n/strings.dart';
 import '../../models/media.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
+import '../../services/gtv_tv_focus_registry.dart';
 import '../../services/playlist_store.dart';
 import '../../services/favorites_store.dart';
 import '../../services/live_preview_guard.dart';
@@ -183,15 +184,13 @@ class LiveTabState extends State<LiveTab> with AutomaticKeepAliveClientMixin {
   final _miniFocus = FocusNode();
   final _railKey = GlobalKey<CategoryListRailState>();
   final _channelFocus = <FocusNode>[];
+  int _focusedChannelIndex = 0;
 
   Future<void> _preview(LiveChannel c) async {
     setState(() {
       _current = c;
       _epgNow = null;
       _epgNext = null;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _miniFocus.requestFocus();
     });
     try {
       final ep = await _api.shortEpg(widget.profile, c.streamId, limit: 2);
@@ -281,7 +280,9 @@ class LiveTabState extends State<LiveTab> with AutomaticKeepAliveClientMixin {
         title: _current?.name ?? t.selectChannel,
         onFullscreen: _fullscreen,
         onMoveLeft: () {
-          if (_channelFocus.isNotEmpty) _channelFocus.first.requestFocus();
+          if (_channelFocus.isEmpty) return;
+          final i = _focusedChannelIndex.clamp(0, _channelFocus.length - 1);
+          _channelFocus[i].requestFocus();
         },
       );
       final epgBox = _EpgBar(now: _epgNow, next: _epgNext);
@@ -309,6 +310,7 @@ class LiveTabState extends State<LiveTab> with AutomaticKeepAliveClientMixin {
                 onMoveRight: () {
                   if (_channelFocus.isNotEmpty) _channelFocus.first.requestFocus();
                 },
+                onMoveDown: GtvTvFocusRegistry.focusBottomNav,
               ),
             ),
             ),
@@ -382,6 +384,7 @@ class LiveTabState extends State<LiveTab> with AutomaticKeepAliveClientMixin {
                     onMoveRight: () {
                       if (_channelFocus.isNotEmpty) _channelFocus.first.requestFocus();
                     },
+                    onMoveDown: GtvTvFocusRegistry.focusBottomNav,
                   ),
                 ),
                 ),
@@ -439,11 +442,16 @@ class LiveTabState extends State<LiveTab> with AutomaticKeepAliveClientMixin {
               _preview(c);
             }
           },
-          onFocus: () => _preview(c),
+          onFocus: () {
+            _focusedChannelIndex = i;
+            _preview(c);
+          },
           onToggleFavorite: () => _toggleFavorite(c),
           onMoveLeft: () => _railKey.currentState?.focusSelected(),
           onMoveUp: i > 0 ? () => _channelFocus[i - 1].requestFocus() : null,
-          onMoveDown: i < _channels.length - 1 ? () => _channelFocus[i + 1].requestFocus() : null,
+          onMoveDown: i < _channels.length - 1
+              ? () => _channelFocus[i + 1].requestFocus()
+              : GtvTvFocusRegistry.focusBottomNav,
           onMoveRight: () => _miniFocus.requestFocus(),
         );
       },

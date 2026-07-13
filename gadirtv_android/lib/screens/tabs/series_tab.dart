@@ -4,6 +4,7 @@ import '../../i18n/strings.dart';
 import '../../models/media.dart';
 import '../../models/profile.dart';
 import '../../services/favorites_store.dart';
+import '../../services/gtv_tv_focus_registry.dart';
 import '../../services/playlist_store.dart';
 import '../../theme.dart';
 import '../../utils/tv_layout.dart';
@@ -141,6 +142,9 @@ class SeriesTabState extends State<SeriesTab> with AutomaticKeepAliveClientMixin
         }
       }
     });
+    if (_selected == _favoritesId) {
+      _gridFocus.rebuild(_series.length);
+    }
   }
 
   @override
@@ -172,6 +176,7 @@ class SeriesTabState extends State<SeriesTab> with AutomaticKeepAliveClientMixin
                   selectedId: _selected,
                   onSelected: _load,
                   onMoveRight: () => _gridFocus.focus(0),
+                  onMoveDown: GtvTvFocusRegistry.focusBottomNav,
                 ),
               ),
             ),
@@ -209,9 +214,7 @@ class SeriesTabState extends State<SeriesTab> with AutomaticKeepAliveClientMixin
       final w = constraints.maxWidth;
       final cols = w >= 1400 ? 8 : w >= 1100 ? 7 : w >= 850 ? 6 : w >= 640 ? 5 : w >= 480 ? 4 : 3;
       _gridFocus.cols = cols;
-      if (_gridFocus.nodes.length != _series.length) {
-        _gridFocus.rebuild(_series.length);
-      }
+      final lastRow = _series.isEmpty ? 0 : (_series.length - 1) ~/ cols;
       return GridView.builder(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -226,7 +229,6 @@ class SeriesTabState extends State<SeriesTab> with AutomaticKeepAliveClientMixin
           final node = i < _gridFocus.nodes.length ? _gridFocus.nodes[i] : null;
           return PosterCard(
             focusNode: node,
-            autofocus: i == 0,
             title: s.name,
             imageUrl: s.cover,
             rating: s.rating,
@@ -236,7 +238,14 @@ class SeriesTabState extends State<SeriesTab> with AutomaticKeepAliveClientMixin
             onMoveLeft: () => _gridFocus.move(i, -1, 0, onLeaveLeft: () => _railKey.currentState?.focusSelected()),
             onMoveRight: () => _gridFocus.move(i, 1, 0),
             onMoveUp: () => _gridFocus.move(i, 0, -1),
-            onMoveDown: () => _gridFocus.move(i, 0, 1),
+            onMoveDown: () {
+              final row = i ~/ cols;
+              if (row >= lastRow) {
+                GtvTvFocusRegistry.focusBottomNav();
+              } else {
+                _gridFocus.move(i, 0, 1);
+              }
+            },
           );
         },
       );

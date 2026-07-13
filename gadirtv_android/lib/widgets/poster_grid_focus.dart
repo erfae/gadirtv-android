@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../services/gtv_tv_focus_navigation.dart';
+
 /// D-pad focus helpers for poster grids (movies / series tabs).
 class PosterGridFocus {
   PosterGridFocus();
@@ -9,6 +11,7 @@ class PosterGridFocus {
 
   void rebuild(int count) {
     for (final n in nodes) {
+      GtvTvFocusNavigation.unregister(n);
       n.dispose();
     }
     nodes
@@ -18,6 +21,7 @@ class PosterGridFocus {
 
   void dispose() {
     for (final n in nodes) {
+      GtvTvFocusNavigation.unregister(n);
       n.dispose();
     }
     nodes.clear();
@@ -29,7 +33,13 @@ class PosterGridFocus {
     }
   }
 
-  void move(int from, int deltaCol, int deltaRow, {VoidCallback? onLeaveLeft}) {
+  void move(
+    int from,
+    int deltaCol,
+    int deltaRow, {
+    VoidCallback? onLeaveLeft,
+    VoidCallback? onLeaveDown,
+  }) {
     if (cols <= 0 || nodes.isEmpty) return;
     final row = from ~/ cols;
     final col = from % cols;
@@ -46,6 +56,8 @@ class PosterGridFocus {
     final next = newRow * cols + newCol;
     if (next >= 0 && next < nodes.length) {
       focus(next);
+    } else if (deltaRow > 0) {
+      onLeaveDown?.call();
     }
   }
 }
