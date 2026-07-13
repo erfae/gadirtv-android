@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/gtv_tv_focus_navigation.dart';
+import '../services/gtv_tv_key_bridge.dart';
 import '../theme.dart';
 
 /// D-pad / remote friendly tap target with visible focus ring.
@@ -102,6 +103,7 @@ class _GtvFocusableState extends State<GtvFocusable> {
   }
 
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    if (GtvTvKeyBridge.nativeKeyHandled) return KeyEventResult.handled;
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final k = event.logicalKey;
     if (k == LogicalKeyboardKey.arrowLeft && widget.onMoveLeft != null) {

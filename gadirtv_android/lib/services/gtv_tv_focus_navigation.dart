@@ -64,6 +64,8 @@ class GtvTvFocusNavigation {
     onActivate();
     return true;
   }
+
+  static bool hasRoute(FocusNode node) => _routes.containsKey(node);
 }
 
 class _Route {

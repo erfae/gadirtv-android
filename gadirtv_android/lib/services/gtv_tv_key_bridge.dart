@@ -20,6 +20,12 @@ class GtvTvKeyBridge {
   /// When true, [_ensureInitialFocus] is skipped (e.g. moving between fields).
   static bool suppressInitialFocus = false;
 
+  /// Set while handling a native key — Flutter [KeyEvent] handlers can skip.
+  static bool nativeKeyHandled = false;
+
+  static int? _lastNativeKeyCode;
+  static int _lastNativeKeyMs = 0;
+
   static void install() {
     if (_installed) return;
     _installed = true;
@@ -32,6 +38,13 @@ class GtvTvKeyBridge {
       final keyCode = args['keyCode'];
       if (keyCode is! int) return;
 
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (_lastNativeKeyCode == keyCode && now - _lastNativeKeyMs < 60) {
+        return;
+      }
+      _lastNativeKeyCode = keyCode;
+      _lastNativeKeyMs = now;
+
       lastKeyCode = keyCode;
       lastKeyLabel = _labelForKeyCode(keyCode);
       lastKeyNotifier.value = keyCode;
@@ -40,16 +53,24 @@ class GtvTvKeyBridge {
         debugPrint('GtvTvKeyBridge: $lastKeyLabel (keyCode=$keyCode)');
       }
 
-      _handleNavigationKey(keyCode);
+      nativeKeyHandled = true;
+      try {
+        _handleNavigationKey(keyCode);
+      } finally {
+        Future<void>.delayed(const Duration(milliseconds: 50), () {
+          nativeKeyHandled = false;
+        });
+      }
     });
   }
 
   static void _handleNavigationKey(int keyCode) {
-    var focus = FocusManager.instance.primaryFocus;
-    if (focus == null || !focus.hasFocus) {
-      _ensureInitialFocus();
-      focus = FocusManager.instance.primaryFocus;
-      if (focus == null || !focus.hasFocus) return;
+    _recoverFocus();
+    var focus = _effectiveFocusNode(FocusManager.instance.primaryFocus);
+    if (focus == null) {
+      _recoverFocus(force: true);
+      focus = _effectiveFocusNode(FocusManager.instance.primaryFocus);
+      if (focus == null) return;
     }
 
     final context = focus.context;
@@ -83,12 +104,54 @@ class GtvTvKeyBridge {
     }
   }
 
+  /// Prefer a node that has explicit D-pad routes registered.
+  static FocusNode? _effectiveFocusNode(FocusNode? node) {
+    if (node != null && node.hasFocus && GtvTvFocusNavigation.hasRoute(node)) {
+      return node;
+    }
+    return _firstRegisteredInTree() ?? node;
+  }
+
+  static FocusNode? _firstRegisteredInTree() {
+    FocusNode? first;
+    void walk(FocusNode n) {
+      if (first != null) return;
+      if (n.canRequestFocus && GtvTvFocusNavigation.hasRoute(n)) {
+        first = n;
+        return;
+      }
+      for (final c in n.children) {
+        walk(c);
+      }
+    }
+
+    walk(FocusManager.instance.rootScope);
+    return first;
+  }
+
+  static void _recoverFocus({bool force = false}) {
+    final current = FocusManager.instance.primaryFocus;
+    if (!force && current != null && current.hasFocus && current.canRequestFocus) {
+      return;
+    }
+    if (!force && suppressInitialFocus) return;
+
+    final registered = _firstRegisteredInTree();
+    if (registered != null) {
+      registered.requestFocus();
+      return;
+    }
+
+    _requestInitialFocus(FocusManager.instance.rootScope);
+  }
+
   static void _moveFocus(FocusNode from, TraversalDirection dir) {
-    if (GtvTvFocusNavigation.move(from, dir)) return;
+    final node = GtvTvFocusNavigation.hasRoute(from) ? from : (_effectiveFocusNode(from) ?? from);
+
+    if (GtvTvFocusNavigation.move(node, dir)) return;
 
     final before = FocusManager.instance.primaryFocus;
 
-    // Leanback / Android TV: bottom nav uses an explicit ordered rail.
     if (GtvTvFocusRegistry.isBottomNavFocused(before)) {
       switch (dir) {
         case TraversalDirection.left:
@@ -106,26 +169,22 @@ class GtvTvKeyBridge {
       }
     }
 
-    from.focusInDirection(dir);
+    node.focusInDirection(dir);
     final after = FocusManager.instance.primaryFocus;
-    if (after != before) return;
+    if (after != before && after != null) return;
 
     if (dir == TraversalDirection.down && GtvTvFocusRegistry.focusBottomNav()) {
       return;
     }
 
-    _focusNearestInDirection(from, dir);
+    _focusNearestInDirection(node, dir);
   }
 
-  /// When [focusInDirection] cannot find a target (common with horizontal
-  /// [ListView]s above a bottom nav bar), pick the closest focusable below.
   static void _focusNearestInDirection(FocusNode from, TraversalDirection dir) {
     if (dir == TraversalDirection.down && GtvTvFocusRegistry.focusBottomNav()) {
       return;
     }
 
-    final ctx = from.context;
-    if (ctx == null) return;
     final fromBox = from.context?.findRenderObject() as RenderBox?;
     if (fromBox == null || !fromBox.hasSize) return;
 
@@ -164,12 +223,6 @@ class GtvTvKeyBridge {
     best?.requestFocus();
   }
 
-  static void _ensureInitialFocus() {
-    if (suppressInitialFocus) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _requestInitialFocus(FocusManager.instance.rootScope);
-    });
-  }
 
   static void _requestInitialFocus(FocusScopeNode scope) {
     if (scope.focusedChild != null) return;

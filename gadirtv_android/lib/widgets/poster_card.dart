@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/gtv_tv_focus_navigation.dart';
+import '../services/gtv_tv_key_bridge.dart';
 import '../theme.dart';
 import '../utils/tv_layout.dart';
 
@@ -106,6 +107,7 @@ class _PosterCardState extends State<PosterCard> {
   }
 
   KeyEventResult _handleKey(KeyEvent event) {
+    if (GtvTvKeyBridge.nativeKeyHandled) return KeyEventResult.handled;
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final k = event.logicalKey;
     if (k == LogicalKeyboardKey.arrowLeft && widget.onMoveLeft != null) {

@@ -112,12 +112,12 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        // Only consume DPAD on leanback/TV devices.
+        // Forward to Dart bridge AND let Flutter try HardwareKeyboard (dual path).
         if (isTvDevice() &&
             event.action == KeyEvent.ACTION_DOWN &&
-            forwardKeyToFlutter(event.keyCode)
+            isNavigationKey(event.keyCode)
         ) {
-            return true
+            forwardKeyToFlutter(event.keyCode)
         }
         return super.dispatchKeyEvent(event)
     }

@@ -179,6 +179,8 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
       _moviesFocus.focus(0);
     } else if (_seriesFocus.nodes.isNotEmpty) {
       _seriesFocus.focus(0);
+    } else {
+      _focusBottomNav();
     }
   }
 

@@ -148,6 +148,11 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     setState(() => _profile = p);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncTvFocusRegistry();
+      _focusTabContent();
+    });
   }
 
   Future<void> _switchProfile() async {
@@ -450,16 +455,11 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     ];
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _syncTvFocusRegistry();
-        if (_tab == 0) _focusTabContent();
-      }
-    });
+    _syncTvFocusRegistry();
 
-    // Wrapping the shell in a FocusTraversalGroup gives predictable
-    // left/right/up/down navigation across content and bottom nav.
     return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
       onKeyEvent: _onTabShortcut,
       child: FocusTraversalGroup(
       policy: OrderedTraversalPolicy(),
