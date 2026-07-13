@@ -29,8 +29,9 @@ import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.ui.movie.MovieDetailActivity
+import com.gadir.tv.player.PlaybackLauncher
+import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.ui.player.LivePlaybackMonitor
-import com.gadir.tv.ui.player.PlayerActivity
 import com.gadir.tv.ui.profiles.ProfilesActivity
 import com.gadir.tv.ui.search.SearchActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
@@ -645,9 +646,9 @@ class MainActivity : AppCompatActivity() {
     ) {
         val profile = PlaylistRepository.profile ?: return
         val url = api.movieStreamUrl(profile, streamId, extension)
-        startActivity(
-            PlayerActivity.intent(
-                context = this,
+        PlaybackLauncher.play(
+            context = this,
+            request = PlaybackRequest(
                 title = title,
                 url = url,
                 kind = ResumeStore.KIND_MOVIE,
@@ -668,9 +669,9 @@ class MainActivity : AppCompatActivity() {
     ) {
         val profile = PlaylistRepository.profile ?: return
         val url = api.seriesStreamUrl(profile, episodeId, extension)
-        startActivity(
-            PlayerActivity.intent(
-                context = this,
+        PlaybackLauncher.play(
+            context = this,
+            request = PlaybackRequest(
                 title = title,
                 url = url,
                 kind = ResumeStore.KIND_SERIES,
@@ -1060,9 +1061,9 @@ class MainActivity : AppCompatActivity() {
     fun openFullscreen(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         val url = api.streamUrl(profile, channel.streamId)
-        startActivity(
-            PlayerActivity.intent(
-                context = this,
+        PlaybackLauncher.play(
+            context = this,
+            request = PlaybackRequest(
                 title = channel.name,
                 url = url,
                 kind = ResumeStore.KIND_LIVE,

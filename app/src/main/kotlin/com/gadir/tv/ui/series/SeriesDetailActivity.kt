@@ -15,7 +15,8 @@ import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.SeriesEpisode
 import com.gadir.tv.model.SeriesItem
-import com.gadir.tv.ui.player.PlayerActivity
+import com.gadir.tv.player.PlaybackLauncher
+import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.util.ImageLoader
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -125,9 +126,9 @@ class SeriesDetailActivity : AppCompatActivity() {
         val title = "${ep.season}x${ep.episodeNum} — ${ep.title}"
         val url = api.seriesStreamUrl(profile, ep.id, ep.extension)
         val image = ep.image.ifEmpty { fallbackCover }
-        startActivity(
-            PlayerActivity.intent(
-                context = this,
+        PlaybackLauncher.play(
+            context = this,
+            request = PlaybackRequest(
                 title = title,
                 url = url,
                 kind = com.gadir.tv.data.ResumeStore.KIND_SERIES,

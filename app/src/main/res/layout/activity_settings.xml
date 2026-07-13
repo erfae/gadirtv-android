@@ -61,10 +61,42 @@
         android:textSize="14sp" />
 
     <TextView
+        android:id="@+id/btnPlayerMode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/tab_bg"
+        android:drawableStart="@drawable/ic_play"
+        android:drawablePadding="8dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="14dp"
+        android:text="@string/settings_player_mode_internal"
+        android:textColor="@android:color/white"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/btnExternalPlayer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/tab_bg"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="14dp"
+        android:text="@string/settings_select_external_player"
+        android:textColor="@android:color/white"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/btnAutoplay"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="12dp"
         android:background="@drawable/tab_bg"
         android:focusable="true"
         android:focusableInTouchMode="true"

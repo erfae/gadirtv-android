@@ -72,6 +72,10 @@
             android:name=".ui.settings.SettingsActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ui.settings.ExternalPlayerSelectActivity"
+            android:exported="false" />
+
         <meta-data
             android:name="com.google.android.tv.feature"
             android:value="true" />

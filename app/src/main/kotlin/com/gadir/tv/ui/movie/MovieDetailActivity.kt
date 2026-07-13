@@ -14,7 +14,8 @@ import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.VodMovie
-import com.gadir.tv.ui.player.PlayerActivity
+import com.gadir.tv.player.PlaybackLauncher
+import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.util.ImageLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -107,9 +108,9 @@ class MovieDetailActivity : AppCompatActivity() {
         val profile = PlaylistRepository.profile ?: return
         val title = findViewById<TextView>(R.id.movieTitle).text.toString()
         val cover = fallbackCover
-        startActivity(
-            PlayerActivity.intent(
-                context = this,
+        PlaybackLauncher.play(
+            context = this,
+            request = PlaybackRequest(
                 title = title,
                 url = api.movieStreamUrl(profile, streamId, extension),
                 kind = ResumeStore.KIND_MOVIE,

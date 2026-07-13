@@ -20,7 +20,8 @@ import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.ui.main.HomeRailAdapter
 import com.gadir.tv.ui.movie.MovieDetailActivity
-import com.gadir.tv.ui.player.PlayerActivity
+import com.gadir.tv.player.PlaybackLauncher
+import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.ui.series.SeriesDetailActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -175,14 +176,15 @@ class SearchActivity : AppCompatActivity() {
     private fun playChannel(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         val url = api.streamUrl(profile, channel.streamId)
-        startActivity(
-            PlayerActivity.intent(
-                context = this,
+        PlaybackLauncher.play(
+            context = this,
+            request = PlaybackRequest(
                 title = channel.name,
                 url = url,
                 kind = com.gadir.tv.data.ResumeStore.KIND_LIVE,
                 contentId = channel.streamId.toString(),
                 imageUrl = channel.icon,
+                streamId = channel.streamId,
             ),
         )
     }
