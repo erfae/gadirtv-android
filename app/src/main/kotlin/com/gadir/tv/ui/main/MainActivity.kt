@@ -1,10 +1,12 @@
 package com.gadir.tv.ui.main
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -14,7 +16,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
 import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.FavoritesStore
@@ -27,11 +28,14 @@ import com.gadir.tv.model.Category
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
+import com.gadir.tv.ui.player.LivePlaybackMonitor
 import com.gadir.tv.ui.player.PlayerActivity
 import com.gadir.tv.ui.profiles.ProfilesActivity
 import com.gadir.tv.ui.search.SearchActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
 import com.gadir.tv.ui.settings.SettingsActivity
+import com.gadir.tv.util.ImageLoader
+import com.gadir.tv.util.VolumeHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,6 +46,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var favoritesStore: FavoritesStore
     private lateinit var appSettings: AppSettings
     private var miniPlayer: ExoPlayer? = null
+    private var miniPlaybackMonitor: LivePlaybackMonitor? = null
+    private var currentPreviewChannel: LiveChannel? = null
     private var selectedLiveCategoryId: String? = null
     private var selectedCatalogCategoryId: String? = null
     private var currentTab = Tab.HOME
@@ -71,6 +77,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var heroSubtitle: TextView
     private lateinit var heroPlot: TextView
     private lateinit var heroPlay: TextView
+    private lateinit var heroTrailer: TextView
     private lateinit var heroPoster: ImageView
     private lateinit var homeLoading: TextView
     private lateinit var homeEmpty: TextView
@@ -90,6 +97,8 @@ class MainActivity : AppCompatActivity() {
     private val recentMovies = mutableListOf<HomeRailAdapter.HomeRailItem>()
     private val recentSeries = mutableListOf<HomeRailAdapter.HomeRailItem>()
     private val heroItems = mutableListOf<HeroItem>()
+    private var heroPlotRequestId = 0
+    private var heroTrailerUrl: String? = null
     private var heroIndex = 0
     private var railPreviewItem: HomeRailAdapter.HomeRailItem? = null
     private var homeLoaded = false
@@ -180,6 +189,7 @@ class MainActivity : AppCompatActivity() {
         heroSubtitle = panelHome.findViewById(R.id.heroSubtitle)
         heroPlot = panelHome.findViewById(R.id.heroPlot)
         heroPlay = panelHome.findViewById(R.id.heroPlay)
+        heroTrailer = panelHome.findViewById(R.id.heroTrailer)
         heroPoster = panelHome.findViewById(R.id.heroPoster)
         homeLoading = panelHome.findViewById(R.id.homeLoading)
         homeEmpty = panelHome.findViewById(R.id.homeEmpty)
@@ -210,15 +220,9 @@ class MainActivity : AppCompatActivity() {
         setupLiveTab()
         setupTabNavigation()
         heroPlay.setOnClickListener { playHero() }
+        heroTrailer.setOnClickListener { openHeroTrailer() }
 
-        panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).apply {
-            useController = false
-            setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_NEVER)
-        }
-        miniPlayer = ExoPlayer.Builder(this).build().also { player ->
-            panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).player = player
-            player.playWhenReady = true
-        }
+        setupMiniPlayer()
 
         showTab(Tab.HOME)
     }
@@ -299,9 +303,12 @@ class MainActivity : AppCompatActivity() {
                 panelLive.visibility = View.GONE
                 panelCatalog.visibility = View.GONE
                 miniPlayer?.pause()
-                startHeroRotation()
-                homeLoaded = false
-                loadHome()
+                miniPlaybackMonitor?.stop()
+                if (!homeLoaded) {
+                    loadHome()
+                } else {
+                    startHeroRotation()
+                }
             }
             Tab.LIVE -> {
                 panelHome.visibility = View.GONE
@@ -309,6 +316,9 @@ class MainActivity : AppCompatActivity() {
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
                 miniPlayer?.playWhenReady = true
+                if (appSettings.autoplayPreview) {
+                    miniPlaybackMonitor?.start()
+                }
                 focusCategoryList()
             }
             Tab.MOVIES, Tab.SERIES -> {
@@ -317,6 +327,7 @@ class MainActivity : AppCompatActivity() {
                 panelCatalog.visibility = View.VISIBLE
                 stopHeroRotation()
                 miniPlayer?.pause()
+                miniPlaybackMonitor?.stop()
                 setupCatalogTab(tab)
                 focusCatalogCategoryList()
             }
@@ -330,10 +341,14 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val movies = withContext(Dispatchers.IO) {
-                HomeLoader.loadRecentMovies(api, profile)
+                val cached = HomeLoader.recentMoviesFromCache()
+                if (cached.isNotEmpty()) cached
+                else HomeLoader.loadRecentMovies(api, profile)
             }
             val series = withContext(Dispatchers.IO) {
-                HomeLoader.loadRecentSeries(api, profile)
+                val cached = HomeLoader.recentSeriesFromCache()
+                if (cached.isNotEmpty()) cached
+                else HomeLoader.loadRecentSeries(api, profile)
             }
 
             homeLoading.visibility = View.GONE
@@ -639,17 +654,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindHero(item: HeroItem) {
+        heroPlotRequestId += 1
+        val requestId = heroPlotRequestId
+        heroTrailerUrl = null
+        heroTrailer.visibility = View.GONE
+
         heroTitle.text = item.title
         heroSubtitle.text = ""
         heroPlot.text = getString(R.string.hero_plot_empty)
 
         when (item) {
-            is HeroItem.Movie -> applyHeroMeta(
-                badge = getString(R.string.hero_type_movie),
-                playLabel = getString(R.string.hero_play),
-                backdrop = item.imageUrl,
-                poster = item.posterUrl,
-            )
+            is HeroItem.Movie -> {
+                applyHeroMeta(
+                    badge = getString(R.string.hero_type_movie),
+                    playLabel = getString(R.string.hero_play),
+                    backdrop = item.imageUrl,
+                    poster = item.posterUrl,
+                )
+                loadMoviePlot(item.movie.streamId, requestId)
+            }
             is HeroItem.Series -> {
                 applyHeroMeta(
                     badge = getString(R.string.hero_type_series),
@@ -657,7 +680,7 @@ class MainActivity : AppCompatActivity() {
                     backdrop = item.imageUrl,
                     poster = item.posterUrl,
                 )
-                loadSeriesPlot(item.series.seriesId)
+                loadSeriesPlot(item.series.seriesId, requestId)
             }
             is HeroItem.Rail -> {
                 applyHeroMeta(
@@ -671,8 +694,8 @@ class MainActivity : AppCompatActivity() {
                 )
                 heroSubtitle.text = item.item.subtitle
                 when (item.item.kind) {
-                    HomeRailAdapter.HomeRailItem.KIND_MOVIE -> loadMoviePlot(item.item.id)
-                    HomeRailAdapter.HomeRailItem.KIND_SERIES -> loadSeriesPlot(item.item.id)
+                    HomeRailAdapter.HomeRailItem.KIND_MOVIE -> loadMoviePlot(item.item.id, requestId)
+                    HomeRailAdapter.HomeRailItem.KIND_SERIES -> loadSeriesPlot(item.item.id, requestId)
                     HomeRailAdapter.HomeRailItem.KIND_LIVE -> Unit
                 }
             }
@@ -692,19 +715,30 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadHeroImage(target: ImageView, url: String) {
-        if (url.isNotEmpty()) {
-            Glide.with(this).load(url).into(target)
+        ImageLoader.loadPoster(target, url)
+    }
+
+    private fun showHeroTrailer(url: String?) {
+        if (url.isNullOrBlank()) {
+            heroTrailer.visibility = View.GONE
+            heroTrailerUrl = null
         } else {
-            target.setImageResource(R.drawable.tv_banner)
+            heroTrailerUrl = url
+            heroTrailer.visibility = View.VISIBLE
         }
     }
 
-    private fun loadMoviePlot(streamId: Int) {
+    private fun openHeroTrailer() {
+        val url = heroTrailerUrl ?: return
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }
+
+    private fun loadMoviePlot(streamId: Int, requestId: Int) {
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
             val info = withContext(Dispatchers.IO) { api.vodInfo(profile, streamId) }
+            if (requestId != heroPlotRequestId) return@launch
             if (info == null) return@launch
-            if (heroTitle.text != info.name && heroTitle.text.isNotEmpty()) return@launch
             if (info.name.isNotBlank()) heroTitle.text = info.name
             heroPlot.text = info.plot.ifBlank { getString(R.string.hero_plot_empty) }
             heroSubtitle.text = listOf(info.genre, info.releaseDate, info.rating)
@@ -713,14 +747,17 @@ class MainActivity : AppCompatActivity() {
             val backdrop = info.backdrop.ifBlank { info.cover }
             if (backdrop.isNotEmpty()) loadHeroImage(heroImage, backdrop)
             if (info.cover.isNotEmpty()) loadHeroImage(heroPoster, info.cover)
+            showHeroTrailer(info.trailerUrl.ifBlank { null })
         }
     }
 
-    private fun loadSeriesPlot(seriesId: Int) {
+    private fun loadSeriesPlot(seriesId: Int, requestId: Int) {
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
             val detail = withContext(Dispatchers.IO) { api.seriesInfo(profile, seriesId) }
+            if (requestId != heroPlotRequestId) return@launch
             if (detail == null) return@launch
+            if (detail.name.isNotBlank()) heroTitle.text = detail.name
             heroPlot.text = detail.plot.ifBlank { getString(R.string.hero_plot_empty) }
             heroSubtitle.text = listOf(detail.genre, detail.releaseDate, detail.rating)
                 .filter { it.isNotBlank() }
@@ -729,6 +766,7 @@ class MainActivity : AppCompatActivity() {
                 loadHeroImage(heroImage, detail.cover)
                 loadHeroImage(heroPoster, detail.cover)
             }
+            showHeroTrailer(detail.trailerUrl.ifBlank { null })
         }
     }
 
@@ -954,6 +992,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun previewChannel(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
+        currentPreviewChannel = channel
         previewTitle.text = channel.name
         epgNow.text = getString(R.string.epg_unavailable)
         epgNext.visibility = View.GONE
@@ -961,8 +1000,12 @@ class MainActivity : AppCompatActivity() {
             val url = api.streamUrl(profile, channel.streamId)
             miniPlayer?.setMediaItem(MediaItem.fromUri(url))
             miniPlayer?.prepare()
+            miniPlayer?.playWhenReady = true
+            miniPlaybackMonitor?.start()
+            miniPlaybackMonitor?.reset()
         } else {
             miniPlayer?.stop()
+            miniPlaybackMonitor?.stop()
         }
 
         lifecycleScope.launch {
@@ -1029,8 +1072,35 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         stopHeroRotation()
+        miniPlaybackMonitor?.stop()
+        miniPlaybackMonitor = null
         miniPlayer?.release()
         miniPlayer = null
         super.onDestroy()
+    }
+
+    private fun setupMiniPlayer() {
+        panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).apply {
+            useController = false
+            setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_NEVER)
+        }
+        val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
+        panelLive.findViewById<View>(R.id.btnNoSignalSettings).setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+        miniPlayer = ExoPlayer.Builder(this).build().also { player ->
+            panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).player = player
+            player.playWhenReady = true
+            miniPlaybackMonitor = LivePlaybackMonitor(player, noSignal)
+        }
+        panelLive.findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
+            VolumeHelper.adjust(this, raise = true)
+        }
+        panelLive.findViewById<ImageButton>(R.id.btnVolDown).setOnClickListener {
+            VolumeHelper.adjust(this, raise = false)
+        }
+        panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
+            currentPreviewChannel?.let { openFullscreen(it) }
+        }
     }
 }

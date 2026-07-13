@@ -5,6 +5,22 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
 
 object HomeLoader {
+    fun recentMoviesFromCache(): List<VodMovie> {
+        val cached = PlaylistRepository.homeRecentMovies
+        if (cached.isNotEmpty()) return cached
+        return PlaylistRepository.allCachedVod()
+            .sortedByDescending { it.added }
+            .take(24)
+    }
+
+    fun recentSeriesFromCache(): List<SeriesItem> {
+        val cached = PlaylistRepository.homeRecentSeries
+        if (cached.isNotEmpty()) return cached
+        return PlaylistRepository.allCachedSeries()
+            .sortedByDescending { it.added }
+            .take(24)
+    }
+
     suspend fun loadRecentMovies(api: XtreamApi, profile: Profile): List<VodMovie> =
         loadRecent(
             fetchCategories = { api.vodCategories(profile) },

@@ -58,6 +58,18 @@
                 app:show_buffering="never"
                 app:use_controller="false" />
 
+            <include
+                android:id="@+id/miniNoSignal"
+                layout="@layout/overlay_no_signal" />
+
+            <include
+                android:id="@+id/miniVolumeControls"
+                layout="@layout/player_volume_controls"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="8dp" />
+
             <TextView
                 android:id="@+id/previewTitle"
                 android:layout_width="match_parent"

@@ -2,6 +2,7 @@ package com.gadir.tv.ui.series
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
@@ -15,7 +16,7 @@ import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.SeriesEpisode
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.ui.player.PlayerActivity
-import com.bumptech.glide.Glide
+import com.gadir.tv.util.ImageLoader
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -78,8 +79,19 @@ class SeriesDetailActivity : AppCompatActivity() {
                 if (detail.rating.isNotEmpty()) add("★ ${detail.rating}")
             }.joinToString(" · ")
             findViewById<TextView>(R.id.seriesMeta).text = meta
-            findViewById<TextView>(R.id.seriesPlot).text = detail.plot
+            findViewById<TextView>(R.id.seriesPlot).text =
+                detail.plot.ifBlank { getString(R.string.hero_plot_empty) }
             if (detail.cover.isNotEmpty()) fallbackCover = detail.cover
+
+            val trailerBtn = findViewById<TextView>(R.id.btnSeriesTrailer)
+            if (detail.trailerUrl.isNotBlank()) {
+                trailerBtn.visibility = View.VISIBLE
+                trailerBtn.setOnClickListener {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(detail.trailerUrl)))
+                }
+            } else {
+                trailerBtn.visibility = View.GONE
+            }
 
             seasons = detail.seasons
             val keys = seasons.keys.sortedBy { it.toIntOrNull() ?: 0 }
@@ -187,7 +199,7 @@ class SeriesDetailActivity : AppCompatActivity() {
             holder.plot.text = item.plot
             val img = item.image.ifEmpty { fallbackCover }
             if (img.isNotEmpty()) {
-                Glide.with(holder.thumb).load(img).into(holder.thumb)
+                ImageLoader.loadPoster(holder.thumb, img, 160, 90)
             } else {
                 holder.thumb.setImageResource(R.drawable.tv_banner)
             }

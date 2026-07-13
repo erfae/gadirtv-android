@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.gadir.tv.R
+import com.gadir.tv.util.ImageLoader
 
 class HomeRailAdapter(
     private val items: List<HomeRailItem>,
@@ -51,7 +52,7 @@ class HomeRailAdapter(
         val item = items[position]
         holder.title.text = item.title
         if (item.imageUrl.isNotEmpty()) {
-            Glide.with(holder.image).load(item.imageUrl).into(holder.image)
+            ImageLoader.loadPoster(holder.image, item.imageUrl, 440, 248)
         } else {
             holder.image.setImageResource(R.drawable.tv_banner)
         }

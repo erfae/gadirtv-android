@@ -72,6 +72,7 @@ data class SeriesDetail(
     val genre: String,
     val releaseDate: String,
     val rating: String,
+    val trailerUrl: String = "",
     val seasons: Map<String, List<SeriesEpisode>>,
 )
 
@@ -83,6 +84,7 @@ data class VodInfo(
     val rating: String,
     val genre: String,
     val releaseDate: String,
+    val trailerUrl: String = "",
 )
 
 data class EpgEntry(

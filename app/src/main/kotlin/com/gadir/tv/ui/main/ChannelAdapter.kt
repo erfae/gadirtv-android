@@ -7,8 +7,8 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
 import com.gadir.tv.R
+import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.model.LiveChannel
 
 class ChannelAdapter(
@@ -35,7 +35,7 @@ class ChannelAdapter(
         val item = items[position]
         holder.name.text = item.name
         if (item.icon.isNotEmpty()) {
-            Glide.with(holder.icon).load(item.icon).into(holder.icon)
+            ImageLoader.loadChannelIcon(holder.icon, item.icon)
         } else {
             holder.icon.setImageResource(R.drawable.tv_banner)
         }

@@ -25,6 +25,15 @@ object PlaylistRepository {
     private val vodCache = mutableMapOf<String, List<VodMovie>>()
     private val seriesCache = mutableMapOf<String, List<SeriesItem>>()
 
+    var homeRecentMovies: List<VodMovie> = emptyList()
+        private set
+
+    var homeRecentSeries: List<SeriesItem> = emptyList()
+        private set
+
+    var bootstrapReady: Boolean = false
+        private set
+
   var userAgent: String = "XCIPTV"
 
     fun setProfile(p: Profile) {
@@ -61,6 +70,15 @@ object PlaylistRepository {
         seriesCache[categoryId] = items
     }
 
+    fun setHomeRecent(movies: List<VodMovie>, series: List<SeriesItem>) {
+        homeRecentMovies = movies
+        homeRecentSeries = series
+    }
+
+    fun markBootstrapReady() {
+        bootstrapReady = true
+    }
+
     fun allCachedVod(): List<VodMovie> = vodCache.values.flatten().distinctBy { it.streamId }
 
     fun allCachedSeries(): List<SeriesItem> = seriesCache.values.flatten().distinctBy { it.seriesId }
@@ -68,6 +86,9 @@ object PlaylistRepository {
     fun clearContentCache() {
         vodCache.clear()
         seriesCache.clear()
+        homeRecentMovies = emptyList()
+        homeRecentSeries = emptyList()
+        bootstrapReady = false
     }
 
     fun clear() {
@@ -78,6 +99,9 @@ object PlaylistRepository {
         seriesCategories = emptyList()
         vodCache.clear()
         seriesCache.clear()
+        homeRecentMovies = emptyList()
+        homeRecentSeries = emptyList()
+        bootstrapReady = false
         userAgent = "XCIPTV"
     }
 }

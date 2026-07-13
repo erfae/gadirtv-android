@@ -10,7 +10,7 @@
     <string name="loading">Cargando contenido…</string>
     <string name="category_all">Todos</string>
     <string name="select_channel">Selecciona un canal</string>
-    <string name="version_label">v1.7.0</string>
+    <string name="version_label">v1.8.0</string>
     <string name="login_subtitle">Televisión, películas y series en tu Android TV</string>
     <string name="login_hint">Introduce los datos de tu cuenta Xtream Codes</string>
     <string name="profiles_title">¿Quién está viendo?</string>
@@ -64,4 +64,18 @@
     <string name="settings_autoplay_off">Vista previa automática: DESACTIVADA</string>
     <string name="rail_continue">Continuar viendo</string>
     <string name="resume_progress">Continuar — %1$d%%</string>
+    <string name="hero_synopsis_label">SINOPSIS</string>
+    <string name="hero_trailer">TRÁILER</string>
+    <string name="no_signal_title">SIN SEÑAL</string>
+    <string name="no_signal_message">No se pudo reproducir este canal. Revisa tu conexión o los ajustes del reproductor.</string>
+    <string name="no_signal_settings">Ir a Ajustes</string>
+    <string name="volume_up">Subir volumen</string>
+    <string name="volume_down">Bajar volumen</string>
+    <string name="fullscreen">Pantalla completa</string>
+    <string name="bootstrap_live">Categorías TV…</string>
+    <string name="bootstrap_channels">Canales TV…</string>
+    <string name="bootstrap_movies">Películas…</string>
+    <string name="bootstrap_series">Series…</string>
+    <string name="bootstrap_home">Preparando inicio…</string>
+    <string name="bootstrap_loading_group">Cargando: %1$s…</string>
 </resources>

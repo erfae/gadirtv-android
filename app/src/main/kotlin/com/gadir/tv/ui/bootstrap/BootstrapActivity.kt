@@ -7,6 +7,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.gadir.tv.R
+import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ProfileStore
 import com.gadir.tv.data.XtreamApi
@@ -62,6 +63,12 @@ class BootstrapActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val loginCheck = getString(R.string.login_check)
             val connectionFailed = getString(R.string.connection_failed)
+            val bootstrapLive = getString(R.string.bootstrap_live)
+            val bootstrapChannels = getString(R.string.bootstrap_channels)
+            val bootstrapMovies = getString(R.string.bootstrap_movies)
+            val bootstrapSeries = getString(R.string.bootstrap_series)
+            val bootstrapHome = getString(R.string.bootstrap_home)
+            val bootstrapGroupFmt = getString(R.string.bootstrap_loading_group)
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     PlaylistRepository.setProfile(profile)
@@ -72,16 +79,39 @@ class BootstrapActivity : AppCompatActivity() {
                     }
                     PlaylistRepository.userAgent = api.activeUserAgent
 
-                    message("Categorías TV…")
+                    message(bootstrapLive)
                     val cats = api.liveCategories(profile)
-                    message("Canales TV…")
+                    message(bootstrapChannels)
                     val channels = api.liveStreams(profile)
                     PlaylistRepository.updateCatalog(cats, channels)
 
-                    message("Películas…")
-                    PlaylistRepository.updateVodCategories(api.vodCategories(profile))
-                    message("Series…")
-                    PlaylistRepository.updateSeriesCategories(api.seriesCategories(profile))
+                    message(bootstrapMovies)
+                    val vodCats = api.vodCategories(profile)
+                    PlaylistRepository.updateVodCategories(vodCats)
+                    vodCats.forEach { category ->
+                        message(String.format(bootstrapGroupFmt, category.name))
+                        val movies = api.vodStreams(profile, category.id)
+                        PlaylistRepository.cacheVod(category.id, movies)
+                    }
+
+                    message(bootstrapSeries)
+                    val seriesCats = api.seriesCategories(profile)
+                    PlaylistRepository.updateSeriesCategories(seriesCats)
+                    seriesCats.forEach { category ->
+                        message(String.format(bootstrapGroupFmt, category.name))
+                        val series = api.seriesList(profile, category.id)
+                        PlaylistRepository.cacheSeries(category.id, series)
+                    }
+
+                    message(bootstrapHome)
+                    val recentMovies = PlaylistRepository.allCachedVod()
+                        .sortedByDescending { it.added }
+                        .take(24)
+                    val recentSeries = PlaylistRepository.allCachedSeries()
+                        .sortedByDescending { it.added }
+                        .take(24)
+                    PlaylistRepository.setHomeRecent(recentMovies, recentSeries)
+                    PlaylistRepository.markBootstrapReady()
 
                     channels.size
                 }

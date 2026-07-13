@@ -12,6 +12,7 @@ import com.gadir.tv.model.VodInfo
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.net.NativeHttpClient
 import com.gadir.tv.util.HostUtils
+import com.gadir.tv.util.MetaExtractor
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
@@ -243,15 +244,17 @@ class XtreamApi(
                 }.filter { it.id > 0 }
                 if (eps.isNotEmpty()) seasons[seasonKey] = eps
             }
+            val name = info?.get("name")?.asStringOrNull() ?: ""
             SeriesDetail(
-                name = info?.get("name")?.asStringOrNull() ?: "",
-                cover = info?.get("cover")?.asStringOrNull() ?: "",
-                plot = info?.get("plot")?.asStringOrNull() ?: "",
+                name = name,
+                cover = MetaExtractor.imageFrom(info, "cover", "stream_icon"),
+                plot = MetaExtractor.plotFrom(info),
                 genre = info?.get("genre")?.asStringOrNull() ?: "",
                 releaseDate = info?.get("releaseDate")?.asStringOrNull() ?: "",
                 rating = info?.get("rating_5based")?.asStringOrNull()
                     ?: info?.get("rating")?.asStringOrNull()
                     ?: "",
+                trailerUrl = MetaExtractor.trailerFrom(name, info).orEmpty(),
                 seasons = seasons,
             )
         } catch (_: Exception) {
@@ -274,20 +277,22 @@ class XtreamApi(
             val root = gson.fromJson(response.body, JsonObject::class.java) ?: return null
             val info = root.getAsJsonObject("info")
             val movieData = root.getAsJsonObject("movie_data")
+            val name = info?.get("name")?.asStringOrNull()
+                ?: movieData?.get("name")?.asStringOrNull()
+                ?: ""
             VodInfo(
-                name = info?.get("name")?.asStringOrNull()
-                    ?: movieData?.get("name")?.asStringOrNull()
-                    ?: "",
-                plot = info?.get("plot")?.asStringOrNull()
-                    ?: movieData?.get("plot")?.asStringOrNull()
-                    ?: "",
-                cover = info?.get("movie_image")?.asStringOrNull()
-                    ?: info?.get("cover")?.asStringOrNull()
-                    ?: movieData?.get("stream_icon")?.asStringOrNull()
-                    ?: "",
-                backdrop = info?.get("backdrop_path")?.asStringOrNull()
-                    ?: info?.get("cover_big")?.asStringOrNull()
-                    ?: "",
+                name = name,
+                plot = MetaExtractor.plotFrom(info, movieData),
+                cover = MetaExtractor.imageFrom(
+                    info,
+                    "movie_image", "cover", "cover_big",
+                ).ifBlank {
+                    MetaExtractor.imageFrom(movieData, "stream_icon", "cover")
+                },
+                backdrop = MetaExtractor.imageFrom(
+                    info,
+                    "backdrop_path", "cover_big", "movie_image", "cover",
+                ),
                 rating = info?.get("rating")?.asStringOrNull()
                     ?: info?.get("rating_5based")?.asStringOrNull()
                     ?: "",
@@ -295,6 +300,7 @@ class XtreamApi(
                 releaseDate = info?.get("releasedate")?.asStringOrNull()
                     ?: info?.get("releaseDate")?.asStringOrNull()
                     ?: "",
+                trailerUrl = MetaExtractor.trailerFrom(name, info, movieData).orEmpty(),
             )
         } catch (_: Exception) {
             null

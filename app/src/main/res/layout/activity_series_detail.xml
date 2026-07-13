@@ -29,6 +29,24 @@
             android:layout_height="wrap_content"
             android:textColor="@color/gtv_text_dim"
             android:textSize="13sp" />
+        <TextView
+            android:id="@+id/btnSeriesTrailer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/btn_trailer_hero"
+            android:drawableStart="@drawable/ic_trailer"
+            android:drawablePadding="8dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:text="@string/hero_trailer"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
     </LinearLayout>
 
     <TextView

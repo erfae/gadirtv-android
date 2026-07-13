@@ -2,17 +2,23 @@ package com.gadir.tv.ui.player
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.view.View
+import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.gadir.tv.R
 import com.gadir.tv.data.ResumeStore
+import com.gadir.tv.ui.settings.SettingsActivity
+import com.gadir.tv.util.VolumeHelper
 
 class PlayerActivity : AppCompatActivity() {
     private var player: ExoPlayer? = null
+    private var playbackMonitor: LivePlaybackMonitor? = null
     private lateinit var resumeStore: ResumeStore
+    private var isLive = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -21,20 +27,42 @@ class PlayerActivity : AppCompatActivity() {
 
         val url = intent.getStringExtra(EXTRA_URL).orEmpty()
         val positionMs = intent.getLongExtra(EXTRA_POSITION_MS, 0L)
+        val kind = intent.getStringExtra(EXTRA_KIND).orEmpty()
+        isLive = kind == ResumeStore.KIND_LIVE
 
         findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).apply {
             useController = false
             setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_NEVER)
         }
 
+        val noSignal = findViewById<View>(R.id.playerNoSignal)
+        findViewById<View>(R.id.btnNoSignalSettings).setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
+        val volumeControls = findViewById<View>(R.id.playerVolumeControls)
+        volumeControls.visibility = if (isLive) View.VISIBLE else View.GONE
+        if (isLive) {
+            findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
+                VolumeHelper.adjust(this, raise = true)
+            }
+            findViewById<ImageButton>(R.id.btnVolDown).setOnClickListener {
+                VolumeHelper.adjust(this, raise = false)
+            }
+            findViewById<ImageButton>(R.id.btnFullscreen).visibility = View.GONE
+        }
+
         player = ExoPlayer.Builder(this).build().also { exo ->
             findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).player = exo
-            exo.setMediaItem(MediaItem.fromUri(url))
+            exo.setMediaItem(MediaItem.fromUri(Uri.parse(url)))
             exo.prepare()
             if (positionMs > 0L) {
                 exo.seekTo(positionMs)
             }
             exo.playWhenReady = true
+            if (isLive) {
+                playbackMonitor = LivePlaybackMonitor(exo, noSignal).also { it.start() }
+            }
         }
     }
 
@@ -50,6 +78,8 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        playbackMonitor?.stop()
+        playbackMonitor = null
         player?.release()
         player = null
         super.onDestroy()
