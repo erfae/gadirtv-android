@@ -6,8 +6,8 @@ class PlayerConstants {
   static const noSignalDelay = Duration(seconds: 25);
 
   /// libVLC network cache (ms) — lower = faster zapping, higher = smoother.
-  static const vlcLiveCacheMs = 600;
-  static const vlcVodCacheMs = 1200;
+  static const vlcLiveCacheMs = 300;
+  static const vlcVodCacheMs = 800;
 }
 
 /// Player engine ids stored in [PrefsSettings].

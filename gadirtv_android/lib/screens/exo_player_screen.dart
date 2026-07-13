@@ -111,10 +111,19 @@ class _ExoPlayerScreenState extends State<ExoPlayerScreen> {
         _buffering = false;
         _fatalError = e.toString();
       });
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-      if (!mounted) return;
-      await _fallbackToVlc();
     }
+  }
+
+  Future<void> _retry() async {
+    setState(() {
+      _fatalError = null;
+      _buffering = true;
+      _noSignal = false;
+    });
+    _controller?.removeListener(_onUpdate);
+    await _controller?.dispose();
+    _controller = null;
+    await _initPlayer();
   }
 
   Future<void> _fallbackToVlc() async {
@@ -256,20 +265,39 @@ class _ExoPlayerScreenState extends State<ExoPlayerScreen> {
                             style: const TextStyle(color: GtvTheme.textDim, fontSize: 13),
                           ),
                           const SizedBox(height: 20),
-                          GtvFocusable(
-                            autofocus: true,
-                            onTap: _fallbackToVlc,
-                            borderRadius: BorderRadius.circular(999),
-                            child: ElevatedButton.icon(
-                              onPressed: _fallbackToVlc,
-                              icon: const Icon(Icons.refresh_rounded),
-                              label: const Text('Probar con libVLC'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: GtvTheme.red,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              GtvFocusable(
+                                autofocus: true,
+                                onTap: _retry,
+                                borderRadius: BorderRadius.circular(999),
+                                child: ElevatedButton.icon(
+                                  onPressed: _retry,
+                                  icon: const Icon(Icons.refresh_rounded),
+                                  label: const Text('Reintentar'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: GtvTheme.red,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 12),
+                              GtvFocusable(
+                                onTap: _fallbackToVlc,
+                                borderRadius: BorderRadius.circular(999),
+                                child: OutlinedButton.icon(
+                                  onPressed: _fallbackToVlc,
+                                  icon: const Icon(Icons.play_circle_outline_rounded, color: Colors.white),
+                                  label: const Text('libVLC', style: TextStyle(color: Colors.white)),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: GtvTheme.border),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

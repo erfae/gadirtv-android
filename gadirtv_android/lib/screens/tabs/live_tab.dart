@@ -185,8 +185,11 @@ class LiveTabState extends State<LiveTab> with AutomaticKeepAliveClientMixin {
   final _railKey = GlobalKey<CategoryListRailState>();
   final _channelFocus = <FocusNode>[];
   int _focusedChannelIndex = 0;
+  Timer? _previewDebounce;
+  LiveChannel? _pendingPreview;
 
   Future<void> _preview(LiveChannel c) async {
+    if (_current?.streamId == c.streamId) return;
     setState(() {
       _current = c;
       _epgNow = null;
@@ -202,6 +205,17 @@ class LiveTabState extends State<LiveTab> with AutomaticKeepAliveClientMixin {
     } catch (_) {
       // ignore
     }
+  }
+
+  void _schedulePreview(LiveChannel c) {
+    if (_current?.streamId == c.streamId) return;
+    _pendingPreview = c;
+    _previewDebounce?.cancel();
+    _previewDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      final ch = _pendingPreview;
+      if (ch != null) _preview(ch);
+    });
   }
 
   String? _decodeTitle(dynamic raw) {
@@ -221,6 +235,7 @@ class LiveTabState extends State<LiveTab> with AutomaticKeepAliveClientMixin {
 
   @override
   void dispose() {
+    _previewDebounce?.cancel();
     _miniFocus.dispose();
     for (final n in _channelFocus) {
       n.dispose();
@@ -444,7 +459,7 @@ class LiveTabState extends State<LiveTab> with AutomaticKeepAliveClientMixin {
           },
           onFocus: () {
             _focusedChannelIndex = i;
-            _preview(c);
+            _schedulePreview(c);
           },
           onToggleFavorite: () => _toggleFavorite(c),
           onMoveLeft: () => _railKey.currentState?.focusSelected(),
@@ -452,7 +467,6 @@ class LiveTabState extends State<LiveTab> with AutomaticKeepAliveClientMixin {
           onMoveDown: i < _channels.length - 1
               ? () => _channelFocus[i + 1].requestFocus()
               : GtvTvFocusRegistry.focusBottomNav,
-          onMoveRight: () => _miniFocus.requestFocus(),
         );
       },
     );

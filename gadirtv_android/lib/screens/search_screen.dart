@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 
 import '../models/media.dart';
 import '../models/profile.dart';
-import '../services/api_service.dart';
+import '../services/playlist_store.dart';
 import '../theme.dart';
 import '../widgets/gtv_focusable.dart';
 import '../widgets/gtv_tv_text_field.dart';
 import '../widgets/poster_card.dart';
+import '../widgets/poster_rail_focus.dart';
 
-/// Global search — filters channels, movies and series by name substring.
+/// Global search — filters channels, movies and series from preloaded catalog.
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
     super.key,
@@ -30,10 +31,13 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  final _api = ApiService();
   final _controller = TextEditingController();
-  final _searchBrowse = FocusNode();
+  final _backFocus = FocusNode(debugLabel: 'search-back');
+  final _searchBrowse = FocusNode(debugLabel: 'search-field');
   final _scrollController = ScrollController();
+  final _channelFocus = PosterRailFocus();
+  final _movieFocus = PosterRailFocus();
+  final _seriesFocus = PosterRailFocus();
 
   List<LiveChannel> _channels = const [];
   List<Movie> _movies = const [];
@@ -53,6 +57,9 @@ class _SearchScreenState extends State<SearchScreen> {
     super.initState();
     _controller.addListener(_onControllerChanged);
     _bootstrap();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchBrowse.requestFocus();
+    });
   }
 
   void _onControllerChanged() {
@@ -61,26 +68,22 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _bootstrap() async {
-    try {
-      final results = await Future.wait([
-        _api.liveStreams(widget.profile),
-        _api.vodStreams(widget.profile),
-        _api.seriesList(widget.profile),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _channels = results[0].map(LiveChannel.fromJson).toList();
-        _movies = results[1].map(Movie.fromJson).toList();
-        _series = results[2].map(Series.fromJson).toList();
-        _loading = false;
-      });
-    } catch (e) {
+    final store = PlaylistStore.instance;
+    if (!store.isLoadedFor(widget.profile)) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _bootstrapError = 'No se pudo cargar el catálogo: $e';
+        _bootstrapError = 'Contenido no cargado. Reinicia la app.';
       });
+      return;
     }
+
+    setState(() {
+      _channels = store.liveStreams;
+      _movies = store.vodStreams;
+      _series = store.seriesList;
+      _loading = false;
+    });
   }
 
   void _onQueryChanged(String q) {
@@ -94,13 +97,45 @@ class _SearchScreenState extends State<SearchScreen> {
           _channelResults = const [];
           _movieResults = const [];
           _seriesResults = const [];
+          _channelFocus.rebuild(0);
+          _movieFocus.rebuild(0);
+          _seriesFocus.rebuild(0);
           return;
         }
-        _channelResults = _channels.where((c) => c.name.toLowerCase().contains(needle)).take(40).toList();
-        _movieResults = _movies.where((m) => m.name.toLowerCase().contains(needle)).take(40).toList();
-        _seriesResults = _series.where((s) => s.name.toLowerCase().contains(needle)).take(40).toList();
+        _channelResults =
+            _channels.where((c) => c.name.toLowerCase().contains(needle)).take(40).toList();
+        _movieResults =
+            _movies.where((m) => m.name.toLowerCase().contains(needle)).take(40).toList();
+        _seriesResults =
+            _series.where((s) => s.name.toLowerCase().contains(needle)).take(40).toList();
       });
+      _channelFocus.rebuild(_channelResults.length);
+      _movieFocus.rebuild(_movieResults.length);
+      _seriesFocus.rebuild(_seriesResults.length);
+      if (_channelResults.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _channelFocus.focus(0);
+        });
+      } else if (_movieResults.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _movieFocus.focus(0);
+        });
+      } else if (_seriesResults.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _seriesFocus.focus(0);
+        });
+      }
     });
+  }
+
+  void _focusFirstResult() {
+    if (_channelResults.isNotEmpty) {
+      _channelFocus.focus(0);
+    } else if (_movieResults.isNotEmpty) {
+      _movieFocus.focus(0);
+    } else if (_seriesResults.isNotEmpty) {
+      _seriesFocus.focus(0);
+    }
   }
 
   @override
@@ -108,8 +143,12 @@ class _SearchScreenState extends State<SearchScreen> {
     _debounce?.cancel();
     _controller.removeListener(_onControllerChanged);
     _controller.dispose();
+    _backFocus.dispose();
     _searchBrowse.dispose();
     _scrollController.dispose();
+    _channelFocus.dispose();
+    _movieFocus.dispose();
+    _seriesFocus.dispose();
     super.dispose();
   }
 
@@ -136,8 +175,11 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Row(
         children: [
           GtvFocusable(
+            focusNode: _backFocus,
             borderRadius: BorderRadius.circular(999),
-            onTap: () => Navigator.of(context).maybePop(),
+            onTap: () => Navigator.of(context).pop(),
+            onMoveRight: () => _searchBrowse.requestFocus(),
+            onMoveDown: _query.isNotEmpty ? _focusFirstResult : null,
             child: const Padding(
               padding: EdgeInsets.all(8),
               child: Icon(Icons.arrow_back_rounded, color: Colors.white),
@@ -151,6 +193,8 @@ class _SearchScreenState extends State<SearchScreen> {
               scrollController: _scrollController,
               textInputAction: TextInputAction.search,
               onSubmitted: _onQueryChanged,
+              onMoveLeft: () => _backFocus.requestFocus(),
+              onMoveDown: _query.isNotEmpty ? _focusFirstResult : null,
               decoration: const InputDecoration(
                 hintText: 'Buscar canales, películas o series…',
                 prefixIcon: Icon(Icons.search_rounded, color: GtvTheme.textDim),
@@ -210,50 +254,102 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     return ListView(
+      controller: _scrollController,
       padding: const EdgeInsets.only(bottom: 32),
       children: [
         if (_channelResults.isNotEmpty)
           _buildSection(
             title: 'Canales (${_channelResults.length})',
+            focus: _channelFocus,
             count: _channelResults.length,
             aspectRatio: 16 / 9,
+            tileHeight: 140,
+            tileWidth: 220,
+            onMoveUp: () => _searchBrowse.requestFocus(),
+            onMoveDown: _movieResults.isNotEmpty
+                ? () => _movieFocus.focus(0)
+                : (_seriesResults.isNotEmpty ? () => _seriesFocus.focus(0) : null),
             builder: (i) {
               final c = _channelResults[i];
               return PosterCard(
+                focusNode: _channelFocus.nodes[i],
                 title: c.name,
                 imageUrl: c.icon,
                 aspectRatio: 16 / 9,
+                showTitle: false,
                 onTap: () => widget.onChannel(c),
+                onMoveLeft: () => _channelFocus.moveHorizontal(i, -1),
+                onMoveRight: () => _channelFocus.moveHorizontal(i, 1),
+                onMoveUp: i == 0 ? () => _searchBrowse.requestFocus() : () => _channelFocus.focus(i - 1),
+                onMoveDown: _movieResults.isNotEmpty
+                    ? () => _movieFocus.focus(0)
+                    : (_seriesResults.isNotEmpty ? () => _seriesFocus.focus(0) : null),
               );
             },
           ),
         if (_movieResults.isNotEmpty)
           _buildSection(
             title: 'Películas (${_movieResults.length})',
+            focus: _movieFocus,
             count: _movieResults.length,
             aspectRatio: 2 / 3,
+            tileHeight: 220,
+            tileWidth: 130,
+            onMoveUp: _channelResults.isNotEmpty
+                ? () => _channelFocus.focus(0)
+                : () => _searchBrowse.requestFocus(),
+            onMoveDown: _seriesResults.isNotEmpty ? () => _seriesFocus.focus(0) : null,
             builder: (i) {
               final m = _movieResults[i];
               return PosterCard(
+                focusNode: _movieFocus.nodes[i],
                 title: m.name,
                 imageUrl: m.icon,
                 rating: m.rating,
+                showTitle: false,
                 onTap: () => widget.onMovie(m),
+                onMoveLeft: () => _movieFocus.moveHorizontal(i, -1),
+                onMoveRight: () => _movieFocus.moveHorizontal(i, 1),
+                onMoveUp: i == 0
+                    ? (_channelResults.isNotEmpty
+                        ? () => _channelFocus.focus(0)
+                        : () => _searchBrowse.requestFocus())
+                    : () => _movieFocus.focus(i - 1),
+                onMoveDown: _seriesResults.isNotEmpty ? () => _seriesFocus.focus(0) : null,
               );
             },
           ),
         if (_seriesResults.isNotEmpty)
           _buildSection(
             title: 'Series (${_seriesResults.length})',
+            focus: _seriesFocus,
             count: _seriesResults.length,
             aspectRatio: 2 / 3,
+            tileHeight: 220,
+            tileWidth: 130,
+            onMoveUp: _movieResults.isNotEmpty
+                ? () => _movieFocus.focus(0)
+                : (_channelResults.isNotEmpty
+                    ? () => _channelFocus.focus(0)
+                    : () => _searchBrowse.requestFocus()),
             builder: (i) {
               final s = _seriesResults[i];
               return PosterCard(
+                focusNode: _seriesFocus.nodes[i],
                 title: s.name,
                 imageUrl: s.cover,
                 rating: s.rating,
+                showTitle: false,
                 onTap: () => widget.onSeries(s),
+                onMoveLeft: () => _seriesFocus.moveHorizontal(i, -1),
+                onMoveRight: () => _seriesFocus.moveHorizontal(i, 1),
+                onMoveUp: i == 0
+                    ? (_movieResults.isNotEmpty
+                        ? () => _movieFocus.focus(0)
+                        : (_channelResults.isNotEmpty
+                            ? () => _channelFocus.focus(0)
+                            : () => _searchBrowse.requestFocus()))
+                    : () => _seriesFocus.focus(i - 1),
               );
             },
           ),
@@ -263,12 +359,15 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildSection({
     required String title,
+    required PosterRailFocus focus,
     required int count,
     required double aspectRatio,
+    required double tileHeight,
+    required double tileWidth,
     required Widget Function(int) builder,
+    VoidCallback? onMoveUp,
+    VoidCallback? onMoveDown,
   }) {
-    final tileHeight = aspectRatio == 16 / 9 ? 140.0 : 220.0;
-    final tileWidth = aspectRatio == 16 / 9 ? 220.0 : 130.0;
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Column(
@@ -285,6 +384,7 @@ class _SearchScreenState extends State<SearchScreen> {
           SizedBox(
             height: tileHeight,
             child: ListView.separated(
+              clipBehavior: Clip.none,
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 24),
               itemCount: count,

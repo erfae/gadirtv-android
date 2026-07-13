@@ -92,13 +92,14 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
 
   /// Home tab — full-bleed backdrop with poster stamp on the right.
   Widget _buildHomeLayout(BuildContext context, String poster, String backdrop) {
+    final bg = backdrop.isNotEmpty ? backdrop : poster;
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (backdrop.isNotEmpty)
+        if (bg.isNotEmpty)
           Positioned.fill(
             child: CachedNetworkImage(
-              imageUrl: backdrop,
+              imageUrl: bg,
               fit: BoxFit.cover,
               alignment: Alignment.center,
               errorWidget: (_, __, ___) => ColoredBox(color: GtvTheme.bg),

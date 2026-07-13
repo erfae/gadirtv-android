@@ -83,12 +83,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _prefs.setPlayerEngine(engine);
     if (!mounted) return;
     setState(() => _player = engine);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Reproductor: ${PlayerEngine.labels[engine]}'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   Future<void> _setLanguage(String code) async {

@@ -15,6 +15,7 @@ import '../../theme.dart';
 import '../../utils/tv_layout.dart';
 import '../../utils/xtream_utils.dart';
 import '../../widgets/detail_hero_widgets.dart';
+import '../../widgets/gtv_focusable.dart';
 import '../../widgets/poster_card.dart';
 import '../../widgets/poster_rail_focus.dart';
 
@@ -402,8 +403,8 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
             ? Map<String, dynamic>.from(info['movie_data'] as Map)
             : <String, dynamic>{};
         final plot = extractPlot(meta, extra: md);
-        final backdrop = extractCinematicBackdrop(meta);
         final poster = (meta['cover'] ?? meta['cover_big'] ?? meta['movie_image'] ?? item.imageUrl).toString();
+        final backdrop = extractBackdrop(meta, fallback: poster.isNotEmpty ? poster : item.imageUrl);
         final trailer = extractTrailerInfo(meta);
         _heroMetaCache[cacheKey] = _CachedHeroMeta(
           plot: plot,
@@ -427,8 +428,8 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
             ? Map<String, dynamic>.from(info['info'] as Map)
             : <String, dynamic>{};
         final plot = extractPlot(meta, fallback: item.series!.plot);
-        final backdrop = extractCinematicBackdrop(meta);
         final poster = (meta['cover'] ?? meta['cover_big'] ?? item.imageUrl).toString();
+        final backdrop = extractBackdrop(meta, fallback: poster.isNotEmpty ? poster : item.imageUrl);
         final trailer = extractTrailerInfo(meta);
         _heroMetaCache[cacheKey] = _CachedHeroMeta(
           plot: plot,
@@ -587,7 +588,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
               synopsisLoading: _heroMetaLoading,
               synopsisSide: GtvHeroSynopsisSide.left,
               posterUrl: poster,
-              backdropUrl: backdrop.isNotEmpty ? backdrop : null,
+              backdropUrl: backdrop.isNotEmpty ? backdrop : (poster.isNotEmpty ? poster : null),
               actions: const SizedBox(height: 56),
             ),
           ),
@@ -627,9 +628,19 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _HeroArrow(icon: Icons.chevron_left_rounded, onTap: () => _shiftHero(-1)),
+              _HeroArrow(
+                icon: Icons.chevron_left_rounded,
+                onTap: () => _shiftHero(-1),
+                onMoveDown: () => _shiftHero(1),
+                onMoveLeft: () => _playFocus.requestFocus(),
+              ),
               const SizedBox(height: 8),
-              _HeroArrow(icon: Icons.chevron_right_rounded, onTap: () => _shiftHero(1)),
+              _HeroArrow(
+                icon: Icons.chevron_right_rounded,
+                onTap: () => _shiftHero(1),
+                onMoveUp: () => _shiftHero(-1),
+                onMoveLeft: () => _playFocus.requestFocus(),
+              ),
             ],
           ),
         ),
@@ -717,6 +728,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
           imageUrl: m.icon,
           rating: m.rating,
           showTitle: false,
+          focusScale: 1.12,
           onTap: () => widget.onOpenMovie(m),
           onFocus: () => _previewRailItem(_heroItemFromMovie(m)),
           onMoveLeft: () => _moviesFocus.moveHorizontal(i, -1),
@@ -755,6 +767,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
           imageUrl: s.cover,
           rating: s.rating,
           showTitle: false,
+          focusScale: 1.12,
           onTap: () => widget.onOpenSeries(s),
           onFocus: () => _previewRailItem(_heroItemFromSeries(s)),
           onMoveLeft: () => _seriesFocus.moveHorizontal(i, -1),
@@ -864,31 +877,43 @@ class _ResumeItem {
 }
 
 class _HeroArrow extends StatelessWidget {
-  const _HeroArrow({required this.icon, required this.onTap});
+  const _HeroArrow({
+    required this.icon,
+    required this.onTap,
+    this.onMoveLeft,
+    this.onMoveRight,
+    this.onMoveUp,
+    this.onMoveDown,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
+  final VoidCallback? onMoveLeft;
+  final VoidCallback? onMoveRight;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      canRequestFocus: false,
-      skipTraversal: true,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Material(
-          color: Colors.black.withOpacity(0.5),
-          shape: const CircleBorder(),
-          child: Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white24),
-            ),
-            child: Icon(icon, color: Colors.white, size: 26),
+    return GtvFocusable(
+      onTap: onTap,
+      onMoveLeft: onMoveLeft,
+      onMoveRight: onMoveRight,
+      onMoveUp: onMoveUp,
+      onMoveDown: onMoveDown,
+      borderRadius: BorderRadius.circular(999),
+      child: Material(
+        color: Colors.black.withOpacity(0.5),
+        shape: const CircleBorder(),
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white24),
           ),
+          child: Icon(icon, color: Colors.white, size: 26),
         ),
       ),
     );

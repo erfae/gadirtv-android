@@ -70,6 +70,18 @@ class TrailerLauncher {
           final opened = await TvUtils.openExternalUrl(watchUrl);
           if (opened) return true;
         } catch (_) {}
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Instala YouTube para TV para ver tráilers, '
+                'o abre el enlace desde otro dispositivo.',
+              ),
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+        return false;
       }
 
       if (!context.mounted) return false;

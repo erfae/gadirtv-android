@@ -47,4 +47,24 @@ class TvUtils {
       return false;
     }
   }
+
+  /// Opens a video stream in VLC, MX Player or any installed player.
+  static Future<bool> openExternalStream(String url) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      final uri = Uri.tryParse(url);
+      if (uri == null) return false;
+      try {
+        return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {
+        return false;
+      }
+    }
+    try {
+      final result = await _channel.invokeMethod<Map>('openStream', {'url': url});
+      if (result == null) return false;
+      return result['ok'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
 }

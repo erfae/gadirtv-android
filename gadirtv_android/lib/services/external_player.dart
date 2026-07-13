@@ -1,18 +1,15 @@
-import 'package:url_launcher/url_launcher.dart';
+import '../utils/tv_utils.dart';
 
-/// Opens a stream URL in an external Android video player via VIEW intent.
+/// Opens a stream URL in an external Android video player (VLC, MX Player…).
 class ExternalPlayer {
   ExternalPlayer._();
 
+  /// Returns true when a player app handled the stream.
   static Future<bool> launch(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null) return false;
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return false;
     try {
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      return launched;
+      return await TvUtils.openExternalStream(trimmed);
     } catch (_) {
       return false;
     }

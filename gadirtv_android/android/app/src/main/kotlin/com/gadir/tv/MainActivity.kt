@@ -62,6 +62,7 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "isAndroidTv" -> result.success(isTvDevice())
                     "openUrl" -> openExternalUrl(call.argument("url"), result)
+                    "openStream" -> openExternalStream(call.argument("url"), result)
                     else -> result.notImplemented()
                 }
             }
@@ -228,6 +229,51 @@ class MainActivity : FlutterActivity() {
         } catch (t: Throwable) {
             Log.e(TAG, "openUrl failed: ${t.message}")
             result.success(false)
+        }
+    }
+
+    /** Opens IPTV/VOD streams in VLC, MX Player or any installed video app. */
+    private fun openExternalStream(url: String?, result: MethodChannel.Result) {
+        if (url.isNullOrBlank()) {
+            result.error("BAD_ARGS", "url required", null)
+            return
+        }
+        try {
+            val uri = Uri.parse(url)
+            val players = listOf(
+                "org.videolan.vlc",
+                "org.videolan.vlc.betav7neon",
+                "com.mxtech.videoplayer.ad",
+                "com.mxtech.videoplayer.pro",
+                "com.bsplayer.bspandroid.free",
+                "com.archos.mediacenter.videoplayer",
+            )
+            for (pkg in players) {
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "video/*")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    setPackage(pkg)
+                }
+                if (intent.resolveActivity(packageManager) != null) {
+                    startActivity(intent)
+                    result.success(mapOf("ok" to true, "package" to pkg))
+                    return
+                }
+            }
+
+            val generic = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "video/*")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (generic.resolveActivity(packageManager) != null) {
+                startActivity(generic)
+                result.success(mapOf("ok" to true, "package" to "generic"))
+            } else {
+                result.success(mapOf("ok" to false))
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "openStream failed: ${t.message}")
+            result.success(mapOf("ok" to false))
         }
     }
 

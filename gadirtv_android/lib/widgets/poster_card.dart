@@ -30,6 +30,7 @@ class PosterCard extends StatefulWidget {
     this.onToggleFavorite,
     this.onFocus,
     this.showTitle = true,
+    this.focusScale = 1.06,
   });
 
   /// 2/3 → portrait poster (VOD, Series). Use 16/9 for landscape logos.
@@ -54,6 +55,7 @@ class PosterCard extends StatefulWidget {
   final VoidCallback? onToggleFavorite;
   final VoidCallback? onFocus;
   final bool showTitle;
+  final double focusScale;
 
   @override
   State<PosterCard> createState() => _PosterCardState();
@@ -144,7 +146,7 @@ class _PosterCardState extends State<PosterCard> {
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOut,
           transform: _focused
-              ? (Matrix4.identity()..scale(1.06))
+              ? (Matrix4.identity()..scale(widget.focusScale))
               : Matrix4.identity(),
           transformAlignment: Alignment.center,
           decoration: BoxDecoration(

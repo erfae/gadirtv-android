@@ -33,7 +33,7 @@ class PlaybackLauncher {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'No hay un reproductor externo instalado. '
+              'No hay reproductor externo instalado. '
               'Instala VLC o MX Player, o elige ExoPlayer en Ajustes.',
             ),
             duration: Duration(seconds: 5),
