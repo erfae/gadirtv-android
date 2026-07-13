@@ -1,10 +1,5 @@
 package com.gadir.tv.player
 
-data class ExternalPlayerApp(
-    val packageName: String,
-    val label: String,
-)
-
 data class PlaybackRequest(
     val title: String,
     val url: String,

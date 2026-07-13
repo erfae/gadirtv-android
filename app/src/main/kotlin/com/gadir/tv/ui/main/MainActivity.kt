@@ -29,9 +29,10 @@ import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.ui.movie.MovieDetailActivity
+import com.gadir.tv.ui.player.LivePlaybackMonitor
 import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
-import com.gadir.tv.ui.player.LivePlaybackMonitor
+import com.gadir.tv.player.PlayerFactory
 import com.gadir.tv.ui.profiles.ProfilesActivity
 import com.gadir.tv.ui.search.SearchActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
@@ -1119,7 +1120,7 @@ class MainActivity : AppCompatActivity() {
         panelLive.findViewById<View>(R.id.btnNoSignalSettings).setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
-        miniPlayer = ExoPlayer.Builder(this).build().also { player ->
+        miniPlayer = PlayerFactory.create(this).also { player ->
             panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).player = player
             player.playWhenReady = true
             miniPlaybackMonitor = LivePlaybackMonitor(player, noSignal)

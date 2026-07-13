@@ -22,6 +22,7 @@ import com.gadir.tv.R
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
+import com.gadir.tv.player.PlayerFactory
 import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.TimeFormat
 import com.gadir.tv.util.VolumeHelper
@@ -113,7 +114,7 @@ class PlayerActivity : AppCompatActivity() {
             setupVodControls(channelTitle)
         }
 
-        player = ExoPlayer.Builder(this).build().also { exo ->
+        player = PlayerFactory.create(this).also { exo ->
             findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).player = exo
             exo.addListener(playerListener)
             exo.setMediaItem(MediaItem.fromUri(Uri.parse(url)))
