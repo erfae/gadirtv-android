@@ -32,13 +32,15 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build release APK (arm32 for TV Box)
-        run: ./gradlew :app:assembleRelease -Pandroid.injected.build.abi=armeabi-v7a
+      - name: Build release APK
+        run: ./gradlew :app:assembleRelease --no-daemon
 
       - name: Rename APK
         run: |
-          cp app/build/outputs/apk/release/app-release.apk GadirTV-Native-AndroidTV.apk
-          ls -la
+          APK=$(find app/build/outputs/apk -name '*.apk' | head -1)
+          if [ -z "$APK" ]; then echo "No APK found"; find app/build -name '*.apk'; exit 1; fi
+          cp "$APK" GadirTV-Native-AndroidTV.apk
+          ls -la GadirTV-Native-AndroidTV.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
