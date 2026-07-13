@@ -4,12 +4,17 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.KeyEvent
 import android.view.View
 import android.widget.ImageButton
+import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -18,6 +23,7 @@ import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.ui.settings.SettingsActivity
+import com.gadir.tv.util.TimeFormat
 import com.gadir.tv.util.VolumeHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -29,6 +35,40 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var resumeStore: ResumeStore
     private val api = XtreamApi()
     private var isLive = false
+
+    private lateinit var vodControls: View
+    private lateinit var vodTitle: TextView
+    private lateinit var vodPosition: TextView
+    private lateinit var vodDuration: TextView
+    private lateinit var vodSeekBar: SeekBar
+    private lateinit var btnVodPlayPause: ImageButton
+
+    private val hideHandler = Handler(Looper.getMainLooper())
+    private var userSeeking = false
+    private var controlsVisible = false
+
+    private val hideControlsRunnable = Runnable { hideVodControls() }
+    private val progressRunnable = object : Runnable {
+        override fun run() {
+            updateVodProgress()
+            if (!isLive && controlsVisible) {
+                hideHandler.postDelayed(this, 500L)
+            }
+        }
+    }
+
+    private val playerListener = object : Player.Listener {
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            updatePlayPauseIcon()
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_READY) {
+                updateVodProgress()
+            }
+            updatePlayPauseIcon()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,8 +94,10 @@ class PlayerActivity : AppCompatActivity() {
 
         val volumeControls = findViewById<View>(R.id.playerVolumeControls)
         val epgPanel = findViewById<View>(R.id.playerEpgPanel)
+        vodControls = findViewById(R.id.playerVodControls)
         volumeControls.visibility = if (isLive) View.VISIBLE else View.GONE
         epgPanel.visibility = if (isLive) View.VISIBLE else View.GONE
+        vodControls.visibility = if (isLive) View.GONE else View.VISIBLE
 
         if (isLive) {
             findViewById<TextView>(R.id.playerChannelTitle).text = channelTitle
@@ -67,10 +109,13 @@ class PlayerActivity : AppCompatActivity() {
             }
             findViewById<ImageButton>(R.id.btnFullscreen).visibility = View.GONE
             loadFullscreenEpg(streamId)
+        } else {
+            setupVodControls(channelTitle)
         }
 
         player = ExoPlayer.Builder(this).build().also { exo ->
             findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).player = exo
+            exo.addListener(playerListener)
             exo.setMediaItem(MediaItem.fromUri(Uri.parse(url)))
             exo.prepare()
             if (positionMs > 0L) {
@@ -79,8 +124,191 @@ class PlayerActivity : AppCompatActivity() {
             exo.playWhenReady = true
             if (isLive) {
                 playbackMonitor = LivePlaybackMonitor(exo, noSignal).also { it.start() }
+            } else {
+                showVodControls()
             }
         }
+    }
+
+    private fun setupVodControls(title: String) {
+        vodTitle = vodControls.findViewById(R.id.vodTitle)
+        vodPosition = vodControls.findViewById(R.id.vodPosition)
+        vodDuration = vodControls.findViewById(R.id.vodDuration)
+        vodSeekBar = vodControls.findViewById(R.id.vodSeekBar)
+        btnVodPlayPause = vodControls.findViewById(R.id.btnVodPlayPause)
+
+        vodTitle.text = title
+
+        btnVodPlayPause.setOnClickListener { togglePlayPause() }
+        vodControls.findViewById<ImageButton>(R.id.btnVodRewind).setOnClickListener {
+            seekBy(-SEEK_STEP_MS)
+            showVodControls()
+        }
+        vodControls.findViewById<ImageButton>(R.id.btnVodForward).setOnClickListener {
+            seekBy(SEEK_STEP_MS)
+            showVodControls()
+        }
+        vodControls.findViewById<ImageButton>(R.id.btnVodVolUp).setOnClickListener {
+            VolumeHelper.adjust(this, raise = true)
+            showVodControls()
+        }
+        vodControls.findViewById<ImageButton>(R.id.btnVodVolDown).setOnClickListener {
+            VolumeHelper.adjust(this, raise = false)
+            showVodControls()
+        }
+
+        vodSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                val duration = player?.duration ?: 0L
+                if (duration > 0L) {
+                    val position = (duration * progress) / seekBar!!.max
+                    vodPosition.text = TimeFormat.formatMs(position)
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                userSeeking = true
+                hideHandler.removeCallbacks(hideControlsRunnable)
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                userSeeking = false
+                val duration = player?.duration ?: 0L
+                if (duration > 0L && seekBar != null) {
+                    val position = (duration * seekBar.progress) / seekBar.max
+                    player?.seekTo(position)
+                }
+                scheduleHideControls()
+            }
+        })
+
+        vodControls.setOnClickListener { showVodControls() }
+    }
+
+    private fun togglePlayPause() {
+        val exo = player ?: return
+        if (exo.isPlaying) exo.pause() else exo.play()
+        showVodControls()
+    }
+
+    private fun seekBy(deltaMs: Long) {
+        val exo = player ?: return
+        val duration = exo.duration
+        if (duration <= 0L) return
+        val target = (exo.currentPosition + deltaMs).coerceIn(0L, duration)
+        exo.seekTo(target)
+        updateVodProgress()
+    }
+
+    private fun updatePlayPauseIcon() {
+        if (isLive || !::btnVodPlayPause.isInitialized) return
+        val playing = player?.isPlaying == true
+        btnVodPlayPause.setImageResource(
+            if (playing) R.drawable.ic_pause else R.drawable.ic_play,
+        )
+    }
+
+    private fun updateVodProgress() {
+        if (isLive || !::vodSeekBar.isInitialized) return
+        val exo = player ?: return
+        val duration = exo.duration
+        if (duration <= 0L) return
+        val position = exo.currentPosition
+        vodDuration.text = TimeFormat.formatMs(duration)
+        vodPosition.text = TimeFormat.formatMs(position)
+        if (!userSeeking) {
+            vodSeekBar.progress = ((position * vodSeekBar.max) / duration).toInt()
+        }
+    }
+
+    private fun showVodControls() {
+        if (isLive) return
+        controlsVisible = true
+        vodControls.visibility = View.VISIBLE
+        updateVodProgress()
+        updatePlayPauseIcon()
+        hideHandler.removeCallbacks(hideControlsRunnable)
+        hideHandler.removeCallbacks(progressRunnable)
+        hideHandler.post(progressRunnable)
+        scheduleHideControls()
+        btnVodPlayPause.requestFocus()
+    }
+
+    private fun hideVodControls() {
+        if (isLive) return
+        controlsVisible = false
+        vodControls.visibility = View.GONE
+        hideHandler.removeCallbacks(hideControlsRunnable)
+        hideHandler.removeCallbacks(progressRunnable)
+    }
+
+    private fun scheduleHideControls() {
+        hideHandler.removeCallbacks(hideControlsRunnable)
+        hideHandler.postDelayed(hideControlsRunnable, CONTROLS_HIDE_MS)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (!isLive && event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+                -> {
+                    if (!controlsVisible) {
+                        showVodControls()
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (!controlsVisible || currentFocus == vodSeekBar) {
+                        seekBy(-SEEK_STEP_MS)
+                        showVodControls()
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (!controlsVisible || currentFocus == vodSeekBar) {
+                        seekBy(SEEK_STEP_MS)
+                        showVodControls()
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                    togglePlayPause()
+                    return true
+                }
+                KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                    player?.play()
+                    showVodControls()
+                    return true
+                }
+                KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                    player?.pause()
+                    showVodControls()
+                    return true
+                }
+                KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                    seekBy(-SEEK_STEP_MS)
+                    showVodControls()
+                    return true
+                }
+                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                    seekBy(SEEK_STEP_MS)
+                    showVodControls()
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    override fun onBackPressed() {
+        if (!isLive && controlsVisible) {
+            hideVodControls()
+            return
+        }
+        saveProgress()
+        finish()
     }
 
     private fun loadFullscreenEpg(streamId: Int) {
@@ -107,11 +335,6 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    override fun onBackPressed() {
-        saveProgress()
-        finish()
-    }
-
     override fun onStop() {
         saveProgress()
         super.onStop()
@@ -119,8 +342,10 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        hideHandler.removeCallbacksAndMessages(null)
         playbackMonitor?.stop()
         playbackMonitor = null
+        player?.removeListener(playerListener)
         player?.release()
         player = null
         super.onDestroy()
@@ -153,6 +378,8 @@ class PlayerActivity : AppCompatActivity() {
         private const val EXTRA_EXTENSION = "extension"
         private const val EXTRA_POSITION_MS = "position_ms"
         private const val EXTRA_STREAM_ID = "stream_id"
+        private const val SEEK_STEP_MS = 10_000L
+        private const val CONTROLS_HIDE_MS = 5_000L
 
         fun intent(
             context: Context,

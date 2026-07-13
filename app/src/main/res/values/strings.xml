@@ -10,7 +10,7 @@
     <string name="loading">Cargando contenido…</string>
     <string name="category_all">Todos</string>
     <string name="select_channel">Selecciona un canal</string>
-    <string name="version_label">v1.9.0</string>
+    <string name="version_label">v1.10.0</string>
     <string name="login_subtitle">Televisión, películas y series en tu Android TV</string>
     <string name="login_hint">Introduce los datos de tu cuenta Xtream Codes</string>
     <string name="profiles_title">¿Quién está viendo?</string>
@@ -83,4 +83,7 @@
     <string name="epg_guide">Guía de programación</string>
     <string name="epg_live_badge">EN VIVO</string>
     <string name="epg_loading">Cargando EPG…</string>
+    <string name="player_play_pause">Reproducir o pausar</string>
+    <string name="player_rewind">Retroceder 10 segundos</string>
+    <string name="player_forward">Avanzar 10 segundos</string>
 </resources>
