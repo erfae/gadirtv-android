@@ -112,7 +112,18 @@ class SeriesDetailActivity : AppCompatActivity() {
         val profile = PlaylistRepository.profile ?: return
         val title = "${ep.season}x${ep.episodeNum} — ${ep.title}"
         val url = api.seriesStreamUrl(profile, ep.id, ep.extension)
-        startActivity(PlayerActivity.intent(this, title, url))
+        val image = ep.image.ifEmpty { fallbackCover }
+        startActivity(
+            PlayerActivity.intent(
+                context = this,
+                title = title,
+                url = url,
+                kind = com.gadir.tv.data.ResumeStore.KIND_SERIES,
+                contentId = ep.id.toString(),
+                imageUrl = image,
+                extension = ep.extension,
+            ),
+        )
     }
 
     private class SeasonAdapter(

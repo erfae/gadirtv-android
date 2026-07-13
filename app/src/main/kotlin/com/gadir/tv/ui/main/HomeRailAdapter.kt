@@ -26,6 +26,7 @@ class HomeRailAdapter(
         val kind: String,
         val extension: String = "mp4",
         val subtitle: String = "",
+        val resumePositionMs: Long = 0L,
     ) {
         companion object {
             const val KIND_MOVIE = "movie"

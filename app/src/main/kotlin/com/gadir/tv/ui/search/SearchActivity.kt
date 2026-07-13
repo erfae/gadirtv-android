@@ -135,8 +135,17 @@ class SearchActivity : AppCompatActivity() {
             onClick = { item ->
                 val profile = PlaylistRepository.profile ?: return@bindSection
                 val movie = results.movies.firstOrNull { it.streamId == item.id } ?: return@bindSection
-                val url = api.movieStreamUrl(profile, movie.streamId, movie.extension)
-                startActivity(PlayerActivity.intent(this, movie.name, url))
+                startActivity(
+                    PlayerActivity.intent(
+                        context = this,
+                        title = movie.name,
+                        url = api.movieStreamUrl(profile, movie.streamId, movie.extension),
+                        kind = com.gadir.tv.data.ResumeStore.KIND_MOVIE,
+                        contentId = movie.streamId.toString(),
+                        imageUrl = movie.icon,
+                        extension = movie.extension,
+                    ),
+                )
             },
         )
 
@@ -176,7 +185,16 @@ class SearchActivity : AppCompatActivity() {
     private fun playChannel(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         val url = api.streamUrl(profile, channel.streamId)
-        startActivity(PlayerActivity.intent(this, channel.name, url))
+        startActivity(
+            PlayerActivity.intent(
+                context = this,
+                title = channel.name,
+                url = url,
+                kind = com.gadir.tv.data.ResumeStore.KIND_LIVE,
+                contentId = channel.streamId.toString(),
+                imageUrl = channel.icon,
+            ),
+        )
     }
 
     private fun openSeries(series: SeriesItem) {

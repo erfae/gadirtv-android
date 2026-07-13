@@ -21,6 +21,7 @@ import com.gadir.tv.data.FavoritesStore
 import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ProfileStore
+import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.Category
 import com.gadir.tv.model.LiveChannel
@@ -37,6 +38,7 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
     private val api = XtreamApi()
+    private lateinit var resumeStore: ResumeStore
     private lateinit var favoritesStore: FavoritesStore
     private lateinit var appSettings: AppSettings
     private var miniPlayer: ExoPlayer? = null
@@ -74,6 +76,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var homeEmpty: TextView
     private lateinit var favoritesRailTitle: TextView
     private lateinit var favoritesRail: RecyclerView
+    private lateinit var resumeRailTitle: TextView
+    private lateinit var resumeRail: RecyclerView
     private lateinit var moviesRail: RecyclerView
     private lateinit var seriesRail: RecyclerView
 
@@ -82,6 +86,7 @@ class MainActivity : AppCompatActivity() {
     private val catalogCategories = mutableListOf<Category>()
     private val posterItems = mutableListOf<PosterAdapter.PosterItem>()
     private val favoriteItems = mutableListOf<HomeRailAdapter.HomeRailItem>()
+    private val resumeItems = mutableListOf<HomeRailAdapter.HomeRailItem>()
     private val recentMovies = mutableListOf<HomeRailAdapter.HomeRailItem>()
     private val recentSeries = mutableListOf<HomeRailAdapter.HomeRailItem>()
     private val heroItems = mutableListOf<HeroItem>()
@@ -137,6 +142,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         favoritesStore = FavoritesStore(this)
+        resumeStore = ResumeStore(this)
         appSettings = AppSettings(this)
 
         findViewById<TextView>(R.id.profileLabel).text = profile.name
@@ -179,6 +185,8 @@ class MainActivity : AppCompatActivity() {
         homeEmpty = panelHome.findViewById(R.id.homeEmpty)
         favoritesRailTitle = panelHome.findViewById(R.id.favoritesRailTitle)
         favoritesRail = panelHome.findViewById(R.id.favoritesRail)
+        resumeRailTitle = panelHome.findViewById(R.id.resumeRailTitle)
+        resumeRail = panelHome.findViewById(R.id.resumeRail)
         moviesRail = panelHome.findViewById(R.id.moviesRail)
         seriesRail = panelHome.findViewById(R.id.seriesRail)
 
@@ -187,6 +195,7 @@ class MainActivity : AppCompatActivity() {
         catalogCategoryList.layoutManager = LinearLayoutManager(this)
         catalogGrid.layoutManager = GridLayoutManager(this, 5)
         favoritesRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        resumeRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         moviesRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         seriesRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
 
@@ -267,10 +276,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupTabNavigation() {
-        tabHome.setOnClickListener { showTab(Tab.HOME) }
-        tabLive.setOnClickListener { showTab(Tab.LIVE) }
-        tabMovies.setOnClickListener { showTab(Tab.MOVIES) }
-        tabSeries.setOnClickListener { showTab(Tab.SERIES) }
+        bindNavTab(tabHome, Tab.HOME)
+        bindNavTab(tabLive, Tab.LIVE)
+        bindNavTab(tabMovies, Tab.MOVIES)
+        bindNavTab(tabSeries, Tab.SERIES)
+    }
+
+    private fun bindNavTab(view: View, tab: Tab) {
+        view.setOnClickListener { showTab(tab) }
     }
 
     private fun showTab(tab: Tab) {
@@ -354,6 +367,11 @@ class MainActivity : AppCompatActivity() {
             }
 
             buildFavoriteItems()
+            buildResumeItems()
+
+            bindHomeRail(resumeRail, resumeItems)
+            resumeRailTitle.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
+            resumeRail.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
 
             bindHomeRail(favoritesRail, favoriteItems)
             bindHomeRail(moviesRail, recentMovies)
@@ -377,6 +395,29 @@ class MainActivity : AppCompatActivity() {
                 bindHero(heroItems[heroIndex])
                 startHeroRotation()
             }
+        }
+    }
+
+    private fun buildResumeItems() {
+        resumeItems.clear()
+        resumeStore.loadAll().forEach { record ->
+            val kind = when (record.kind) {
+                ResumeStore.KIND_MOVIE -> HomeRailAdapter.HomeRailItem.KIND_MOVIE
+                ResumeStore.KIND_SERIES -> HomeRailAdapter.HomeRailItem.KIND_SERIES
+                else -> return@forEach
+            }
+            resumeItems.add(
+                HomeRailAdapter.HomeRailItem(
+                    id = record.id.toIntOrNull() ?: return@forEach,
+                    title = record.title,
+                    imageUrl = record.imageUrl,
+                    badge = getString(R.string.rail_continue),
+                    kind = kind,
+                    extension = record.extension,
+                    subtitle = getString(R.string.resume_progress, record.progressPercent),
+                    resumePositionMs = record.positionMs,
+                ),
+            )
         }
     }
 
@@ -517,19 +558,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onHomeRailClick(item: HomeRailAdapter.HomeRailItem) {
-        val profile = PlaylistRepository.profile ?: return
         when (item.kind) {
-            HomeRailAdapter.HomeRailItem.KIND_MOVIE -> {
-                val url = api.movieStreamUrl(profile, item.id, item.extension)
-                startActivity(PlayerActivity.intent(this, item.title, url))
-            }
+            HomeRailAdapter.HomeRailItem.KIND_MOVIE -> playMovie(
+                title = item.title,
+                streamId = item.id,
+                extension = item.extension,
+                imageUrl = item.imageUrl,
+                positionMs = item.resumePositionMs,
+            )
             HomeRailAdapter.HomeRailItem.KIND_SERIES -> {
-                startActivity(
-                    SeriesDetailActivity.intent(
-                        this,
-                        SeriesItem(item.id, item.title, item.imageUrl, ""),
-                    ),
-                )
+                if (item.resumePositionMs > 0L) {
+                    playSeriesEpisode(
+                        title = item.title,
+                        episodeId = item.id,
+                        extension = item.extension,
+                        imageUrl = item.imageUrl,
+                        positionMs = item.resumePositionMs,
+                    )
+                } else {
+                    startActivity(
+                        SeriesDetailActivity.intent(
+                            this,
+                            SeriesItem(item.id, item.title, item.imageUrl, ""),
+                        ),
+                    )
+                }
             }
             HomeRailAdapter.HomeRailItem.KIND_LIVE -> {
                 val channel = PlaylistRepository.allChannels.firstOrNull { it.streamId == item.id }
@@ -537,6 +590,52 @@ class MainActivity : AppCompatActivity() {
                 openFullscreen(channel)
             }
         }
+    }
+
+    private fun playMovie(
+        title: String,
+        streamId: Int,
+        extension: String,
+        imageUrl: String = "",
+        positionMs: Long = 0L,
+    ) {
+        val profile = PlaylistRepository.profile ?: return
+        val url = api.movieStreamUrl(profile, streamId, extension)
+        startActivity(
+            PlayerActivity.intent(
+                context = this,
+                title = title,
+                url = url,
+                kind = ResumeStore.KIND_MOVIE,
+                contentId = streamId.toString(),
+                imageUrl = imageUrl,
+                extension = extension,
+                positionMs = positionMs,
+            ),
+        )
+    }
+
+    private fun playSeriesEpisode(
+        title: String,
+        episodeId: Int,
+        extension: String,
+        imageUrl: String = "",
+        positionMs: Long = 0L,
+    ) {
+        val profile = PlaylistRepository.profile ?: return
+        val url = api.seriesStreamUrl(profile, episodeId, extension)
+        startActivity(
+            PlayerActivity.intent(
+                context = this,
+                title = title,
+                url = url,
+                kind = ResumeStore.KIND_SERIES,
+                contentId = episodeId.toString(),
+                imageUrl = imageUrl,
+                extension = extension,
+                positionMs = positionMs,
+            ),
+        )
     }
 
     private fun bindHero(item: HeroItem) {
@@ -634,17 +733,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun playHero() {
-        val profile = PlaylistRepository.profile ?: return
         railPreviewItem?.let {
             onHomeRailClick(it)
             return
         }
         val item = heroItems.getOrNull(heroIndex) ?: return
         when (item) {
-            is HeroItem.Movie -> {
-                val url = api.movieStreamUrl(profile, item.movie.streamId, item.movie.extension)
-                startActivity(PlayerActivity.intent(this, item.title, url))
-            }
+            is HeroItem.Movie -> playMovie(
+                title = item.title,
+                streamId = item.movie.streamId,
+                extension = item.movie.extension,
+                imageUrl = item.movie.icon,
+            )
             is HeroItem.Series -> {
                 startActivity(SeriesDetailActivity.intent(this, item.series))
             }
@@ -802,12 +902,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onPosterClick(tab: Tab, item: PosterAdapter.PosterItem) {
-        val profile = PlaylistRepository.profile ?: return
         when (tab) {
-            Tab.MOVIES -> {
-                val url = api.movieStreamUrl(profile, item.id, item.extension)
-                startActivity(PlayerActivity.intent(this, item.title, url))
-            }
+            Tab.MOVIES -> playMovie(
+                title = item.title,
+                streamId = item.id,
+                extension = item.extension,
+                imageUrl = item.imageUrl,
+            )
             Tab.SERIES -> {
                 val series = SeriesItem(
                     seriesId = item.id,
@@ -887,7 +988,16 @@ class MainActivity : AppCompatActivity() {
     fun openFullscreen(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         val url = api.streamUrl(profile, channel.streamId)
-        startActivity(PlayerActivity.intent(this, channel.name, url))
+        startActivity(
+            PlayerActivity.intent(
+                context = this,
+                title = channel.name,
+                url = url,
+                kind = ResumeStore.KIND_LIVE,
+                contentId = channel.streamId.toString(),
+                imageUrl = channel.icon,
+            ),
+        )
     }
 
     private fun logoutUser() {
