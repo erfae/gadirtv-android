@@ -3,6 +3,7 @@ package com.gadir.tv.data
 import android.content.Context
 import com.gadir.tv.model.LoginDraft
 import com.gadir.tv.model.Profile
+import com.gadir.tv.util.HostUtils
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
@@ -14,7 +15,7 @@ class ProfileStore(context: Context) {
         val raw = prefs.getString(KEY_PROFILES, null) ?: return emptyList()
         return try {
             val type = object : TypeToken<List<Profile>>() {}.type
-            gson.fromJson<List<Profile>>(raw, type) ?: emptyList()
+            (gson.fromJson<List<Profile>>(raw, type) ?: emptyList()).map { normalizeProfile(it) }
         } catch (_: Exception) {
             emptyList()
         }
@@ -27,12 +28,13 @@ class ProfileStore(context: Context) {
     }
 
     fun upsert(profile: Profile): List<Profile> {
+        val normalized = normalizeProfile(profile)
         val all = loadAll().toMutableList()
-        val idx = all.indexOfFirst { it.id == profile.id }
+        val idx = all.indexOfFirst { it.id == normalized.id }
         if (idx >= 0) {
-            all[idx] = profile
+            all[idx] = normalized
         } else {
-            all.add(profile)
+            all.add(normalized)
         }
         saveAll(all)
         return all
@@ -52,7 +54,7 @@ class ProfileStore(context: Context) {
             clearActive()
         } else {
             prefs.edit()
-                .putString(KEY_ACTIVE, gson.toJson(profile))
+                .putString(KEY_ACTIVE, gson.toJson(normalizeProfile(profile)))
                 .apply()
         }
     }
@@ -62,7 +64,7 @@ class ProfileStore(context: Context) {
     fun getActive(): Profile? {
         val raw = prefs.getString(KEY_ACTIVE, null) ?: return null
         return try {
-            gson.fromJson(raw, Profile::class.java)
+            normalizeProfile(gson.fromJson(raw, Profile::class.java))
         } catch (_: Exception) {
             null
         }
@@ -90,6 +92,9 @@ class ProfileStore(context: Context) {
     fun clearDraft() {
         prefs.edit().remove(KEY_DRAFT).apply()
     }
+
+    private fun normalizeProfile(p: Profile): Profile =
+        p.copy(host = HostUtils.baseUrl(p.host))
 
     companion object {
         private const val PREFS = "gadirtv_prefs"

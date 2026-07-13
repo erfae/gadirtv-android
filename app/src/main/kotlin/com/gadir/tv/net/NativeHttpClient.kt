@@ -4,33 +4,43 @@ import android.util.Log
 import com.gadir.tv.util.HostUtils
 import okhttp3.ConnectionSpec
 import okhttp3.Dns
+import okhttp3.FormBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.URL
 import java.util.concurrent.TimeUnit
 
-/** OkHttp Xtream client — IPv4 preferido, reintentos ante 503/cuerpo vacío. */
+/** Cliente HTTP Xtream — OkHttp + HttpURLConnection, IPv4, fallback por IP. */
 object NativeHttpClient {
     private const val TAG = "GadirTV-HTTP"
     private const val MAX_RETRIES = 3
 
+    /** IP conocida de gadir.co — fallback cuando DNS/TCP al hostname falla en TV Box. */
+    private const val GADIR_IP = "51.91.120.175"
+
     private val ipv4PreferredDns = object : Dns {
         override fun lookup(hostname: String): List<InetAddress> {
-            val resolved = Dns.SYSTEM.lookup(hostname)
-            val v4 = resolved.filterIsInstance<Inet4Address>()
-            if (v4.isNotEmpty()) {
-                Log.i(TAG, "DNS $hostname → IPv4 ${v4.first().hostAddress}")
-                return v4
+            return try {
+                val resolved = Dns.SYSTEM.lookup(hostname)
+                val v4 = resolved.filterIsInstance<Inet4Address>()
+                if (v4.isNotEmpty()) v4 else resolved
+            } catch (e: Exception) {
+                Log.w(TAG, "DNS falló para $hostname: ${e.message}")
+                emptyList()
             }
-            Log.w(TAG, "DNS $hostname → sin IPv4, usando ${resolved.size} direcciones")
-            return resolved
         }
     }
 
-    private val client = okhttp3.OkHttpClient.Builder()
+    private val okHttp = OkHttpClient.Builder()
         .dns(ipv4PreferredDns)
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(25, TimeUnit.SECONDS)
+        .readTimeout(35, TimeUnit.SECONDS)
+        .writeTimeout(25, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
         .retryOnConnectionFailure(true)
@@ -38,74 +48,155 @@ object NativeHttpClient {
         .build()
 
     fun request(url: String, userAgent: String, method: String = "GET"): HttpResult {
-        var last: HttpResult? = null
-        repeat(MAX_RETRIES) { attempt ->
-            val result = requestOnce(url, userAgent, method)
-            last = result
-            if (result.error != null && result.status == 0) return result
-            val retryable = result.status in 500..599 ||
-                result.status == 429 ||
-                result.status == 502 ||
-                result.status == 503 ||
-                (result.status == 200 && result.body.isBlank())
-            if (!retryable) return result
-            val delay = 500L * (attempt + 1)
-            Log.w(TAG, "Retry ${attempt + 1}/$MAX_RETRIES status=${result.status}")
-            Thread.sleep(delay)
+        val targets = buildTargets(url)
+        var last = HttpResult(0, "", method.uppercase(), "Sin respuesta")
+
+        for (target in targets) {
+            repeat(MAX_RETRIES) { attempt ->
+                for (transport in listOf("OkHttp", "HttpURL")) {
+                    val result = when (transport) {
+                        "OkHttp" -> requestOkHttp(target, userAgent, method)
+                        else -> requestHttpUrl(target, userAgent, method)
+                    }
+                    last = result
+                    if (result.error == null && result.status > 0) {
+                        if (result.status == 200 && result.body.isNotBlank()) return result
+                        if (result.status !in 500..599 && result.status != 512 && result.status != 429) {
+                            return result
+                        }
+                    }
+                }
+                if (attempt < MAX_RETRIES - 1) {
+                    Thread.sleep(600L * (attempt + 1))
+                }
+            }
         }
-        return last ?: HttpResult(0, "", method.uppercase(), "Sin respuesta")
+        return last
     }
 
-    private fun requestOnce(url: String, userAgent: String, method: String): HttpResult {
-        return try {
-            val normalizedUrl = normalizeRequestUrl(url)
-            val uri = java.net.URI(normalizedUrl)
-            val origin = HostUtils.baseUrl("${uri.scheme}://${uri.host}${portSuffix(uri)}")
-            val referer = "$origin/"
+    private data class RequestTarget(
+        val requestUrl: String,
+        val hostHeader: String?,
+        val label: String,
+    )
 
-            val builder = okhttp3.Request.Builder()
+    private fun buildTargets(url: String): List<RequestTarget> {
+        val normalized = normalizeRequestUrl(url)
+        val uri = java.net.URI(normalized)
+        val hostname = uri.host ?: return listOf(RequestTarget(normalized, null, "direct"))
+        val pathAndQuery = buildString {
+            append(uri.rawPath ?: "")
+            if (!uri.rawQuery.isNullOrBlank()) append('?').append(uri.rawQuery)
+        }
+        val scheme = uri.scheme ?: "http"
+
+        val targets = mutableListOf<RequestTarget>()
+        targets.add(RequestTarget(normalized, null, "host:$hostname"))
+
+        if (hostname.equals("gadir.co", ignoreCase = true)) {
+            val ipUrl = "$scheme://$GADIR_IP$pathAndQuery"
+            targets.add(RequestTarget(ipUrl, "gadir.co", "ip:$GADIR_IP"))
+        }
+        return targets
+    }
+
+    private fun requestOkHttp(target: RequestTarget, userAgent: String, method: String): HttpResult {
+        return try {
+            val uri = java.net.URI(target.requestUrl)
+            val originHost = target.hostHeader ?: uri.host
+            val scheme = uri.scheme ?: "http"
+            val origin = HostUtils.baseUrl("$scheme://${originHost}${portSuffix(uri)}")
+
+            val builder = Request.Builder()
                 .header("User-Agent", userAgent)
                 .header("Accept", "application/json, text/plain, */*")
                 .header("Accept-Encoding", "identity")
                 .header("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
                 .header("Connection", "keep-alive")
-                .header("Referer", referer)
-                .header("Origin", origin)
+                .header("Referer", "$origin/")
+
+            if (target.hostHeader != null) {
+                builder.header("Host", target.hostHeader)
+            }
 
             if (method.equals("POST", ignoreCase = true)) {
-                val form = okhttp3.FormBody.Builder()
+                val form = FormBody.Builder()
                 parseQuery(uri.query).forEach { (k, v) -> form.add(k, v) }
                 val postUrl = "$origin/player_api.php"
                 builder.url(postUrl).post(form.build())
-                Log.i(TAG, "POST $postUrl UA=$userAgent")
+                Log.i(TAG, "OkHttp POST $postUrl [${target.label}] UA=$userAgent")
             } else {
-                builder.url(normalizedUrl).get()
-                Log.i(TAG, "GET $normalizedUrl UA=$userAgent")
+                builder.url(target.requestUrl).get()
+                Log.i(TAG, "OkHttp GET ${target.requestUrl} [${target.label}] UA=$userAgent")
             }
 
-            client.newCall(builder.build()).execute().use { response ->
-                val body = response.body?.string() ?: ""
-                HttpResult(
-                    status = response.code,
-                    body = body,
-                    method = method.uppercase(),
-                )
+            okHttp.newCall(builder.build()).execute().use { response ->
+                HttpResult(response.code, response.body?.string() ?: "", method.uppercase())
             }
         } catch (e: Exception) {
-            Log.e(TAG, "HTTP error: ${e.message}", e)
-            HttpResult(
-                status = 0,
-                body = "",
-                method = method.uppercase(),
-                error = e.message ?: e.javaClass.simpleName,
-            )
+            Log.e(TAG, "OkHttp [${target.label}] ${e.message}")
+            HttpResult(0, "", method.uppercase(), e.message ?: e.javaClass.simpleName)
+        }
+    }
+
+    private fun requestHttpUrl(target: RequestTarget, userAgent: String, method: String): HttpResult {
+        return try {
+            val uri = java.net.URI(target.requestUrl)
+            val originHost = target.hostHeader ?: uri.host
+            val scheme = uri.scheme ?: "http"
+            val origin = HostUtils.baseUrl("$scheme://${originHost}${portSuffix(uri)}")
+
+            val connUrl = if (method.equals("POST", ignoreCase = true)) {
+                "$origin/player_api.php"
+            } else {
+                target.requestUrl
+            }
+
+            val conn = (URL(connUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 25_000
+                readTimeout = 35_000
+                requestMethod = method.uppercase()
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", userAgent)
+                setRequestProperty("Accept", "application/json, text/plain, */*")
+                setRequestProperty("Accept-Encoding", "identity")
+                setRequestProperty("Connection", "keep-alive")
+                setRequestProperty("Referer", "$origin/")
+                if (target.hostHeader != null) {
+                    setRequestProperty("Host", target.hostHeader)
+                }
+                if (method.equals("POST", ignoreCase = true)) {
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                }
+            }
+
+            if (method.equals("POST", ignoreCase = true)) {
+                val form = parseQuery(uri.query)
+                    .entries.joinToString("&") { "${it.key}=${java.net.URLEncoder.encode(it.value, "UTF-8")}" }
+                conn.outputStream.use { it.write(form.toByteArray(Charsets.UTF_8)) }
+            }
+
+            Log.i(TAG, "HttpURL ${method.uppercase()} $connUrl [${target.label}]")
+            val status = conn.responseCode
+            val stream = if (status >= 400) conn.errorStream else conn.inputStream
+            val body = stream?.let { input ->
+                BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { it.readText() }
+            }.orEmpty()
+            conn.disconnect()
+            HttpResult(status, body, method.uppercase())
+        } catch (e: Exception) {
+            Log.e(TAG, "HttpURL [${target.label}] ${e.message}")
+            HttpResult(0, "", method.uppercase(), e.message ?: e.javaClass.simpleName)
         }
     }
 
     private fun normalizeRequestUrl(url: String): String {
-        val base = HostUtils.normalize(url.substringBefore('?'))
-        val query = url.substringAfter('?', "")
-        return if (query.isEmpty() || query == url) base else "$base?$query"
+        val qIdx = url.indexOf('?')
+        val base = if (qIdx >= 0) url.substring(0, qIdx) else url
+        val query = if (qIdx >= 0) url.substring(qIdx + 1) else ""
+        val normalizedBase = HostUtils.baseUrl(base)
+        return if (query.isEmpty()) normalizedBase else "$normalizedBase?$query"
     }
 
     private fun portSuffix(uri: java.net.URI): String {

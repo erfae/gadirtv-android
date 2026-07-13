@@ -57,15 +57,26 @@ class XtreamApi(
             onProgress?.invoke("Intento ${index + 1}/${userAgents.size}…")
             try {
                 val get = NativeHttpClient.request(url, ua, "GET")
-                if (get.error != null) {
+                if (get.error != null || get.status == 0) {
                     hadConnectionError = true
-                    lastDiag = get.error
-                    Thread.sleep(500L * (index + 1))
+                    lastDiag = get.error ?: "Sin respuesta HTTP"
+                    Thread.sleep(400L * (index + 1))
+                    continue
+                }
+                if (get.status == 512 || get.status == 405 || get.status == 403) {
+                    onProgress?.invoke("Reintentando POST…")
+                    val post = NativeHttpClient.request(url, ua, "POST")
+                    if (post.error == null && post.status == 200 && parseAuth(post.body)) {
+                        activeUserAgent = ua
+                        PlaylistRepository.userAgent = ua
+                        return LoginResult(true)
+                    }
+                    lastDiag = "HTTP ${get.status} GET, POST ${post.status}"
                     continue
                 }
                 if (get.status in 500..599) {
                     lastDiag = "HTTP ${get.status} GET"
-                    Thread.sleep(500L * (index + 1))
+                    Thread.sleep(600L * (index + 1))
                     continue
                 }
                 if (get.status != 200) {
@@ -78,6 +89,16 @@ class XtreamApi(
                     return LoginResult(true)
                 }
 
+                if (get.body.isBlank()) {
+                    onProgress?.invoke("Reintentando POST…")
+                    val post = NativeHttpClient.request(url, ua, "POST")
+                    if (post.error == null && post.status == 200 && parseAuth(post.body)) {
+                        activeUserAgent = ua
+                        PlaylistRepository.userAgent = ua
+                        return LoginResult(true)
+                    }
+                }
+
                 val post = NativeHttpClient.request(url, ua, "POST")
                 if (post.error == null && post.status == 200 && parseAuth(post.body)) {
                     activeUserAgent = ua
@@ -86,24 +107,20 @@ class XtreamApi(
                 }
                 lastDiag = when {
                     get.body.isBlank() -> "Respuesta vacía del servidor"
-                    else -> "GET ${get.status}, auth no válida"
+                    else -> "Credenciales rechazadas (auth≠1)"
                 }
             } catch (e: Exception) {
                 hadConnectionError = true
                 lastDiag = e.message
-                Thread.sleep(500L * (index + 1))
+                Thread.sleep(400L * (index + 1))
             }
         }
 
-        // Fallback: verificar vía M3U (get.php) como hacen muchos clientes IPTV
-        if (hadConnectionError || lastDiag?.contains("connect", ignoreCase = true) == true) {
-            onProgress?.invoke("Probando vía M3U…")
-            val m3uOk = verifyM3u(profile)
-            if (m3uOk) {
-                activeUserAgent = userAgents.first()
-                PlaylistRepository.userAgent = activeUserAgent
-                return LoginResult(true)
-            }
+        onProgress?.invoke("Probando vía M3U…")
+        if (verifyM3u(profile)) {
+            activeUserAgent = userAgents.first()
+            PlaylistRepository.userAgent = activeUserAgent
+            return LoginResult(true)
         }
 
         return LoginResult(

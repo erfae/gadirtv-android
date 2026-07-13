@@ -66,9 +66,18 @@ class ProfilesActivity : AppCompatActivity() {
         }
     }
 
+    private var autoConnected = false
+
     override fun onResume() {
         super.onResume()
         reload()
+        if (!autoConnected && profiles.size == 1 && !manageMode) {
+            autoConnected = true
+            val profile = profiles.first()
+            profileStore.setActive(profile)
+            startActivity(Intent(this, BootstrapActivity::class.java))
+            finish()
+        }
     }
 
     private fun reload() {
