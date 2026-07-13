@@ -13,20 +13,22 @@
   · 15-20 minutos de tu tiempo (mayormente esperando)
 
 PASOS:
-  1. Descomprime este ZIP en una carpeta con nombre corto,
-     por ejemplo C:\GadirTV\  (evita rutas largas con espacios).
-  2. Haz clic DERECHO sobre "COMPILAR_APK.bat".
+  1. Descomprime el ZIP del repo en una carpeta corta, por ejemplo:
+       C:\GadirTV\
+     Debe quedar asi:
+       C:\GadirTV\gadirtv_android\
+       C:\GadirTV\gadirtv_windows_builder\
+  2. Haz clic DERECHO sobre "COMPILAR_APK.bat" (en esta carpeta).
   3. Elige "Ejecutar como administrador".
   4. Cuando salga el aviso de Windows, dale a "Si".
   5. Espera. La ventana negra ira mostrando lo que hace.
   6. Al terminar, se abrira sola la carpeta con los APKs
      en tu Escritorio ("GadirTV-APKs").
 
-APKs QUE OBTENDRAS:
-  app-arm64-v8a-release.apk        <- INSTALA ESTE en tu movil/TV Box moderno
-  app-armeabi-v7a-release.apk      <- solo si tu Android es muy antiguo
-  app-x86_64-release.apk           <- solo para emuladores
-  app-universal-release.apk        <- si no sabes cual, usa este (mas pesado)
+APKs QUE OBTENDRAS (solo dispositivos reales ARM):
+  app-arm64-v8a-release.apk        <- movil/tablet o TV Box 64-bit (Shield, etc.)
+  app-armeabi-v7a-release.apk      <- TV Box 32-bit (Xiaomi, ONN, Hisense...) — prueba este en TV
+  app-universal-release.apk        <- incluye 32 y 64 bits (mas pesado, sirve si no sabes cual)
 
 QUE HACE CON TU PC:
   · Todo lo descargado va a C:\GadirTVBuild\

@@ -77,16 +77,29 @@ cd gadirtv_android
 ./scripts/build-tv-apk.sh universal     # 32+64 en un solo APK
 ```
 
-**Windows:**
+**Windows (con Flutter + JDK 17):**
 ```cmd
 cd gadirtv_android
+COMPILAR_TV.bat
+```
+
+O manualmente:
+```cmd
 scripts\build-tv-apk.bat
 ```
 
-Antes de compilar, restaura el registrant mínimo:
-```bash
-./scripts/restore-minimal-registrant.sh
+**Windows (sin Flutter instalado):**
+```cmd
+gadirtv_windows_builder\COMPILAR_APK.bat
 ```
+El repo debe tener `gadirtv_android\` y `gadirtv_windows_builder\` como carpetas hermanas.
+
+**Sin compilar — descargar APK listo:**
+```cmd
+scripts\download-tv-apk.bat
+```
+
+El script `build-tv-apk.bat` restaura solo el registrant mínimo (no hace falta el `.sh` en Windows).
 
 ### Error `INSTALL_FAILED_NO_MATCHING_ABIS`
 
