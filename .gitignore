@@ -1,144 +1,16 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# IDE and editors
+# Gradle / Android
+.gradle/
+build/
+app/build/
+local.properties
+*.apk
+*.aab
 .idea/
-.vscode/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
 
-# Dependencies
-node_modules/
-/node_modules
-/.pnp
-.pnp.js
-.yarn/install-state.gz
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# Testing
-/coverage
-
-# Next.js
-/.next/
-/out/
-next-env.d.ts
-*.tsbuildinfo
-
-# Production builds
-/build
-dist/
-dist
-
-# Environment files (comprehensive coverage)
-
-*token.json*
-*credentials.json*
-
-# Logs and debug files
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-dump.rdb
-
-# System files
+# OS
 .DS_Store
-*.pem
-
-# Python
-__pycache__/
-*pyc*
-venv/
-.venv/
-
-# Development tools
-chainlit.md
-.chainlit
-.ipynb_checkpoints/
-.ac
-
-# Deployment
-.vercel
-
-# Data and databases
-agenthub/agents/youtube/db
-
-# Archive files and large assets
-**/*.zip
-**/*.tar.gz
-**/*.tar
-**/*.tgz
-*.pack
-*.deb
-*.dylib
-
-# Build caches
-.cache/
-
-memory/test_credentials.md
-
-# Mobile development
-android-sdk/work3/box.apk
-work3/box.apk
-frontend/public/box_gadir.apk
-output/box_gadir.apk
-work3/box_gadir_aligned.apk
-work3/box_gadir.apk
-work3/box_gadir_v1.apk
-frontend/public/GadirTV-Windows.zip
-electron/node_modules/electron/dist/electron
-electron/dist_manual/GadirTV/GadirTV.exe
-electron/dist/win-unpacked/GadirTV.exe
-electron/GadirTV-Windows-x64.zip
-electron/GadirTV-portable-encrypted.zip
-electron/dist_manual/GadirTV/mpv/mpv.exe
-electron/GadirTV-Setup-1.0.0.exe
-electron/mpv/mpv.exe
-electron/GadirTV-Installer.zip
-electron/GadirTV-Portable-v1.0.1.zip
-electron/GadirTV-Portable-v1.0.1-encrypted.zip
-electron/GadirTV-Setup-1.0.1-fix-network.exe
-electron/GadirTV-Installer-v1.0.1.zip
-electron/GadirTV-Installer-v1.1.zip
-electron/GadirTV-Portable-v1.1-encrypted.zip
-electron/GadirTV-Setup-1.1.exe
-electron/GadirTV-Portable-v1.1.zip
-electron/GadirTV-Portable-v1.2.zip
-electron/GadirTV-Setup-1.2.exe
-electron/GadirTV-Portable-v1.2-encrypted.zip
-electron/GadirTV-Installer-v1.2.zip
-electron/GadirTV-Setup-1.3.exe
-electron/GadirTV-Installer-v1.3.zip
-electron/GadirTV-Portable-v1.3.zip
-electron/GadirTV-Portable-v1.3-encrypted.zip
-electron/GadirTV-Setup-1.4.exe
-electron/GadirTV-Installer-v1.4.zip
-electron/GadirTV-Portable-v1.4.zip
-electron/GadirTV-Portable-v1.4-encrypted.zip
-electron/GadirTV-Portable-v1.5-encrypted.zip
-electron/GadirTV-Installer-v1.5.zip
-electron/GadirTV-Setup-1.5.exe
-electron/GadirTV-Portable-v1.5.zip
-electron/GadirTV-Portable-v1.6-encrypted.zip
-electron/GadirTV-Installer-v1.6.zip
-electron/GadirTV-Portable-v1.6.zip
-electron/GadirTV-Setup-1.6.exe
-electron/GadirTV-Portable-v1.7.zip
-electron/GadirTV-Portable-v1.8.zip
-electron/GadirTV-Portable-v1.12.zip
-electron/GadirTV-Portable-v1.13.zip
-electron/GadirTV-Installer-v1.13.zip
-electron/GadirTV-Installer-v1.13.zip
-electron/GadirTV-Setup-1.13.exe
-electron/GadirTV-Setup-1.13.exe
-.env
-.env.*
-*.env
-credentials.json
-*.key
-.credentials
-frontend/public/downloads/GadirTV-Setup-1.13.exe
-frontend/public/downloads/GadirTV-Portable-v1.13.zip
-frontend/public/downloads/GadirTV-Installer-v1.13.zip
-box.apk

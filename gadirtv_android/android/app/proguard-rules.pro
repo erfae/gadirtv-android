@@ -1,3 +1,0 @@
--keep class io.flutter.plugins.GeneratedPluginRegistrant { *; }
--keep class org.videolan.libvlc.** { *; }
--keep class software.solid.fluttervlcplayer.** { *; }
