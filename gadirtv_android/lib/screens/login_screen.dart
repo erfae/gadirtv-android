@@ -16,7 +16,7 @@ import '../widgets/gtv_tv_text_field.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v2.5.0';
+const String kAppVersionLabel = 'v2.5.1';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -64,6 +64,8 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _progress;
   String? _diagnostic;
   Timer? _draftTimer;
+
+  bool get _compact => MediaQuery.sizeOf(context).height < 620;
 
   @override
   void initState() {
@@ -304,12 +306,15 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final keyboardPad = _fieldEditing ? 340.0 : 0.0;
+    final screenH = MediaQuery.sizeOf(context).height;
+    final compact = screenH < 620;
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        toolbarHeight: compact ? 44 : kToolbarHeight,
         leading: GtvFocusable(
           focusNode: _backFocus,
           borderRadius: BorderRadius.circular(999),
@@ -332,7 +337,13 @@ class _LoginScreenState extends State<LoginScreen> {
           policy: OrderedTraversalPolicy(),
           child: SingleChildScrollView(
           controller: _scrollController,
-          padding: EdgeInsets.fromLTRB(48, 24, 48, 24 + bottomInset + keyboardPad),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(
+            compact ? 28 : 48,
+            compact ? 8 : 16,
+            compact ? 28 : 48,
+            32 + bottomInset + keyboardPad,
+          ),
           child: Align(
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
@@ -340,12 +351,16 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                const Text(
+                Text(
                   'Añadir perfil',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white),
+                  style: TextStyle(
+                    fontSize: compact ? 28 : 34,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: compact ? 4 : 8),
                 Text(
                   _mode == 'm3u'
                       ? 'Conecta con una URL M3U/M3U8'
@@ -373,7 +388,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: compact ? 16 : 32),
                 // ── Mode toggle: Xtream / M3U ────────────────────
                 Container(
                   decoration: BoxDecoration(
@@ -408,7 +423,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: compact ? 12 : 20),
                 AbsorbPointer(
                   absorbing: _busy,
                   child: AnimatedOpacity(
@@ -469,7 +484,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ],
-                const SizedBox(height: 24),
+                SizedBox(height: compact ? 16 : 24),
                 Row(
                   children: [
                     Expanded(
@@ -538,6 +553,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 24),
               ],
               ),
             ),
@@ -568,7 +584,7 @@ class _LoginScreenState extends State<LoginScreen> {
             helperStyle: TextStyle(color: GtvTheme.textDim, fontSize: 11),
           ),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: _compact ? 10 : 14),
         GtvTvTextField(
           controller: _user,
           browseFocusNode: _userBrowse,
@@ -583,7 +599,7 @@ class _LoginScreenState extends State<LoginScreen> {
           enabled: !_busy,
           decoration: const InputDecoration(hintText: 'Usuario'),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: _compact ? 10 : 14),
         GtvTvTextField(
           controller: _pass,
           browseFocusNode: _passBrowse,
@@ -608,7 +624,7 @@ class _LoginScreenState extends State<LoginScreen> {
             hintText: 'Contraseña',
           ),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: _compact ? 10 : 14),
         GtvTvTextField(
           controller: _name,
           browseFocusNode: _nameBrowse,
@@ -643,7 +659,7 @@ class _LoginScreenState extends State<LoginScreen> {
             helperStyle: TextStyle(color: GtvTheme.textDim, fontSize: 11),
           ),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: _compact ? 10 : 14),
         GtvTvTextField(
           controller: _name,
           browseFocusNode: _m3uNameBrowse,

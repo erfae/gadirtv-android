@@ -68,6 +68,17 @@ class _GtvDpadFocusState extends State<GtvDpadFocus> {
 
   void _onFocus() {
     if (mounted) setState(() => _focused = _node.hasFocus);
+    if (_node.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_node.hasFocus) return;
+        Scrollable.ensureVisible(
+          context,
+          alignment: 0.38,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOut,
+        );
+      });
+    }
   }
 
   void _syncNav() {
