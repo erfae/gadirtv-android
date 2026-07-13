@@ -59,6 +59,15 @@
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.GadirTV.Player" />
 
+        <activity
+            android:name=".ui.search.SearchActivity"
+            android:exported="false"
+            android:windowSoftInputMode="stateVisible|adjustResize" />
+
+        <activity
+            android:name=".ui.settings.SettingsActivity"
+            android:exported="false" />
+
         <meta-data
             android:name="com.google.android.tv.feature"
             android:value="true" />

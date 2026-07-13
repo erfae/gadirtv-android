@@ -61,6 +61,15 @@ object PlaylistRepository {
         seriesCache[categoryId] = items
     }
 
+    fun allCachedVod(): List<VodMovie> = vodCache.values.flatten().distinctBy { it.streamId }
+
+    fun allCachedSeries(): List<SeriesItem> = seriesCache.values.flatten().distinctBy { it.seriesId }
+
+    fun clearContentCache() {
+        vodCache.clear()
+        seriesCache.clear()
+    }
+
     fun clear() {
         profile = null
         categories = emptyList()

@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.gadir.tv.R
+import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.FavoritesStore
 import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.PlaylistRepository
@@ -27,7 +28,9 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.ui.player.PlayerActivity
 import com.gadir.tv.ui.profiles.ProfilesActivity
+import com.gadir.tv.ui.search.SearchActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
+import com.gadir.tv.ui.settings.SettingsActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,6 +38,7 @@ import kotlinx.coroutines.withContext
 class MainActivity : AppCompatActivity() {
     private val api = XtreamApi()
     private lateinit var favoritesStore: FavoritesStore
+    private lateinit var appSettings: AppSettings
     private var miniPlayer: ExoPlayer? = null
     private var selectedLiveCategoryId: String? = null
     private var selectedCatalogCategoryId: String? = null
@@ -133,8 +137,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         favoritesStore = FavoritesStore(this)
+        appSettings = AppSettings(this)
 
         findViewById<TextView>(R.id.profileLabel).text = profile.name
+        findViewById<TextView>(R.id.btnSearch).setOnClickListener {
+            startActivity(Intent(this, SearchActivity::class.java))
+        }
+        findViewById<TextView>(R.id.btnSettings).setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
         findViewById<TextView>(R.id.btnLogout).setOnClickListener { logoutUser() }
         findViewById<TextView>(R.id.btnExit).setOnClickListener { exitApp() }
 
@@ -845,9 +856,13 @@ class MainActivity : AppCompatActivity() {
         previewTitle.text = channel.name
         epgNow.text = getString(R.string.epg_unavailable)
         epgNext.visibility = View.GONE
-        val url = api.streamUrl(profile, channel.streamId)
-        miniPlayer?.setMediaItem(MediaItem.fromUri(url))
-        miniPlayer?.prepare()
+        if (appSettings.autoplayPreview) {
+            val url = api.streamUrl(profile, channel.streamId)
+            miniPlayer?.setMediaItem(MediaItem.fromUri(url))
+            miniPlayer?.prepare()
+        } else {
+            miniPlayer?.stop()
+        }
 
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {

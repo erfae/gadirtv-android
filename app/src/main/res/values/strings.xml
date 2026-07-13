@@ -10,7 +10,7 @@
     <string name="loading">Cargando contenido…</string>
     <string name="category_all">Todos</string>
     <string name="select_channel">Selecciona un canal</string>
-    <string name="version_label">v1.5.0</string>
+    <string name="version_label">v1.6.0</string>
     <string name="login_subtitle">Televisión, películas y series en tu Android TV</string>
     <string name="login_hint">Introduce los datos de tu cuenta Xtream Codes</string>
     <string name="profiles_title">¿Quién está viendo?</string>
@@ -46,4 +46,20 @@
     <string name="rail_favorites">Mis favoritos</string>
     <string name="favorite_hint">Mantén OK para favorito</string>
     <string name="hero_brand">GadirTV</string>
+    <string name="back">Volver</string>
+    <string name="search_title">Buscar</string>
+    <string name="search_hint">Buscar canales, películas o series…</string>
+    <string name="search_empty">No hay resultados para esta búsqueda</string>
+    <string name="search_channels">Canales</string>
+    <string name="search_movies">Películas</string>
+    <string name="search_series">Series</string>
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_player_exo">Reproductor: ExoPlayer nativo</string>
+    <string name="settings_clear_cache">Limpiar caché de películas y series</string>
+    <string name="settings_change_profile">Cambiar perfil</string>
+    <string name="settings_cache_cleared">Caché limpiada</string>
+    <string name="settings_profile_label">Perfil: %1$s</string>
+    <string name="settings_version_label">Versión %1$s</string>
+    <string name="settings_autoplay_on">Vista previa automática: ACTIVADA</string>
+    <string name="settings_autoplay_off">Vista previa automática: DESACTIVADA</string>
 </resources>
