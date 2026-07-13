@@ -150,12 +150,15 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /** Path, DB, backup & share plugins — after login UI is visible. */
+    /** Path, DB, playback & share plugins — after login UI is visible. */
     private fun registerCorePlugins(engine: FlutterEngine) {
         if (coreRegistered) return
         val plugins = engine.plugins
         try {
             plugins.add(io.flutter.plugins.flutter_plugin_android_lifecycle.FlutterAndroidLifecyclePlugin())
+            plugins.add(io.flutter.plugins.videoplayer.VideoPlayerPlugin())
+            plugins.add(io.flutter.plugins.urllauncher.UrlLauncherPlugin())
+            plugins.add(io.flutter.plugins.webviewflutter.WebViewFlutterPlugin())
             plugins.add(io.flutter.plugins.pathprovider.PathProviderPlugin())
             plugins.add(com.tekartik.sqflite.SqflitePlugin())
             plugins.add(com.mr.flutter.plugin.filepicker.FilePickerPlugin())

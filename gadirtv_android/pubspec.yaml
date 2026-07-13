@@ -1,7 +1,7 @@
 name: gadirtv
 description: GadirTV — Xtream Codes IPTV client for Android (Mobile + TV).
 publish_to: 'none'
-version: 2.5.7+83
+version: 2.5.8+84
 
 environment:
   sdk: '>=3.5.0 <4.0.0'

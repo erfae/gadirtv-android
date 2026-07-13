@@ -8,6 +8,7 @@ import 'external_player.dart';
 import 'live_preview_guard.dart';
 import 'player_constants.dart';
 import 'prefs_settings.dart';
+import 'plugins_bootstrap.dart';
 
 /// Routes playback to ExoPlayer, libVLC or an external app based on settings.
 class PlaybackLauncher {
@@ -27,6 +28,8 @@ class PlaybackLauncher {
     }
 
     if (engine == PlayerEngine.external) {
+      await PluginsBootstrap.ensureCore();
+      if (!context.mounted) return;
       final ok = await ExternalPlayer.launch(playable.url);
       if (!context.mounted) return;
       if (!ok) {
@@ -44,6 +47,8 @@ class PlaybackLauncher {
     }
 
     if (engine == PlayerEngine.vlc) {
+      await PluginsBootstrap.ensureCore();
+      if (!context.mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => PlayerScreen(
@@ -56,6 +61,8 @@ class PlaybackLauncher {
       return;
     }
 
+    await PluginsBootstrap.ensureCore();
+    if (!context.mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ExoPlayerScreen(
