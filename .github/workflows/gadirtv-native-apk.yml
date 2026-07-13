@@ -1,0 +1,87 @@
+name: GadirTV APK
+
+on:
+  push:
+    branches: [android-native, main]
+    paths:
+      - 'app/**'
+      - 'gradle/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'key.properties'
+      - 'app/gadirtv-release.jks'
+      - '.github/workflows/gadirtv-native-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build GadirTV Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Build release APK
+        run: ./gradlew :app:assembleRelease --no-daemon
+
+      - name: Prepare APK
+        run: |
+          APK=$(find app/build/outputs/apk -name '*.apk' | head -1)
+          cp "$APK" GadirTV-AndroidTV.apk
+          ls -la GadirTV-AndroidTV.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GadirTV-AndroidTV
+          path: GadirTV-AndroidTV.apk
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/android-native' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: ver
+        run: |
+          V=$(grep 'versionName' app/build.gradle.kts | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "tag=v${V}" >> "$GITHUB_OUTPUT"
+          echo "version=${V}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: GadirTV-AndroidTV
+          path: release-assets
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: GadirTV ${{ steps.ver.outputs.version }}
+          body: |
+            ## GadirTV ${{ steps.ver.outputs.version }} — Android nativo
+
+            100% Kotlin + ExoPlayer. Sin Flutter.
+
+            ```
+            https://github.com/${{ github.repository }}/releases/download/${{ steps.ver.outputs.tag }}/GadirTV-AndroidTV.apk
+            ```
+
+            **Package:** `com.gadir.tv`
+
+            Instala encima de GadirTV Flutter (misma firma y versionCode > 84).
+            Si falla, desinstala GadirTV y vuelve a instalar.
+          files: release-assets/*
+          make_latest: true
+          overwrite_files: true
