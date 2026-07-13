@@ -44,6 +44,7 @@ data class VodMovie(
     val icon: String,
     val categoryId: String,
     val extension: String,
+    val added: Long = 0,
 )
 
 data class SeriesItem(
@@ -51,6 +52,7 @@ data class SeriesItem(
     val name: String,
     val cover: String,
     val categoryId: String,
+    val added: Long = 0,
 )
 
 data class SeriesEpisode(

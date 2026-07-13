@@ -10,10 +10,19 @@ import com.gadir.tv.model.Category
 
 class CategoryAdapter(
     private val items: List<Category>,
+    private val onFocus: ((Category) -> Unit)? = null,
     private val onClick: (Category) -> Unit,
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
     private var selected = 0
+
+    fun select(position: Int) {
+        if (position !in items.indices || position == selected) return
+        val old = selected
+        selected = position
+        notifyItemChanged(old)
+        notifyItemChanged(selected)
+    }
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
         val name: TextView = view.findViewById(R.id.categoryName)
@@ -30,14 +39,17 @@ class CategoryAdapter(
         holder.name.text = item.name
         holder.itemView.isSelected = position == selected
         holder.itemView.setOnClickListener {
-            val old = selected
-            selected = holder.bindingAdapterPosition
-            notifyItemChanged(old)
-            notifyItemChanged(selected)
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
+            select(pos)
             onClick(item)
         }
-        holder.itemView.setOnFocusChangeListener { v, hasFocus ->
-            if (hasFocus) v.isSelected = true
+        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) return@setOnFocusChangeListener
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION || pos == selected) return@setOnFocusChangeListener
+            select(pos)
+            (onFocus ?: onClick)(item)
         }
     }
 

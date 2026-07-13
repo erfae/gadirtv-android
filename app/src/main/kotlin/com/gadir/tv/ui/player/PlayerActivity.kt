@@ -16,10 +16,12 @@ class PlayerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
 
-        val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val url = intent.getStringExtra(EXTRA_URL).orEmpty()
 
-        findViewById<android.widget.TextView>(R.id.playerTitle).text = title
+        findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).apply {
+            useController = false
+            setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_NEVER)
+        }
 
         player = ExoPlayer.Builder(this).build().also { exo ->
             findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).player = exo
@@ -27,6 +29,10 @@ class PlayerActivity : AppCompatActivity() {
             exo.prepare()
             exo.playWhenReady = true
         }
+    }
+
+    override fun onBackPressed() {
+        finish()
     }
 
     override fun onStop() {

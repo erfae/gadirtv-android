@@ -183,6 +183,7 @@ class XtreamApi(
                     ?: "",
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
                 extension = row.get("container_extension")?.asStringOrNull() ?: "mp4",
+                added = row.addedTimestamp(),
             )
         }.filter { it.streamId > 0 }
     }
@@ -200,6 +201,7 @@ class XtreamApi(
                     ?: row.get("stream_icon")?.asStringOrNull()
                     ?: "",
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
+                added = row.addedTimestamp(),
             )
         }.filter { it.seriesId > 0 }
     }
@@ -339,4 +341,9 @@ class XtreamApi(
         } catch (_: Exception) {
             0
         }
+
+    private fun JsonObject.addedTimestamp(): Long =
+        get("added")?.asStringOrNull()?.toLongOrNull()
+            ?: get("last_modified")?.asStringOrNull()?.toLongOrNull()
+            ?: 0L
 }
