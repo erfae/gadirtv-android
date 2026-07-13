@@ -46,6 +46,39 @@ object MetaExtractor {
         return null
     }
 
+    fun textFrom(json: JsonObject?, vararg keys: String): String {
+        if (json == null) return ""
+        for (key in keys) {
+            val value = stripHtml(json.get(key)?.asStringOrNull())
+            if (value.isNotBlank()) return value
+        }
+        return ""
+    }
+
+    fun castFrom(vararg sources: JsonObject?): String {
+        val keys = listOf("cast", "actors", "starring", "actor")
+        for (source in sources) {
+            if (source == null) continue
+            for (key in keys) {
+                val value = stripHtml(source.get(key)?.asStringOrNull())
+                if (value.isNotBlank()) return value
+            }
+        }
+        return ""
+    }
+
+    fun directorFrom(vararg sources: JsonObject?): String {
+        val keys = listOf("director", "directors")
+        for (source in sources) {
+            if (source == null) continue
+            for (key in keys) {
+                val value = stripHtml(source.get(key)?.asStringOrNull())
+                if (value.isNotBlank()) return value
+            }
+        }
+        return ""
+    }
+
     fun imageFrom(json: JsonObject?, vararg keys: String): String {
         if (json == null) return ""
         for (key in keys) {

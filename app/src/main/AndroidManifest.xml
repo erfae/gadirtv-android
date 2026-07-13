@@ -53,6 +53,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".ui.movie.MovieDetailActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ui.player.PlayerActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize"
             android:exported="false"
@@ -77,6 +81,10 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:mimeType="video/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
         </intent>
     </queries>
 </manifest>

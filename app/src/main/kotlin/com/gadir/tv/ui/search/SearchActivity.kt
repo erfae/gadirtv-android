@@ -19,6 +19,7 @@ import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.ui.main.HomeRailAdapter
+import com.gadir.tv.ui.movie.MovieDetailActivity
 import com.gadir.tv.ui.player.PlayerActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
 import kotlinx.coroutines.Dispatchers
@@ -133,19 +134,8 @@ class SearchActivity : AppCompatActivity() {
                 )
             },
             onClick = { item ->
-                val profile = PlaylistRepository.profile ?: return@bindSection
                 val movie = results.movies.firstOrNull { it.streamId == item.id } ?: return@bindSection
-                startActivity(
-                    PlayerActivity.intent(
-                        context = this,
-                        title = movie.name,
-                        url = api.movieStreamUrl(profile, movie.streamId, movie.extension),
-                        kind = com.gadir.tv.data.ResumeStore.KIND_MOVIE,
-                        contentId = movie.streamId.toString(),
-                        imageUrl = movie.icon,
-                        extension = movie.extension,
-                    ),
-                )
+                startActivity(MovieDetailActivity.intent(this, movie))
             },
         )
 

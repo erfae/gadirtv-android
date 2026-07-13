@@ -301,6 +301,8 @@ class XtreamApi(
                     ?: info?.get("releaseDate")?.asStringOrNull()
                     ?: "",
                 trailerUrl = MetaExtractor.trailerFrom(name, info, movieData).orEmpty(),
+                cast = MetaExtractor.castFrom(info, movieData),
+                director = MetaExtractor.directorFrom(info, movieData),
             )
         } catch (_: Exception) {
             null

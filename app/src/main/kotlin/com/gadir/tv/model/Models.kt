@@ -85,6 +85,8 @@ data class VodInfo(
     val genre: String,
     val releaseDate: String,
     val trailerUrl: String = "",
+    val cast: String = "",
+    val director: String = "",
 )
 
 data class EpgEntry(

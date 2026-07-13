@@ -10,7 +10,7 @@
     <string name="loading">Cargando contenido…</string>
     <string name="category_all">Todos</string>
     <string name="select_channel">Selecciona un canal</string>
-    <string name="version_label">v1.8.0</string>
+    <string name="version_label">v1.9.0</string>
     <string name="login_subtitle">Televisión, películas y series en tu Android TV</string>
     <string name="login_hint">Introduce los datos de tu cuenta Xtream Codes</string>
     <string name="profiles_title">¿Quién está viendo?</string>
@@ -78,4 +78,9 @@
     <string name="bootstrap_series">Series…</string>
     <string name="bootstrap_home">Preparando inicio…</string>
     <string name="bootstrap_loading_group">Cargando: %1$s…</string>
+    <string name="movie_director">Director: %1$s</string>
+    <string name="movie_cast">Reparto: %1$s</string>
+    <string name="epg_guide">Guía de programación</string>
+    <string name="epg_live_badge">EN VIVO</string>
+    <string name="epg_loading">Cargando EPG…</string>
 </resources>

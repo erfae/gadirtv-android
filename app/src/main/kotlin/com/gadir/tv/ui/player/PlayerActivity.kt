@@ -6,18 +6,28 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageButton
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
+import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ResumeStore
+import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.VolumeHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PlayerActivity : AppCompatActivity() {
     private var player: ExoPlayer? = null
     private var playbackMonitor: LivePlaybackMonitor? = null
     private lateinit var resumeStore: ResumeStore
+    private val api = XtreamApi()
     private var isLive = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,6 +38,8 @@ class PlayerActivity : AppCompatActivity() {
         val url = intent.getStringExtra(EXTRA_URL).orEmpty()
         val positionMs = intent.getLongExtra(EXTRA_POSITION_MS, 0L)
         val kind = intent.getStringExtra(EXTRA_KIND).orEmpty()
+        val streamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
+        val channelTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         isLive = kind == ResumeStore.KIND_LIVE
 
         findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).apply {
@@ -41,8 +53,12 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         val volumeControls = findViewById<View>(R.id.playerVolumeControls)
+        val epgPanel = findViewById<View>(R.id.playerEpgPanel)
         volumeControls.visibility = if (isLive) View.VISIBLE else View.GONE
+        epgPanel.visibility = if (isLive) View.VISIBLE else View.GONE
+
         if (isLive) {
+            findViewById<TextView>(R.id.playerChannelTitle).text = channelTitle
             findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
                 VolumeHelper.adjust(this, raise = true)
             }
@@ -50,6 +66,7 @@ class PlayerActivity : AppCompatActivity() {
                 VolumeHelper.adjust(this, raise = false)
             }
             findViewById<ImageButton>(R.id.btnFullscreen).visibility = View.GONE
+            loadFullscreenEpg(streamId)
         }
 
         player = ExoPlayer.Builder(this).build().also { exo ->
@@ -63,6 +80,30 @@ class PlayerActivity : AppCompatActivity() {
             if (isLive) {
                 playbackMonitor = LivePlaybackMonitor(exo, noSignal).also { it.start() }
             }
+        }
+    }
+
+    private fun loadFullscreenEpg(streamId: Int) {
+        val profile = PlaylistRepository.profile ?: return
+        if (streamId <= 0) return
+
+        val loading = findViewById<TextView>(R.id.epgLoadingLabel)
+        val list = findViewById<RecyclerView>(R.id.epgList)
+        list.layoutManager = LinearLayoutManager(this)
+        loading.visibility = View.VISIBLE
+
+        lifecycleScope.launch {
+            val epg = withContext(Dispatchers.IO) {
+                api.shortEpg(profile, streamId, limit = 10)
+            }
+            loading.visibility = View.GONE
+            if (epg.isEmpty()) {
+                loading.visibility = View.VISIBLE
+                loading.text = getString(R.string.epg_unavailable)
+                return@launch
+            }
+            val now = System.currentTimeMillis() / 1000L
+            list.adapter = EpgAdapter(epg, now)
         }
     }
 
@@ -111,6 +152,7 @@ class PlayerActivity : AppCompatActivity() {
         private const val EXTRA_IMAGE_URL = "image_url"
         private const val EXTRA_EXTENSION = "extension"
         private const val EXTRA_POSITION_MS = "position_ms"
+        private const val EXTRA_STREAM_ID = "stream_id"
 
         fun intent(
             context: Context,
@@ -121,6 +163,7 @@ class PlayerActivity : AppCompatActivity() {
             imageUrl: String = "",
             extension: String = "mp4",
             positionMs: Long = 0L,
+            streamId: Int = 0,
         ): Intent = Intent(context, PlayerActivity::class.java)
             .putExtra(EXTRA_TITLE, title)
             .putExtra(EXTRA_URL, url)
@@ -129,5 +172,6 @@ class PlayerActivity : AppCompatActivity() {
             .putExtra(EXTRA_IMAGE_URL, imageUrl)
             .putExtra(EXTRA_EXTENSION, extension)
             .putExtra(EXTRA_POSITION_MS, positionMs)
+            .putExtra(EXTRA_STREAM_ID, streamId)
     }
 }

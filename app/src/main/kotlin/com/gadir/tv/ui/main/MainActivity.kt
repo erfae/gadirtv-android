@@ -28,6 +28,7 @@ import com.gadir.tv.model.Category
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
+import com.gadir.tv.ui.movie.MovieDetailActivity
 import com.gadir.tv.ui.player.LivePlaybackMonitor
 import com.gadir.tv.ui.player.PlayerActivity
 import com.gadir.tv.ui.profiles.ProfilesActivity
@@ -574,13 +575,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun onHomeRailClick(item: HomeRailAdapter.HomeRailItem) {
         when (item.kind) {
-            HomeRailAdapter.HomeRailItem.KIND_MOVIE -> playMovie(
-                title = item.title,
-                streamId = item.id,
-                extension = item.extension,
-                imageUrl = item.imageUrl,
-                positionMs = item.resumePositionMs,
-            )
+            HomeRailAdapter.HomeRailItem.KIND_MOVIE -> {
+                if (item.resumePositionMs > 0L) {
+                    playMovie(
+                        title = item.title,
+                        streamId = item.id,
+                        extension = item.extension,
+                        imageUrl = item.imageUrl,
+                        positionMs = item.resumePositionMs,
+                    )
+                } else {
+                    openMovieDetail(
+                        streamId = item.id,
+                        title = item.title,
+                        cover = item.imageUrl,
+                        extension = item.extension,
+                    )
+                }
+            }
             HomeRailAdapter.HomeRailItem.KIND_SERIES -> {
                 if (item.resumePositionMs > 0L) {
                     playSeriesEpisode(
@@ -605,6 +617,23 @@ class MainActivity : AppCompatActivity() {
                 openFullscreen(channel)
             }
         }
+    }
+
+    private fun openMovieDetail(
+        streamId: Int,
+        title: String,
+        cover: String,
+        extension: String = "mp4",
+    ) {
+        startActivity(
+            MovieDetailActivity.intent(
+                context = this,
+                streamId = streamId,
+                name = title,
+                cover = cover,
+                extension = extension,
+            ),
+        )
     }
 
     private fun playMovie(
@@ -941,11 +970,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun onPosterClick(tab: Tab, item: PosterAdapter.PosterItem) {
         when (tab) {
-            Tab.MOVIES -> playMovie(
-                title = item.title,
+            Tab.MOVIES -> openMovieDetail(
                 streamId = item.id,
+                title = item.title,
+                cover = item.imageUrl,
                 extension = item.extension,
-                imageUrl = item.imageUrl,
             )
             Tab.SERIES -> {
                 val series = SeriesItem(
@@ -1039,6 +1068,7 @@ class MainActivity : AppCompatActivity() {
                 kind = ResumeStore.KIND_LIVE,
                 contentId = channel.streamId.toString(),
                 imageUrl = channel.icon,
+                streamId = channel.streamId,
             ),
         )
     }
