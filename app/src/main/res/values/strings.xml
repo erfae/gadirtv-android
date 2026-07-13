@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">GadirTV</string>
     <string name="login_title">Conectar a Xtream</string>
-    <string name="hint_host">Servidor (http://host:puerto)</string>
+    <string name="hint_host">Servidor Xtream (http://host:puerto)</string>
     <string name="hint_user">Usuario</string>
     <string name="hint_pass">Contraseña</string>
     <string name="hint_name">Nombre del perfil</string>
@@ -10,7 +10,9 @@
     <string name="loading">Cargando contenido…</string>
     <string name="category_all">Todos</string>
     <string name="select_channel">Selecciona un canal</string>
-    <string name="version_label">v1.2.0</string>
+    <string name="version_label">v1.2.1</string>
+    <string name="login_subtitle">Televisión, películas y series en tu Android TV</string>
+    <string name="login_hint">Introduce los datos de tu cuenta Xtream Codes</string>
     <string name="profiles_title">¿Quién está viendo?</string>
     <string name="profiles_subtitle">Selecciona un perfil o añade uno nuevo</string>
     <string name="add_profile">Añadir perfil</string>
