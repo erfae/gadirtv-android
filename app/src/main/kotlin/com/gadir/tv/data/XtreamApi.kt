@@ -42,8 +42,9 @@ class XtreamApi(
             return LoginResult(false, "Usuario y contraseña obligatorios")
         }
 
+        val base = HostUtils.baseUrl(host)
         val url = buildString {
-            append(host.trimEnd('/'))
+            append(base)
             append("/player_api.php?username=")
             append(encode(profile.username))
             append("&password=")
@@ -51,13 +52,20 @@ class XtreamApi(
         }
 
         var lastDiag: String? = null
+        var hadConnectionError = false
         for ((index, ua) in userAgents.withIndex()) {
             onProgress?.invoke("Intento ${index + 1}/${userAgents.size}…")
             try {
                 val get = NativeHttpClient.request(url, ua, "GET")
+                if (get.error != null) {
+                    hadConnectionError = true
+                    lastDiag = get.error
+                    Thread.sleep(500L * (index + 1))
+                    continue
+                }
                 if (get.status in 500..599) {
                     lastDiag = "HTTP ${get.status} GET"
-                    Thread.sleep(400L * (index + 1))
+                    Thread.sleep(500L * (index + 1))
                     continue
                 }
                 if (get.status != 200) {
@@ -71,15 +79,30 @@ class XtreamApi(
                 }
 
                 val post = NativeHttpClient.request(url, ua, "POST")
-                if (post.status == 200 && parseAuth(post.body)) {
+                if (post.error == null && post.status == 200 && parseAuth(post.body)) {
                     activeUserAgent = ua
                     PlaylistRepository.userAgent = ua
                     return LoginResult(true)
                 }
-                lastDiag = "GET ${get.status}, POST ${post.status}"
+                lastDiag = when {
+                    get.body.isBlank() -> "Respuesta vacía del servidor"
+                    else -> "GET ${get.status}, auth no válida"
+                }
             } catch (e: Exception) {
+                hadConnectionError = true
                 lastDiag = e.message
-                Thread.sleep(400L * (index + 1))
+                Thread.sleep(500L * (index + 1))
+            }
+        }
+
+        // Fallback: verificar vía M3U (get.php) como hacen muchos clientes IPTV
+        if (hadConnectionError || lastDiag?.contains("connect", ignoreCase = true) == true) {
+            onProgress?.invoke("Probando vía M3U…")
+            val m3uOk = verifyM3u(profile)
+            if (m3uOk) {
+                activeUserAgent = userAgents.first()
+                PlaylistRepository.userAgent = activeUserAgent
+                return LoginResult(true)
             }
         }
 
@@ -88,6 +111,24 @@ class XtreamApi(
             error = "No se pudo conectar al servidor",
             diagnostic = lastDiag,
         )
+    }
+
+    private fun verifyM3u(profile: Profile): Boolean {
+        val base = HostUtils.baseUrl(profile.host)
+        val url = buildString {
+            append(base)
+            append("/get.php?username=")
+            append(encode(profile.username))
+            append("&password=")
+            append(encode(profile.password))
+            append("&type=m3u_plus&output=mpegts")
+        }
+        for (ua in userAgents) {
+            val res = NativeHttpClient.request(url, ua, "GET")
+            if (res.error != null) continue
+            if (res.status == 200 && res.body.startsWith("#EXTM3U")) return true
+        }
+        return false
     }
 
     fun liveCategories(profile: Profile): List<Category> {
@@ -147,7 +188,7 @@ class XtreamApi(
     }
 
     fun seriesInfo(profile: Profile, seriesId: Int): SeriesDetail? {
-        val host = HostUtils.normalize(profile.host).trimEnd('/')
+        val host = HostUtils.baseUrl(profile.host)
         val query = buildString {
             append("username=").append(encode(profile.username))
             append("&password=").append(encode(profile.password))
@@ -207,7 +248,7 @@ class XtreamApi(
         buildStreamUrl(profile, "series", episodeId, ext)
 
     private fun buildStreamUrl(profile: Profile, kind: String, streamId: Int, ext: String): String {
-        val host = HostUtils.normalize(profile.host).trimEnd('/')
+        val host = HostUtils.baseUrl(profile.host)
         val u = encode(profile.username)
         val pw = encode(profile.password)
         return "$host/$kind/$u/$pw/$streamId.$ext"
@@ -226,7 +267,7 @@ class XtreamApi(
         action: String,
         extra: Map<String, String> = emptyMap(),
     ): List<JsonObject> {
-        val host = HostUtils.normalize(profile.host).trimEnd('/')
+        val host = HostUtils.baseUrl(profile.host)
         val query = buildString {
             append("username=").append(encode(profile.username))
             append("&password=").append(encode(profile.password))

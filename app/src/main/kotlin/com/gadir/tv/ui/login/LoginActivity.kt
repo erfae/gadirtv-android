@@ -18,6 +18,7 @@ import com.gadir.tv.model.LoginDraft
 import com.gadir.tv.model.Profile
 import com.gadir.tv.ui.bootstrap.BootstrapActivity
 import com.gadir.tv.ui.profiles.ProfilesActivity
+import com.gadir.tv.util.DefaultCredentials
 import com.gadir.tv.util.HostUtils
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
@@ -77,7 +78,7 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun loadDraft() {
-        val draft = profileStore.loadDraft()
+        val draft = DefaultCredentials.draftOrExisting(profileStore.loadDraft())
         inputHost.setText(draft.host)
         inputUser.setText(draft.username)
         inputPass.setText(draft.password)

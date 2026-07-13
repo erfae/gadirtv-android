@@ -16,6 +16,7 @@ import com.gadir.tv.data.ProfileStore
 import com.gadir.tv.model.Profile
 import com.gadir.tv.ui.bootstrap.BootstrapActivity
 import com.gadir.tv.ui.login.LoginActivity
+import com.gadir.tv.util.DefaultCredentials
 import com.google.android.material.button.MaterialButton
 
 class ProfilesActivity : AppCompatActivity() {
@@ -39,6 +40,7 @@ class ProfilesActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         profileStore = ProfileStore(this)
+        ensureDefaultProfile()
         setContentView(R.layout.activity_profiles)
 
         profileGrid = findViewById(R.id.profileGrid)
@@ -54,6 +56,14 @@ class ProfilesActivity : AppCompatActivity() {
         }
 
         reload()
+    }
+
+    /** Crea el perfil RAFA si no hay ninguno guardado (evita reescribir credenciales tras cada instalación). */
+    private fun ensureDefaultProfile() {
+        if (profileStore.loadAll().isEmpty()) {
+            profileStore.upsert(DefaultCredentials.profile())
+            profileStore.saveDraft(DefaultCredentials.draft())
+        }
     }
 
     override fun onResume() {

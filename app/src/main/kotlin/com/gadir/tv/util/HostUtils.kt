@@ -1,5 +1,6 @@
 package com.gadir.tv.util
 
+import java.net.Inet4Address
 import java.net.URI
 
 /** Port of Flutter [normalizeXtreamHost]. */
@@ -41,9 +42,25 @@ object HostUtils {
             if (h.startsWith("https://") && uri.port == 80) {
                 h = h.replaceFirst("https://", "http://")
             }
+            h = stripDefaultPort(h, uri)
         } catch (_: Exception) {
         }
 
         return h
     }
+
+    /** Evita :80/:443 explícitos — algunos TV Box fallan al conectar con puerto en la URL. */
+    private fun stripDefaultPort(url: String, uri: URI): String {
+        val port = uri.port
+        if (port == 80 && uri.scheme == "http") {
+            return "${uri.scheme}://${uri.host}"
+        }
+        if (port == 443 && uri.scheme == "https") {
+            return "${uri.scheme}://${uri.host}"
+        }
+        return url
+    }
+
+    fun baseUrl(profileHost: String): String =
+        normalize(profileHost).trimEnd('/')
 }
