@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../models/profile.dart';
 import '../services/playlist_store.dart';
 import '../services/plugins_bootstrap.dart';
 import '../services/profile_store.dart';
@@ -18,8 +17,7 @@ class BootstrapScreen extends StatefulWidget {
 
 class _BootstrapScreenState extends State<BootstrapScreen> {
   final _retryFocus = FocusNode(debugLabel: 'bootstrap-retry');
-  String _message = 'Preparando GadirTV…';
-  double _progress = 0;
+  String _message = 'Preparando contenido…';
   String? _error;
 
   @override
@@ -38,7 +36,6 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
     setState(() {
       _error = null;
       _message = 'Iniciando…';
-      _progress = 0.02;
     });
 
     try {
@@ -59,10 +56,7 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
     }
 
     if (profile.isM3U) {
-      setState(() {
-        _message = 'Cargando playlist M3U…';
-        _progress = 0.5;
-      });
+      setState(() => _message = 'Cargando playlist M3U…');
       await PlaylistStore.instance.preload(profile, onProgress: _onProgress);
       if (!mounted) return;
       context.go('/home');
@@ -87,10 +81,7 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
 
   void _onProgress(String message, double progress) {
     if (!mounted) return;
-    setState(() {
-      _message = message;
-      _progress = progress.clamp(0, 1);
-    });
+    setState(() => _message = message);
   }
 
   @override
@@ -100,22 +91,33 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
+            constraints: const BoxConstraints(maxWidth: 420),
             child: Padding(
               padding: const EdgeInsets.all(32),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'GadirTV',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
+                  Image.asset(
+                    'assets/gadirtv_logo.png',
+                    height: 110,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.live_tv_rounded,
+                      color: GtvTheme.red,
+                      size: 72,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 28),
+                  if (_error == null)
+                    const SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: GtvTheme.red,
+                      ),
+                    ),
+                  const SizedBox(height: 20),
                   Text(
                     _error ?? _message,
                     textAlign: TextAlign.center,
@@ -123,16 +125,6 @@ class _BootstrapScreenState extends State<BootstrapScreen> {
                       color: _error != null ? GtvTheme.redHi : GtvTheme.textDim,
                       fontSize: 15,
                       height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      value: _error != null ? null : (_progress > 0 ? _progress : null),
-                      minHeight: 8,
-                      backgroundColor: GtvTheme.surface,
-                      color: GtvTheme.red,
                     ),
                   ),
                   if (_error != null) ...[

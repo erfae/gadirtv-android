@@ -49,7 +49,11 @@ class SeriesTabState extends State<SeriesTab> with AutomaticKeepAliveClientMixin
   bool get wantKeepAlive => true;
 
   void focusInitial() {
-    _railKey.currentState?.focusSelected();
+    if (!_loading && _series.isNotEmpty && _gridFocus.nodes.isNotEmpty) {
+      _gridFocus.focus(0);
+    } else {
+      _railKey.currentState?.focusSelected();
+    }
   }
 
   @override

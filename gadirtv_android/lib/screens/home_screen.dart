@@ -99,6 +99,18 @@ class _HomeScreenState extends State<HomeScreen> {
     _focusTabContent();
   }
 
+  /// Inactive [IndexedStack] children stay mounted but must not steal D-pad focus.
+  Widget _wrapIndexedTab(int index, Widget child) {
+    final active = _tab == index;
+    return ExcludeFocus(
+      excluding: !active,
+      child: IgnorePointer(
+        ignoring: !active,
+        child: child,
+      ),
+    );
+  }
+
   void _selectTab(int index) {
     setState(() => _tab = index);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -408,22 +420,34 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final tabs = [
-      HomeTab(
-        key: _homeKey,
-        profile: p,
-        onOpenMovie: _openMovie,
-        onOpenSeries: _openSeries,
-        onPlayMovie: _playMovie,
-        onPlaySeries: _playSeries,
+      _wrapIndexedTab(
+        0,
+        HomeTab(
+          key: _homeKey,
+          profile: p,
+          onOpenMovie: _openMovie,
+          onOpenSeries: _openSeries,
+          onPlayMovie: _playMovie,
+          onPlaySeries: _playSeries,
+        ),
       ),
-      LiveTab(
-        key: _liveKey,
-        profile: p,
-        onPlay: _playChannel,
-        active: _tab == 1,
+      _wrapIndexedTab(
+        1,
+        LiveTab(
+          key: _liveKey,
+          profile: p,
+          onPlay: _playChannel,
+          active: _tab == 1,
+        ),
       ),
-      MoviesTab(key: _moviesKey, profile: p, onOpen: _openMovie),
-      SeriesTab(key: _seriesKey, profile: p, onOpen: _openSeries),
+      _wrapIndexedTab(
+        2,
+        MoviesTab(key: _moviesKey, profile: p, onOpen: _openMovie),
+      ),
+      _wrapIndexedTab(
+        3,
+        SeriesTab(key: _seriesKey, profile: p, onOpen: _openSeries),
+      ),
     ];
 
     WidgetsBinding.instance.addPostFrameCallback((_) {

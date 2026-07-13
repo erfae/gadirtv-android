@@ -90,6 +90,15 @@ String extractBackdrop(
   return fallback.trim();
 }
 
+/// Wide cinematic backdrop only — never falls back to portrait poster/cover.
+String extractCinematicBackdrop(Map<String, dynamic> info) {
+  for (final key in ['backdrop_path', 'backdrop', 'fanart']) {
+    final v = (info[key] ?? '').toString().trim();
+    if (v.isNotEmpty) return v;
+  }
+  return '';
+}
+
 String? extractTrailer(Map<String, dynamic> meta) {
   final info = extractTrailerInfo(meta);
   return info.originalUrl ?? info.spanishUrl;

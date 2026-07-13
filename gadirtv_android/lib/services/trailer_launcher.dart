@@ -5,8 +5,7 @@ import '../screens/trailer_screen.dart';
 import '../utils/tv_utils.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Opens YouTube trailers in-app (embedded WebView). Prefers Spanish when the
-/// panel provides it; otherwise plays the original — no user dialog.
+/// Opens YouTube trailers — on TV prefers YouTube TV app; fallback in-app WebView.
 class TrailerLauncher {
   TrailerLauncher._();
 
@@ -44,7 +43,6 @@ class TrailerLauncher {
     return null;
   }
 
-  /// Auto-pick Spanish trailer when available, else original. No language picker.
   static Future<bool> openFromInfo(
     BuildContext context,
     TrailerInfo info, {
@@ -63,22 +61,52 @@ class TrailerLauncher {
     bool spanish = false,
   }) async {
     final videoId = extractYoutubeId(url);
+    final isTv = await TvUtils.isAndroidTv();
+
     if (videoId != null) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => TrailerScreen(
-            videoId: videoId,
-            title: title,
-            spanish: spanish,
+      if (isTv) {
+        final watchUrl = 'https://www.youtube.com/watch?v=$videoId';
+        try {
+          final opened = await TvUtils.openExternalUrl(watchUrl);
+          if (opened) return true;
+        } catch (_) {}
+      }
+
+      if (!context.mounted) return false;
+      try {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => TrailerScreen(
+              videoId: videoId,
+              title: title,
+              spanish: spanish,
+            ),
+            fullscreenDialog: true,
           ),
-          fullscreenDialog: true,
-        ),
-      );
-      return true;
+        );
+        return true;
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('No se pudo abrir el tráiler: $e'),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+        return false;
+      }
     }
 
     final uri = Uri.tryParse(url);
-    if (uri == null) return false;
+    if (uri == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enlace de tráiler no válido')),
+        );
+      }
+      return false;
+    }
 
     try {
       final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);

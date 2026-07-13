@@ -53,6 +53,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
   List<Series> _recentSeries = const [];
   List<_ResumeItem> _resume = const [];
   List<_HeroItem> _heroPool = const [];
+  _HeroItem? _railPreview;
 
   bool _loading = true;
   String? _error;
@@ -76,12 +77,16 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
   @override
   void initState() {
     super.initState();
+    _playFocus.addListener(_onHeroControlFocus);
+    _trailerFocus.addListener(_onHeroControlFocus);
     _load();
   }
 
   @override
   void dispose() {
     _heroTimer?.cancel();
+    _playFocus.removeListener(_onHeroControlFocus);
+    _trailerFocus.removeListener(_onHeroControlFocus);
     _playFocus.dispose();
     _trailerFocus.dispose();
     _resumeFocus.dispose();
@@ -89,6 +94,76 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
     _seriesFocus.dispose();
     super.dispose();
   }
+
+  void _onHeroControlFocus() {
+    if (_playFocus.hasFocus || _trailerFocus.hasFocus) {
+      _clearRailPreview();
+    }
+  }
+
+  void _clearRailPreview() {
+    if (_railPreview == null) return;
+    setState(() => _railPreview = null);
+    _applyHeroMetaFromCache(_heroIndex);
+    _startHeroRotation();
+  }
+
+  void _previewRailItem(_HeroItem item) {
+    _heroTimer?.cancel();
+    final cacheKey = _heroCacheKey(item);
+    final cached = _heroMetaCache[cacheKey];
+    setState(() {
+      _railPreview = item;
+      if (cached != null) {
+        _heroPlot = cached.plot;
+        _heroBackdrop = cached.backdrop;
+        _heroPoster = cached.poster;
+        _heroTrailer = cached.trailer;
+        _heroMetaLoading = false;
+      } else {
+        _heroMetaLoading = true;
+        _heroPlot = item.isMovie ? '' : (item.series?.plot ?? '');
+        _heroBackdrop = '';
+        _heroPoster = item.imageUrl;
+        _heroTrailer = const TrailerInfo();
+      }
+    });
+    _loadHeroMetaForItem(item);
+  }
+
+  _HeroItem _heroItemFromMovie(Movie m) => _HeroItem(
+        title: m.name,
+        imageUrl: m.icon,
+        badge: 'PELÍCULA',
+        rating: m.rating,
+        isMovie: true,
+        movie: m,
+        onPlay: () {
+          if (widget.onPlayMovie != null) {
+            widget.onPlayMovie!(m);
+          } else {
+            widget.onOpenMovie(m);
+          }
+        },
+        onOpen: () => widget.onOpenMovie(m),
+      );
+
+  _HeroItem _heroItemFromSeries(Series s) => _HeroItem(
+        title: s.name,
+        imageUrl: s.cover,
+        badge: 'SERIE',
+        rating: s.rating,
+        isMovie: false,
+        series: s,
+        onPlay: () {
+          if (widget.onPlaySeries != null) {
+            widget.onPlaySeries!(s);
+          } else {
+            widget.onOpenSeries(s);
+          }
+        },
+        onOpen: () => widget.onOpenSeries(s),
+      );
 
   void _focusFirstRailBelowHero() {
     if (_resume.isNotEmpty && _resumeFocus.nodes.isNotEmpty) {
@@ -227,7 +302,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
       setState(() {
         _heroMetaLoading = true;
         _heroPlot = item.isMovie ? '' : (item.series?.plot ?? '');
-        _heroBackdrop = item.imageUrl;
+        _heroBackdrop = '';
         _heroPoster = item.imageUrl;
         _heroTrailer = const TrailerInfo();
       });
@@ -245,12 +320,12 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
 
   void _startHeroRotation() {
     _heroTimer?.cancel();
-    if (_heroPool.length <= 1) return;
+    if (_heroPool.length <= 1 || _railPreview != null) return;
     _heroTimer = Timer.periodic(const Duration(seconds: 15), (_) => _shiftHeroRandom());
   }
 
   void _shiftHeroRandom() {
-    if (_heroPool.isEmpty) return;
+    if (_heroPool.isEmpty || _railPreview != null) return;
     var next = _rng.nextInt(_heroPool.length);
     if (_heroPool.length > 1) {
       while (next == _heroIndex) {
@@ -268,11 +343,22 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
   Future<void> _loadHeroMeta(int index, {bool prefetch = false}) async {
     if (_heroPool.isEmpty) return;
     final item = _heroPool[index % _heroPool.length];
+    await _loadHeroMetaForItem(
+      item,
+      prefetch: prefetch,
+      activeWhen: () => mounted && (prefetch || (_railPreview == null && _heroIndex % _heroPool.length == index)),
+    );
+  }
+
+  Future<void> _loadHeroMetaForItem(
+    _HeroItem item, {
+    bool prefetch = false,
+    bool Function()? activeWhen,
+  }) async {
     final cacheKey = _heroCacheKey(item);
     final cached = _heroMetaCache[cacheKey];
     if (cached != null) {
-      if (!mounted || (!prefetch && _heroIndex % _heroPool.length != index)) return;
-      if (!prefetch) {
+      if (activeWhen?.call() ?? (!prefetch && mounted && _isActiveHeroItem(item))) {
         setState(() {
           _heroPlot = cached.plot;
           _heroBackdrop = cached.backdrop;
@@ -284,11 +370,10 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
       return;
     }
 
-    if (!prefetch) {
+    if (!prefetch && (activeWhen?.call() ?? _isActiveHeroItem(item))) {
       setState(() {
         _heroMetaLoading = true;
         _heroPlot = item.isMovie ? '' : (item.series?.plot ?? '');
-        _heroBackdrop = item.imageUrl;
         _heroPoster = item.imageUrl;
       });
     }
@@ -296,7 +381,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
     try {
       if (item.isMovie && item.movie != null) {
         final info = await _api.vodInfo(widget.profile, item.movie!.streamId);
-        if (!mounted || (!prefetch && _heroIndex % _heroPool.length != index)) return;
+        if (!(activeWhen?.call() ?? (!prefetch && mounted && _isActiveHeroItem(item)))) return;
         final meta = info['info'] is Map
             ? Map<String, dynamic>.from(info['info'] as Map)
             : <String, dynamic>{};
@@ -304,19 +389,19 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
             ? Map<String, dynamic>.from(info['movie_data'] as Map)
             : <String, dynamic>{};
         final plot = extractPlot(meta, extra: md);
-        final backdrop = extractBackdrop(meta, fallback: item.imageUrl);
+        final backdrop = extractCinematicBackdrop(meta);
         final poster = (meta['cover'] ?? meta['cover_big'] ?? meta['movie_image'] ?? item.imageUrl).toString();
         final trailer = extractTrailerInfo(meta);
         _heroMetaCache[cacheKey] = _CachedHeroMeta(
           plot: plot,
-          backdrop: backdrop.isNotEmpty ? backdrop : item.imageUrl,
+          backdrop: backdrop,
           poster: poster.isNotEmpty ? poster : item.imageUrl,
           trailer: trailer,
         );
         if (!prefetch) {
           setState(() {
             _heroPlot = plot;
-            _heroBackdrop = backdrop.isNotEmpty ? backdrop : item.imageUrl;
+            _heroBackdrop = backdrop;
             _heroPoster = poster.isNotEmpty ? poster : item.imageUrl;
             _heroTrailer = trailer;
             _heroMetaLoading = false;
@@ -324,35 +409,46 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
         }
       } else if (item.series != null) {
         final info = await _api.seriesInfo(widget.profile, item.series!.seriesId);
-        if (!mounted || (!prefetch && _heroIndex % _heroPool.length != index)) return;
+        if (!(activeWhen?.call() ?? (!prefetch && mounted && _isActiveHeroItem(item)))) return;
         final meta = info['info'] is Map
             ? Map<String, dynamic>.from(info['info'] as Map)
             : <String, dynamic>{};
         final plot = extractPlot(meta, fallback: item.series!.plot);
-        final backdrop = extractBackdrop(meta, fallback: item.imageUrl);
+        final backdrop = extractCinematicBackdrop(meta);
         final poster = (meta['cover'] ?? meta['cover_big'] ?? item.imageUrl).toString();
         final trailer = extractTrailerInfo(meta);
         _heroMetaCache[cacheKey] = _CachedHeroMeta(
           plot: plot,
-          backdrop: backdrop.isNotEmpty ? backdrop : item.imageUrl,
+          backdrop: backdrop,
           poster: poster.isNotEmpty ? poster : item.imageUrl,
           trailer: trailer,
         );
         if (!prefetch) {
           setState(() {
             _heroPlot = plot;
-            _heroBackdrop = backdrop.isNotEmpty ? backdrop : item.imageUrl;
+            _heroBackdrop = backdrop;
             _heroPoster = poster.isNotEmpty ? poster : item.imageUrl;
             _heroTrailer = trailer;
             _heroMetaLoading = false;
           });
         }
-      } else if (mounted && !prefetch) {
+      } else if (mounted && !prefetch && (activeWhen?.call() ?? _isActiveHeroItem(item))) {
         setState(() => _heroMetaLoading = false);
       }
     } catch (_) {
-      if (mounted && !prefetch) setState(() => _heroMetaLoading = false);
+      if (mounted && !prefetch && (activeWhen?.call() ?? _isActiveHeroItem(item))) {
+        setState(() => _heroMetaLoading = false);
+      }
     }
+  }
+
+  bool _isActiveHeroItem(_HeroItem item) {
+    if (!mounted) return false;
+    if (_railPreview != null) {
+      return _heroCacheKey(_railPreview!) == _heroCacheKey(item);
+    }
+    if (_heroPool.isEmpty) return false;
+    return _heroCacheKey(_heroPool[_heroIndex % _heroPool.length]) == _heroCacheKey(item);
   }
 
   String _heroCacheKey(_HeroItem item) {
@@ -363,15 +459,25 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
 
   Future<void> _openTrailer() async {
     if (!_heroTrailer.hasAny) return;
-    final item = _heroPool[_heroIndex % _heroPool.length];
+    final item = _activeHeroItem;
+    if (item == null) return;
     await TrailerLauncher.openFromInfo(context, _heroTrailer, title: item.title);
+  }
+
+  _HeroItem? get _activeHeroItem {
+    if (_railPreview != null) return _railPreview;
+    if (_heroPool.isEmpty) return null;
+    return _heroPool[_heroIndex % _heroPool.length];
   }
 
   void _shiftHero(int delta) {
     if (_heroPool.isEmpty) return;
     _heroTimer?.cancel();
     final next = (_heroIndex + delta) % _heroPool.length;
-    setState(() => _heroIndex = next < 0 ? _heroPool.length + next : next);
+    setState(() {
+      _railPreview = null;
+      _heroIndex = next < 0 ? _heroPool.length + next : next;
+    });
     _applyHeroMetaFromCache(_heroIndex);
     _loadHeroMeta(_heroIndex);
     _startHeroRotation();
@@ -398,7 +504,6 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
     return LayoutBuilder(
       builder: (context, constraints) {
         final railH = TvLayout.compactRailBlockHeight(context, maxHeight: constraints.maxHeight) * 0.88;
-        final heroH = constraints.maxHeight;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -439,10 +544,12 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
     if (_heroPool.isEmpty) {
       return Container(color: GtvTheme.surface);
     }
-    final idx = _heroIndex % _heroPool.length;
-    final item = _heroPool[idx];
+    final item = _activeHeroItem;
+    if (item == null) {
+      return Container(color: GtvTheme.surface);
+    }
     final poster = _heroPoster.isNotEmpty ? _heroPoster : item.imageUrl;
-    final backdrop = _heroBackdrop.isNotEmpty ? _heroBackdrop : '';
+    final backdrop = _heroBackdrop.trim();
     final hasTrailer = _heroTrailer.hasAny;
 
     return Stack(
@@ -451,7 +558,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 500),
           child: KeyedSubtree(
-            key: ValueKey('$idx-$backdrop-$poster'),
+            key: ValueKey('${_heroCacheKey(item)}-$backdrop'),
             child: GtvAndroidTvHeroLayout(
               badge: item.badge,
               title: item.title,
@@ -460,7 +567,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
               synopsisLoading: _heroMetaLoading,
               synopsisSide: GtvHeroSynopsisSide.left,
               posterUrl: poster,
-              backdropUrl: backdrop.isNotEmpty ? backdrop : poster,
+              backdropUrl: backdrop.isNotEmpty ? backdrop : null,
               actions: Row(
                 children: [
                   GtvHeroActionButton(
@@ -506,8 +613,9 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
   }
 
   Widget _buildResumeRail(double height) {
-    final cardW = TvLayout.compactPosterWidth(context);
-    final innerH = height - 28;
+    final listH = height - 28;
+    final maxW = TvLayout.compactPosterWidth(context);
+    final cardW = ((listH - 12) / 1.5).clamp(72.0, maxW);
     if (_resumeFocus.nodes.length != _resume.length) {
       _resumeFocus.rebuild(_resume.length);
     }
@@ -528,8 +636,9 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
         ),
         const SizedBox(height: 6),
         SizedBox(
-          height: innerH,
+          height: listH,
           child: ListView.separated(
+            clipBehavior: Clip.none,
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 36),
             itemCount: _resume.length,
@@ -543,6 +652,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
                   focusNode: node,
                   title: r.title,
                   imageUrl: r.image,
+                  showTitle: false,
                   onTap: r.onTap,
                   onMoveLeft: () => _resumeFocus.moveHorizontal(i, -1),
                   onMoveRight: () => _resumeFocus.moveHorizontal(i, 1),
@@ -581,7 +691,9 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
           title: m.name,
           imageUrl: m.icon,
           rating: m.rating,
+          showTitle: false,
           onTap: () => widget.onOpenMovie(m),
+          onFocus: () => _previewRailItem(_heroItemFromMovie(m)),
           onMoveLeft: () => _moviesFocus.moveHorizontal(i, -1),
           onMoveRight: () => _moviesFocus.moveHorizontal(i, 1),
           onMoveUp: () {
@@ -614,7 +726,9 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
           title: s.name,
           imageUrl: s.cover,
           rating: s.rating,
+          showTitle: false,
           onTap: () => widget.onOpenSeries(s),
+          onFocus: () => _previewRailItem(_heroItemFromSeries(s)),
           onMoveLeft: () => _seriesFocus.moveHorizontal(i, -1),
           onMoveRight: () => _seriesFocus.moveHorizontal(i, 1),
           onMoveUp: () => _moviesFocus.focus(0),
@@ -633,8 +747,9 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
   }) {
     final count = focus.nodes.length;
     if (count == 0) return const SizedBox.shrink();
-    final cardW = TvLayout.compactPosterWidth(context);
     final listH = blockHeight - 30;
+    final maxW = TvLayout.compactPosterWidth(context);
+    final cardW = ((listH - 12) / 1.5).clamp(72.0, maxW);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -654,6 +769,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
         SizedBox(
           height: listH,
           child: ListView.separated(
+            clipBehavior: Clip.none,
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 36),
             itemCount: count,

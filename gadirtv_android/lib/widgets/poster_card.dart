@@ -28,6 +28,8 @@ class PosterCard extends StatefulWidget {
     this.onMoveDown,
     this.isFavorite,
     this.onToggleFavorite,
+    this.onFocus,
+    this.showTitle = true,
   });
 
   /// 2/3 → portrait poster (VOD, Series). Use 16/9 for landscape logos.
@@ -50,6 +52,8 @@ class PosterCard extends StatefulWidget {
   /// triggering the main [onTap].
   final bool? isFavorite;
   final VoidCallback? onToggleFavorite;
+  final VoidCallback? onFocus;
+  final bool showTitle;
 
   @override
   State<PosterCard> createState() => _PosterCardState();
@@ -226,6 +230,7 @@ class _PosterCardState extends State<PosterCard> {
                     ],
                   ),
                 ),
+                if (widget.showTitle)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   color: GtvTheme.surface,
@@ -255,6 +260,7 @@ class _PosterCardState extends State<PosterCard> {
         onFocusChange: (v) {
           setState(() => _focused = v);
           if (v) {
+            widget.onFocus?.call();
             Scrollable.ensureVisible(
               context,
               alignment: 0.45,
@@ -272,6 +278,7 @@ class _PosterCardState extends State<PosterCard> {
       onShowFocusHighlight: (v) {
         setState(() => _focused = v);
         if (v) {
+          widget.onFocus?.call();
           Scrollable.ensureVisible(
             context,
             alignment: 0.45,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -6,7 +8,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../theme.dart';
 import '../widgets/gtv_focusable.dart';
 
-/// In-app YouTube trailer — embedded player (no external YouTube app).
+/// In-app YouTube trailer — embedded player (fallback when external app unavailable).
 class TrailerScreen extends StatefulWidget {
   const TrailerScreen({
     super.key,
@@ -24,14 +26,23 @@ class TrailerScreen extends StatefulWidget {
 }
 
 class _TrailerScreenState extends State<TrailerScreen> {
-  late final WebViewController _controller;
+  WebViewController? _controller;
+  final _backFocus = FocusNode(debugLabel: 'trailer-back');
   bool _loading = true;
   String? _error;
+  Timer? _timeout;
 
   @override
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    _timeout = Timer(const Duration(seconds: 18), () {
+      if (!mounted || !_loading) return;
+      setState(() {
+        _loading = false;
+        _error = 'Tiempo de espera agotado';
+      });
+    });
     _initWebView();
   }
 
@@ -41,31 +52,32 @@ class _TrailerScreenState extends State<TrailerScreen> {
     final embedUrl =
         'https://www.youtube-nocookie.com/embed/$id?autoplay=1&rel=0&modestbranding=1&playsinline=1&hl=$lang&cc_lang_pref=$lang&enablejsapi=1&origin=https://www.youtube.com';
 
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.black)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageFinished: (_) {
-            if (mounted) setState(() => _loading = false);
-          },
-          onWebResourceError: (e) {
-            if (!mounted) return;
-            setState(() {
-              _loading = false;
-              _error = e.description.isNotEmpty ? e.description : 'Error ${e.errorCode}';
-            });
-          },
-        ),
-      );
+    try {
+      final controller = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(Colors.black)
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onPageFinished: (_) {
+              if (mounted) setState(() => _loading = false);
+            },
+            onWebResourceError: (e) {
+              if (!mounted) return;
+              setState(() {
+                _loading = false;
+                _error = e.description.isNotEmpty ? e.description : 'Error ${e.errorCode}';
+              });
+            },
+          ),
+        );
 
-    final platform = _controller.platform;
-    if (platform is AndroidWebViewController) {
-      await platform.setMediaPlaybackRequiresUserGesture(false);
-      await platform.setOnShowFileSelector((_) async => []);
-    }
+      final platform = controller.platform;
+      if (platform is AndroidWebViewController) {
+        await platform.setMediaPlaybackRequiresUserGesture(false);
+        await platform.setOnShowFileSelector((_) async => []);
+      }
 
-    final html = '''
+      final html = '''
 <!DOCTYPE html>
 <html>
 <head>
@@ -88,8 +100,12 @@ class _TrailerScreenState extends State<TrailerScreen> {
 </html>
 ''';
 
-    try {
-      await _controller.loadHtmlString(html, baseUrl: 'https://www.youtube.com');
+      await controller.loadHtmlString(html, baseUrl: 'https://www.youtube.com');
+      if (!mounted) return;
+      setState(() => _controller = controller);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _backFocus.requestFocus();
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -99,8 +115,16 @@ class _TrailerScreenState extends State<TrailerScreen> {
     }
   }
 
+  void _close() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   void dispose() {
+    _timeout?.cancel();
+    _backFocus.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -109,12 +133,16 @@ class _TrailerScreenState extends State<TrailerScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _close();
+      },
       child: Scaffold(
         backgroundColor: Colors.black,
         body: Stack(
           fit: StackFit.expand,
           children: [
-            if (_error == null) WebViewWidget(controller: _controller),
+            if (_controller != null && _error == null)
+              WebViewWidget(controller: _controller!),
             if (_loading)
               const Center(child: CircularProgressIndicator(color: GtvTheme.red)),
             if (_error != null)
@@ -131,6 +159,17 @@ class _TrailerScreenState extends State<TrailerScreen> {
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: GtvTheme.textDim),
                       ),
+                      const SizedBox(height: 20),
+                      GtvFocusable(
+                        autofocus: true,
+                        onTap: _close,
+                        borderRadius: BorderRadius.circular(999),
+                        child: ElevatedButton(
+                          onPressed: _close,
+                          style: ElevatedButton.styleFrom(backgroundColor: GtvTheme.red),
+                          child: const Text('VOLVER'),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -141,8 +180,9 @@ class _TrailerScreenState extends State<TrailerScreen> {
                 child: Row(
                   children: [
                     GtvFocusable(
+                      focusNode: _backFocus,
                       autofocus: true,
-                      onTap: () => Navigator.of(context).pop(),
+                      onTap: _close,
                       borderRadius: BorderRadius.circular(999),
                       child: const Padding(
                         padding: EdgeInsets.all(8),

@@ -92,19 +92,20 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
 
   /// Home tab — full-bleed backdrop with poster stamp on the right.
   Widget _buildHomeLayout(BuildContext context, String poster, String backdrop) {
-    final bg = backdrop.isNotEmpty ? backdrop : poster;
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (bg.isNotEmpty)
+        if (backdrop.isNotEmpty)
           Positioned.fill(
             child: CachedNetworkImage(
-              imageUrl: bg,
+              imageUrl: backdrop,
               fit: BoxFit.cover,
               alignment: Alignment.center,
-              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+              errorWidget: (_, __, ___) => ColoredBox(color: GtvTheme.bg),
             ),
-          ),
+          )
+        else
+          const ColoredBox(color: GtvTheme.bg),
         Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -341,7 +342,8 @@ class _LargePoster extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             child: CachedNetworkImage(
               imageUrl: posterUrl,
-              fit: BoxFit.cover,
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
               errorWidget: (_, __, ___) => Container(
                 color: GtvTheme.surface,
                 child: const Icon(Icons.broken_image_rounded, color: GtvTheme.textDim, size: 48),
