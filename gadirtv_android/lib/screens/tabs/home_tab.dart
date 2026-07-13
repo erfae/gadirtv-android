@@ -9,12 +9,12 @@ import '../../models/profile.dart';
 import '../../services/api_service.dart';
 import '../../services/playlist_store.dart';
 import '../../services/resume_store.dart';
+import '../../services/gtv_tv_focus_registry.dart';
 import '../../services/trailer_launcher.dart';
 import '../../theme.dart';
 import '../../utils/tv_layout.dart';
 import '../../utils/xtream_utils.dart';
 import '../../widgets/detail_hero_widgets.dart';
-import '../../widgets/gtv_focusable.dart';
 import '../../widgets/poster_card.dart';
 import '../../widgets/poster_rail_focus.dart';
 
@@ -109,6 +109,9 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
   }
 
   void _previewRailItem(_HeroItem item) {
+    if (_railPreview != null && _heroCacheKey(_railPreview!) == _heroCacheKey(item)) {
+      return;
+    }
     _heroTimer?.cancel();
     final cacheKey = _heroCacheKey(item);
     final cached = _heroMetaCache[cacheKey];
@@ -164,6 +167,10 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
         },
         onOpen: () => widget.onOpenSeries(s),
       );
+
+  void _focusBottomNav() {
+    GtvTvFocusRegistry.focusBottomNav();
+  }
 
   void _focusFirstRailBelowHero() {
     if (_resume.isNotEmpty && _resumeFocus.nodes.isNotEmpty) {
@@ -503,35 +510,41 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final railH = TvLayout.compactRailBlockHeight(context, maxHeight: constraints.maxHeight) * 0.88;
-
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
+              flex: 55,
               child: _buildGoogleTvHero(context),
             ),
-            SizedBox(
-              height: railH * 2.2,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (_resume.isNotEmpty) ...[
-                      SizedBox(height: railH * 0.72, child: _buildResumeRail(railH * 0.72)),
-                      const SizedBox(height: 6),
-                    ],
-                    SizedBox(
-                      height: railH,
-                      child: _buildMoviesRail(railH),
+            Expanded(
+              flex: 45,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_resume.isNotEmpty)
+                    Expanded(
+                      flex: 2,
+                      child: LayoutBuilder(
+                        builder: (context, railConstraints) =>
+                            _buildResumeRail(railConstraints.maxHeight),
+                      ),
                     ),
-                    SizedBox(
-                      height: railH,
-                      child: _buildSeriesRail(railH),
+                  Expanded(
+                    flex: 3,
+                    child: LayoutBuilder(
+                      builder: (context, railConstraints) =>
+                          _buildMoviesRail(railConstraints.maxHeight),
                     ),
-                  ],
-                ),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: LayoutBuilder(
+                      builder: (context, railConstraints) =>
+                          _buildSeriesRail(railConstraints.maxHeight),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -558,7 +571,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 500),
           child: KeyedSubtree(
-            key: ValueKey('${_heroCacheKey(item)}-$backdrop'),
+            key: ValueKey(_heroCacheKey(item)),
             child: GtvAndroidTvHeroLayout(
               badge: item.badge,
               title: item.title,
@@ -568,31 +581,36 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
               synopsisSide: GtvHeroSynopsisSide.left,
               posterUrl: poster,
               backdropUrl: backdrop.isNotEmpty ? backdrop : null,
-              actions: Row(
-                children: [
-                  GtvHeroActionButton(
-                    focusNode: _playFocus,
-                    autofocus: true,
-                    label: 'REPRODUCIR',
-                    icon: Icons.play_arrow_rounded,
-                    onTap: item.onPlay,
-                    onMoveDown: _focusFirstRailBelowHero,
-                    onMoveRight: hasTrailer ? () => _trailerFocus.requestFocus() : null,
-                  ),
-                  if (hasTrailer) ...[
-                    const SizedBox(width: 12),
-                    GtvHeroActionButton(
-                      focusNode: _trailerFocus,
-                      label: 'TRÁILER',
-                      icon: Icons.ondemand_video_rounded,
-                      onTap: _openTrailer,
-                      onMoveDown: _focusFirstRailBelowHero,
-                      onMoveLeft: () => _playFocus.requestFocus(),
-                    ),
-                  ],
-                ],
-              ),
+              actions: const SizedBox(height: 56),
             ),
+          ),
+        ),
+        Positioned(
+          left: 36,
+          right: 28,
+          bottom: 20,
+          child: Row(
+            children: [
+              GtvHeroActionButton(
+                focusNode: _playFocus,
+                label: 'REPRODUCIR',
+                icon: Icons.play_arrow_rounded,
+                onTap: item.onPlay,
+                onMoveDown: _focusFirstRailBelowHero,
+                onMoveRight: hasTrailer ? () => _trailerFocus.requestFocus() : null,
+              ),
+              if (hasTrailer) ...[
+                const SizedBox(width: 12),
+                GtvHeroActionButton(
+                  focusNode: _trailerFocus,
+                  label: 'TRÁILER',
+                  icon: Icons.ondemand_video_rounded,
+                  onTap: _openTrailer,
+                  onMoveDown: _focusFirstRailBelowHero,
+                  onMoveLeft: () => _playFocus.requestFocus(),
+                ),
+              ],
+            ],
           ),
         ),
         Positioned(
@@ -613,7 +631,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
   }
 
   Widget _buildResumeRail(double height) {
-    final listH = height - 28;
+    final listH = (height - 28).clamp(60.0, height);
     final maxW = TvLayout.compactPosterWidth(context);
     final cardW = ((listH - 12) / 1.5).clamp(72.0, maxW);
     if (_resumeFocus.nodes.length != _resume.length) {
@@ -683,7 +701,13 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
           _playFocus.requestFocus();
         }
       },
-      onMoveDown: () => _seriesFocus.focus(0),
+      onMoveDown: () {
+        if (_recentSeries.isNotEmpty) {
+          _seriesFocus.focus(0);
+        } else {
+          _focusBottomNav();
+        }
+      },
       builder: (i) {
         final m = _recentMovies[i];
         return PosterCard(
@@ -703,7 +727,13 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
               _playFocus.requestFocus();
             }
           },
-          onMoveDown: () => _seriesFocus.focus(0),
+          onMoveDown: () {
+            if (_recentSeries.isNotEmpty) {
+              _seriesFocus.focus(0);
+            } else {
+              _focusBottomNav();
+            }
+          },
         );
       },
     );
@@ -732,6 +762,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
           onMoveLeft: () => _seriesFocus.moveHorizontal(i, -1),
           onMoveRight: () => _seriesFocus.moveHorizontal(i, 1),
           onMoveUp: () => _moviesFocus.focus(0),
+          onMoveDown: _focusBottomNav,
         );
       },
     );
@@ -747,7 +778,7 @@ class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
   }) {
     final count = focus.nodes.length;
     if (count == 0) return const SizedBox.shrink();
-    final listH = blockHeight - 30;
+    final listH = (blockHeight - 30).clamp(60.0, blockHeight);
     final maxW = TvLayout.compactPosterWidth(context);
     final cardW = ((listH - 12) / 1.5).clamp(72.0, maxW);
 
@@ -842,21 +873,24 @@ class _HeroArrow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GtvFocusable(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Material(
-        color: Colors.black.withOpacity(0.5),
-        shape: const CircleBorder(),
-        child: Container(
-          width: 40,
-          height: 40,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white24),
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Material(
+          color: Colors.black.withOpacity(0.5),
+          shape: const CircleBorder(),
+          child: Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white24),
+            ),
+            child: Icon(icon, color: Colors.white, size: 26),
           ),
-          child: Icon(icon, color: Colors.white, size: 26),
         ),
       ),
     );
