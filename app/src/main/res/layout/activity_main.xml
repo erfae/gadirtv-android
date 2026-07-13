@@ -10,12 +10,13 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="16dp">
+        android:paddingHorizontal="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="8dp">
 
         <TextView
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:text="@string/app_name"
             android:textColor="@android:color/white"
             android:textSize="20sp"
@@ -23,10 +24,53 @@
 
         <TextView
             android:id="@+id/profileLabel"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
             android:textColor="@color/gtv_text_dim"
             android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/tabLive"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/tab_bg"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:text="@string/tab_live"
+            android:textColor="@android:color/white"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tabMovies"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/tab_bg"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:text="@string/tab_movies"
+            android:textColor="@android:color/white"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tabSeries"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/tab_bg"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:text="@string/tab_series"
+            android:textColor="@android:color/white"
+            android:textSize="14sp" />
     </LinearLayout>
 
     <View
@@ -34,65 +78,22 @@
         android:layout_height="1dp"
         android:background="@color/gtv_border" />
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="horizontal">
+        android:layout_weight="1">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/categoryList"
-            android:layout_width="0dp"
+        <include
+            android:id="@+id/panelLive"
+            layout="@layout/panel_live"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <include
+            android:id="@+id/panelMovies"
+            layout="@layout/panel_catalog"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_weight="0.28"
-            android:clipToPadding="false"
-            android:padding="8dp"
-            android:scrollbars="vertical" />
-
-        <View
-            android:layout_width="1dp"
-            android:layout_height="match_parent"
-            android:background="@color/gtv_border" />
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/channelList"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="0.42"
-            android:clipToPadding="false"
-            android:padding="8dp"
-            android:scrollbars="vertical" />
-
-        <View
-            android:layout_width="1dp"
-            android:layout_height="match_parent"
-            android:background="@color/gtv_border" />
-
-        <FrameLayout
-            android:id="@+id/previewContainer"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="0.30"
-            android:background="@android:color/black">
-
-            <androidx.media3.ui.PlayerView
-                android:id="@+id/miniPlayer"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:keepScreenOn="true" />
-
-            <TextView
-                android:id="@+id/previewTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="#99000000"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:padding="10dp"
-                android:text="@string/select_channel"
-                android:textColor="@android:color/white"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-        </FrameLayout>
-    </LinearLayout>
+            android:visibility="gone" />
+    </FrameLayout>
 </LinearLayout>

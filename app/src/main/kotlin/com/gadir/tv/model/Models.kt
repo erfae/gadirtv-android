@@ -21,6 +21,41 @@ data class LiveChannel(
     val categoryId: String,
 )
 
+data class VodMovie(
+    val streamId: Int,
+    val name: String,
+    val icon: String,
+    val categoryId: String,
+    val extension: String,
+)
+
+data class SeriesItem(
+    val seriesId: Int,
+    val name: String,
+    val cover: String,
+    val categoryId: String,
+)
+
+data class SeriesEpisode(
+    val id: Int,
+    val title: String,
+    val episodeNum: Int,
+    val season: String,
+    val extension: String,
+    val plot: String,
+    val image: String,
+)
+
+data class SeriesDetail(
+    val name: String,
+    val cover: String,
+    val plot: String,
+    val genre: String,
+    val releaseDate: String,
+    val rating: String,
+    val seasons: Map<String, List<SeriesEpisode>>,
+)
+
 data class LoginResult(
     val ok: Boolean,
     val error: String? = null,

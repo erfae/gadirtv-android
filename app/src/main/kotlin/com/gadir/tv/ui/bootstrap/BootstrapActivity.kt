@@ -58,6 +58,10 @@ class BootstrapActivity : AppCompatActivity() {
                     message("Canales…")
                     val channels = api.liveStreams(profile)
                     PlaylistRepository.updateCatalog(cats, channels)
+                    message("Películas…")
+                    PlaylistRepository.updateVodCategories(api.vodCategories(profile))
+                    message("Series…")
+                    PlaylistRepository.updateSeriesCategories(api.seriesCategories(profile))
                     channels.size
                 }
             }

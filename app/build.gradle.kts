@@ -11,8 +11,8 @@ android {
         applicationId = "com.gadir.tv"
         minSdk = 21
         targetSdk = 33
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
