@@ -41,7 +41,16 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="REINTENTAR"
+            android:text="@string/retry"
             android:visibility="gone" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnProfiles"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/back_profiles"
+            android:visibility="gone"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
     </LinearLayout>
 </FrameLayout>

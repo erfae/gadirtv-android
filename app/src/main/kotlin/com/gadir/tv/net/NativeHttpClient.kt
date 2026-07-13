@@ -1,26 +1,30 @@
 package com.gadir.tv.net
 
 import android.util.Log
-import okhttp3.FormBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.net.URI
-import java.util.concurrent.TimeUnit
 
-/** OkHttp Xtream client — ported from Flutter [NativeHttpClient]. */
+/** OkHttp Xtream client with retries for overloaded IPTV servers. */
 object NativeHttpClient {
     private const val TAG = "GadirTV-HTTP"
-
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(12, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .retryOnConnectionFailure(true)
-        .build()
+    private const val MAX_RETRIES = 3
 
     fun request(url: String, userAgent: String, method: String = "GET"): HttpResult {
-        val uri = URI(url)
+        var last: HttpResult? = null
+        repeat(MAX_RETRIES) { attempt ->
+            val result = requestOnce(url, userAgent, method)
+            last = result
+            val retryable = result.status in 500..599 ||
+                result.status == 429 ||
+                (result.status == 200 && result.body.isBlank())
+            if (!retryable) return result
+            val delay = 400L * (attempt + 1)
+            Log.w(TAG, "Retry ${attempt + 1}/$MAX_RETRIES status=${result.status} empty=${result.body.isBlank()}")
+            Thread.sleep(delay)
+        }
+        return last ?: HttpResult(0, "", method.uppercase())
+    }
+
+    private fun requestOnce(url: String, userAgent: String, method: String): HttpResult {
+        val uri = java.net.URI(url)
         val portPart = when {
             uri.port == -1 -> ""
             uri.port == 80 && uri.scheme == "http" -> ""
@@ -30,17 +34,17 @@ object NativeHttpClient {
         val origin = "${uri.scheme}://${uri.host}$portPart"
         val referer = "$origin/"
 
-        val builder = Request.Builder()
+        val builder = okhttp3.Request.Builder()
             .header("User-Agent", userAgent)
             .header("Accept", "application/json, text/plain, */*")
             .header("Accept-Encoding", "identity")
-            .header("Accept-Language", "en-US,en;q=0.9")
+            .header("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
             .header("Connection", "keep-alive")
             .header("Referer", referer)
             .header("Origin", origin)
 
         if (method.equals("POST", ignoreCase = true)) {
-            val form = FormBody.Builder()
+            val form = okhttp3.FormBody.Builder()
             parseQuery(uri.query).forEach { (k, v) -> form.add(k, v) }
             val postUrl = if (uri.path.isNullOrBlank()) "$origin/player_api.php" else "$origin${uri.path}"
             builder.url(postUrl).post(form.build())
@@ -59,6 +63,14 @@ object NativeHttpClient {
             )
         }
     }
+
+    private val client: okhttp3.OkHttpClient = okhttp3.OkHttpClient.Builder()
+        .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .retryOnConnectionFailure(true)
+        .build()
 
     private fun parseQuery(query: String?): Map<String, String> {
         if (query.isNullOrBlank()) return emptyMap()

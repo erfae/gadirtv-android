@@ -1,5 +1,6 @@
 package com.gadir.tv.ui.main
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
@@ -18,6 +19,7 @@ import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.ui.player.PlayerActivity
+import com.gadir.tv.ui.profiles.ProfilesActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -62,7 +64,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        findViewById<TextView>(R.id.profileLabel).text = profile.name
+        findViewById<TextView>(R.id.profileLabel).apply {
+            text = profile.name
+            setOnClickListener { openProfiles() }
+        }
 
         tabLive = findViewById(R.id.tabLive)
         tabMovies = findViewById(R.id.tabMovies)
@@ -299,6 +304,14 @@ class MainActivity : AppCompatActivity() {
         val profile = PlaylistRepository.profile ?: return
         val url = api.streamUrl(profile, channel.streamId)
         startActivity(PlayerActivity.intent(this, channel.name, url))
+    }
+
+    private fun openProfiles() {
+        startActivity(Intent(this, ProfilesActivity::class.java))
+    }
+
+    override fun onBackPressed() {
+        openProfiles()
     }
 
     override fun onStop() {

@@ -16,8 +16,10 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import java.net.URLEncoder
 
-class XtreamApi {
-    var activeUserAgent: String = "XCIPTV"
+class XtreamApi(
+    initialUserAgent: String = PlaylistRepository.userAgent,
+) {
+    var activeUserAgent: String = initialUserAgent.ifBlank { "XCIPTV" }
         private set
 
     private val gson = Gson()
@@ -64,12 +66,14 @@ class XtreamApi {
                 }
                 if (parseAuth(get.body)) {
                     activeUserAgent = ua
+                    PlaylistRepository.userAgent = ua
                     return LoginResult(true)
                 }
 
                 val post = NativeHttpClient.request(url, ua, "POST")
                 if (post.status == 200 && parseAuth(post.body)) {
                     activeUserAgent = ua
+                    PlaylistRepository.userAgent = ua
                     return LoginResult(true)
                 }
                 lastDiag = "GET ${get.status}, POST ${post.status}"

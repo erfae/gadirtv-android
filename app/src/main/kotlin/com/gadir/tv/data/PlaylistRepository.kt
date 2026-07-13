@@ -25,6 +25,8 @@ object PlaylistRepository {
     private val vodCache = mutableMapOf<String, List<VodMovie>>()
     private val seriesCache = mutableMapOf<String, List<SeriesItem>>()
 
+  var userAgent: String = "XCIPTV"
+
     fun setProfile(p: Profile) {
         profile = p
     }
@@ -67,5 +69,6 @@ object PlaylistRepository {
         seriesCategories = emptyList()
         vodCache.clear()
         seriesCache.clear()
+        userAgent = "XCIPTV"
     }
 }

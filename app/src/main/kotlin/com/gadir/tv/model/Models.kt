@@ -5,9 +5,26 @@ data class Profile(
     val host: String,
     val username: String,
     val password: String,
+    val mode: String = "xtream",
+    val m3uUrl: String = "",
+    val avatarSeed: Int = 0,
 ) {
-    val id: String get() = "$host|$username"
+    val id: String
+        get() = if (mode == "m3u") "m3u|$m3uUrl" else "$host|$username"
+
+    val displayName: String
+        get() = name.ifEmpty { username }
+
+    val isXtream: Boolean
+        get() = mode != "m3u"
 }
+
+data class LoginDraft(
+    val host: String = "",
+    val username: String = "",
+    val password: String = "",
+    val name: String = "",
+)
 
 data class Category(
     val id: String,
