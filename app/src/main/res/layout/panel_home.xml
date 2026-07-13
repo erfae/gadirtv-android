@@ -14,8 +14,8 @@
         <FrameLayout
             android:id="@+id/heroContainer"
             android:layout_width="match_parent"
-            android:layout_height="280dp"
-            android:background="@color/gtv_surface">
+            android:layout_height="360dp"
+            android:background="@color/gtv_bg">
 
             <ImageView
                 android:id="@+id/heroImage"
@@ -28,71 +28,96 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@drawable/hero_scrim" />
+                android:background="@drawable/hero_scrim_left" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:gravity="bottom"
+                android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:padding="20dp">
+                android:paddingHorizontal="36dp"
+                android:paddingVertical="24dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
+                    android:layout_weight="1.15"
                     android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/app_name"
+                        android:textColor="@color/gtv_text_dim"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/heroType"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/version_badge_bg"
-                        android:paddingHorizontal="10dp"
-                        android:paddingVertical="4dp"
-                        android:textColor="@android:color/white"
-                        android:textSize="11sp"
+                        android:layout_marginTop="8dp"
+                        android:textColor="@color/gtv_red_hi"
+                        android:textSize="12sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/heroTitle"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="6dp"
                         android:ellipsize="end"
                         android:maxLines="2"
                         android:textColor="@android:color/white"
-                        android:textSize="28sp"
+                        android:textSize="34sp"
                         android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/heroSubtitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/gtv_text_dim"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/heroPlot"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:ellipsize="end"
+                        android:maxLines="4"
+                        android:textColor="#D9FFFFFF"
+                        android:textSize="14sp" />
 
                     <TextView
                         android:id="@+id/heroPlay"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
-                        android:background="@drawable/tab_bg"
+                        android:layout_marginTop="18dp"
+                        android:background="@drawable/btn_play_hero"
                         android:focusable="true"
                         android:focusableInTouchMode="true"
-                        android:paddingHorizontal="20dp"
-                        android:paddingVertical="10dp"
+                        android:paddingHorizontal="28dp"
+                        android:paddingVertical="12dp"
                         android:text="@string/hero_play"
-                        android:textColor="@android:color/white"
+                        android:textColor="@android:color/black"
                         android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/heroPlot"
+                <ImageView
+                    android:id="@+id/heroPoster"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="20dp"
-                    android:layout_weight="0.45"
-                    android:background="#88000000"
-                    android:ellipsize="end"
-                    android:maxLines="6"
-                    android:padding="12dp"
-                    android:textColor="@color/gtv_text_dim"
-                    android:textSize="13sp" />
+                    android:layout_height="220dp"
+                    android:layout_marginStart="24dp"
+                    android:layout_weight="0.42"
+                    android:background="@color/gtv_surface"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/tv_banner" />
             </LinearLayout>
         </FrameLayout>
 
@@ -119,13 +144,35 @@
             android:visibility="gone" />
 
         <TextView
+            android:id="@+id/favoritesRailTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginStart="36dp"
+            android:layout_marginTop="20dp"
+            android:text="@string/rail_favorites"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/favoritesRail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clipToPadding="false"
+            android:paddingHorizontal="36dp"
+            android:paddingTop="12dp"
+            android:scrollbars="none"
+            android:visibility="gone" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="36dp"
+            android:layout_marginTop="20dp"
             android:text="@string/rail_recent_movies"
             android:textColor="@android:color/white"
-            android:textSize="16sp"
+            android:textSize="18sp"
             android:textStyle="bold" />
 
         <androidx.recyclerview.widget.RecyclerView
@@ -133,18 +180,18 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:clipToPadding="false"
-            android:paddingHorizontal="16dp"
-            android:paddingTop="10dp"
+            android:paddingHorizontal="36dp"
+            android:paddingTop="12dp"
             android:scrollbars="none" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginStart="36dp"
+            android:layout_marginTop="20dp"
             android:text="@string/rail_recent_series"
             android:textColor="@android:color/white"
-            android:textSize="16sp"
+            android:textSize="18sp"
             android:textStyle="bold" />
 
         <androidx.recyclerview.widget.RecyclerView
@@ -152,8 +199,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:clipToPadding="false"
-            android:paddingHorizontal="16dp"
-            android:paddingTop="10dp"
+            android:paddingHorizontal="36dp"
+            android:paddingTop="12dp"
             android:scrollbars="none" />
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

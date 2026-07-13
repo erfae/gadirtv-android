@@ -75,6 +75,16 @@ data class SeriesDetail(
     val seasons: Map<String, List<SeriesEpisode>>,
 )
 
+data class VodInfo(
+    val name: String,
+    val plot: String,
+    val cover: String,
+    val backdrop: String,
+    val rating: String,
+    val genre: String,
+    val releaseDate: String,
+)
+
 data class EpgEntry(
     val title: String,
     val start: Long = 0,

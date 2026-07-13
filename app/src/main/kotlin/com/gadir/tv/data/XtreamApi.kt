@@ -8,6 +8,7 @@ import com.gadir.tv.model.Profile
 import com.gadir.tv.model.SeriesDetail
 import com.gadir.tv.model.SeriesEpisode
 import com.gadir.tv.model.SeriesItem
+import com.gadir.tv.model.VodInfo
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.net.NativeHttpClient
 import com.gadir.tv.util.HostUtils
@@ -252,6 +253,48 @@ class XtreamApi(
                     ?: info?.get("rating")?.asStringOrNull()
                     ?: "",
                 seasons = seasons,
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun vodInfo(profile: Profile, vodId: Int): VodInfo? {
+        val host = HostUtils.baseUrl(profile.host)
+        val query = buildString {
+            append("username=").append(encode(profile.username))
+            append("&password=").append(encode(profile.password))
+            append("&action=get_vod_info")
+            append("&vod_id=").append(vodId)
+        }
+        val url = "$host/player_api.php?$query"
+        val response = NativeHttpClient.request(url, activeUserAgent)
+        if (response.status != 200 || response.body.isBlank()) return null
+        return try {
+            val root = gson.fromJson(response.body, JsonObject::class.java) ?: return null
+            val info = root.getAsJsonObject("info")
+            val movieData = root.getAsJsonObject("movie_data")
+            VodInfo(
+                name = info?.get("name")?.asStringOrNull()
+                    ?: movieData?.get("name")?.asStringOrNull()
+                    ?: "",
+                plot = info?.get("plot")?.asStringOrNull()
+                    ?: movieData?.get("plot")?.asStringOrNull()
+                    ?: "",
+                cover = info?.get("movie_image")?.asStringOrNull()
+                    ?: info?.get("cover")?.asStringOrNull()
+                    ?: movieData?.get("stream_icon")?.asStringOrNull()
+                    ?: "",
+                backdrop = info?.get("backdrop_path")?.asStringOrNull()
+                    ?: info?.get("cover_big")?.asStringOrNull()
+                    ?: "",
+                rating = info?.get("rating")?.asStringOrNull()
+                    ?: info?.get("rating_5based")?.asStringOrNull()
+                    ?: "",
+                genre = info?.get("genre")?.asStringOrNull() ?: "",
+                releaseDate = info?.get("releasedate")?.asStringOrNull()
+                    ?: info?.get("releaseDate")?.asStringOrNull()
+                    ?: "",
             )
         } catch (_: Exception) {
             null

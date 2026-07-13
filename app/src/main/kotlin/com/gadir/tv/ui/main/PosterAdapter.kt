@@ -13,6 +13,9 @@ import com.gadir.tv.R
 class PosterAdapter(
     private val items: List<PosterItem>,
     private val onClick: (PosterItem) -> Unit,
+    private val kind: String? = null,
+    private val isFavorite: ((PosterItem) -> Boolean)? = null,
+    private val onToggleFavorite: ((PosterItem) -> Unit)? = null,
 ) : RecyclerView.Adapter<PosterAdapter.Holder>() {
 
     data class PosterItem(
@@ -43,6 +46,15 @@ class PosterAdapter(
         }
 
         holder.itemView.setOnClickListener { onClick(item) }
+        holder.itemView.setOnLongClickListener {
+            if (onToggleFavorite != null) {
+                onToggleFavorite.invoke(item)
+                notifyItemChanged(holder.bindingAdapterPosition)
+                true
+            } else {
+                false
+            }
+        }
         holder.itemView.setOnKeyListener { _, keyCode, event ->
             if (event.action == KeyEvent.ACTION_DOWN &&
                 (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)

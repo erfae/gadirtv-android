@@ -15,11 +15,14 @@ class ChannelAdapter(
     private val items: List<LiveChannel>,
     private val onFocus: (LiveChannel) -> Unit,
     private val onMoveLeft: (() -> Unit)? = null,
+    private val isFavorite: (LiveChannel) -> Boolean = { false },
+    private val onToggleFavorite: ((LiveChannel) -> Unit)? = null,
 ) : RecyclerView.Adapter<ChannelAdapter.Holder>() {
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.channelIcon)
         val name: TextView = view.findViewById(R.id.channelName)
+        val favorite: ImageView = view.findViewById(R.id.channelFavorite)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
@@ -36,6 +39,9 @@ class ChannelAdapter(
         } else {
             holder.icon.setImageResource(R.drawable.tv_banner)
         }
+        holder.favorite.setImageResource(
+            if (isFavorite(item)) R.drawable.ic_favorite_on else R.drawable.ic_favorite_off,
+        )
 
         holder.itemView.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) onFocus(item)
@@ -45,6 +51,14 @@ class ChannelAdapter(
             onFocus(item)
             val activity = holder.itemView.context as? MainActivity
             activity?.openFullscreen(item)
+        }
+
+        holder.itemView.setOnLongClickListener {
+            onToggleFavorite?.invoke(item)
+            holder.favorite.setImageResource(
+                if (isFavorite(item)) R.drawable.ic_favorite_on else R.drawable.ic_favorite_off,
+            )
+            true
         }
 
         holder.itemView.setOnKeyListener { _, keyCode, event ->
