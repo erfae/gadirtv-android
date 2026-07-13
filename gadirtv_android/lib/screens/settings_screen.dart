@@ -33,6 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   );
   late final FocusNode _backupCreateNode = FocusNode(debugLabel: 'backup-create');
   late final FocusNode _backupRestoreNode = FocusNode(debugLabel: 'backup-restore');
+  late final FocusNode _aboutNode = FocusNode(debugLabel: 'settings-about');
 
   static const _engines = [PlayerEngine.exo, PlayerEngine.vlc, PlayerEngine.external];
 
@@ -58,6 +59,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     _backupCreateNode.dispose();
     _backupRestoreNode.dispose();
+    _aboutNode.dispose();
     super.dispose();
   }
 
@@ -157,7 +159,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: GtvTheme.red))
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(color: GtvTheme.red),
+                  const SizedBox(height: 16),
+                  GtvFocusable(
+                    focusNode: _backNode,
+                    onTap: () => Navigator.of(context).pop(),
+                    borderRadius: BorderRadius.circular(999),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Text('Volver', style: TextStyle(color: Colors.white70)),
+                    ),
+                  ),
+                ],
+              ),
+            )
           : FocusTraversalGroup(
               policy: OrderedTraversalPolicy(),
               child: ListView(
@@ -272,6 +291,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             focusNode: _backupRestoreNode,
                             onTap: _busy ? null : _restoreBackup,
                             onMoveUp: () => _backupCreateNode.requestFocus(),
+                            onMoveDown: () => _aboutNode.requestFocus(),
                             borderRadius: BorderRadius.circular(999),
                             child: OutlinedButton.icon(
                               onPressed: _busy ? null : _restoreBackup,
@@ -291,24 +311,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 30),
                   _sectionTitle(t.about),
                   const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: GtvTheme.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: GtvTheme.border),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline_rounded, color: GtvTheme.textDim, size: 20),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text('GadirTV',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                        ),
-                        Text(kAppVersionLabel,
-                            style: const TextStyle(color: GtvTheme.textDim, fontSize: 12)),
-                      ],
+                  GtvFocusable(
+                    focusNode: _aboutNode,
+                    onTap: () {},
+                    enabled: true,
+                    onMoveUp: () => _backupRestoreNode.requestFocus(),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: GtvTheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: GtvTheme.border),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline_rounded, color: GtvTheme.textDim, size: 20),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text('GadirTV',
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                          ),
+                          Text(kAppVersionLabel,
+                              style: const TextStyle(color: GtvTheme.textDim, fontSize: 12)),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 40),

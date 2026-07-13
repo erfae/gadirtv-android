@@ -8,6 +8,7 @@ import '../../i18n/strings.dart';
 import '../../models/media.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
+import '../../services/playlist_store.dart';
 import '../../services/favorites_store.dart';
 import '../../services/live_preview_guard.dart';
 import '../../services/player_constants.dart';
@@ -39,10 +40,10 @@ class LiveTab extends StatefulWidget {
   final bool active;
 
   @override
-  State<LiveTab> createState() => _LiveTabState();
+  State<LiveTab> createState() => LiveTabState();
 }
 
-class _LiveTabState extends State<LiveTab> {
+class LiveTabState extends State<LiveTab> with AutomaticKeepAliveClientMixin {
   static const _favoritesId = '__favorites__';
   static const _allId = '__all__';
 
@@ -64,6 +65,17 @@ class _LiveTabState extends State<LiveTab> {
   String? _epgNext;
 
   @override
+  bool get wantKeepAlive => true;
+
+  void focusInitial() {
+    if (_channelFocus.isNotEmpty) {
+      _channelFocus.first.requestFocus();
+    } else {
+      _railKey.currentState?.focusSelected();
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
     _boot();
@@ -71,16 +83,20 @@ class _LiveTabState extends State<LiveTab> {
 
   Future<void> _boot() async {
     try {
-      final results = await Future.wait([
-        _api.liveCategories(widget.profile),
-        _favs.loadAll(FavoritesStore.kindLive),
-      ]);
+      final store = PlaylistStore.instance;
+      final favs = await _favs.loadAll(FavoritesStore.kindLive);
       if (!mounted) return;
+      if (!store.isLoadedFor(widget.profile)) {
+        setState(() {
+          _loadingCats = false;
+          _error = 'Contenido no cargado. Reinicia la app.';
+        });
+        return;
+      }
       setState(() {
-        _categories = (results[0] as List)
-            .map((e) => Category.fromJson(e as Map<String, dynamic>))
-            .toList();
-        _favoriteIds = results[1] as Set<int>;
+        _categories = store.liveCategories;
+        _allChannels = store.liveStreams;
+        _favoriteIds = favs;
         _loadingCats = false;
       });
       await _loadChannels(_allId);
@@ -109,26 +125,25 @@ class _LiveTabState extends State<LiveTab> {
       });
       _syncChannelFocus(list.length);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _railKey.currentState?.focusSelected();
+        if (mounted && _channelFocus.isNotEmpty) {
+          _channelFocus.first.requestFocus();
+        }
       });
       return;
     }
 
     try {
-      final raw = await _api.liveStreams(
-        widget.profile,
-        categoryId: id == _allId ? null : id,
-      );
+      final parsed = PlaylistStore.instance.liveForCategory(id == _allId ? null : id);
       if (!mounted) return;
-      final parsed = raw.map(LiveChannel.fromJson).toList();
       setState(() {
         _channels = parsed;
         _loadingChans = false;
-        if (id == _allId) _allChannels = parsed;
       });
       _syncChannelFocus(parsed.length);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _railKey.currentState?.focusSelected();
+        if (mounted && _channelFocus.isNotEmpty) {
+          _channelFocus.first.requestFocus();
+        }
       });
     } catch (_) {
       if (!mounted) return;
@@ -239,6 +254,7 @@ class _LiveTabState extends State<LiveTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final t = AppI18n.of(context);
     if (_loadingCats) {
       return const Center(child: CircularProgressIndicator(color: GtvTheme.red));
@@ -264,6 +280,9 @@ class _LiveTabState extends State<LiveTab> {
         streamUrl: streamUrl,
         title: _current?.name ?? t.selectChannel,
         onFullscreen: _fullscreen,
+        onMoveLeft: () {
+          if (_channelFocus.isNotEmpty) _channelFocus.first.requestFocus();
+        },
       );
       final epgBox = _EpgBar(now: _epgNow, next: _epgNext);
 
@@ -441,12 +460,14 @@ class _MiniPlayer extends StatefulWidget {
     required this.streamUrl,
     required this.title,
     required this.onFullscreen,
+    this.onMoveLeft,
   });
 
   final FocusNode? focusNode;
   final String? streamUrl;
   final String title;
   final VoidCallback onFullscreen;
+  final VoidCallback? onMoveLeft;
 
   @override
   State<_MiniPlayer> createState() => _MiniPlayerState();
@@ -675,6 +696,7 @@ class _MiniPlayerState extends State<_MiniPlayer> with WidgetsBindingObserver {
       focusNode: widget.focusNode,
       onTap: widget.streamUrl != null ? widget.onFullscreen : null,
       enabled: widget.streamUrl != null,
+      onMoveLeft: widget.onMoveLeft,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         color: Colors.black,

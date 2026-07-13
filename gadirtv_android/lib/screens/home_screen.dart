@@ -43,6 +43,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Profile? _profile;
   int _tab = 0;
   int _reloadTick = 0;
+  final _homeKey = GlobalKey<HomeTabState>();
+  final _liveKey = GlobalKey<LiveTabState>();
+  final _moviesKey = GlobalKey<MoviesTabState>();
+  final _seriesKey = GlobalKey<SeriesTabState>();
+  final _searchFocus = FocusNode(debugLabel: 'quick-search');
+  final _settingsFocus = FocusNode(debugLabel: 'quick-settings');
+  final _profileChipFocus = FocusNode(debugLabel: 'quick-profile');
   late final List<FocusNode> _navFocusNodes = List.generate(
     4,
     (i) => FocusNode(debugLabel: 'bottom-nav-$i'),
@@ -56,6 +63,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _searchFocus.dispose();
+    _settingsFocus.dispose();
+    _profileChipFocus.dispose();
     for (final n in _navFocusNodes) {
       n.dispose();
     }
@@ -68,21 +78,25 @@ class _HomeScreenState extends State<HomeScreen> {
     GtvTvFocusRegistry.focusPrimaryContent = _focusPrimaryInContent;
   }
 
-  void _focusPrimaryInContent() {
-    if (!mounted) return;
-    final h = MediaQuery.sizeOf(context).height;
-    for (final node in FocusManager.instance.rootScope.descendants) {
-      if (!node.canRequestFocus) continue;
-      if (_navFocusNodes.contains(node)) continue;
-      final ro = node.context?.findRenderObject();
-      if (ro is! RenderBox || !ro.hasSize || !ro.attached) continue;
-      final top = ro.localToGlobal(Offset.zero).dy;
-      final bottom = ro.localToGlobal(Offset(0, ro.size.height)).dy;
-      // Skip top quick-actions and bottom navigation strip.
-      if (top < 48 || bottom > h - 96) continue;
-      node.requestFocus();
-      return;
+  void _focusTabContent() {
+    switch (_tab) {
+      case 0:
+        _homeKey.currentState?.focusInitial();
+        break;
+      case 1:
+        _liveKey.currentState?.focusInitial();
+        break;
+      case 2:
+        _moviesKey.currentState?.focusInitial();
+        break;
+      case 3:
+        _seriesKey.currentState?.focusInitial();
+        break;
     }
+  }
+
+  void _focusPrimaryInContent() {
+    _focusTabContent();
   }
 
   void _selectTab(int index) {
@@ -90,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncTvFocusRegistry();
-      _navFocusNodes[index].requestFocus();
+      _focusTabContent();
     });
   }
 
@@ -393,18 +407,30 @@ class _HomeScreenState extends State<HomeScreen> {
       return _buildM3UScreen(p);
     }
 
-    final tabs = <Widget Function()>[
-      () => KeyedSubtree(key: ValueKey('home-$_reloadTick'), child: HomeTab(profile: p, onOpenMovie: _openMovie, onOpenSeries: _openSeries, onPlayMovie: _playMovie, onPlaySeries: _playSeries)),
-      () => KeyedSubtree(key: ValueKey('live-$_reloadTick'), child: LiveTab(profile: p, onPlay: _playChannel, active: _tab == 1)),
-      () => KeyedSubtree(key: ValueKey('movies-$_reloadTick'), child: MoviesTab(profile: p, onOpen: _openMovie)),
-      () => KeyedSubtree(key: ValueKey('series-$_reloadTick'), child: SeriesTab(profile: p, onOpen: _openSeries)),
+    final tabs = [
+      HomeTab(
+        key: _homeKey,
+        profile: p,
+        onOpenMovie: _openMovie,
+        onOpenSeries: _openSeries,
+        onPlayMovie: _playMovie,
+        onPlaySeries: _playSeries,
+      ),
+      LiveTab(
+        key: _liveKey,
+        profile: p,
+        onPlay: _playChannel,
+        active: _tab == 1,
+      ),
+      MoviesTab(key: _moviesKey, profile: p, onOpen: _openMovie),
+      SeriesTab(key: _seriesKey, profile: p, onOpen: _openSeries),
     ];
 
-    // Build only the active tab — IndexedStack eagerly constructed all four
-    // tabs (including LiveTab's VLC imports) even when the user was on Inicio.
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _syncTvFocusRegistry();
+      if (mounted) {
+        _syncTvFocusRegistry();
+        if (_tab == 0) _focusTabContent();
+      }
     });
 
     // Wrapping the shell in a FocusTraversalGroup gives predictable
@@ -425,7 +451,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   Expanded(
                     child: FocusTraversalOrder(
                       order: const NumericFocusOrder(1),
-                      child: tabs[_tab](),
+                      child: IndexedStack(
+                        index: _tab,
+                        children: tabs,
+                      ),
                     ),
                   ),
                   FocusTraversalOrder(
@@ -453,15 +482,20 @@ class _HomeScreenState extends State<HomeScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         GtvIconButton(
+          focusNode: _searchFocus,
           icon: Icons.search_rounded,
           tooltip: 'Buscar',
           onTap: _openSearch,
+          onMoveDown: _focusTabContent,
         ),
         const SizedBox(width: 6),
         GtvIconButton(
+          focusNode: _settingsFocus,
           icon: Icons.settings_rounded,
           tooltip: 'Ajustes',
           onTap: _openSettings,
+          onMoveDown: _focusTabContent,
+          onMoveLeft: () => _searchFocus.requestFocus(),
         ),
         const SizedBox(width: 6),
         _buildProfileChip(p),
@@ -471,8 +505,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildProfileChip(Profile p) {
     return GtvFocusable(
+      focusNode: _profileChipFocus,
       borderRadius: BorderRadius.circular(999),
       onTap: _switchProfile,
+      onMoveDown: _focusTabContent,
+      onMoveLeft: () => _settingsFocus.requestFocus(),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -523,6 +560,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   item: items[i],
                   selected: _tab == i,
                   onTap: () => _selectTab(i),
+                  onMoveUp: _focusTabContent,
+                  onMoveLeft: i > 0 ? () => _navFocusNodes[i - 1].requestFocus() : null,
+                  onMoveRight: i < items.length - 1 ? () => _navFocusNodes[i + 1].requestFocus() : null,
                 ),
               ),
           ],
@@ -577,13 +617,16 @@ class _NavItem {
   final String label;
 }
 
-class _NavButton extends StatefulWidget {
+class _NavButton extends StatelessWidget {
   const _NavButton({
     required this.focusNode,
     required this.navIndex,
     required this.item,
     required this.selected,
     required this.onTap,
+    this.onMoveUp,
+    this.onMoveLeft,
+    this.onMoveRight,
   });
 
   final FocusNode focusNode;
@@ -591,64 +634,46 @@ class _NavButton extends StatefulWidget {
   final _NavItem item;
   final bool selected;
   final VoidCallback onTap;
-
-  @override
-  State<_NavButton> createState() => _NavButtonState();
-}
-
-class _NavButtonState extends State<_NavButton> {
-  bool _focused = false;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveLeft;
+  final VoidCallback? onMoveRight;
 
   @override
   Widget build(BuildContext context) {
-    final on = widget.selected;
-    return FocusableActionDetector(
-      focusNode: widget.focusNode,
-      onShowFocusHighlight: (v) => setState(() => _focused = v),
-      onShowHoverHighlight: (v) => setState(() => _focused = v),
-      mouseCursor: SystemMouseCursors.click,
-      actions: {
-        ActivateIntent: CallbackAction<ActivateIntent>(
-          onInvoke: (_) {
-            widget.onTap();
-            return null;
-          },
+    final on = selected;
+    return GtvFocusable(
+      focusNode: focusNode,
+      onTap: onTap,
+      onMoveUp: onMoveUp,
+      onMoveLeft: onMoveLeft,
+      onMoveRight: onMoveRight,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: on ? GtvTheme.red : GtvTheme.bg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: GtvTheme.border),
         ),
-      },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          decoration: BoxDecoration(
-            color: on
-                ? GtvTheme.red
-                : (_focused ? GtvTheme.surfaceHi : GtvTheme.bg),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: _focused ? GtvTheme.redHi : GtvTheme.border,
-              width: _focused ? 2 : 1,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              item.icon,
+              color: on ? Colors.white : GtvTheme.textDim,
+              size: 26,
             ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                widget.item.icon,
-                color: on || _focused ? Colors.white : GtvTheme.textDim,
-                size: 26,
+            const SizedBox(width: 10),
+            Text(
+              item.label,
+              style: TextStyle(
+                color: on ? Colors.white : GtvTheme.textDim,
+                fontSize: 14,
+                fontWeight: on ? FontWeight.w800 : FontWeight.w600,
               ),
-              const SizedBox(width: 10),
-              Text(
-                widget.item.label,
-                style: TextStyle(
-                  color: on || _focused ? Colors.white : GtvTheme.textDim,
-                  fontSize: 14,
-                  fontWeight: on ? FontWeight.w800 : FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

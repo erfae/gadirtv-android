@@ -7,6 +7,7 @@ import '../../models/media.dart';
 import '../../models/trailer_info.dart';
 import '../../models/profile.dart';
 import '../../services/api_service.dart';
+import '../../services/playlist_store.dart';
 import '../../services/resume_store.dart';
 import '../../services/trailer_launcher.dart';
 import '../../theme.dart';
@@ -35,10 +36,10 @@ class HomeTab extends StatefulWidget {
   final ValueChanged<Series>? onPlaySeries;
 
   @override
-  State<HomeTab> createState() => _HomeTabState();
+  State<HomeTab> createState() => HomeTabState();
 }
 
-class _HomeTabState extends State<HomeTab> {
+class HomeTabState extends State<HomeTab> with AutomaticKeepAliveClientMixin {
   final _api = ApiService();
   final _resumeStore = ResumeStore();
   final _playFocus = FocusNode(debugLabel: 'hero-play');
@@ -64,6 +65,13 @@ class _HomeTabState extends State<HomeTab> {
   TrailerInfo _heroTrailer = const TrailerInfo();
   bool _heroMetaLoading = false;
   final _heroMetaCache = <String, _CachedHeroMeta>{};
+
+  @override
+  bool get wantKeepAlive => true;
+
+  void focusInitial() {
+    _playFocus.requestFocus();
+  }
 
   @override
   void initState() {
@@ -93,26 +101,24 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _load() async {
+    final store = PlaylistStore.instance;
+    if (!store.isLoadedFor(widget.profile)) {
+      setState(() {
+        _loading = true;
+        _error = 'Contenido no cargado. Reinicia la app.';
+      });
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
     });
 
     try {
-      final moviesFuture = _api.vodStreams(widget.profile);
-      final seriesFuture = _api.seriesList(widget.profile);
-      final resumeFuture = _resumeStore.loadAll();
-
-      final resumeMap = await resumeFuture;
-      if (!mounted) return;
-
-      final moviesRaw = await moviesFuture;
-      if (!mounted) return;
-
-      final movies = moviesRaw
-          .map((e) => Movie.fromJson(e as Map<String, dynamic>))
-          .toList()
-        ..sort((a, b) => b.addedTs.compareTo(a.addedTs));
+      final movies = store.vodStreams;
+      final series = store.seriesList;
+      final resumeMap = await _resumeStore.loadAll();
 
       final movieById = {for (final m in movies) m.streamId.toString(): m};
       final resumeItems = <_ResumeItem>[];
@@ -145,14 +151,6 @@ class _HomeTabState extends State<HomeTab> {
 
       _resumeFocus.rebuild(_resume.length);
       _moviesFocus.rebuild(recentMovies.length);
-
-      final seriesRaw = await seriesFuture;
-      if (!mounted) return;
-
-      final series = seriesRaw
-          .map((e) => Series.fromJson(e as Map<String, dynamic>))
-          .toList()
-        ..sort((a, b) => b.lastModifiedTs.compareTo(a.lastModifiedTs));
 
       final recentSeries = series.take(24).toList();
       final pool = <_HeroItem>[
@@ -262,7 +260,9 @@ class _HomeTabState extends State<HomeTab> {
     setState(() => _heroIndex = next);
     _applyHeroMetaFromCache(next);
     _loadHeroMeta(next);
-    _playFocus.requestFocus();
+    if (_playFocus.hasFocus || _trailerFocus.hasFocus) {
+      _playFocus.requestFocus();
+    }
   }
 
   Future<void> _loadHeroMeta(int index, {bool prefetch = false}) async {
@@ -375,11 +375,14 @@ class _HomeTabState extends State<HomeTab> {
     _applyHeroMetaFromCache(_heroIndex);
     _loadHeroMeta(_heroIndex);
     _startHeroRotation();
-    _playFocus.requestFocus();
+    if (_playFocus.hasFocus || _trailerFocus.hasFocus) {
+      _playFocus.requestFocus();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator(color: GtvTheme.red));
     }
@@ -395,16 +398,16 @@ class _HomeTabState extends State<HomeTab> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final railH = TvLayout.compactRailBlockHeight(context, maxHeight: constraints.maxHeight) * 0.88;
-        final heroH = (constraints.maxHeight * 0.58).clamp(280.0, constraints.maxHeight * 0.65);
+        final heroH = constraints.maxHeight;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(
-              height: heroH,
+            Expanded(
               child: _buildGoogleTvHero(context),
             ),
-            Expanded(
+            SizedBox(
+              height: railH * 2.2,
               child: SingleChildScrollView(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Column(

@@ -49,8 +49,50 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     final backdrop = (backdropUrl ?? '').trim();
     final poster = posterUrl.trim();
-    final bg = backdrop.isNotEmpty ? backdrop : poster;
 
+    if (synopsisSide == GtvHeroSynopsisSide.left) {
+      return _buildHomeLayout(context, poster, backdrop);
+    }
+
+    final bg = backdrop.isNotEmpty ? backdrop : poster;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (bg.isNotEmpty)
+          Positioned.fill(
+            child: CachedNetworkImage(
+              imageUrl: bg,
+              fit: BoxFit.cover,
+              alignment: Alignment.centerRight,
+              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          ),
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                GtvTheme.bg,
+                GtvTheme.bg.withOpacity(0.92),
+                GtvTheme.bg.withOpacity(0.55),
+                GtvTheme.bg.withOpacity(0.20),
+              ],
+              stops: const [0, 0.32, 0.58, 1],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(36, 20, 28, 24),
+          child: _buildDetailLayout(context, poster),
+        ),
+      ],
+    );
+  }
+
+  /// Home tab — full-bleed backdrop with poster stamp on the right.
+  Widget _buildHomeLayout(BuildContext context, String poster, String backdrop) {
+    final bg = backdrop.isNotEmpty ? backdrop : poster;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -68,56 +110,42 @@ class GtvAndroidTvHeroLayout extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: synopsisSide == GtvHeroSynopsisSide.right
-                  ? [
-                      GtvTheme.bg,
-                      GtvTheme.bg.withOpacity(0.92),
-                      GtvTheme.bg.withOpacity(0.55),
-                      GtvTheme.bg.withOpacity(0.20),
-                    ]
-                  : [
-                      GtvTheme.bg,
-                      GtvTheme.bg.withOpacity(0.88),
-                      GtvTheme.bg.withOpacity(0.40),
-                      Colors.transparent,
-                    ],
-              stops: synopsisSide == GtvHeroSynopsisSide.right
-                  ? const [0, 0.32, 0.58, 1]
-                  : const [0, 0.28, 0.50, 1],
+              colors: [
+                GtvTheme.bg.withOpacity(0.92),
+                GtvTheme.bg.withOpacity(0.72),
+                GtvTheme.bg.withOpacity(0.35),
+                Colors.transparent,
+              ],
+              stops: const [0, 0.30, 0.55, 0.85],
             ),
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(36, 20, 28, 24),
-          child: synopsisSide == GtvHeroSynopsisSide.right
-              ? _buildDetailLayout(context, poster)
-              : _buildHomeLayout(context, poster),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHomeLayout(BuildContext context, String poster) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          flex: 11,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.fromLTRB(36, 20, 28, 20),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ..._metaBlock(context, includeSynopsis: true),
-              const SizedBox(height: 16),
-              actions,
+              Expanded(
+                flex: 12,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ..._metaBlock(context, includeSynopsis: true),
+                    const SizedBox(height: 14),
+                    actions,
+                  ],
+                ),
+              ),
+              const SizedBox(width: 20),
+              if (poster.isNotEmpty)
+                Expanded(
+                  flex: 7,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: _LargePoster(posterUrl: poster),
+                  ),
+                ),
             ],
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          flex: 9,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: _LargePoster(posterUrl: poster),
           ),
         ),
       ],

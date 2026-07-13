@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import 'i18n/strings.dart';
+import 'screens/bootstrap_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profiles_screen.dart';
@@ -168,6 +169,7 @@ final _router = GoRouter(
     GoRoute(path: '/', builder: (_, __) => const _Boot()),
     GoRoute(path: '/profiles', builder: (_, __) => const ProfilesScreen()),
     GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+    GoRoute(path: '/bootstrap', builder: (_, __) => const BootstrapScreen()),
     GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
   ],
 );
@@ -196,7 +198,7 @@ class _BootState extends State<_Boot> {
       if (!mounted) return;
 
       if (active != null) {
-        context.go('/home');
+        context.go('/bootstrap');
       } else if (all.isNotEmpty) {
         context.go('/profiles');
       } else {

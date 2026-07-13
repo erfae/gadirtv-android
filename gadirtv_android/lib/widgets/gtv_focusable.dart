@@ -155,19 +155,34 @@ class GtvIconButton extends StatelessWidget {
     required this.onTap,
     this.tooltip,
     this.autofocus = false,
+    this.focusNode,
+    this.onMoveDown,
+    this.onMoveLeft,
+    this.onMoveRight,
+    this.onMoveUp,
   });
 
   final IconData icon;
   final VoidCallback onTap;
   final String? tooltip;
   final bool autofocus;
+  final FocusNode? focusNode;
+  final VoidCallback? onMoveDown;
+  final VoidCallback? onMoveLeft;
+  final VoidCallback? onMoveRight;
+  final VoidCallback? onMoveUp;
 
   @override
   Widget build(BuildContext context) {
     return GtvFocusable(
+      focusNode: focusNode,
       autofocus: autofocus,
       borderRadius: BorderRadius.circular(999),
       onTap: onTap,
+      onMoveDown: onMoveDown,
+      onMoveLeft: onMoveLeft,
+      onMoveRight: onMoveRight,
+      onMoveUp: onMoveUp,
       child: Tooltip(
         message: tooltip ?? '',
         child: Container(

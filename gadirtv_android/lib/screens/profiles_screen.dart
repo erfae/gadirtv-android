@@ -40,7 +40,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   Future<void> _select(Profile p) async {
     await _store.setActive(p);
     if (!mounted) return;
-    context.go('/home');
+    context.go('/bootstrap');
   }
 
   Future<void> _delete(Profile p) async {

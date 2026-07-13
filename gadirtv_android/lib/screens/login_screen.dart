@@ -16,7 +16,7 @@ import '../widgets/gtv_tv_text_field.dart';
 
 /// Bump this string every release so users can visually confirm they have
 /// the latest APK installed (avoids the "am I testing the right build?" loop).
-const String kAppVersionLabel = 'v2.4.9';
+const String kAppVersionLabel = 'v2.5.0';
 
 /// Add-profile / connect-to-Xtream screen.
 ///
@@ -288,7 +288,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() => _progress = 'Abriendo pantalla principal…');
     try {
-      context.go('/home');
+      context.go('/bootstrap');
     } catch (e) {
       if (!mounted) return;
       setState(() {

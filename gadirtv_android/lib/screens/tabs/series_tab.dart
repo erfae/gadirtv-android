@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../i18n/strings.dart';
 import '../../models/media.dart';
 import '../../models/profile.dart';
-import '../../services/api_service.dart';
 import '../../services/favorites_store.dart';
+import '../../services/playlist_store.dart';
 import '../../theme.dart';
 import '../../utils/tv_layout.dart';
 import '../../widgets/category_list_rail.dart';
@@ -12,9 +12,6 @@ import '../../widgets/poster_card.dart';
 import '../../widgets/poster_grid_focus.dart';
 
 /// Series tab — categories on top, portrait cover grid below.
-///
-/// Adds "★ Favoritos" chip and a star toggle on every poster (same UX
-/// as Live TV and Películas).
 class SeriesTab extends StatefulWidget {
   const SeriesTab({
     super.key,
@@ -26,14 +23,13 @@ class SeriesTab extends StatefulWidget {
   final ValueChanged<Series> onOpen;
 
   @override
-  State<SeriesTab> createState() => _SeriesTabState();
+  State<SeriesTab> createState() => SeriesTabState();
 }
 
-class _SeriesTabState extends State<SeriesTab> {
+class SeriesTabState extends State<SeriesTab> with AutomaticKeepAliveClientMixin {
   static const _favoritesId = '__favorites__';
   static const _allId = '__all__';
 
-  final _api = ApiService();
   final _favs = FavoritesStore();
 
   List<Category> _categories = const [];
@@ -50,6 +46,13 @@ class _SeriesTabState extends State<SeriesTab> {
   final _gridFocus = PosterGridFocus();
 
   @override
+  bool get wantKeepAlive => true;
+
+  void focusInitial() {
+    _railKey.currentState?.focusSelected();
+  }
+
+  @override
   void initState() {
     super.initState();
     _boot();
@@ -63,16 +66,20 @@ class _SeriesTabState extends State<SeriesTab> {
 
   Future<void> _boot() async {
     try {
-      final results = await Future.wait([
-        _api.seriesCategories(widget.profile),
-        _favs.loadAll(FavoritesStore.kindSeries),
-      ]);
+      final store = PlaylistStore.instance;
+      final favs = await _favs.loadAll(FavoritesStore.kindSeries);
       if (!mounted) return;
+      if (!store.isLoadedFor(widget.profile)) {
+        setState(() {
+          _loadingCats = false;
+          _error = 'Contenido no cargado. Reinicia la app.';
+        });
+        return;
+      }
       setState(() {
-        _categories = (results[0] as List)
-            .map((e) => Category.fromJson(e as Map<String, dynamic>))
-            .toList();
-        _favoriteIds = results[1] as Set<int>;
+        _categories = store.seriesCategories;
+        _allSeries = store.seriesList;
+        _favoriteIds = favs;
         _loadingCats = false;
       });
       await _load(_allId);
@@ -105,36 +112,16 @@ class _SeriesTabState extends State<SeriesTab> {
         _loading = false;
       });
       _gridFocus.rebuild(list.length);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && list.isNotEmpty) _railKey.currentState?.focusSelected();
-      });
       return;
     }
 
-    try {
-      final raw = await _api.seriesList(
-        widget.profile,
-        categoryId: id == _allId ? null : id,
-      );
-      if (!mounted) return;
-      final list = raw.map(Series.fromJson).toList()
-        ..sort((a, b) => b.lastModifiedTs.compareTo(a.lastModifiedTs));
-      setState(() {
-        _series = list;
-        _loading = false;
-        if (id == _allId) _allSeries = list;
-      });
-      _gridFocus.rebuild(list.length);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _railKey.currentState?.focusSelected();
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = 'No se pudieron cargar las series';
-      });
-    }
+    final list = PlaylistStore.instance.seriesForCategory(id == _allId ? null : id);
+    if (!mounted) return;
+    setState(() {
+      _series = list;
+      _loading = false;
+    });
+    _gridFocus.rebuild(list.length);
   }
 
   Future<void> _toggleFavorite(Series s) async {
@@ -154,6 +141,7 @@ class _SeriesTabState extends State<SeriesTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     if (_loadingCats) {
       return const Center(child: CircularProgressIndicator(color: GtvTheme.red));
     }
@@ -167,30 +155,30 @@ class _SeriesTabState extends State<SeriesTab> {
     return FocusTraversalGroup(
       policy: OrderedTraversalPolicy(),
       child: Row(
-      children: [
-        FocusTraversalOrder(
-          order: const NumericFocusOrder(1),
-          child: Padding(
-          padding: const EdgeInsets.only(left: 12),
-          child: SizedBox(
-          width: TvLayout.categoryRailWidth(context),
-          child: CategoryListRail(
-            key: _railKey,
-            categories: chips,
-            selectedId: _selected,
-            onSelected: _load,
-            onMoveRight: () => _gridFocus.focus(0),
+        children: [
+          FocusTraversalOrder(
+            order: const NumericFocusOrder(1),
+            child: Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: SizedBox(
+                width: TvLayout.categoryRailWidth(context),
+                child: CategoryListRail(
+                  key: _railKey,
+                  categories: chips,
+                  selectedId: _selected,
+                  onSelected: _load,
+                  onMoveRight: () => _gridFocus.focus(0),
+                ),
+              ),
+            ),
           ),
-        ),
-        ),
-        ),
-        const VerticalDivider(width: 1, color: GtvTheme.border),
-        FocusTraversalOrder(
-          order: const NumericFocusOrder(2),
-          child: Expanded(child: _buildGrid()),
-        ),
-      ],
-    ),
+          const VerticalDivider(width: 1, color: GtvTheme.border),
+          FocusTraversalOrder(
+            order: const NumericFocusOrder(2),
+            child: Expanded(child: _buildGrid()),
+          ),
+        ],
+      ),
     );
   }
 
