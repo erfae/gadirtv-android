@@ -14,6 +14,7 @@ import com.gadir.tv.model.LiveChannel
 class ChannelAdapter(
     private val items: List<LiveChannel>,
     private val onFocus: (LiveChannel) -> Unit,
+    private val onMoveLeft: (() -> Unit)? = null,
 ) : RecyclerView.Adapter<ChannelAdapter.Holder>() {
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
@@ -47,15 +48,19 @@ class ChannelAdapter(
         }
 
         holder.itemView.setOnKeyListener { _, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN &&
-                (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
-            ) {
-                onFocus(item)
-                val activity = holder.itemView.context as? MainActivity
-                activity?.openFullscreen(item)
-                true
-            } else {
-                false
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    onMoveLeft?.invoke()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                    onFocus(item)
+                    val activity = holder.itemView.context as? MainActivity
+                    activity?.openFullscreen(item)
+                    true
+                }
+                else -> false
             }
         }
     }

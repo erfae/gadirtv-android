@@ -38,10 +38,10 @@ class MainActivity : AppCompatActivity() {
     private var selectedCatalogCategoryId: String? = null
     private var currentTab = Tab.HOME
 
-    private lateinit var tabHome: TextView
-    private lateinit var tabLive: TextView
-    private lateinit var tabMovies: TextView
-    private lateinit var tabSeries: TextView
+    private lateinit var tabHome: View
+    private lateinit var tabLive: View
+    private lateinit var tabMovies: View
+    private lateinit var tabSeries: View
     private lateinit var panelHome: View
     private lateinit var panelLive: View
     private lateinit var panelCatalog: View
@@ -49,6 +49,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var liveCategoryList: RecyclerView
     private lateinit var channelList: RecyclerView
     private lateinit var previewTitle: TextView
+    private lateinit var epgNow: TextView
+    private lateinit var epgNext: TextView
 
     private lateinit var catalogCategoryList: RecyclerView
     private lateinit var catalogGrid: RecyclerView
@@ -127,6 +129,8 @@ class MainActivity : AppCompatActivity() {
         liveCategoryList = panelLive.findViewById(R.id.categoryList)
         channelList = panelLive.findViewById(R.id.channelList)
         previewTitle = panelLive.findViewById(R.id.previewTitle)
+        epgNow = panelLive.findViewById(R.id.epgNow)
+        epgNext = panelLive.findViewById(R.id.epgNext)
 
         catalogCategoryList = panelCatalog.findViewById(R.id.catalogCategoryList)
         catalogGrid = panelCatalog.findViewById(R.id.catalogGrid)
@@ -171,11 +175,41 @@ class MainActivity : AppCompatActivity() {
         liveCategories.add(Category(id = "", name = getString(R.string.category_all)))
         liveCategories.addAll(PlaylistRepository.categories)
 
-        liveCategoryList.adapter = CategoryAdapter(liveCategories) { cat ->
-            selectedLiveCategoryId = cat.id.ifEmpty { null }
-            reloadChannels()
-        }
+        liveCategoryList.adapter = CategoryAdapter(
+            items = liveCategories,
+            onClick = { cat ->
+                selectedLiveCategoryId = cat.id.ifEmpty { null }
+                reloadChannels(keepCategoryFocus = true)
+            },
+            onMoveRight = { focusFirstChannel() },
+        )
         reloadChannels()
+    }
+
+    private fun focusFirstChannel() {
+        if (channels.isEmpty()) return
+        channelList.post {
+            channelList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+        }
+    }
+
+    private fun focusCategoryList() {
+        liveCategoryList.post {
+            liveCategoryList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+        }
+    }
+
+    private fun focusCatalogCategoryList() {
+        catalogCategoryList.post {
+            catalogCategoryList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+        }
+    }
+
+    private fun focusFirstCatalogItem() {
+        if (posterItems.isEmpty()) return
+        catalogGrid.post {
+            catalogGrid.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+        }
     }
 
     private fun setupTabNavigation() {
@@ -183,11 +217,6 @@ class MainActivity : AppCompatActivity() {
         tabLive.setOnClickListener { showTab(Tab.LIVE) }
         tabMovies.setOnClickListener { showTab(Tab.MOVIES) }
         tabSeries.setOnClickListener { showTab(Tab.SERIES) }
-
-        tabHome.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) showTab(Tab.HOME) }
-        tabLive.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) showTab(Tab.LIVE) }
-        tabMovies.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) showTab(Tab.MOVIES) }
-        tabSeries.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) showTab(Tab.SERIES) }
     }
 
     private fun showTab(tab: Tab) {
@@ -212,6 +241,7 @@ class MainActivity : AppCompatActivity() {
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
                 miniPlayer?.playWhenReady = true
+                focusCategoryList()
             }
             Tab.MOVIES, Tab.SERIES -> {
                 panelHome.visibility = View.GONE
@@ -220,6 +250,7 @@ class MainActivity : AppCompatActivity() {
                 stopHeroRotation()
                 miniPlayer?.pause()
                 setupCatalogTab(tab)
+                focusCatalogCategoryList()
             }
         }
     }
@@ -370,14 +401,18 @@ class MainActivity : AppCompatActivity() {
             catalogLoading.visibility = View.GONE
             catalogEmpty.visibility = View.VISIBLE
             catalogEmpty.text = getString(R.string.catalog_empty)
-            catalogCategoryList.adapter = CategoryAdapter(emptyList()) {}
+            catalogCategoryList.adapter = CategoryAdapter(emptyList(), onClick = {})
             return
         }
 
-        catalogCategoryList.adapter = CategoryAdapter(catalogCategories) { cat ->
-            selectedCatalogCategoryId = cat.id
-            loadCatalogItems(tab, cat.id)
-        }
+        catalogCategoryList.adapter = CategoryAdapter(
+            items = catalogCategories,
+            onClick = { cat ->
+                selectedCatalogCategoryId = cat.id
+                loadCatalogItems(tab, cat.id)
+            },
+            onMoveRight = { focusFirstCatalogItem() },
+        )
 
         val first = catalogCategories.first()
         selectedCatalogCategoryId = first.id
@@ -461,12 +496,6 @@ class MainActivity : AppCompatActivity() {
     private fun updateCatalogGrid() {
         catalogGrid.adapter?.notifyDataSetChanged()
         catalogEmpty.visibility = if (posterItems.isEmpty()) View.VISIBLE else View.GONE
-
-        if (posterItems.isNotEmpty()) {
-            catalogGrid.post {
-                catalogGrid.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
-            }
-        }
     }
 
     private fun onPosterClick(tab: Tab, item: PosterAdapter.PosterItem) {
@@ -489,23 +518,46 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun reloadChannels() {
+    private fun reloadChannels(keepCategoryFocus: Boolean = false) {
         channels.clear()
         channels.addAll(PlaylistRepository.channelsFor(selectedLiveCategoryId))
-        channelList.adapter = ChannelAdapter(channels) { channel ->
-            previewChannel(channel)
-        }
-        if (channels.isNotEmpty()) {
-            channelList.post { channelList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus() }
+        channelList.adapter = ChannelAdapter(
+            items = channels,
+            onFocus = { channel -> previewChannel(channel) },
+            onMoveLeft = { focusCategoryList() },
+        )
+        if (!keepCategoryFocus && channels.isNotEmpty()) {
+            focusFirstChannel()
         }
     }
 
     private fun previewChannel(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         previewTitle.text = channel.name
+        epgNow.text = getString(R.string.epg_unavailable)
+        epgNext.visibility = View.GONE
         val url = api.streamUrl(profile, channel.streamId)
         miniPlayer?.setMediaItem(MediaItem.fromUri(url))
         miniPlayer?.prepare()
+
+        lifecycleScope.launch {
+            val epg = withContext(Dispatchers.IO) {
+                api.shortEpg(profile, channel.streamId, limit = 2)
+            }
+            if (previewTitle.text != channel.name) return@launch
+            if (epg.isEmpty()) {
+                epgNow.text = getString(R.string.epg_unavailable)
+                epgNext.visibility = View.GONE
+            } else {
+                epgNow.text = epg[0].title
+                if (epg.size > 1) {
+                    epgNext.text = getString(R.string.epg_next) + ": " + epg[1].title
+                    epgNext.visibility = View.VISIBLE
+                } else {
+                    epgNext.visibility = View.GONE
+                }
+            }
+        }
     }
 
     fun openFullscreen(channel: LiveChannel) {

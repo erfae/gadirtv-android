@@ -1,5 +1,6 @@
 package com.gadir.tv.ui.main
 
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,8 +11,8 @@ import com.gadir.tv.model.Category
 
 class CategoryAdapter(
     private val items: List<Category>,
-    private val onFocus: ((Category) -> Unit)? = null,
     private val onClick: (Category) -> Unit,
+    private val onMoveRight: (() -> Unit)? = null,
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
     private var selected = 0
@@ -38,18 +39,36 @@ class CategoryAdapter(
         val item = items[position]
         holder.name.text = item.name
         holder.itemView.isSelected = position == selected
+
         holder.itemView.setOnClickListener {
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
             select(pos)
             onClick(item)
         }
-        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) return@setOnFocusChangeListener
-            val pos = holder.bindingAdapterPosition
-            if (pos == RecyclerView.NO_POSITION || pos == selected) return@setOnFocusChangeListener
-            select(pos)
-            (onFocus ?: onClick)(item)
+
+        holder.itemView.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    val pos = holder.bindingAdapterPosition
+                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
+                    if (pos != selected) {
+                        select(pos)
+                        onClick(item)
+                    }
+                    onMoveRight?.invoke()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                    val pos = holder.bindingAdapterPosition
+                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
+                    select(pos)
+                    onClick(item)
+                    true
+                }
+                else -> false
+            }
         }
     }
 

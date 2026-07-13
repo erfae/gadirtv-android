@@ -1,6 +1,7 @@
 package com.gadir.tv.data
 
 import com.gadir.tv.model.Category
+import com.gadir.tv.model.EpgEntry
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.LoginResult
 import com.gadir.tv.model.Profile
@@ -265,6 +266,45 @@ class XtreamApi(
 
     fun seriesStreamUrl(profile: Profile, episodeId: Int, ext: String = "mp4"): String =
         buildStreamUrl(profile, "series", episodeId, ext)
+
+    fun shortEpg(profile: Profile, streamId: Int, limit: Int = 2): List<EpgEntry> {
+        val host = HostUtils.baseUrl(profile.host)
+        val query = buildString {
+            append("username=").append(encode(profile.username))
+            append("&password=").append(encode(profile.password))
+            append("&action=get_short_epg")
+            append("&stream_id=").append(streamId)
+            append("&limit=").append(limit)
+        }
+        val url = "$host/player_api.php?$query"
+        val response = NativeHttpClient.request(url, activeUserAgent)
+        if (response.status != 200 || response.body.isBlank()) return emptyList()
+        return try {
+            val root = gson.fromJson(response.body, JsonObject::class.java) ?: return emptyList()
+            val listings = root.getAsJsonArray("epg_listings") ?: return emptyList()
+            listings.mapNotNull { el ->
+                val row = el.asJsonObjectOrNull() ?: return@mapNotNull null
+                val rawTitle = row.get("title")?.asStringOrNull().orEmpty()
+                EpgEntry(
+                    title = decodeEpgTitle(rawTitle),
+                    start = row.get("start_timestamp")?.asStringOrNull()?.toLongOrNull() ?: 0L,
+                    end = row.get("stop_timestamp")?.asStringOrNull()?.toLongOrNull() ?: 0L,
+                )
+            }.filter { it.title.isNotBlank() }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun decodeEpgTitle(raw: String): String {
+        if (raw.isBlank()) return ""
+        return try {
+            val bytes = android.util.Base64.decode(raw, android.util.Base64.DEFAULT)
+            String(bytes, Charsets.UTF_8).trim()
+        } catch (_: Exception) {
+            raw
+        }
+    }
 
     private fun buildStreamUrl(profile: Profile, kind: String, streamId: Int, ext: String): String {
         val host = HostUtils.baseUrl(profile.host)

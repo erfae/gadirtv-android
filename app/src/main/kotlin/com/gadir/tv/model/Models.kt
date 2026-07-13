@@ -75,6 +75,12 @@ data class SeriesDetail(
     val seasons: Map<String, List<SeriesEpisode>>,
 )
 
+data class EpgEntry(
+    val title: String,
+    val start: Long = 0,
+    val end: Long = 0,
+)
+
 data class LoginResult(
     val ok: Boolean,
     val error: String? = null,

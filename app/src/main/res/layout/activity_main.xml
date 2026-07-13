@@ -28,8 +28,6 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:layout_weight="1"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
             android:textColor="@color/gtv_text_dim"
             android:textSize="13sp" />
 
@@ -51,7 +49,6 @@
             android:id="@+id/btnExit"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="12dp"
             android:background="@drawable/tab_bg"
             android:focusable="true"
             android:focusableInTouchMode="true"
@@ -60,61 +57,6 @@
             android:text="@string/exit_app"
             android:textColor="@android:color/white"
             android:textSize="12sp" />
-
-        <TextView
-            android:id="@+id/tabHome"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/tab_bg"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="8dp"
-            android:text="@string/tab_home"
-            android:textColor="@android:color/white"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/tabLive"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/tab_bg"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="8dp"
-            android:text="@string/tab_live"
-            android:textColor="@android:color/white"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/tabMovies"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/tab_bg"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="8dp"
-            android:text="@string/tab_movies"
-            android:textColor="@android:color/white"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/tabSeries"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/tab_bg"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="8dp"
-            android:text="@string/tab_series"
-            android:textColor="@android:color/white"
-            android:textSize="14sp" />
     </LinearLayout>
 
     <View
@@ -123,6 +65,7 @@
         android:background="@color/gtv_border" />
 
     <FrameLayout
+        android:id="@+id/contentPanels"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
@@ -147,4 +90,11 @@
             android:layout_height="match_parent"
             android:visibility="gone" />
     </FrameLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/gtv_border" />
+
+    <include layout="@layout/bottom_nav" />
 </LinearLayout>

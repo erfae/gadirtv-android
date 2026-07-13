@@ -10,7 +10,7 @@
     <string name="loading">Cargando contenido…</string>
     <string name="category_all">Todos</string>
     <string name="select_channel">Selecciona un canal</string>
-    <string name="version_label">v1.3.0</string>
+    <string name="version_label">v1.4.0</string>
     <string name="login_subtitle">Televisión, películas y series en tu Android TV</string>
     <string name="login_hint">Introduce los datos de tu cuenta Xtream Codes</string>
     <string name="profiles_title">¿Quién está viendo?</string>
@@ -39,4 +39,7 @@
     <string name="rail_recent_movies">Recientes Películas</string>
     <string name="rail_recent_series">Recientes Series</string>
     <string name="home_empty">No se pudo cargar contenido reciente.</string>
+    <string name="epg_now">AHORA</string>
+    <string name="epg_next">Después</string>
+    <string name="epg_unavailable">EPG no disponible</string>
 </resources>
