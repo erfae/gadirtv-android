@@ -11,15 +11,13 @@ import com.gadir.tv.ui.player.VlcPlayerActivity
 object PlaybackLauncher {
     fun play(context: Context, request: PlaybackRequest) {
         val settings = AppSettings(context)
-        when (settings.playerMode) {
-            AppSettings.PLAYER_EXTERNAL -> launchExternal(context, request, settings)
-            AppSettings.PLAYER_VLC -> {
-                if (request.kind == ResumeStore.KIND_LIVE) {
-                    launchVlc(context, request)
-                } else {
-                    launchExo(context, request)
-                }
-            }
+        when {
+            // NetTV: live siempre con libVLC (audio fiable en TV boxes).
+            request.kind == ResumeStore.KIND_LIVE -> launchVlc(context, request)
+            settings.playerMode == AppSettings.PLAYER_EXTERNAL ->
+                launchExternal(context, request, settings)
+            settings.playerMode == AppSettings.PLAYER_VLC ->
+                launchVlc(context, request)
             else -> launchExo(context, request)
         }
     }
