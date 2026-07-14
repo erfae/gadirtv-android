@@ -4,10 +4,13 @@ import com.gadir.tv.model.Category
 
 object CategorySort {
     private val adultPattern = Regex(
-        "(?i)(adult|adultos|adulto|xxx|18\\+|for\\s*adults|erotic|er[oó]tico|porn|hot|madur)",
+        "(?i)(adult|adultos|adulto|xxx|18\\+|for\\s*adults|foradults|erotic|er[oó]tico|porn|hot|madur)",
     )
 
     fun isAdultCategory(name: String): Boolean = adultPattern.containsMatchIn(name)
+
+    fun isAdultContent(title: String, categoryName: String = ""): Boolean =
+        isAdultCategory(title) || (categoryName.isNotBlank() && isAdultCategory(categoryName))
 
     fun sortWithAdultLast(categories: List<Category>): List<Category> {
         if (categories.isEmpty()) return categories

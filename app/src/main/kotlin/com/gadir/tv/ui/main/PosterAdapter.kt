@@ -65,9 +65,11 @@ class PosterAdapter(
             if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    if (position % 5 == 0) {
+                    val pos = holder.bindingAdapterPosition
+                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
+                    if (pos % 5 == 0) {
                         onMoveLeft?.invoke()
-                        onMoveLeft != null
+                        true
                     } else {
                         false
                     }
