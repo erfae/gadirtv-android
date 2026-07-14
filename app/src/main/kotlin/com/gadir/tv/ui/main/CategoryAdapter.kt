@@ -17,6 +17,7 @@ class CategoryAdapter(
     private val onMoveRight: (() -> Unit)? = null,
     private val onMoveLeft: (() -> Unit)? = null,
     private val onMoveUp: (() -> Unit)? = null,
+    private val onMoveDown: (() -> Unit)? = null,
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
@@ -73,6 +74,15 @@ class CategoryAdapter(
                         false
                     }
                 }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    val pos = holder.bindingAdapterPosition
+                    if (pos == items.lastIndex) {
+                        onMoveDown?.invoke()
+                        onMoveDown != null
+                    } else {
+                        false
+                    }
+                }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     val pos = holder.bindingAdapterPosition
                     if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
@@ -91,6 +101,12 @@ class CategoryAdapter(
 
     fun refreshSelection() {
         notifyDataSetChanged()
+    }
+
+    fun refreshSelectionAt(vararg positions: Int) {
+        positions.distinct().forEach { pos ->
+            if (pos in items.indices) notifyItemChanged(pos)
+        }
     }
 
     override fun getItemCount(): Int = items.size
