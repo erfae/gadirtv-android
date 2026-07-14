@@ -95,6 +95,9 @@ class ProfilesActivity : BaseLocaleActivity() {
                 profileStore.setActive(profile)
                 startActivity(Intent(this, BootstrapActivity::class.java))
             },
+            onEdit = { profile ->
+                startActivity(LoginActivity.editIntent(this, profile))
+            },
             onAdd = {
                 startActivity(Intent(this, LoginActivity::class.java))
             },
@@ -119,6 +122,7 @@ class ProfilesActivity : BaseLocaleActivity() {
         private val manageMode: Boolean,
         private val colorFor: (Int) -> Int,
         private val onSelect: (Profile) -> Unit,
+        private val onEdit: (Profile) -> Unit,
         private val onAdd: () -> Unit,
         private val onDelete: (Profile) -> Unit,
     ) : RecyclerView.Adapter<ProfileAdapter.Holder>() {
@@ -170,7 +174,7 @@ class ProfilesActivity : BaseLocaleActivity() {
 
             holder.itemView.setOnClickListener {
                 if (manageMode) {
-                    onDelete(profile)
+                    onEdit(profile)
                 } else {
                     onSelect(profile)
                 }

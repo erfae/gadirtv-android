@@ -39,6 +39,7 @@ import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.PlayerFactory
 import com.gadir.tv.player.ResumePlaybackHelper
+import com.gadir.tv.ui.bootstrap.BootstrapActivity
 import com.gadir.tv.ui.profiles.ProfilesActivity
 import com.gadir.tv.ui.search.SearchActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
@@ -198,6 +199,18 @@ class MainActivity : BaseLocaleActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        val profileStore = ProfileStore(this)
+        if (PlaylistRepository.profile == null) {
+            val saved = profileStore.getActive()
+            if (saved != null) {
+                startActivity(Intent(this, BootstrapActivity::class.java))
+            } else {
+                startActivity(Intent(this, ProfilesActivity::class.java))
+            }
+            finish()
+            return
+        }
 
         val profile = PlaylistRepository.profile
         if (profile == null) {
@@ -747,6 +760,11 @@ class MainActivity : BaseLocaleActivity() {
                 }
             }.onFailure {
                 homeLoading.visibility = View.GONE
+                android.widget.Toast.makeText(
+                    this@MainActivity,
+                    getString(R.string.connection_failed),
+                    android.widget.Toast.LENGTH_LONG,
+                ).show()
             }
         }
     }
@@ -1591,7 +1609,7 @@ class MainActivity : BaseLocaleActivity() {
             clearMediaItems()
             setMediaItem(LiveStreamUrls.mediaItem(url))
             prepare()
-            volume = if (appSettings.previewSound) 1f else 0f
+            volume = if (appSettings.previewSound) PREVIEW_PLAYER_VOLUME else 0f
             playWhenReady = true
         }
     }
@@ -1844,5 +1862,9 @@ class MainActivity : BaseLocaleActivity() {
         panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
             currentPreviewChannel?.let { openFullscreen(it) }
         }
+    }
+
+    private companion object {
+        const val PREVIEW_PLAYER_VOLUME = 0.55f
     }
 }

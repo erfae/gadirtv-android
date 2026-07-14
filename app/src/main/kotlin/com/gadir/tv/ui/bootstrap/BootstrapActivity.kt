@@ -40,12 +40,25 @@ class BootstrapActivity : BaseLocaleActivity() {
         btnProfiles = findViewById(R.id.btnProfiles)
         btnRetry.setOnClickListener { load() }
         btnProfiles.setOnClickListener {
-            profileStore.clearActive()
-            PlaylistRepository.clear()
-            startActivity(Intent(this, ProfilesActivity::class.java))
+            startActivity(
+                Intent(this, ProfilesActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            )
             finish()
         }
         load()
+    }
+
+    override fun onBackPressed() {
+        if (errorView.visibility == View.VISIBLE) {
+            load()
+            return
+        }
+        startActivity(
+            Intent(this, ProfilesActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
+        )
+        finish()
     }
 
     private fun load() {
