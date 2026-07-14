@@ -18,10 +18,15 @@
     <string name="profiles_subtitle">Selecciona un perfil o añade uno nuevo</string>
     <string name="add_profile">Añadir perfil</string>
     <string name="manage_profiles">Gestionar perfiles</string>
+    <string name="edit_profile">Editar perfil</string>
+    <string name="save_profile">GUARDAR</string>
+    <string name="login_edit_title">Editar perfil</string>
     <string name="done_profiles">Listo</string>
     <string name="back_profiles">Cambiar perfil</string>
     <string name="connecting">Conectando al servidor…</string>
     <string name="login_check">Verificando cuenta…</string>
+    <string name="bootstrap_retry">Reintentar</string>
+    <string name="bootstrap_change_profile">Cambiar perfil</string>
     <string name="connection_failed">No se pudo conectar al servidor</string>
     <string name="retry">REINTENTAR</string>
     <string name="tab_live">TV en Vivo</string>

@@ -166,7 +166,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_URL = "url"
         private const val EXTRA_ALTERNATE_URLS = "alternate_urls"
-        private const val VLC_VOLUME = 75
+        private const val VLC_VOLUME = 60
         private const val CONTROLS_HIDE_MS = 5_000L
 
         fun intent(
