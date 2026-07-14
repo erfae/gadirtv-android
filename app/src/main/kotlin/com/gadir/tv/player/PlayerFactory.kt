@@ -26,7 +26,7 @@ object PlayerFactory {
 
         val builder = ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
-            .setAudioAttributes(audioAttributes, true)
+            .setAudioAttributes(audioAttributes, false)
             .setHandleAudioBecomingNoisy(true)
 
         if (settings.isCompatPlayer || settings.isVlcPlayer) {

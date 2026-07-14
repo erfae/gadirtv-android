@@ -1210,6 +1210,7 @@ class MainActivity : BaseLocaleActivity() {
 
         if (appSettings.autoplayPreview) {
             if (previewingStreamId != channel.streamId) {
+                VolumeHelper.boostOnPlaybackStart(this)
                 val urls = LiveStreamUrls.candidates(api, profile, channel)
                 miniPlayer?.apply {
                     setMediaItem(MediaItem.fromUri(urls.first()))
@@ -1238,6 +1239,7 @@ class MainActivity : BaseLocaleActivity() {
 
     fun openFullscreen(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
+        VolumeHelper.boostOnPlaybackStart(this)
         miniPlayer?.stop()
         miniPlayer?.clearMediaItems()
         val urls = LiveStreamUrls.candidates(api, profile, channel)
