@@ -300,7 +300,7 @@ class MainActivity : BaseLocaleActivity() {
 
         setupLiveTab()
         setupTabNavigation()
-        heroPlay.setOnClickListener { playHero() }
+        heroPlay.setOnClickListener { openHeroContent() }
         heroTrailer.setOnClickListener { openHeroTrailer() }
         tabHome.nextFocusUpId = heroPlay.id
         tabLive.nextFocusUpId = R.id.categoryList
@@ -339,6 +339,7 @@ class MainActivity : BaseLocaleActivity() {
             onClick = onCategorySelected,
             onFocus = onCategorySelected,
             onMoveRight = { focusFirstChannel() },
+            onMoveLeft = { focusBottomTab(Tab.LIVE) },
         )
         channelList.setItemViewCacheSize(24)
         channelAdapter = ChannelAdapter(
@@ -348,6 +349,7 @@ class MainActivity : BaseLocaleActivity() {
                 schedulePreview(channel)
                 showMiniPreviewControls()
             },
+            onDoubleSelect = { channel -> openFullscreen(channel) },
             onMoveLeft = { focusCategoryList() },
             onMoveUp = { zapChannel(-1) },
             onMoveDown = { zapChannel(1) },
@@ -959,7 +961,7 @@ class MainActivity : BaseLocaleActivity() {
             is HeroItem.Movie -> {
                 applyHeroMeta(
                     badge = getString(R.string.hero_type_movie),
-                    playLabel = getString(R.string.hero_play),
+                    playLabel = getString(R.string.hero_view_detail),
                     backdrop = item.imageUrl,
                     poster = item.posterUrl,
                 )
@@ -968,7 +970,7 @@ class MainActivity : BaseLocaleActivity() {
             is HeroItem.Series -> {
                 applyHeroMeta(
                     badge = getString(R.string.hero_type_series),
-                    playLabel = getString(R.string.hero_play),
+                    playLabel = getString(R.string.hero_view_detail),
                     backdrop = item.imageUrl,
                     poster = item.posterUrl,
                 )
@@ -977,8 +979,12 @@ class MainActivity : BaseLocaleActivity() {
             is HeroItem.Rail -> {
                 applyHeroMeta(
                     badge = item.item.badge,
-                    playLabel = when (item.item.kind) {
-                        HomeRailAdapter.HomeRailItem.KIND_SERIES -> getString(R.string.hero_play)
+                    playLabel = when {
+                        item.item.resumePositionMs > 0L -> getString(R.string.hero_play)
+                        item.item.kind == HomeRailAdapter.HomeRailItem.KIND_SERIES ->
+                            getString(R.string.hero_view_detail)
+                        item.item.kind == HomeRailAdapter.HomeRailItem.KIND_MOVIE ->
+                            getString(R.string.hero_view_detail)
                         else -> getString(R.string.hero_play)
                     },
                     backdrop = item.imageUrl,
@@ -1064,39 +1070,50 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun playHero() {
+    private fun openHeroContent() {
         val item = railPreviewItem
             ?: (heroItems.getOrNull(heroIndex) as? HeroItem.Rail)?.item
         if (item != null) {
-            playHomeItem(item)
+            openHomeItem(item)
             return
         }
         when (val hero = heroItems.getOrNull(heroIndex)) {
-            is HeroItem.Movie -> playMovie(
-                title = hero.title,
+            is HeroItem.Movie -> openMovieDetail(
                 streamId = hero.movie.streamId,
+                title = hero.title,
+                cover = hero.movie.icon,
                 extension = hero.movie.extension,
-                imageUrl = hero.movie.icon,
             )
-            is HeroItem.Series -> playSeriesFirstEpisode(
+            is HeroItem.Series -> openSeriesDetail(
                 seriesId = hero.series.seriesId,
                 title = hero.series.name,
-                imageUrl = hero.series.cover,
+                cover = hero.series.cover,
             )
-            is HeroItem.Rail -> playHomeItem(hero.item)
+            is HeroItem.Rail -> openHomeItem(hero.item)
             null -> Unit
         }
     }
 
-    private fun playHomeItem(item: HomeRailAdapter.HomeRailItem) {
+    private fun openHomeItem(item: HomeRailAdapter.HomeRailItem) {
         when (item.kind) {
-            HomeRailAdapter.HomeRailItem.KIND_MOVIE -> playMovie(
-                title = item.title,
-                streamId = item.id,
-                extension = item.extension,
-                imageUrl = item.imageUrl,
-                positionMs = item.resumePositionMs,
-            )
+            HomeRailAdapter.HomeRailItem.KIND_MOVIE -> {
+                if (item.resumePositionMs > 0L) {
+                    playMovie(
+                        title = item.title,
+                        streamId = item.id,
+                        extension = item.extension,
+                        imageUrl = item.imageUrl,
+                        positionMs = item.resumePositionMs,
+                    )
+                } else {
+                    openMovieDetail(
+                        streamId = item.id,
+                        title = item.title,
+                        cover = item.imageUrl,
+                        extension = item.extension,
+                    )
+                }
+            }
             HomeRailAdapter.HomeRailItem.KIND_SERIES -> {
                 if (item.resumePositionMs > 0L) {
                     playSeriesEpisode(
@@ -1107,10 +1124,10 @@ class MainActivity : BaseLocaleActivity() {
                         positionMs = item.resumePositionMs,
                     )
                 } else {
-                    playSeriesFirstEpisode(
+                    openSeriesDetail(
                         seriesId = item.id,
                         title = item.title,
-                        imageUrl = item.imageUrl,
+                        cover = item.imageUrl,
                     )
                 }
             }
@@ -1190,6 +1207,7 @@ class MainActivity : BaseLocaleActivity() {
                 loadCatalogItems(tab, cat.id)
             },
             onMoveRight = { focusFirstCatalogItem() },
+            onMoveLeft = { focusBottomTab(tab) },
         )
 
         val first = catalogCategories.first()
@@ -1380,7 +1398,7 @@ class MainActivity : BaseLocaleActivity() {
         miniPlayer?.apply {
             setMediaItem(MediaItem.fromUri(url))
             prepare()
-            volume = if (appSettings.previewSound) 0.8f else 0f
+            volume = if (appSettings.previewSound) 1f else 0f
             playWhenReady = true
         }
     }
@@ -1454,11 +1472,20 @@ class MainActivity : BaseLocaleActivity() {
     override fun onBackPressed() {
         when (currentTab) {
             Tab.HOME -> logoutUser()
-            Tab.LIVE, Tab.MOVIES, Tab.SERIES -> {
-                if (isFocusInBottomNav()) {
-                    showTab(Tab.HOME)
-                } else {
-                    focusBottomTab(currentTab)
+            Tab.LIVE -> {
+                when {
+                    isFocusInList(channelList) -> focusCategoryList()
+                    isFocusInList(liveCategoryList) -> focusBottomTab(Tab.LIVE)
+                    isFocusInBottomNav() -> Unit
+                    else -> focusChannelAt(currentPreviewChannel)
+                }
+            }
+            Tab.MOVIES, Tab.SERIES -> {
+                when {
+                    isFocusInList(catalogGrid) -> focusCatalogCategoryList()
+                    isFocusInList(catalogCategoryList) -> focusBottomTab(currentTab)
+                    isFocusInBottomNav() -> Unit
+                    else -> focusFirstCatalogItem()
                 }
             }
         }
@@ -1501,8 +1528,11 @@ class MainActivity : BaseLocaleActivity() {
         super.onResume()
         if (currentTab == Tab.HOME && shouldFocusHeroOnResume) {
             focusHeroPlay()
-        } else if (currentTab == Tab.LIVE && appSettings.autoplayPreview) {
-            currentPreviewChannel?.let { previewChannel(it) }
+        } else if (currentTab == Tab.LIVE) {
+            focusChannelAt(currentPreviewChannel)
+            if (appSettings.autoplayPreview) {
+                currentPreviewChannel?.let { previewChannel(it) }
+            }
         }
     }
 

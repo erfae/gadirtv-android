@@ -76,4 +76,36 @@ object PlayerFactory {
             .build()
             .apply { volume = 1f }
     }
+
+    fun createForLive(context: Context): ExoPlayer {
+        val settings = AppSettings(context)
+        val bufferMs = settings.networkBufferMs
+        val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent(PlaylistRepository.userAgent)
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(25_000)
+            .setReadTimeoutMs(25_000)
+
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+            .build()
+
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                bufferMs * 80,
+                bufferMs * 150,
+                bufferMs * 4,
+                bufferMs * 8,
+            )
+            .build()
+
+        return ExoPlayer.Builder(context)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .setAudioAttributes(audioAttributes, true)
+            .setHandleAudioBecomingNoisy(true)
+            .setLoadControl(loadControl)
+            .build()
+            .apply { volume = 1f }
+    }
 }
