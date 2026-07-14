@@ -448,7 +448,7 @@ class MainActivity : AppCompatActivity() {
     private fun buildFavoriteItems() {
         favoriteItems.clear()
         val liveIds = favoritesStore.load(FavoritesStore.KIND_LIVE)
-        PlaylistRepository.allChannels
+        PlaylistRepository.channelsFor(null)
             .filter { liveIds.contains(it.streamId) }
             .forEach { channel ->
                 favoriteItems.add(
@@ -1004,7 +1004,7 @@ class MainActivity : AppCompatActivity() {
         channels.addAll(
             when (selectedLiveCategoryId) {
                 FavoritesStore.FAVORITES_CATEGORY_ID ->
-                    PlaylistRepository.allChannels.filter {
+                    PlaylistRepository.channelsFor(null).filter {
                         favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId)
                     }
                 else -> PlaylistRepository.channelsFor(selectedLiveCategoryId)

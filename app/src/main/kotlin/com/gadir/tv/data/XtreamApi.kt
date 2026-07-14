@@ -151,23 +151,18 @@ class XtreamApi(
         return false
     }
 
-    fun liveCategories(profile: Profile): List<Category> {
-        return fetchList(profile, "get_live_categories").map {
-            Category(
-                id = it.get("category_id")?.asStringOrNull() ?: "",
-                name = it.get("category_name")?.asStringOrNull() ?: "",
-            )
-        }.filter { it.id.isNotEmpty() }
-    }
+    fun liveCategories(profile: Profile): List<Category> =
+        fetchCategories(profile, "get_live_categories")
 
     fun liveStreams(profile: Profile, categoryId: String? = null): List<LiveChannel> {
         val extra = if (!categoryId.isNullOrEmpty()) mapOf("category_id" to categoryId) else emptyMap()
-        return fetchList(profile, "get_live_streams", extra).map { row ->
+        return fetchList(profile, "get_live_streams", extra).mapIndexed { index, row ->
             LiveChannel(
                 streamId = row.get("stream_id")?.asIntOrZero() ?: 0,
                 name = row.get("name")?.asStringOrNull() ?: "",
                 icon = row.get("stream_icon")?.asStringOrNull() ?: "",
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
+                num = row.channelNum(index),
             )
         }.filter { it.streamId > 0 }
     }
@@ -365,12 +360,14 @@ class XtreamApi(
     }
 
     private fun fetchCategories(profile: Profile, action: String): List<Category> =
-        fetchList(profile, action).map {
+        fetchList(profile, action).mapIndexed { index, row ->
             Category(
-                id = it.get("category_id")?.asStringOrNull() ?: "",
-                name = it.get("category_name")?.asStringOrNull() ?: "",
+                id = row.get("category_id")?.asStringOrNull() ?: "",
+                name = row.get("category_name")?.asStringOrNull() ?: "",
+                order = row.playlistOrder(index),
             )
         }.filter { it.id.isNotEmpty() }
+            .sortedBy { it.order }
 
     private fun fetchList(
         profile: Profile,
@@ -437,4 +434,20 @@ class XtreamApi(
         get("added")?.asStringOrNull()?.toLongOrNull()
             ?: get("last_modified")?.asStringOrNull()?.toLongOrNull()
             ?: 0L
+
+    private fun JsonObject.playlistOrder(fallbackIndex: Int): Int {
+        for (key in listOf("category_order", "cat_order", "order", "num")) {
+            val value = get(key)?.asIntOrZero() ?: continue
+            if (value > 0) return value
+        }
+        return fallbackIndex
+    }
+
+    private fun JsonObject.channelNum(fallbackIndex: Int): Int {
+        for (key in listOf("num", "order", "stream_order")) {
+            val value = get(key)?.asIntOrZero() ?: continue
+            if (value > 0) return value
+        }
+        return fallbackIndex
+    }
 }

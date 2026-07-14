@@ -41,22 +41,36 @@ object PlaylistRepository {
     }
 
     fun updateCatalog(cats: List<Category>, channels: List<LiveChannel>) {
-        categories = cats
+        categories = cats.sortedBy { it.order }
         allChannels = channels
     }
 
     fun updateVodCategories(cats: List<Category>) {
-        vodCategories = cats
+        vodCategories = cats.sortedBy { it.order }
     }
 
     fun updateSeriesCategories(cats: List<Category>) {
-        seriesCategories = cats
+        seriesCategories = cats.sortedBy { it.order }
     }
 
     fun channelsFor(categoryId: String?): List<LiveChannel> {
-        if (categoryId.isNullOrEmpty()) return allChannels
-        return allChannels.filter { it.categoryId == categoryId }
+        if (categoryId.isNullOrEmpty()) return playlistOrderedChannels()
+        return allChannels
+            .filter { it.categoryId == categoryId }
+            .sortedWith(channelOrderComparator())
     }
+
+    private fun playlistOrderedChannels(): List<LiveChannel> {
+        val groupOrder = categories.associate { it.id to it.order }
+        return allChannels.sortedWith(
+            compareBy<LiveChannel> { groupOrder[it.categoryId] ?: Int.MAX_VALUE }
+                .thenBy { it.num }
+                .thenBy { it.streamId },
+        )
+    }
+
+    private fun channelOrderComparator() =
+        compareBy<LiveChannel>({ it.num }, { it.streamId })
 
     fun cachedVod(categoryId: String): List<VodMovie>? = vodCache[categoryId]
 
