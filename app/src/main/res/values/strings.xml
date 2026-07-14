@@ -103,6 +103,11 @@
     <string name="settings_buffer_stable">Estable (2500 ms)</string>
     <string name="rail_continue">Continuar viendo</string>
     <string name="resume_progress">Continuar — %1$d%%</string>
+    <string name="playback_exit_title">¿Salir de la reproducción?</string>
+    <string name="playback_exit_message">Puedes continuar donde lo dejaste o empezar desde el principio.</string>
+    <string name="playback_continue">Continuar</string>
+    <string name="playback_restart">Desde el principio</string>
+    <string name="playback_cancel">Seguir viendo</string>
     <string name="hero_synopsis_label">SINOPSIS</string>
     <string name="hero_trailer">TRÁILER</string>
     <string name="trailer_unavailable">No se encontró una app para reproducir el tráiler</string>

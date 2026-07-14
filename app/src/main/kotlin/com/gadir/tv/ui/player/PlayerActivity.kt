@@ -12,6 +12,7 @@ import android.widget.ImageButton
 import android.widget.SeekBar
 import android.widget.TextView
 import com.gadir.tv.ui.BaseLocaleActivity
+import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -454,12 +455,44 @@ class PlayerActivity : BaseLocaleActivity() {
             finish()
             return
         }
-        if (!isLive && controlsVisible) {
+        if (controlsVisible) {
             hideVodControls()
             return
         }
-        saveProgress()
-        finish()
+        promptVodExit()
+    }
+
+    private fun promptVodExit() {
+        val exo = player
+        if (exo == null) {
+            finish()
+            return
+        }
+        val positionMs = exo.currentPosition
+        val durationMs = exo.duration
+        val nearEnd = durationMs > 0 && positionMs >= durationMs - 30_000L
+        if (positionMs < 90_000L || nearEnd) {
+            saveProgress()
+            finish()
+            return
+        }
+        val kind = intent.getStringExtra(EXTRA_KIND).orEmpty()
+        val contentId = intent.getStringExtra(EXTRA_CONTENT_ID).orEmpty()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.playback_exit_title)
+            .setMessage(R.string.playback_exit_message)
+            .setPositiveButton(R.string.playback_continue) { _, _ ->
+                saveProgress()
+                finish()
+            }
+            .setNegativeButton(R.string.playback_restart) { _, _ ->
+                if (kind.isNotEmpty() && contentId.isNotEmpty()) {
+                    resumeStore.remove(kind, contentId)
+                }
+                finish()
+            }
+            .setNeutralButton(R.string.playback_cancel, null)
+            .show()
     }
 
     private fun loadFullscreenEpg(streamId: Int) {
