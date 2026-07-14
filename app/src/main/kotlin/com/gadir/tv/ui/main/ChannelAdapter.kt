@@ -14,12 +14,16 @@ import com.gadir.tv.model.LiveChannel
 class ChannelAdapter(
     private val items: List<LiveChannel>,
     private val onFocus: (LiveChannel) -> Unit,
+    private val onSelect: ((LiveChannel) -> Unit)? = null,
     private val onMoveLeft: (() -> Unit)? = null,
+    private val onMoveUp: (() -> Unit)? = null,
+    private val onMoveDown: (() -> Unit)? = null,
     private val isFavorite: (LiveChannel) -> Boolean = { false },
     private val onToggleFavorite: ((LiveChannel) -> Unit)? = null,
 ) : RecyclerView.Adapter<ChannelAdapter.Holder>() {
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
+        val number: TextView = view.findViewById(R.id.channelNumber)
         val icon: ImageView = view.findViewById(R.id.channelIcon)
         val name: TextView = view.findViewById(R.id.channelName)
         val favorite: ImageView = view.findViewById(R.id.channelFavorite)
@@ -33,6 +37,7 @@ class ChannelAdapter(
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val item = items[position]
+        holder.number.text = (position + 1).toString()
         holder.name.text = item.name
         if (item.icon.isNotEmpty()) {
             ImageLoader.loadChannelIcon(holder.icon, item.icon)
@@ -44,16 +49,16 @@ class ChannelAdapter(
         )
 
         holder.itemView.isSelected = holder.itemView.hasFocus()
+        holder.number.isSelected = holder.itemView.hasFocus()
 
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             view.isSelected = hasFocus
+            holder.number.isSelected = hasFocus
             if (hasFocus) onFocus(item)
         }
 
         holder.itemView.setOnClickListener {
-            onFocus(item)
-            val activity = holder.itemView.context as? MainActivity
-            activity?.openFullscreen(item)
+            onSelect?.invoke(item) ?: onFocus(item)
         }
 
         holder.itemView.setOnLongClickListener {
@@ -66,15 +71,30 @@ class ChannelAdapter(
 
         holder.itemView.setOnKeyListener { _, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            val pos = holder.bindingAdapterPosition
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     onMoveLeft?.invoke()
                     true
                 }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    if (pos == 0) {
+                        onMoveUp?.invoke()
+                        onMoveUp != null
+                    } else {
+                        false
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (pos == items.lastIndex) {
+                        onMoveDown?.invoke()
+                        onMoveDown != null
+                    } else {
+                        false
+                    }
+                }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                    onFocus(item)
-                    val activity = holder.itemView.context as? MainActivity
-                    activity?.openFullscreen(item)
+                    onSelect?.invoke(item) ?: onFocus(item)
                     true
                 }
                 else -> false

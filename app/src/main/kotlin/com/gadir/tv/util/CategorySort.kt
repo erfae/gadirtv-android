@@ -1,0 +1,21 @@
+package com.gadir.tv.util
+
+import com.gadir.tv.model.Category
+
+object CategorySort {
+    private val adultPattern = Regex(
+        "(?i)(adult|adultos|adulto|xxx|18\\+|for\\s*adults|erotic|er[oó]tico|porn|hot|madur)",
+    )
+
+    fun isAdultCategory(name: String): Boolean = adultPattern.containsMatchIn(name)
+
+    fun sortWithAdultLast(categories: List<Category>): List<Category> {
+        if (categories.isEmpty()) return categories
+        val normal = mutableListOf<Category>()
+        val adult = mutableListOf<Category>()
+        categories.forEach { cat ->
+            if (isAdultCategory(cat.name)) adult.add(cat) else normal.add(cat)
+        }
+        return normal.sortedBy { it.order } + adult.sortedBy { it.order }
+    }
+}

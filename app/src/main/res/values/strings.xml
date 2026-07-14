@@ -122,4 +122,6 @@
     <string name="player_play_pause">Reproducir o pausar</string>
     <string name="player_rewind">Retroceder 10 segundos</string>
     <string name="player_forward">Avanzar 10 segundos</string>
+    <string name="preview_fullscreen_hint">OK en la vista previa para pantalla completa</string>
+    <string name="channel_zap_hint">↑↓ para cambiar de canal</string>
 </resources>
