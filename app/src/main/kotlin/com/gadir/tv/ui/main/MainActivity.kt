@@ -11,6 +11,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import com.gadir.tv.ui.BaseLocaleActivity
+import androidx.core.widget.NestedScrollView
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
@@ -119,6 +120,7 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var resumeRail: RecyclerView
     private lateinit var moviesRail: RecyclerView
     private lateinit var seriesRail: RecyclerView
+    private lateinit var homeScrollView: NestedScrollView
 
     private lateinit var headerClock: TextView
     private lateinit var headerDate: TextView
@@ -267,6 +269,7 @@ class MainActivity : BaseLocaleActivity() {
         resumeRail = panelHome.findViewById(R.id.resumeRail)
         moviesRail = panelHome.findViewById(R.id.moviesRail)
         seriesRail = panelHome.findViewById(R.id.seriesRail)
+        homeScrollView = panelHome.findViewById(R.id.homeScrollView)
 
         liveCategoryList.layoutManager = LinearLayoutManager(this)
         channelList.layoutManager = LinearLayoutManager(this)
@@ -317,6 +320,16 @@ class MainActivity : BaseLocaleActivity() {
         tabLive.nextFocusUpId = R.id.btnSettings
         tabMovies.nextFocusUpId = R.id.btnSettings
         tabSeries.nextFocusUpId = R.id.btnSettings
+        tabHome.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN || currentTab != Tab.HOME) {
+                return@setOnKeyListener false
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                focusLastHomeRail()
+                return@setOnKeyListener true
+            }
+            false
+        }
 
         setupMiniPlayer()
         setupHeaderFocusChain()
@@ -648,16 +661,114 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun focusFirstHomeRail() {
-        val rail = when {
-            resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() -> resumeRail
-            favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() -> favoritesRail
-            recentMovies.isNotEmpty() -> moviesRail
-            recentSeries.isNotEmpty() -> seriesRail
-            else -> return
+        when {
+            resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
+                focusHomeRailItem(resumeRail)
+            favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
+                focusHomeRailItem(favoritesRail)
+            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail)
+            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail)
         }
-        rail.post {
-            rail.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+    }
+
+    private fun focusHomeRailItem(rail: RecyclerView) {
+        homeScrollView.post {
+            homeScrollView.smoothScrollTo(0, rail.top)
+            TvNavHelper.focusItem(rail, 0)
         }
+    }
+
+    private fun focusLastHomeRail() {
+        when {
+            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail)
+            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail)
+            favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
+                focusHomeRailItem(favoritesRail)
+            resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
+                focusHomeRailItem(resumeRail)
+            else -> heroPlay.requestFocus()
+        }
+    }
+
+    private fun focusHomeRailBelowResume() {
+        when {
+            favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
+                focusHomeRailItem(favoritesRail)
+            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail)
+            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail)
+            else -> tabHome.requestFocus()
+        }
+    }
+
+    private fun focusHomeRailBelowFavorites() {
+        when {
+            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail)
+            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail)
+            else -> tabHome.requestFocus()
+        }
+    }
+
+    private fun focusHomeRailAboveFavorites() {
+        when {
+            resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
+                focusHomeRailItem(resumeRail)
+            else -> heroPlay.requestFocus()
+        }
+    }
+
+    private fun focusHomeRailAboveMovies() {
+        when {
+            favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
+                focusHomeRailItem(favoritesRail)
+            resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
+                focusHomeRailItem(resumeRail)
+            else -> heroPlay.requestFocus()
+        }
+    }
+
+    private fun focusHomeRailBelowMovies() {
+        when {
+            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail)
+            else -> tabHome.requestFocus()
+        }
+    }
+
+    private fun focusHomeRailAboveSeries() {
+        when {
+            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail)
+            favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
+                focusHomeRailItem(favoritesRail)
+            resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
+                focusHomeRailItem(resumeRail)
+            else -> heroPlay.requestFocus()
+        }
+    }
+
+    private fun wireHomeRails() {
+        bindHomeRail(
+            resumeRail,
+            resumeItems,
+            onMoveUp = { heroPlay.requestFocus() },
+            onMoveDown = { focusHomeRailBelowResume() },
+        )
+        bindHomeRail(
+            favoritesRail,
+            favoriteItems,
+            onMoveUp = { focusHomeRailAboveFavorites() },
+            onMoveDown = { focusHomeRailBelowFavorites() },
+        )
+        bindHomeRail(
+            moviesRail,
+            recentMovies,
+            onMoveUp = { focusHomeRailAboveMovies() },
+            onMoveDown = { focusHomeRailBelowMovies() },
+        )
+        bindHomeRail(
+            seriesRail,
+            recentSeries,
+            onMoveUp = { focusHomeRailAboveSeries() },
+            onMoveDown = { tabHome.requestFocus() },
+        )
     }
 
     private fun applyHomeData(movies: List<VodMovie>, series: List<SeriesItem>) {
@@ -691,23 +802,9 @@ class MainActivity : BaseLocaleActivity() {
         buildFavoriteItems()
         buildResumeItems()
 
-        bindHomeRail(resumeRail, resumeItems, onMoveUp = { heroPlay.requestFocus() })
+        wireHomeRails()
         resumeRailTitle.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
         resumeRail.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
-
-        bindHomeRail(favoritesRail, favoriteItems, onMoveUp = { heroPlay.requestFocus() })
-        bindHomeRail(moviesRail, recentMovies, onMoveUp = {
-            if (favoritesRail.visibility == View.VISIBLE) {
-                favoritesRail.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
-            } else if (resumeRail.visibility == View.VISIBLE) {
-                resumeRail.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
-            } else {
-                heroPlay.requestFocus()
-            }
-        })
-        bindHomeRail(seriesRail, recentSeries, onMoveUp = {
-            moviesRail.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
-        })
 
         favoritesRailTitle.visibility =
             if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
@@ -878,6 +975,7 @@ class MainActivity : BaseLocaleActivity() {
         list: RecyclerView,
         items: List<HomeRailAdapter.HomeRailItem>,
         onMoveUp: (() -> Unit)? = null,
+        onMoveDown: (() -> Unit)? = null,
     ) {
         list.clipChildren = false
         list.clipToPadding = false
@@ -888,6 +986,7 @@ class MainActivity : BaseLocaleActivity() {
             onToggleFavorite = { item -> toggleHomeFavorite(item) },
             isFavorite = { item -> isHomeFavorite(item) },
             onMoveUp = onMoveUp,
+            onMoveDown = onMoveDown,
         )
     }
 
@@ -902,7 +1001,7 @@ class MainActivity : BaseLocaleActivity() {
                 if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
             favoritesRail.visibility =
                 if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
-            bindHomeRail(favoritesRail, favoriteItems, onMoveUp = null)
+            wireHomeRails()
         }
         if (currentTab == Tab.LIVE &&
             selectedLiveCategoryId == FavoritesStore.FAVORITES_CATEGORY_ID

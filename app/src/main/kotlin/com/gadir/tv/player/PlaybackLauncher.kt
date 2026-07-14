@@ -4,6 +4,7 @@ import android.content.Context
 import android.widget.Toast
 import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
+import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.ui.player.PlayerActivity
 import com.gadir.tv.ui.player.VlcPlayerActivity
 
@@ -12,7 +13,13 @@ object PlaybackLauncher {
         val settings = AppSettings(context)
         when (settings.playerMode) {
             AppSettings.PLAYER_EXTERNAL -> launchExternal(context, request, settings)
-            AppSettings.PLAYER_VLC -> launchVlc(context, request)
+            AppSettings.PLAYER_VLC -> {
+                if (request.kind == ResumeStore.KIND_LIVE) {
+                    launchVlc(context, request)
+                } else {
+                    launchExo(context, request)
+                }
+            }
             else -> launchExo(context, request)
         }
     }

@@ -19,6 +19,7 @@ class HomeRailAdapter(
     private val onToggleFavorite: ((HomeRailItem) -> Unit)? = null,
     private val isFavorite: ((HomeRailItem) -> Boolean)? = null,
     private val onMoveUp: (() -> Unit)? = null,
+    private val onMoveDown: (() -> Unit)? = null,
 ) : RecyclerView.Adapter<HomeRailAdapter.Holder>() {
 
     data class HomeRailItem(
@@ -79,6 +80,13 @@ class HomeRailAdapter(
                     if (holder.bindingAdapterPosition == 0) {
                         onMoveUp?.invoke()
                         return@setOnKeyListener onMoveUp != null
+                    }
+                    false
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (holder.bindingAdapterPosition == 0) {
+                        onMoveDown?.invoke()
+                        return@setOnKeyListener onMoveDown != null
                     }
                     false
                 }
