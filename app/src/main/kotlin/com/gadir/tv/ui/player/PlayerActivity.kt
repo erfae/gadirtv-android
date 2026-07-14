@@ -152,6 +152,15 @@ class PlayerActivity : BaseLocaleActivity() {
                     timeoutMs = 12_000L,
                     onBeforeNoSignal = { tryNextLiveUrl() },
                 ).also { it.start() }
+            } else {
+                exo.addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == Player.STATE_READY) {
+                            exo.removeListener(this)
+                            showVodControls()
+                        }
+                    }
+                })
             }
         }
     }

@@ -1,12 +1,12 @@
 package com.gadir.tv.ui.main
 
 import android.content.Intent
+import android.view.KeyEvent
 import com.gadir.tv.util.TrailerLauncher
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
-import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
@@ -21,7 +21,6 @@ import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.FavoritesStore
 import com.gadir.tv.data.BootstrapLoader
-import com.gadir.tv.data.CatalogPreloader
 import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.LiveChannelStore
 import com.gadir.tv.data.PlaylistRepository
@@ -131,6 +130,10 @@ class MainActivity : BaseLocaleActivity() {
     private var heroIndex = 0
     private var railPreviewItem: HomeRailAdapter.HomeRailItem? = null
     private var homeLoaded = false
+    private var shouldFocusHeroOnResume = true
+    private lateinit var miniPreviewControls: View
+    private val miniControlsHandler = Handler(Looper.getMainLooper())
+    private val hideMiniControlsRunnable = Runnable { hideMiniPreviewControls() }
     private val heroHandler = Handler(Looper.getMainLooper())
     private val clockRunnable = object : Runnable {
         override fun run() {
@@ -272,6 +275,26 @@ class MainActivity : BaseLocaleActivity() {
         heroTrailer.setOnFocusChangeListener { view, hasFocus ->
             FocusScaleHelper.applyConeFocus(view, hasFocus)
         }
+        heroPlay.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    focusFirstHomeRail()
+                    true
+                }
+                else -> false
+            }
+        }
+        heroTrailer.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    focusFirstHomeRail()
+                    true
+                }
+                else -> false
+            }
+        }
 
         setupLiveTab()
         setupTabNavigation()
@@ -281,33 +304,10 @@ class MainActivity : BaseLocaleActivity() {
         tabLive.nextFocusUpId = R.id.categoryList
         tabMovies.nextFocusUpId = R.id.catalogCategoryList
         tabSeries.nextFocusUpId = R.id.catalogCategoryList
-        moviesRail.nextFocusUpId = heroPlay.id
-        seriesRail.nextFocusUpId = heroPlay.id
-        (findViewById<View>(R.id.contentPanels) as ViewGroup).apply {
-            isFocusable = true
-            isFocusableInTouchMode = true
-            descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-        }
 
         setupMiniPlayer()
-        startBackgroundCatalogPreload()
 
         showTab(Tab.HOME)
-    }
-
-    private fun startBackgroundCatalogPreload() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            if (!PlaylistRepository.bootstrapReady) return@launch
-            val activeProfile = PlaylistRepository.profile ?: return@launch
-            val needsPreload = PlaylistRepository.vodCategories.any {
-                PlaylistRepository.cachedVod(it.id) == null
-            } || PlaylistRepository.seriesCategories.any {
-                PlaylistRepository.cachedSeries(it.id) == null
-            }
-            if (needsPreload) {
-                runCatching { CatalogPreloader.preloadRemaining(api, activeProfile) }
-            }
-        }
     }
 
     private fun setupLiveTab() {
@@ -344,7 +344,7 @@ class MainActivity : BaseLocaleActivity() {
             onFocus = { channel -> schedulePreview(channel) },
             onSelect = { channel ->
                 schedulePreview(channel)
-                panelLive.findViewById<View>(R.id.previewContainer).requestFocus()
+                showMiniPreviewControls()
             },
             onMoveLeft = { focusCategoryList() },
             onMoveUp = { zapChannel(-1) },
@@ -419,14 +419,28 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun focusCategoryList() {
+        val index = liveCategoryIndex()
+        liveCategoryList.scrollToPosition(index)
         liveCategoryList.post {
-            liveCategoryList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+            liveCategoryList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
+        }
+    }
+
+    private fun liveCategoryIndex(): Int {
+        return when (selectedLiveCategoryId) {
+            null -> 0
+            FavoritesStore.FAVORITES_CATEGORY_ID -> 1
+            else -> liveCategories.indexOfFirst { it.id == selectedLiveCategoryId }
+                .takeIf { it >= 0 } ?: 0
         }
     }
 
     private fun focusCatalogCategoryList() {
+        val index = catalogCategories.indexOfFirst { it.id == selectedCatalogCategoryId }
+            .takeIf { it >= 0 } ?: 0
+        catalogCategoryList.scrollToPosition(index)
         catalogCategoryList.post {
-            catalogCategoryList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+            catalogCategoryList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
         }
     }
 
@@ -462,11 +476,11 @@ class MainActivity : BaseLocaleActivity() {
                 panelCatalog.visibility = View.GONE
                 miniPlayer?.pause()
                 miniPlaybackMonitor?.stop()
+                hideMiniPreviewControls()
                 if (!homeLoaded) {
                     loadHome()
                 } else {
                     startHeroRotation()
-                    focusHeroPlay()
                 }
             }
             Tab.LIVE -> {
@@ -526,10 +540,28 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun focusHeroPlay() {
-        if (currentTab != Tab.HOME || heroItems.isEmpty()) return
+        if (currentTab != Tab.HOME || heroItems.isEmpty() || !shouldFocusHeroOnResume) return
         heroPlay.post {
-            if (heroPlay.requestFocus()) return@post
-            heroPlay.postDelayed({ heroPlay.requestFocus() }, 120L)
+            if (heroPlay.requestFocus()) {
+                shouldFocusHeroOnResume = false
+                return@post
+            }
+            heroPlay.postDelayed({
+                if (heroPlay.requestFocus()) shouldFocusHeroOnResume = false
+            }, 120L)
+        }
+    }
+
+    private fun focusFirstHomeRail() {
+        val rail = when {
+            resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() -> resumeRail
+            favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() -> favoritesRail
+            recentMovies.isNotEmpty() -> moviesRail
+            recentSeries.isNotEmpty() -> seriesRail
+            else -> return
+        }
+        rail.post {
+            rail.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
         }
     }
 
@@ -564,13 +596,23 @@ class MainActivity : BaseLocaleActivity() {
         buildFavoriteItems()
         buildResumeItems()
 
-        bindHomeRail(resumeRail, resumeItems, onMoveUp = null)
+        bindHomeRail(resumeRail, resumeItems, onMoveUp = { heroPlay.requestFocus() })
         resumeRailTitle.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
         resumeRail.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
 
-        bindHomeRail(favoritesRail, favoriteItems, onMoveUp = null)
-        bindHomeRail(moviesRail, recentMovies, onMoveUp = { heroPlay.requestFocus() })
-        bindHomeRail(seriesRail, recentSeries, onMoveUp = null)
+        bindHomeRail(favoritesRail, favoriteItems, onMoveUp = { heroPlay.requestFocus() })
+        bindHomeRail(moviesRail, recentMovies, onMoveUp = {
+            if (favoritesRail.visibility == View.VISIBLE) {
+                favoritesRail.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+            } else if (resumeRail.visibility == View.VISIBLE) {
+                resumeRail.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+            } else {
+                heroPlay.requestFocus()
+            }
+        })
+        bindHomeRail(seriesRail, recentSeries, onMoveUp = {
+            moviesRail.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+        })
 
         favoritesRailTitle.visibility =
             if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
@@ -1127,6 +1169,7 @@ class MainActivity : BaseLocaleActivity() {
                 }
                 favoritesStore.toggle(kind, item.id)
             },
+            onMoveLeft = { focusCatalogCategoryList() },
         )
 
         if (catalogCategories.isEmpty()) {
@@ -1232,21 +1275,17 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun onPosterClick(tab: Tab, item: PosterAdapter.PosterItem) {
         when (tab) {
-            Tab.MOVIES -> openMovieDetail(
-                streamId = item.id,
+            Tab.MOVIES -> playMovie(
                 title = item.title,
-                cover = item.imageUrl,
+                streamId = item.id,
                 extension = item.extension,
+                imageUrl = item.imageUrl,
             )
-            Tab.SERIES -> {
-                val series = SeriesItem(
-                    seriesId = item.id,
-                    name = item.title,
-                    cover = item.imageUrl,
-                    categoryId = selectedCatalogCategoryId.orEmpty(),
-                )
-                startActivity(SeriesDetailActivity.intent(this, series))
-            }
+            Tab.SERIES -> playSeriesFirstEpisode(
+                seriesId = item.id,
+                title = item.title,
+                imageUrl = item.imageUrl,
+            )
             Tab.LIVE, Tab.HOME -> Unit
         }
     }
@@ -1343,6 +1382,22 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun showMiniPreviewControls() {
+        miniPreviewControls.visibility = View.VISIBLE
+        miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
+        miniControlsHandler.postDelayed(hideMiniControlsRunnable, 5_000L)
+    }
+
+    private fun hideMiniPreviewControls() {
+        miniPreviewControls.visibility = View.GONE
+        miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
+    }
+
+    private fun scheduleHideMiniControls() {
+        miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
+        miniControlsHandler.postDelayed(hideMiniControlsRunnable, 5_000L)
+    }
+
     private fun tryNextPreviewUrl(): Boolean {
         if (previewUrlIndex >= previewUrls.lastIndex) return false
         previewUrlIndex += 1
@@ -1408,23 +1463,17 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (currentTab == Tab.HOME) {
+        if (currentTab == Tab.HOME && shouldFocusHeroOnResume) {
             focusHeroPlay()
         } else if (currentTab == Tab.LIVE && appSettings.autoplayPreview) {
             currentPreviewChannel?.let { previewChannel(it) }
         }
     }
 
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus && currentTab == Tab.HOME) {
-            focusHeroPlay()
-        }
-    }
-
     override fun onDestroy() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         clockHandler.removeCallbacks(clockRunnable)
+        miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
         stopHeroRotation()
         miniPlaybackMonitor?.stop()
         miniPlaybackMonitor = null
@@ -1434,6 +1483,9 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun setupMiniPlayer() {
+        miniPreviewControls = panelLive.findViewById(R.id.miniPreviewControls)
+        miniPreviewControls.visibility = View.GONE
+
         panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).apply {
             useController = false
             setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_NEVER)
@@ -1482,13 +1534,12 @@ class MainActivity : BaseLocaleActivity() {
         miniPlayer = PlayerFactory.create(this).also { player ->
             panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).player = player
             player.playWhenReady = true
-            val previewOverlay = panelLive.findViewById<View>(R.id.miniPreviewControls)
             player.addListener(object : androidx.media3.common.Player.Listener {
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    if (!appSettings.autoplayPreview || previewOverlay == null) return
-                    val showInfo = !isPlaying
-                    previewOverlay.visibility = if (showInfo) View.VISIBLE else View.GONE
-                    if (isPlaying && previewUrlIndex in previewUrls.indices) {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == androidx.media3.common.Player.STATE_READY &&
+                        player.isPlaying &&
+                        previewUrlIndex in previewUrls.indices
+                    ) {
                         previewWorkingUrl = previewUrls[previewUrlIndex]
                     }
                 }
@@ -1506,9 +1557,11 @@ class MainActivity : BaseLocaleActivity() {
         }
         panelLive.findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
             VolumeHelper.adjust(this, raise = true)
+            scheduleHideMiniControls()
         }
         panelLive.findViewById<ImageButton>(R.id.btnVolDown).setOnClickListener {
             VolumeHelper.adjust(this, raise = false)
+            scheduleHideMiniControls()
         }
         panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
             currentPreviewChannel?.let { openFullscreen(it) }

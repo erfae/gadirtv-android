@@ -13,6 +13,7 @@ import com.gadir.tv.data.PlaylistRepository
 object PlayerFactory {
     fun create(context: Context): ExoPlayer {
         val settings = AppSettings(context)
+        val bufferMs = settings.networkBufferMs
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setUserAgent(PlaylistRepository.userAgent)
             .setAllowCrossProtocolRedirects(true)
@@ -24,23 +25,21 @@ object PlayerFactory {
             .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
             .build()
 
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                bufferMs * 40,
+                bufferMs * 100,
+                bufferMs * 2,
+                bufferMs * 4,
+            )
+            .build()
+
         val builder = ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
-            .setAudioAttributes(audioAttributes, false)
+            .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
+            .setLoadControl(loadControl)
 
-        if (settings.isCompatPlayer || settings.isVlcPlayer) {
-            val bufferMs = settings.networkBufferMs
-            val loadControl = DefaultLoadControl.Builder()
-                .setBufferDurationsMs(
-                    bufferMs * 40,
-                    bufferMs * 100,
-                    bufferMs * 2,
-                    bufferMs * 4,
-                )
-                .build()
-            builder.setLoadControl(loadControl)
-        }
         return builder.build().apply {
             volume = 1f
         }

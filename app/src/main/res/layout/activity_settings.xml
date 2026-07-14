@@ -19,6 +19,7 @@
             android:background="@drawable/tab_bg"
             android:focusable="true"
             android:focusableInTouchMode="true"
+            android:nextFocusDown="@+id/btnPlayerMode"
             android:paddingHorizontal="16dp"
             android:paddingVertical="10dp"
             android:text="@string/back"
@@ -39,6 +40,7 @@
     </LinearLayout>
 
     <ScrollView
+        android:id="@+id/settingsScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="16dp"
@@ -46,6 +48,7 @@
         android:clipToPadding="false"
         android:descendantFocusability="afterDescendants"
         android:fillViewport="true"
+        android:focusable="false"
         android:scrollbars="vertical">
 
         <LinearLayout
@@ -107,6 +110,7 @@
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:gravity="center_vertical"
+                android:nextFocusUp="@+id/btnBack"
                 android:nextFocusDown="@+id/btnLanguage"
                 android:paddingHorizontal="16dp"
                 android:paddingVertical="14dp"
@@ -201,6 +205,7 @@
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:nextFocusUp="@+id/btnNetworkBuffer"
+                android:nextFocusDown="@+id/btnReloadPlaylist"
                 android:paddingHorizontal="16dp"
                 android:paddingVertical="14dp"
                 android:textColor="@android:color/white"
@@ -214,6 +219,8 @@
                 android:background="@drawable/tab_bg"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
+                android:nextFocusUp="@+id/btnLiveSort"
+                android:nextFocusDown="@+id/btnClearCache"
                 android:paddingHorizontal="16dp"
                 android:paddingVertical="14dp"
                 android:text="@string/settings_reload_playlist"
@@ -228,7 +235,7 @@
                 android:background="@drawable/tab_bg"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
-                android:nextFocusUp="@+id/btnAutoplay"
+                android:nextFocusUp="@+id/btnReloadPlaylist"
                 android:nextFocusDown="@+id/btnChangeProfile"
                 android:paddingHorizontal="16dp"
                 android:paddingVertical="14dp"

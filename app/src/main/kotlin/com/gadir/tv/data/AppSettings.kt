@@ -11,7 +11,7 @@ class AppSettings(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_AUTOPLAY, value).apply()
 
     var playerMode: String
-        get() = prefs.getString(KEY_PLAYER_MODE, PLAYER_VLC) ?: PLAYER_VLC
+        get() = prefs.getString(KEY_PLAYER_MODE, PLAYER_STANDARD) ?: PLAYER_STANDARD
         set(value) = prefs.edit().putString(KEY_PLAYER_MODE, value).apply()
 
     var externalPlayerPackage: String
@@ -36,7 +36,7 @@ class AppSettings(context: Context) {
         set(value) = prefs.edit().putString(KEY_LIVE_SORT, value).apply()
 
     var previewSound: Boolean
-        get() = prefs.getBoolean(KEY_PREVIEW_SOUND, false)
+        get() = prefs.getBoolean(KEY_PREVIEW_SOUND, true)
         set(value) = prefs.edit().putBoolean(KEY_PREVIEW_SOUND, value).apply()
 
     var networkBufferMs: Int
@@ -55,7 +55,7 @@ class AppSettings(context: Context) {
         const val BUFFER_FAST_MS = 600
         const val BUFFER_NORMAL_MS = 1200
         const val BUFFER_STABLE_MS = 2500
-        const val BUFFER_DEFAULT_MS = BUFFER_NORMAL_MS
+        const val BUFFER_DEFAULT_MS = BUFFER_STABLE_MS
 
         const val LANG_ES = "es"
         const val LANG_EN = "en"

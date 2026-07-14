@@ -8,7 +8,8 @@
         android:id="@+id/heroContainer"
         android:layout_width="match_parent"
         android:layout_height="230dp"
-        android:background="@color/gtv_bg">
+        android:background="@color/gtv_bg"
+        android:descendantFocusability="afterDescendants">
 
         <ImageView
             android:id="@+id/heroImage"
@@ -100,7 +101,6 @@
                         android:focusable="true"
                         android:focusableInTouchMode="true"
                         android:nextFocusRight="@+id/heroTrailer"
-                        android:nextFocusDown="@+id/moviesRail"
                         android:paddingHorizontal="24dp"
                         android:paddingVertical="10dp"
                         android:text="@string/hero_play"
@@ -120,7 +120,6 @@
                         android:focusableInTouchMode="true"
                         android:gravity="center_vertical"
                         android:nextFocusLeft="@+id/heroPlay"
-                        android:nextFocusDown="@+id/moviesRail"
                         android:paddingHorizontal="20dp"
                         android:paddingVertical="10dp"
                         android:text="@string/hero_trailer"

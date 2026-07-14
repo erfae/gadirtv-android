@@ -16,6 +16,7 @@ class PosterAdapter(
     private val kind: String? = null,
     private val isFavorite: ((PosterItem) -> Boolean)? = null,
     private val onToggleFavorite: ((PosterItem) -> Unit)? = null,
+    private val onMoveLeft: (() -> Unit)? = null,
 ) : RecyclerView.Adapter<PosterAdapter.Holder>() {
 
     data class PosterItem(
@@ -45,6 +46,11 @@ class PosterAdapter(
             holder.image.setImageResource(R.drawable.tv_banner)
         }
 
+        holder.itemView.isSelected = holder.itemView.hasFocus()
+        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+            view.isSelected = hasFocus
+        }
+
         holder.itemView.setOnClickListener { onClick(item) }
         holder.itemView.setOnLongClickListener {
             if (onToggleFavorite != null) {
@@ -56,13 +62,21 @@ class PosterAdapter(
             }
         }
         holder.itemView.setOnKeyListener { _, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN &&
-                (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
-            ) {
-                onClick(item)
-                true
-            } else {
-                false
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (position % 5 == 0) {
+                        onMoveLeft?.invoke()
+                        onMoveLeft != null
+                    } else {
+                        false
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                    onClick(item)
+                    true
+                }
+                else -> false
             }
         }
     }
