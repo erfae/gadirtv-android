@@ -4,19 +4,20 @@ import android.content.Context
 import android.media.AudioManager
 
 object VolumeHelper {
-    private const val MIN_PLAYBACK_RATIO = 0.25f
+    private const val BOOST_TARGET_RATIO = 0.28f
+    private const val BOOST_ONLY_BELOW_RATIO = 0.10f
     private const val ADJUST_STEP_RATIO = 0.05f
 
-    /** Asegura volumen audible del TV antes de reproducir (ExoPlayer multiplica sobre esto). */
+    /** Sube el volumen del sistema solo si está casi en silencio (evita distorsión). */
     fun boostOnPlaybackStart(context: Context) {
         val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         if (max <= 0) return
         val current = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
-        val target = (max * MIN_PLAYBACK_RATIO).toInt().coerceIn(1, max)
-        if (current < target) {
-            audio.setStreamVolume(AudioManager.STREAM_MUSIC, target, AudioManager.FLAG_SHOW_UI)
-        }
+        val currentRatio = current.toFloat() / max.toFloat()
+        if (currentRatio >= BOOST_ONLY_BELOW_RATIO) return
+        val target = (max * BOOST_TARGET_RATIO).toInt().coerceIn(1, max)
+        audio.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
     }
 
     fun adjust(context: Context, raise: Boolean) {

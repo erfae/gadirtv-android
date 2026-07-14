@@ -68,6 +68,10 @@
     <string name="settings_player_vlc">Reproductor: VLC nativo (dentro de la app)</string>
     <string name="reload_playlist">Recargar</string>
     <string name="playlist_reloaded">Lista actualizada</string>
+    <string name="header_expires">Caduca: %1$s</string>
+    <string name="edit_profile">Editar perfil</string>
+    <string name="save_profile">GUARDAR</string>
+    <string name="login_edit_title">Editar perfil</string>
     <string name="settings_reload_playlist">Recargar lista del servidor</string>
     <string name="settings_live_sort_playlist">Orden canales: playlist</string>
     <string name="settings_live_sort_alpha">Orden canales: A-Z</string>

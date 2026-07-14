@@ -15,13 +15,14 @@ object LiveStreamUrls {
         }
 
         val ext = channel.extension.ifBlank { "ts" }.lowercase()
-        if (ext.isNotEmpty()) {
+        if (ext.isNotEmpty() && ext !in setOf("ts", "m3u8")) {
             urls.add(api.streamUrl(profile, channel.streamId, ext))
         }
-        urls.add(api.streamUrl(profile, channel.streamId, "ts"))
+        // HLS suele tener mejor audio en muchos canales IPTV.
         urls.add(api.streamUrl(profile, channel.streamId, "m3u8"))
+        urls.add(api.streamUrl(profile, channel.streamId, "ts"))
         urls.add(api.streamUrlWithoutExtension(profile, channel.streamId))
-        if (ext !in setOf("ts", "m3u8", "mp4")) {
+        if (ext == "mp4") {
             urls.add(api.streamUrl(profile, channel.streamId, "mp4"))
         }
         return urls.filter { it.isNotBlank() }.toList()

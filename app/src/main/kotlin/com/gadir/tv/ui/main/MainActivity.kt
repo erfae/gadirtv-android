@@ -44,6 +44,7 @@ import com.gadir.tv.ui.profiles.ProfilesActivity
 import com.gadir.tv.ui.search.SearchActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
 import com.gadir.tv.ui.settings.SettingsActivity
+import com.gadir.tv.util.AccountFormat
 import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.MetaExtractor
@@ -125,6 +126,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private lateinit var headerClock: TextView
     private lateinit var headerDate: TextView
+    private lateinit var headerExpiration: TextView
     private lateinit var btnSearch: TextView
     private lateinit var btnReload: TextView
     private lateinit var btnSettings: TextView
@@ -146,7 +148,7 @@ class MainActivity : BaseLocaleActivity() {
     private var heroIndex = 0
     private var railPreviewItem: HomeRailAdapter.HomeRailItem? = null
     private var homeLoaded = false
-    private var shouldFocusHeroOnResume = true
+    private var shouldFocusHomeRailsOnResume = true
     private lateinit var miniPreviewControls: View
     private val miniControlsHandler = Handler(Looper.getMainLooper())
     private val hideMiniControlsRunnable = Runnable { hideMiniPreviewControls() }
@@ -213,15 +215,16 @@ class MainActivity : BaseLocaleActivity() {
         resumeStore = ResumeStore(this)
         appSettings = AppSettings(this)
 
-        findViewById<TextView>(R.id.profileLabel).text = profile.name
         headerClock = findViewById(R.id.headerClock)
         headerDate = findViewById(R.id.headerDate)
+        headerExpiration = findViewById(R.id.headerExpiration)
         profileAvatar = findViewById(R.id.profileAvatar)
         ProfileAvatarHelper.bind(
             findViewById(R.id.profileAvatarCircle),
             profileAvatar,
             profile,
         )
+        updateHeaderAccountInfo()
         startHeaderClock()
         findViewById<TextView>(R.id.btnSearch).also { btnSearch = it }
         TvFocusHelper.bindButton(btnSearch) {
@@ -580,6 +583,7 @@ class MainActivity : BaseLocaleActivity() {
                 panelLive.visibility = View.VISIBLE
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
+                VolumeHelper.boostOnPlaybackStart(this)
                 miniPlayer?.playWhenReady = true
                 if (appSettings.autoplayPreview) {
                     miniPlaybackMonitor?.start()
@@ -613,7 +617,7 @@ class MainActivity : BaseLocaleActivity() {
             applyHomeData(cachedMovies, cachedSeries)
             homeLoading.visibility = View.GONE
             homeLoaded = true
-            focusHeroPlay()
+            focusHomeMoviesOnStart()
             refreshHomeIfNeeded(profile, cachedMovies.size)
             return
         }
@@ -634,8 +638,15 @@ class MainActivity : BaseLocaleActivity() {
             applyHomeData(movies, series)
             homeLoading.visibility = View.GONE
             homeLoaded = true
-            focusHeroPlay()
+            focusHomeMoviesOnStart()
         }
+    }
+
+    private fun updateHeaderAccountInfo() {
+        val account = PlaylistRepository.accountInfo
+        val exp = AccountFormat.formatExpiration(account?.expDate.orEmpty())
+        headerExpiration.text = getString(R.string.header_expires, exp)
+        headerExpiration.visibility = View.VISIBLE
     }
 
     private fun refreshHomeIfNeeded(profile: Profile, cachedMovieCount: Int) {
@@ -654,16 +665,27 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun focusHeroPlay() {
-        if (currentTab != Tab.HOME || heroItems.isEmpty() || !shouldFocusHeroOnResume) return
+        if (currentTab != Tab.HOME || heroItems.isEmpty() || !shouldFocusHomeRailsOnResume) return
         heroPlay.post {
             if (heroPlay.requestFocus()) {
-                shouldFocusHeroOnResume = false
+                shouldFocusHomeRailsOnResume = false
                 return@post
             }
             heroPlay.postDelayed({
-                if (heroPlay.requestFocus()) shouldFocusHeroOnResume = false
+                if (heroPlay.requestFocus()) shouldFocusHomeRailsOnResume = false
             }, 120L)
         }
+    }
+
+    private fun focusHomeMoviesOnStart() {
+        if (currentTab != Tab.HOME) return
+        when {
+            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail)
+            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail)
+            heroItems.isNotEmpty() -> focusHeroPlay()
+            else -> Unit
+        }
+        shouldFocusHomeRailsOnResume = false
     }
 
     private fun focusFirstHomeRail() {
@@ -829,7 +851,7 @@ class MainActivity : BaseLocaleActivity() {
             homeEmpty.visibility = View.GONE
             bindHero(heroItems[heroIndex])
             startHeroRotation()
-            focusHeroPlay()
+            focusHomeMoviesOnStart()
         }
     }
 
@@ -868,6 +890,7 @@ class MainActivity : BaseLocaleActivity() {
                     getString(R.string.playlist_reloaded),
                     android.widget.Toast.LENGTH_SHORT,
                 ).show()
+                updateHeaderAccountInfo()
             }.onFailure { e ->
                 homeLoading.visibility = View.GONE
                 android.widget.Toast.makeText(
@@ -1715,7 +1738,6 @@ class MainActivity : BaseLocaleActivity() {
     private fun playMiniPreviewUrl(url: String, token: Int) {
         if (token != previewToken || url.isBlank()) return
         setPreviewVideoVisible(false)
-        VolumeHelper.boostOnPlaybackStart(this)
         miniPlayer?.apply {
             stop()
             clearMediaItems()
@@ -1882,8 +1904,8 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (currentTab == Tab.HOME && shouldFocusHeroOnResume) {
-            focusHeroPlay()
+        if (currentTab == Tab.HOME && shouldFocusHomeRailsOnResume) {
+            focusHomeMoviesOnStart()
         } else if (currentTab == Tab.LIVE) {
             focusChannelAt(currentPreviewChannel)
             liveCategoryList.adapter?.let { (it as? CategoryAdapter)?.refreshSelection() }
@@ -1977,6 +1999,6 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private companion object {
-        const val PREVIEW_PLAYER_VOLUME = 0.85f
+        const val PREVIEW_PLAYER_VOLUME = 0.55f
     }
 }

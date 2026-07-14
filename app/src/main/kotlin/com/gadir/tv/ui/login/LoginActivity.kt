@@ -1,5 +1,6 @@
 package com.gadir.tv.ui.login
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -31,6 +32,7 @@ class LoginActivity : BaseLocaleActivity() {
     private lateinit var profileStore: ProfileStore
     private val draftHandler = Handler(Looper.getMainLooper())
     private var draftRunnable: Runnable? = null
+    private var editingProfileId: String? = null
 
     private lateinit var inputHost: TextInputEditText
     private lateinit var inputUser: TextInputEditText
@@ -46,6 +48,7 @@ class LoginActivity : BaseLocaleActivity() {
         profileStore = ProfileStore(this)
         setContentView(R.layout.activity_login)
         bindViews()
+        setupEditMode()
         loadDraft()
         setupDraftAutosave()
 
@@ -66,6 +69,24 @@ class LoginActivity : BaseLocaleActivity() {
         inputHost.requestFocus()
     }
 
+    private fun setupEditMode() {
+        editingProfileId = intent.getStringExtra(EXTRA_PROFILE_ID)
+        if (editingProfileId == null) return
+
+        val existing = profileStore.loadAll().firstOrNull { it.id == editingProfileId }
+        if (existing == null) {
+            editingProfileId = null
+            return
+        }
+
+        findViewById<TextView>(R.id.loginTitle).text = getString(R.string.login_edit_title)
+        btnConnect.text = getString(R.string.save_profile)
+        inputHost.setText(existing.host)
+        inputUser.setText(existing.username)
+        inputPass.setText(existing.password)
+        inputName.setText(existing.name)
+    }
+
     private fun bindViews() {
         inputHost = findViewById(R.id.inputHost)
         inputUser = findViewById(R.id.inputUser)
@@ -78,6 +99,7 @@ class LoginActivity : BaseLocaleActivity() {
     }
 
     private fun loadDraft() {
+        if (editingProfileId != null) return
         val draft = DefaultCredentials.draftOrExisting(profileStore.loadDraft())
         inputHost.setText(draft.host)
         inputUser.setText(draft.username)
@@ -125,12 +147,17 @@ class LoginActivity : BaseLocaleActivity() {
             return
         }
 
+        val existing = editingProfileId?.let { id ->
+            profileStore.loadAll().firstOrNull { it.id == id }
+        }
         val profile = Profile(
             name = displayName,
             host = host,
             username = username,
             password = password,
-            avatarSeed = displayName.hashCode(),
+            avatarSeed = existing?.avatarSeed ?: displayName.hashCode(),
+            mode = existing?.mode ?: "xtream",
+            m3uUrl = existing?.m3uUrl.orEmpty(),
         )
 
         profileStore.saveDraft(currentDraft())
@@ -151,10 +178,19 @@ class LoginActivity : BaseLocaleActivity() {
 
             if (result.ok) {
                 profileStore.upsert(profile)
-                profileStore.setActive(profile)
                 profileStore.saveDraft(currentDraft())
-                startActivity(Intent(this@LoginActivity, BootstrapActivity::class.java))
-                finish()
+                if (editingProfileId != null) {
+                    val wasActive = profileStore.getActive()?.id == profile.id
+                    if (wasActive) {
+                        profileStore.setActive(profile)
+                        startActivity(Intent(this@LoginActivity, BootstrapActivity::class.java))
+                    }
+                    finish()
+                } else {
+                    profileStore.setActive(profile)
+                    startActivity(Intent(this@LoginActivity, BootstrapActivity::class.java))
+                    finish()
+                }
             } else {
                 loginProgress.visibility = View.GONE
                 showError(
@@ -185,5 +221,13 @@ class LoginActivity : BaseLocaleActivity() {
             startActivity(Intent(this, ProfilesActivity::class.java))
         }
         finish()
+    }
+
+    companion object {
+        private const val EXTRA_PROFILE_ID = "profile_id"
+
+        fun editIntent(context: Context, profile: Profile): Intent =
+            Intent(context, LoginActivity::class.java)
+                .putExtra(EXTRA_PROFILE_ID, profile.id)
     }
 }

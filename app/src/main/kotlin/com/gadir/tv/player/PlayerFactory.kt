@@ -25,7 +25,7 @@ object PlayerFactory {
 
     private fun liveAudioAttributes() = AudioAttributes.Builder()
         .setUsage(C.USAGE_MEDIA)
-        .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
+        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
         .build()
 
     private fun build(
