@@ -28,10 +28,21 @@ class AppSettings(context: Context) {
     val isCompatPlayer: Boolean
         get() = playerMode == PLAYER_COMPAT
 
+    val isVlcPlayer: Boolean
+        get() = playerMode == PLAYER_VLC
+
+    var liveSortMode: String
+        get() = prefs.getString(KEY_LIVE_SORT, LIVE_SORT_PLAYLIST) ?: LIVE_SORT_PLAYLIST
+        set(value) = prefs.edit().putString(KEY_LIVE_SORT, value).apply()
+
     companion object {
         const val PLAYER_STANDARD = "standard"
         const val PLAYER_COMPAT = "compat"
+        const val PLAYER_VLC = "vlc"
         const val PLAYER_EXTERNAL = "external"
+
+        const val LIVE_SORT_PLAYLIST = "playlist"
+        const val LIVE_SORT_ALPHA = "alpha"
 
         const val LANG_ES = "es"
         const val LANG_EN = "en"
@@ -44,5 +55,6 @@ class AppSettings(context: Context) {
         private const val KEY_PLAYER_MODE = "player_mode"
         private const val KEY_EXTERNAL_PLAYER = "external_player_package"
         private const val KEY_LANGUAGE = "app_language"
+        private const val KEY_LIVE_SORT = "live_sort_mode"
     }
 }

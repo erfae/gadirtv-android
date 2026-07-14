@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.FavoritesStore
+import com.gadir.tv.data.BootstrapLoader
 import com.gadir.tv.data.CatalogPreloader
 import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.PlaylistRepository
@@ -42,6 +43,7 @@ import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.VolumeHelper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -163,6 +165,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.btnSearch).setOnClickListener {
             startActivity(Intent(this, SearchActivity::class.java))
         }
+        findViewById<TextView>(R.id.btnReload).setOnClickListener { reloadPlaylist() }
         findViewById<TextView>(R.id.btnSettings).setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
@@ -227,6 +230,8 @@ class MainActivity : AppCompatActivity() {
         setupTabNavigation()
         heroPlay.setOnClickListener { playHero() }
         heroTrailer.setOnClickListener { openHeroTrailer() }
+        tabHome.nextFocusUpId = heroPlay.id
+        moviesRail.nextFocusUpId = heroPlay.id
 
         setupMiniPlayer()
 
@@ -249,16 +254,19 @@ class MainActivity : AppCompatActivity() {
         )
         liveCategories.addAll(PlaylistRepository.categories)
 
+        val onCategorySelected = { cat: Category ->
+            selectedLiveCategoryId = when (cat.id) {
+                "" -> null
+                FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
+                else -> cat.id
+            }
+            reloadChannels(keepCategoryFocus = true)
+        }
+
         liveCategoryList.adapter = CategoryAdapter(
             items = liveCategories,
-            onClick = { cat ->
-                selectedLiveCategoryId = when (cat.id) {
-                    "" -> null
-                    FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
-                    else -> cat.id
-                }
-                reloadChannels(keepCategoryFocus = true)
-            },
+            onClick = onCategorySelected,
+            onFocus = onCategorySelected,
             onMoveRight = { focusFirstChannel() },
         )
         reloadChannels()
@@ -347,79 +355,109 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadHome() {
         val profile = PlaylistRepository.profile ?: return
-        homeLoading.visibility = View.VISIBLE
-        homeEmpty.visibility = View.GONE
+        val cachedMovies = HomeLoader.recentMoviesFromCache()
+        val cachedSeries = HomeLoader.recentSeriesFromCache()
+        if (cachedMovies.isNotEmpty() || cachedSeries.isNotEmpty()) {
+            applyHomeData(cachedMovies, cachedSeries)
+            homeLoading.visibility = View.GONE
+        } else {
+            homeLoading.visibility = View.VISIBLE
+            homeEmpty.visibility = View.GONE
+        }
 
         lifecycleScope.launch {
-            val movies = withContext(Dispatchers.IO) {
-                val cached = HomeLoader.recentMoviesFromCache()
-                if (cached.isNotEmpty()) cached
+            val moviesDeferred = async(Dispatchers.IO) {
+                if (cachedMovies.isNotEmpty()) cachedMovies
                 else HomeLoader.loadRecentMovies(api, profile)
             }
-            val series = withContext(Dispatchers.IO) {
-                val cached = HomeLoader.recentSeriesFromCache()
-                if (cached.isNotEmpty()) cached
+            val seriesDeferred = async(Dispatchers.IO) {
+                if (cachedSeries.isNotEmpty()) cachedSeries
                 else HomeLoader.loadRecentSeries(api, profile)
             }
-
+            val movies = moviesDeferred.await()
+            val series = seriesDeferred.await()
+            PlaylistRepository.setHomeRecent(movies, series)
+            applyHomeData(movies, series)
             homeLoading.visibility = View.GONE
             homeLoaded = true
+        }
+    }
 
-            recentMovies.clear()
-            movies.forEach { movie ->
-                recentMovies.add(
-                    HomeRailAdapter.HomeRailItem(
-                        id = movie.streamId,
-                        title = movie.name,
-                        imageUrl = movie.icon,
-                        badge = getString(R.string.hero_type_movie),
-                        kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
-                        extension = movie.extension,
-                    ),
-                )
+    private fun applyHomeData(movies: List<VodMovie>, series: List<SeriesItem>) {
+        recentMovies.clear()
+        movies.forEach { movie ->
+            recentMovies.add(
+                HomeRailAdapter.HomeRailItem(
+                    id = movie.streamId,
+                    title = movie.name,
+                    imageUrl = movie.icon,
+                    badge = getString(R.string.hero_type_movie),
+                    kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
+                    extension = movie.extension,
+                ),
+            )
+        }
+
+        recentSeries.clear()
+        series.forEach { item ->
+            recentSeries.add(
+                HomeRailAdapter.HomeRailItem(
+                    id = item.seriesId,
+                    title = item.name,
+                    imageUrl = item.cover,
+                    badge = getString(R.string.hero_type_series),
+                    kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
+                ),
+            )
+        }
+
+        buildFavoriteItems()
+        buildResumeItems()
+
+        bindHomeRail(resumeRail, resumeItems, onMoveUp = null)
+        resumeRailTitle.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
+        resumeRail.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
+
+        bindHomeRail(favoritesRail, favoriteItems, onMoveUp = null)
+        bindHomeRail(moviesRail, recentMovies, onMoveUp = { heroPlay.requestFocus() })
+        bindHomeRail(seriesRail, recentSeries, onMoveUp = null)
+
+        favoritesRailTitle.visibility =
+            if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
+        favoritesRail.visibility =
+            if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
+
+        heroItems.clear()
+        recentMovies.take(6).forEach { heroItems.add(HeroItem.Rail(it)) }
+        recentSeries.take(6).forEach { heroItems.add(HeroItem.Rail(it)) }
+        heroIndex = 0
+        railPreviewItem = null
+
+        if (heroItems.isEmpty()) {
+            homeEmpty.visibility = View.VISIBLE
+        } else {
+            homeEmpty.visibility = View.GONE
+            bindHero(heroItems[heroIndex])
+            startHeroRotation()
+        }
+    }
+
+    private fun reloadPlaylist() {
+        val profile = PlaylistRepository.profile ?: return
+        homeLoaded = false
+        homeLoading.visibility = View.VISIBLE
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { BootstrapLoader.load(api, profile) }
             }
-
-            recentSeries.clear()
-            series.forEach { item ->
-                recentSeries.add(
-                    HomeRailAdapter.HomeRailItem(
-                        id = item.seriesId,
-                        title = item.name,
-                        imageUrl = item.cover,
-                        badge = getString(R.string.hero_type_series),
-                        kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
-                    ),
-                )
-            }
-
-            buildFavoriteItems()
-            buildResumeItems()
-
-            bindHomeRail(resumeRail, resumeItems)
-            resumeRailTitle.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
-            resumeRail.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
-
-            bindHomeRail(favoritesRail, favoriteItems)
-            bindHomeRail(moviesRail, recentMovies)
-            bindHomeRail(seriesRail, recentSeries)
-
-            favoritesRailTitle.visibility =
-                if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
-            favoritesRail.visibility =
-                if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
-
-            heroItems.clear()
-            recentMovies.take(6).forEach { heroItems.add(HeroItem.Rail(it)) }
-            recentSeries.take(6).forEach { heroItems.add(HeroItem.Rail(it)) }
-            heroIndex = 0
-            railPreviewItem = null
-
-            if (heroItems.isEmpty()) {
-                homeEmpty.visibility = View.VISIBLE
-            } else {
-                homeEmpty.visibility = View.GONE
-                bindHero(heroItems[heroIndex])
-                startHeroRotation()
+            result.onSuccess {
+                setupLiveTab()
+                loadHome()
+                if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
+                    setupCatalogTab(currentTab)
+                }
+            }.onFailure {
+                homeLoading.visibility = View.GONE
             }
         }
     }
@@ -547,7 +585,11 @@ class MainActivity : AppCompatActivity() {
         return found
     }
 
-    private fun bindHomeRail(list: RecyclerView, items: List<HomeRailAdapter.HomeRailItem>) {
+    private fun bindHomeRail(
+        list: RecyclerView,
+        items: List<HomeRailAdapter.HomeRailItem>,
+        onMoveUp: (() -> Unit)? = null,
+    ) {
         list.clipChildren = false
         list.clipToPadding = false
         list.adapter = HomeRailAdapter(
@@ -556,6 +598,7 @@ class MainActivity : AppCompatActivity() {
             onFocus = { item -> previewHomeRailItem(item) },
             onToggleFavorite = { item -> toggleHomeFavorite(item) },
             isFavorite = { item -> isHomeFavorite(item) },
+            onMoveUp = onMoveUp,
         )
     }
 
@@ -570,7 +613,7 @@ class MainActivity : AppCompatActivity() {
                 if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
             favoritesRail.visibility =
                 if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
-            bindHomeRail(favoritesRail, favoriteItems)
+            bindHomeRail(favoritesRail, favoriteItems, onMoveUp = null)
         }
         if (currentTab == Tab.LIVE &&
             selectedLiveCategoryId == FavoritesStore.FAVORITES_CATEGORY_ID
@@ -1044,10 +1087,10 @@ class MainActivity : AppCompatActivity() {
         channels.addAll(
             when (selectedLiveCategoryId) {
                 FavoritesStore.FAVORITES_CATEGORY_ID ->
-                    PlaylistRepository.channelsFor(null).filter {
+                    PlaylistRepository.channelsFor(null, appSettings.liveSortMode).filter {
                         favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId)
                     }
-                else -> PlaylistRepository.channelsFor(selectedLiveCategoryId)
+                else -> PlaylistRepository.channelsFor(selectedLiveCategoryId, appSettings.liveSortMode)
             },
         )
         channelList.adapter = ChannelAdapter(

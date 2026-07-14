@@ -5,13 +5,15 @@ import android.widget.Toast
 import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
 import com.gadir.tv.ui.player.PlayerActivity
+import com.gadir.tv.ui.player.VlcPlayerActivity
 
 object PlaybackLauncher {
     fun play(context: Context, request: PlaybackRequest) {
         val settings = AppSettings(context)
         when (settings.playerMode) {
             AppSettings.PLAYER_EXTERNAL -> launchExternal(context, request, settings)
-            else -> launchInternal(context, request)
+            AppSettings.PLAYER_VLC -> launchVlc(context, request)
+            else -> launchExo(context, request)
         }
     }
 
@@ -19,7 +21,7 @@ object PlaybackLauncher {
         val players = ExternalPlayerHelper.findInstalledPlayers(context)
         if (players.isEmpty()) {
             Toast.makeText(context, R.string.settings_no_external_player, Toast.LENGTH_LONG).show()
-            launchInternal(context, request)
+            launchExo(context, request)
             return
         }
 
@@ -30,7 +32,7 @@ object PlaybackLauncher {
                 settings.externalPlayerPackage = packageName
             } else {
                 Toast.makeText(context, R.string.settings_pick_external_player, Toast.LENGTH_LONG).show()
-                launchInternal(context, request)
+                launchExo(context, request)
                 return
             }
         }
@@ -43,11 +45,22 @@ object PlaybackLauncher {
         )
         if (!launched) {
             Toast.makeText(context, R.string.settings_external_player_failed, Toast.LENGTH_LONG).show()
-            launchInternal(context, request)
+            launchExo(context, request)
         }
     }
 
-    private fun launchInternal(context: Context, request: PlaybackRequest) {
+    private fun launchVlc(context: Context, request: PlaybackRequest) {
+        context.startActivity(
+            VlcPlayerActivity.intent(
+                context = context,
+                title = request.title,
+                url = request.url,
+                alternateUrls = request.alternateUrls,
+            ),
+        )
+    }
+
+    private fun launchExo(context: Context, request: PlaybackRequest) {
         context.startActivity(
             PlayerActivity.intent(
                 context = context,

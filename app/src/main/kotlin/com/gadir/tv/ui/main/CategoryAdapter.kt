@@ -12,12 +12,17 @@ import com.gadir.tv.model.Category
 class CategoryAdapter(
     private val items: List<Category>,
     private val onClick: (Category) -> Unit,
+    private val onFocus: ((Category) -> Unit)? = null,
     private val onMoveRight: (() -> Unit)? = null,
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
     private var selected = 0
 
     fun select(position: Int) {
+        syncSelection(position)
+    }
+
+    private fun syncSelection(position: Int) {
         if (position !in items.indices || position == selected) return
         val old = selected
         selected = position
@@ -40,10 +45,18 @@ class CategoryAdapter(
         holder.name.text = item.name
         holder.itemView.isSelected = position == selected
 
+        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) return@setOnFocusChangeListener
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
+            syncSelection(pos)
+            onFocus?.invoke(items[pos])
+        }
+
         holder.itemView.setOnClickListener {
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
-            select(pos)
+            syncSelection(pos)
             onClick(item)
         }
 
@@ -54,7 +67,7 @@ class CategoryAdapter(
                     val pos = holder.bindingAdapterPosition
                     if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
                     if (pos != selected) {
-                        select(pos)
+                        syncSelection(pos)
                         onClick(item)
                     }
                     onMoveRight?.invoke()
@@ -63,7 +76,7 @@ class CategoryAdapter(
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     val pos = holder.bindingAdapterPosition
                     if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
-                    select(pos)
+                    syncSelection(pos)
                     onClick(item)
                     true
                 }
