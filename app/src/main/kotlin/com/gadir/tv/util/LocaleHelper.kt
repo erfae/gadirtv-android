@@ -7,7 +7,7 @@ import java.util.Locale
 
 object LocaleHelper {
     fun wrap(context: Context): Context {
-        val language = AppSettings(context).language
+        val language = runCatching { AppSettings(context).language }.getOrDefault(AppSettings.LANG_ES)
         return updateResources(context, language)
     }
 

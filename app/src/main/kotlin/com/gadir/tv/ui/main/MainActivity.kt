@@ -180,8 +180,9 @@ class MainActivity : AppCompatActivity() {
         liveCategoryList = panelLive.findViewById(R.id.categoryList)
         channelList = panelLive.findViewById(R.id.channelList)
         previewTitle = panelLive.findViewById(R.id.previewTitle)
-        epgNow = panelLive.findViewById(R.id.epgNow)
-        epgNext = panelLive.findViewById(R.id.epgNext)
+        val previewControls = panelLive.findViewById<View>(R.id.miniPreviewControls)
+        epgNow = previewControls.findViewById(R.id.epgNow)
+        epgNext = previewControls.findViewById(R.id.epgNext)
 
         catalogCategoryList = panelCatalog.findViewById(R.id.catalogCategoryList)
         catalogGrid = panelCatalog.findViewById(R.id.catalogGrid)
@@ -1188,10 +1189,10 @@ class MainActivity : AppCompatActivity() {
         miniPlayer = PlayerFactory.create(this).also { player ->
             panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).player = player
             player.playWhenReady = true
-            val previewOverlay = panelLive.findViewById<View>(R.id.miniPreviewOverlay)
+            val previewOverlay = panelLive.findViewById<View>(R.id.miniPreviewControls)
             player.addListener(object : androidx.media3.common.Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    if (!appSettings.autoplayPreview) return
+                    if (!appSettings.autoplayPreview || previewOverlay == null) return
                     val showInfo = !isPlaying
                     previewTitle.visibility = if (showInfo) View.VISIBLE else View.GONE
                     previewOverlay.visibility = if (showInfo) View.VISIBLE else View.GONE
