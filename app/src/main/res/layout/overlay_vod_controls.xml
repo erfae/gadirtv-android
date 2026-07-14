@@ -43,6 +43,7 @@
             android:layout_weight="1"
             android:focusable="true"
             android:max="1000"
+            android:nextFocusDown="@+id/btnVodPlayPause"
             android:progressTint="@color/gtv_red"
             android:thumbTint="@color/gtv_red_hi" />
 
@@ -70,6 +71,8 @@
             android:background="@drawable/player_control_bg"
             android:contentDescription="@string/player_rewind"
             android:focusable="true"
+            android:nextFocusRight="@+id/btnVodPlayPause"
+            android:nextFocusUp="@+id/vodSeekBar"
             android:padding="10dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_rewind" />
@@ -82,6 +85,9 @@
             android:background="@drawable/player_control_bg"
             android:contentDescription="@string/player_play_pause"
             android:focusable="true"
+            android:nextFocusLeft="@+id/btnVodRewind"
+            android:nextFocusRight="@+id/btnVodForward"
+            android:nextFocusUp="@+id/vodSeekBar"
             android:padding="12dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_pause" />
@@ -93,6 +99,9 @@
             android:background="@drawable/player_control_bg"
             android:contentDescription="@string/player_forward"
             android:focusable="true"
+            android:nextFocusLeft="@+id/btnVodPlayPause"
+            android:nextFocusRight="@+id/btnVodVolDown"
+            android:nextFocusUp="@+id/vodSeekBar"
             android:padding="10dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_forward" />
@@ -105,6 +114,9 @@
             android:background="@drawable/player_control_bg"
             android:contentDescription="@string/volume_down"
             android:focusable="true"
+            android:nextFocusLeft="@+id/btnVodForward"
+            android:nextFocusRight="@+id/btnVodVolUp"
+            android:nextFocusUp="@+id/vodSeekBar"
             android:padding="10dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_volume_down" />
@@ -117,6 +129,8 @@
             android:background="@drawable/player_control_bg"
             android:contentDescription="@string/volume_up"
             android:focusable="true"
+            android:nextFocusLeft="@+id/btnVodVolDown"
+            android:nextFocusUp="@+id/vodSeekBar"
             android:padding="10dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_volume_up" />

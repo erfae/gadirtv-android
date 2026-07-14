@@ -142,12 +142,16 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:fillViewport="true"
         android:scrollbars="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             android:orientation="vertical"
             android:paddingBottom="16dp">
 
@@ -189,9 +193,11 @@
                 android:id="@+id/resumeRail"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clipChildren="false"
                 android:clipToPadding="false"
                 android:paddingHorizontal="32dp"
                 android:paddingTop="8dp"
+                android:paddingBottom="12dp"
                 android:scrollbars="none"
                 android:visibility="gone" />
 
@@ -211,9 +217,11 @@
                 android:id="@+id/favoritesRail"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clipChildren="false"
                 android:clipToPadding="false"
                 android:paddingHorizontal="32dp"
                 android:paddingTop="8dp"
+                android:paddingBottom="12dp"
                 android:scrollbars="none"
                 android:visibility="gone" />
 
@@ -231,9 +239,11 @@
                 android:id="@+id/moviesRail"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clipChildren="false"
                 android:clipToPadding="false"
                 android:paddingHorizontal="32dp"
                 android:paddingTop="8dp"
+                android:paddingBottom="12dp"
                 android:scrollbars="none" />
 
             <TextView
@@ -250,9 +260,11 @@
                 android:id="@+id/seriesRail"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clipChildren="false"
                 android:clipToPadding="false"
                 android:paddingHorizontal="32dp"
                 android:paddingTop="8dp"
+                android:paddingBottom="12dp"
                 android:scrollbars="none" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>

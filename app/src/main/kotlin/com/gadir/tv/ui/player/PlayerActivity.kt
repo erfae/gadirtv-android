@@ -252,25 +252,39 @@ class PlayerActivity : AppCompatActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (!isLive && event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
-                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
-                -> {
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                    if (!controlsVisible) {
+                        showVodControls()
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
                     if (!controlsVisible) {
                         showVodControls()
                         return true
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    if (!controlsVisible || currentFocus == vodSeekBar) {
+                    if (!controlsVisible) {
                         seekBy(-SEEK_STEP_MS)
                         showVodControls()
                         return true
                     }
+                    if (controlsVisible && currentFocus == vodSeekBar) {
+                        seekBy(-SEEK_STEP_MS)
+                        scheduleHideControls()
+                        return true
+                    }
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (!controlsVisible || currentFocus == vodSeekBar) {
+                    if (!controlsVisible) {
                         seekBy(SEEK_STEP_MS)
                         showVodControls()
+                        return true
+                    }
+                    if (controlsVisible && currentFocus == vodSeekBar) {
+                        seekBy(SEEK_STEP_MS)
+                        scheduleHideControls()
                         return true
                     }
                 }

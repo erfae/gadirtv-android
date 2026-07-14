@@ -12,7 +12,7 @@ import com.gadir.tv.data.PlaylistRepository
 object ImageLoader {
     private val channelOptions = RequestOptions()
         .diskCacheStrategy(DiskCacheStrategy.ALL)
-        .override(96, 96)
+        .override(128, 128)
         .centerInside()
         .placeholder(R.drawable.tv_banner)
         .error(R.drawable.tv_banner)

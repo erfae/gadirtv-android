@@ -25,7 +25,7 @@
         android:id="@+id/channelList"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="0.42"
+        android:layout_weight="0.36"
         android:clipToPadding="false"
         android:descendantFocusability="afterDescendants"
         android:nextFocusLeft="@+id/categoryList"
@@ -41,7 +41,7 @@
         android:id="@+id/previewContainer"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="0.30"
+        android:layout_weight="0.36"
         android:background="@android:color/black"
         android:orientation="vertical">
 
