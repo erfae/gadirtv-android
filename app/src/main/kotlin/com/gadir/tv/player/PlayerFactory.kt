@@ -42,6 +42,7 @@ object PlayerFactory {
 
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(minBuffer, maxBuffer, playbackBuffer, rebuffer)
+            .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
         return ExoPlayer.Builder(context, renderersFactory)
@@ -66,25 +67,27 @@ object PlayerFactory {
         )
     }
 
-    fun createForLivePreview(context: Context): ExoPlayer =
-        build(
+    fun createForLivePreview(context: Context): ExoPlayer {
+        val bufferMs = AppSettings(context).networkBufferMs
+        return build(
             context = context,
-            minBuffer = 2_500,
-            maxBuffer = 12_000,
-            playbackBuffer = 750,
-            rebuffer = 2_000,
+            minBuffer = (bufferMs * 4).coerceIn(6_000, 18_000),
+            maxBuffer = (bufferMs * 10).coerceIn(20_000, 50_000),
+            playbackBuffer = (bufferMs * 2).coerceIn(2_500, 8_000),
+            rebuffer = (bufferMs * 4).coerceIn(4_000, 12_000),
             audioAttributes = liveAudioAttributes(),
             handleAudioFocus = false,
         )
+    }
 
     fun createForLive(context: Context): ExoPlayer {
         val bufferMs = AppSettings(context).networkBufferMs
         return build(
             context = context,
-            minBuffer = (bufferMs * 4).coerceIn(4_000, 20_000),
-            maxBuffer = (bufferMs * 12).coerceIn(12_000, 45_000),
-            playbackBuffer = (bufferMs * 2).coerceIn(1_500, 8_000),
-            rebuffer = (bufferMs * 3).coerceIn(2_500, 12_000),
+            minBuffer = (bufferMs * 6).coerceIn(8_000, 25_000),
+            maxBuffer = (bufferMs * 16).coerceIn(25_000, 60_000),
+            playbackBuffer = (bufferMs * 3).coerceIn(2_500, 10_000),
+            rebuffer = (bufferMs * 5).coerceIn(5_000, 15_000),
             audioAttributes = liveAudioAttributes(),
             handleAudioFocus = true,
         )

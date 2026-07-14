@@ -69,16 +69,24 @@ class PlayerActivity : BaseLocaleActivity() {
         }
     }
 
-    private val playerListener = object : Player.Listener {
-        override fun onIsPlayingChanged(isPlaying: Boolean) {
-            updatePlayPauseIcon()
-        }
+    private var liveUrlSettled = false
 
+    private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_READY) {
                 updateVodProgress()
+                if (isLive && player?.isPlaying == true && (player?.currentPosition ?: 0L) > 5_000L) {
+                    liveUrlSettled = true
+                }
             }
             updatePlayPauseIcon()
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            updatePlayPauseIcon()
+            if (isLive && isPlaying && (player?.currentPosition ?: 0L) > 5_000L) {
+                liveUrlSettled = true
+            }
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -149,10 +157,13 @@ class PlayerActivity : BaseLocaleActivity() {
             exo.addListener(playerListener)
             startPlayback(exo, url, positionMs)
             if (isLive) {
+                liveUrlSettled = false
                 playbackMonitor = LivePlaybackMonitor(
                     player = exo,
                     overlay = noSignal,
-                    timeoutMs = 15_000L,
+                    timeoutMs = 25_000L,
+                    bufferingFallbackMs = 30_000L,
+                    shouldHoldStream = { liveUrlSettled },
                     onBeforeNoSignal = { tryNextLiveUrl() },
                 ).also { it.start() }
             } else {
@@ -183,8 +194,11 @@ class PlayerActivity : BaseLocaleActivity() {
         pendingLiveUrls.removeFirst()
         val next = pendingLiveUrls.firstOrNull() ?: return false
         val exo = player ?: return false
+        liveUrlSettled = false
         playbackMonitor?.reset()
-        startPlayback(exo, next, 0L)
+        exo.setMediaItem(LiveStreamUrls.mediaItem(next))
+        exo.prepare()
+        exo.playWhenReady = true
         return true
     }
 
