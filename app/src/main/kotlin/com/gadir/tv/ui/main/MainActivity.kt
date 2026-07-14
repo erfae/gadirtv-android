@@ -12,7 +12,10 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -73,8 +76,14 @@ class MainActivity : BaseLocaleActivity() {
     private val epgCache = mutableMapOf<Int, List<EpgEntry>>()
     private val previewHandler = Handler(Looper.getMainLooper())
     private var pendingPreview: Runnable? = null
+    private var previewToken = 0
+    private var previewAudioCheck: Runnable? = null
     private var selectedLiveCategoryId: String? = null
     private var selectedCatalogCategoryId: String? = null
+    private var movieCategoryId: String? = null
+    private var seriesCategoryId: String? = null
+    private var moviesCatalogReady = false
+    private var seriesCatalogReady = false
     private var currentTab = Tab.HOME
 
     private lateinit var tabHome: View
@@ -116,6 +125,11 @@ class MainActivity : BaseLocaleActivity() {
 
     private lateinit var headerClock: TextView
     private lateinit var headerDate: TextView
+    private lateinit var btnSearch: TextView
+    private lateinit var btnReload: TextView
+    private lateinit var btnSettings: TextView
+    private lateinit var btnLogout: TextView
+    private lateinit var btnExit: TextView
     private lateinit var profileAvatar: TextView
 
     private val clockHandler = Handler(Looper.getMainLooper())
@@ -209,15 +223,15 @@ class MainActivity : BaseLocaleActivity() {
             profile,
         )
         startHeaderClock()
-        findViewById<TextView>(R.id.btnSearch).setOnClickListener {
+        findViewById<TextView>(R.id.btnSearch).also { btnSearch = it }.setOnClickListener {
             startActivity(Intent(this, SearchActivity::class.java))
         }
-        findViewById<TextView>(R.id.btnReload).setOnClickListener { reloadPlaylist() }
-        findViewById<TextView>(R.id.btnSettings).setOnClickListener {
+        findViewById<TextView>(R.id.btnReload).also { btnReload = it }.setOnClickListener { reloadPlaylist() }
+        findViewById<TextView>(R.id.btnSettings).also { btnSettings = it }.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
-        findViewById<TextView>(R.id.btnLogout).setOnClickListener { logoutUser() }
-        findViewById<TextView>(R.id.btnExit).setOnClickListener { exitApp() }
+        findViewById<TextView>(R.id.btnLogout).also { btnLogout = it }.setOnClickListener { logoutUser() }
+        findViewById<TextView>(R.id.btnExit).also { btnExit = it }.setOnClickListener { exitApp() }
 
         tabHome = findViewById(R.id.tabHome)
         tabLive = findViewById(R.id.tabLive)
@@ -308,6 +322,7 @@ class MainActivity : BaseLocaleActivity() {
         tabSeries.nextFocusUpId = R.id.catalogCategoryList
 
         setupMiniPlayer()
+        setupHeaderFocusChain()
 
         showTab(Tab.HOME)
     }
@@ -331,15 +346,18 @@ class MainActivity : BaseLocaleActivity() {
                 FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
                 else -> cat.id
             }
+            liveCategoryList.adapter?.let { (it as? CategoryAdapter)?.refreshSelection() }
             reloadChannels(keepCategoryFocus = true)
         }
 
         liveCategoryList.adapter = CategoryAdapter(
             items = liveCategories,
+            selectedId = { liveSelectedCategoryKey() },
             onClick = onCategorySelected,
             onFocus = onCategorySelected,
             onMoveRight = { focusFirstChannel() },
             onMoveLeft = { focusBottomTab(Tab.LIVE) },
+            onMoveUp = { focusHeader() },
         )
         channelList.setItemViewCacheSize(24)
         channelAdapter = ChannelAdapter(
@@ -351,7 +369,7 @@ class MainActivity : BaseLocaleActivity() {
             },
             onDoubleSelect = { channel -> openFullscreen(channel) },
             onMoveLeft = { focusCategoryList() },
-            onMoveUp = { zapChannel(-1) },
+            onMoveUp = { focusCategoryList() },
             onMoveDown = { zapChannel(1) },
             isFavorite = { favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId) },
             onToggleFavorite = { channel ->
@@ -413,6 +431,58 @@ class MainActivity : BaseLocaleActivity() {
         TvNavHelper.focusItem(channelList, index)
     }
 
+    private fun liveSelectedCategoryKey(): String =
+        selectedLiveCategoryId ?: ""
+
+    private fun focusHeader() {
+        btnSettings.requestFocus()
+    }
+
+    private fun setupHeaderFocusChain() {
+        val headerButtons = listOf(btnSearch, btnReload, btnSettings, btnLogout, btnExit)
+        headerButtons.forEach { button ->
+            button.setOnKeyListener { _, keyCode, event ->
+                if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+                when (keyCode) {
+                    KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        focusContentFromHeader()
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
+        updateHeaderDownFocus()
+    }
+
+    private fun updateHeaderDownFocus() {
+        val target = when (currentTab) {
+            Tab.HOME -> heroPlay.id
+            Tab.LIVE -> liveCategoryList.id
+            Tab.MOVIES, Tab.SERIES -> catalogCategoryList.id
+        }
+        listOf(btnSearch, btnReload, btnSettings, btnLogout, btnExit).forEach {
+            it.nextFocusDownId = target
+        }
+    }
+
+    private fun focusContentFromHeader() {
+        when (currentTab) {
+            Tab.HOME -> heroPlay.requestFocus()
+            Tab.LIVE -> focusCategoryList()
+            Tab.MOVIES, Tab.SERIES -> focusCatalogCategoryList()
+        }
+    }
+
+    private fun isFocusInHeader(): Boolean {
+        val focused = currentFocus ?: return false
+        return focused === btnSearch ||
+            focused === btnReload ||
+            focused === btnSettings ||
+            focused === btnLogout ||
+            focused === btnExit
+    }
+
     private fun focusCategoryList() {
         TvNavHelper.focusItem(liveCategoryList, liveCategoryIndex())
     }
@@ -454,6 +524,7 @@ class MainActivity : BaseLocaleActivity() {
         tabLive.isSelected = tab == Tab.LIVE
         tabMovies.isSelected = tab == Tab.MOVIES
         tabSeries.isSelected = tab == Tab.SERIES
+        updateHeaderDownFocus()
 
         when (tab) {
             Tab.HOME -> {
@@ -487,7 +558,13 @@ class MainActivity : BaseLocaleActivity() {
                 stopHeroRotation()
                 miniPlayer?.pause()
                 miniPlaybackMonitor?.stop()
-                setupCatalogTab(tab)
+                val ready = if (tab == Tab.MOVIES) moviesCatalogReady else seriesCatalogReady
+                if (!ready) {
+                    setupCatalogTab(tab)
+                    if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
+                } else {
+                    restoreCatalogTab(tab)
+                }
                 focusCatalogCategoryList()
             }
         }
@@ -1159,7 +1236,13 @@ class MainActivity : BaseLocaleActivity() {
 
         catalogCategories.clear()
         catalogCategories.addAll(cats)
-        selectedCatalogCategoryId = null
+        val savedId = when (tab) {
+            Tab.MOVIES -> movieCategoryId
+            Tab.SERIES -> seriesCategoryId
+            else -> null
+        }
+        selectedCatalogCategoryId = savedId?.takeIf { id -> cats.any { it.id == id } }
+            ?: cats.firstOrNull()?.id
         posterItems.clear()
         catalogGrid.adapter = PosterAdapter(
             items = posterItems,
@@ -1186,33 +1269,66 @@ class MainActivity : BaseLocaleActivity() {
                 favoritesStore.toggle(kind, item.id)
             },
             onMoveLeft = { focusCatalogCategoryList() },
+            onMoveUp = { focusHeader() },
         )
 
         if (catalogCategories.isEmpty()) {
             catalogLoading.visibility = View.GONE
             catalogEmpty.visibility = View.VISIBLE
             catalogEmpty.text = getString(R.string.catalog_empty)
-            catalogCategoryList.adapter = CategoryAdapter(emptyList(), onClick = {})
+            catalogCategoryList.adapter = CategoryAdapter(emptyList(), selectedId = { null }, onClick = {})
             return
+        }
+
+        bindCatalogCategoryAdapter(tab)
+        when (tab) {
+            Tab.MOVIES -> movieCategoryId = selectedCatalogCategoryId
+            Tab.SERIES -> seriesCategoryId = selectedCatalogCategoryId
+            else -> Unit
+        }
+        selectedCatalogCategoryId?.let { loadCatalogItems(tab, it) }
+    }
+
+    private fun restoreCatalogTab(tab: Tab) {
+        val cats = when (tab) {
+            Tab.MOVIES -> PlaylistRepository.vodCategories
+            Tab.SERIES -> PlaylistRepository.seriesCategories
+            else -> emptyList()
+        }
+        catalogCategories.clear()
+        catalogCategories.addAll(cats)
+        selectedCatalogCategoryId = when (tab) {
+            Tab.MOVIES -> movieCategoryId
+            Tab.SERIES -> seriesCategoryId
+            else -> null
+        }?.takeIf { id -> cats.any { it.id == id } }
+            ?: cats.firstOrNull()?.id
+        bindCatalogCategoryAdapter(tab)
+        (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+        selectedCatalogCategoryId?.let { loadCatalogItems(tab, it) }
+    }
+
+    private fun bindCatalogCategoryAdapter(tab: Tab) {
+        val onCategoryPicked = { cat: Category ->
+            selectedCatalogCategoryId = cat.id
+            when (tab) {
+                Tab.MOVIES -> movieCategoryId = cat.id
+                Tab.SERIES -> seriesCategoryId = cat.id
+                else -> Unit
+            }
+            (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+            loadCatalogItems(tab, cat.id)
         }
 
         catalogCategoryList.adapter = CategoryAdapter(
             items = catalogCategories,
-            onClick = { cat ->
-                selectedCatalogCategoryId = cat.id
-                loadCatalogItems(tab, cat.id)
-            },
-            onFocus = { cat ->
-                selectedCatalogCategoryId = cat.id
-                loadCatalogItems(tab, cat.id)
-            },
+            selectedId = { selectedCatalogCategoryId },
+            onClick = onCategoryPicked,
+            onFocus = onCategoryPicked,
             onMoveRight = { focusFirstCatalogItem() },
             onMoveLeft = { focusBottomTab(tab) },
+            onMoveUp = { focusHeader() },
         )
-
-        val first = catalogCategories.first()
-        selectedCatalogCategoryId = first.id
-        loadCatalogItems(tab, first.id)
     }
 
     private fun loadCatalogItems(tab: Tab, categoryId: String) {
@@ -1330,9 +1446,22 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun schedulePreview(channel: LiveChannel) {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
-        val task = Runnable { previewChannel(channel) }
+        previewAudioCheck?.let { previewHandler.removeCallbacks(it) }
+        previewToken++
+        cancelMiniPreviewPlayback()
+        val token = previewToken
+        val task = Runnable {
+            if (token == previewToken) previewChannel(channel, token)
+        }
         pendingPreview = task
-        previewHandler.postDelayed(task, 180L)
+        previewHandler.postDelayed(task, 280L)
+    }
+
+    private fun cancelMiniPreviewPlayback() {
+        miniPlayer?.stop()
+        miniPlayer?.clearMediaItems()
+        previewingStreamId = null
+        previewWorkingUrl = null
     }
 
     private fun applyEpg(channel: LiveChannel, epg: List<EpgEntry>) {
@@ -1351,7 +1480,8 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun previewChannel(channel: LiveChannel) {
+    private fun previewChannel(channel: LiveChannel, token: Int) {
+        if (token != previewToken) return
         val profile = PlaylistRepository.profile ?: return
         currentPreviewChannel = channel
         liveChannelStore.lastStreamId = channel.streamId
@@ -1369,17 +1499,15 @@ class MainActivity : BaseLocaleActivity() {
         }
 
         if (appSettings.autoplayPreview) {
-            if (previewingStreamId != channel.streamId) {
-                previewUrls = LiveStreamUrls.candidates(api, profile, channel)
-                previewUrlIndex = 0
-                previewWorkingUrl = null
-                playMiniPreviewUrl(previewUrls.firstOrNull().orEmpty())
-                previewingStreamId = channel.streamId
-                miniPlaybackMonitor?.start()
-                miniPlaybackMonitor?.reset()
-            }
+            previewUrls = LiveStreamUrls.candidates(api, profile, channel)
+            previewUrlIndex = 0
+            previewWorkingUrl = null
+            previewingStreamId = channel.streamId
+            playMiniPreviewUrl(previewUrls.firstOrNull().orEmpty(), token)
+            miniPlaybackMonitor?.start()
+            miniPlaybackMonitor?.reset()
         } else {
-            miniPlayer?.pause()
+            cancelMiniPreviewPlayback()
             miniPlaybackMonitor?.stop()
         }
 
@@ -1388,19 +1516,43 @@ class MainActivity : BaseLocaleActivity() {
             val epg = withContext(Dispatchers.IO) {
                 api.shortEpg(profile, channel.streamId, limit = 2)
             }
+            if (token != previewToken) return@launch
             epgCache[channel.streamId] = epg
             applyEpg(channel, epg)
         }
     }
 
-    private fun playMiniPreviewUrl(url: String) {
-        if (url.isBlank()) return
+    private fun playMiniPreviewUrl(url: String, token: Int) {
+        if (token != previewToken || url.isBlank()) return
+        previewAudioCheck?.let { previewHandler.removeCallbacks(it) }
         miniPlayer?.apply {
+            stop()
+            clearMediaItems()
             setMediaItem(MediaItem.fromUri(url))
             prepare()
             volume = if (appSettings.previewSound) 1f else 0f
             playWhenReady = true
         }
+        schedulePreviewAudioCheck(token)
+    }
+
+    private fun schedulePreviewAudioCheck(token: Int) {
+        previewAudioCheck?.let { previewHandler.removeCallbacks(it) }
+        val check = Runnable {
+            if (token != previewToken) return@Runnable
+            val player = miniPlayer ?: return@Runnable
+            if (player.playbackState != Player.STATE_READY) return@Runnable
+            if (!hasSelectedAudio(player.currentTracks) && tryNextPreviewUrl(token)) return@Runnable
+        }
+        previewAudioCheck = check
+        previewHandler.postDelayed(check, 2_500L)
+    }
+
+    private fun hasSelectedAudio(tracks: Tracks): Boolean {
+        for (group in tracks.groups) {
+            if (group.type == C.TRACK_TYPE_AUDIO && group.isSelected) return true
+        }
+        return false
     }
 
     private fun showMiniPreviewControls() {
@@ -1419,10 +1571,11 @@ class MainActivity : BaseLocaleActivity() {
         miniControlsHandler.postDelayed(hideMiniControlsRunnable, 5_000L)
     }
 
-    private fun tryNextPreviewUrl(): Boolean {
+    private fun tryNextPreviewUrl(token: Int = previewToken): Boolean {
+        if (token != previewToken) return false
         if (previewUrlIndex >= previewUrls.lastIndex) return false
         previewUrlIndex += 1
-        playMiniPreviewUrl(previewUrls[previewUrlIndex])
+        playMiniPreviewUrl(previewUrls[previewUrlIndex], token)
         miniPlaybackMonitor?.reset()
         return true
     }
@@ -1474,17 +1627,19 @@ class MainActivity : BaseLocaleActivity() {
             Tab.HOME -> logoutUser()
             Tab.LIVE -> {
                 when {
+                    isFocusInHeader() -> focusBottomTab(Tab.LIVE)
                     isFocusInList(channelList) -> focusCategoryList()
                     isFocusInList(liveCategoryList) -> focusBottomTab(Tab.LIVE)
-                    isFocusInBottomNav() -> Unit
+                    isFocusInBottomNav() -> focusHeader()
                     else -> focusChannelAt(currentPreviewChannel)
                 }
             }
             Tab.MOVIES, Tab.SERIES -> {
                 when {
+                    isFocusInHeader() -> focusBottomTab(currentTab)
                     isFocusInList(catalogGrid) -> focusCatalogCategoryList()
                     isFocusInList(catalogCategoryList) -> focusBottomTab(currentTab)
-                    isFocusInBottomNav() -> Unit
+                    isFocusInBottomNav() -> focusHeader()
                     else -> focusFirstCatalogItem()
                 }
             }
@@ -1530,14 +1685,18 @@ class MainActivity : BaseLocaleActivity() {
             focusHeroPlay()
         } else if (currentTab == Tab.LIVE) {
             focusChannelAt(currentPreviewChannel)
+            liveCategoryList.adapter?.let { (it as? CategoryAdapter)?.refreshSelection() }
             if (appSettings.autoplayPreview) {
-                currentPreviewChannel?.let { previewChannel(it) }
+                currentPreviewChannel?.let { schedulePreview(it) }
             }
+        } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
+            (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
         }
     }
 
     override fun onDestroy() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
+        previewAudioCheck?.let { previewHandler.removeCallbacks(it) }
         clockHandler.removeCallbacks(clockRunnable)
         miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
         stopHeroRotation()

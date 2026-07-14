@@ -11,10 +11,12 @@ import com.gadir.tv.model.Category
 
 class CategoryAdapter(
     private val items: List<Category>,
+    private val selectedId: () -> String?,
     private val onClick: (Category) -> Unit,
     private val onFocus: ((Category) -> Unit)? = null,
     private val onMoveRight: (() -> Unit)? = null,
     private val onMoveLeft: (() -> Unit)? = null,
+    private val onMoveUp: (() -> Unit)? = null,
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
@@ -29,12 +31,13 @@ class CategoryAdapter(
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val item = items[position]
+        val active = isSelected(item)
 
         holder.name.text = item.name
-        holder.itemView.isSelected = holder.itemView.hasFocus()
+        holder.itemView.isSelected = active || holder.itemView.hasFocus()
 
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
-            view.isSelected = hasFocus
+            view.isSelected = isSelected(item) || hasFocus
             if (!hasFocus) return@setOnFocusChangeListener
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
@@ -61,6 +64,15 @@ class CategoryAdapter(
                     onMoveRight?.invoke()
                     true
                 }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    val pos = holder.bindingAdapterPosition
+                    if (pos == 0) {
+                        onMoveUp?.invoke()
+                        onMoveUp != null
+                    } else {
+                        false
+                    }
+                }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     val pos = holder.bindingAdapterPosition
                     if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
@@ -70,6 +82,15 @@ class CategoryAdapter(
                 else -> false
             }
         }
+    }
+
+    private fun isSelected(item: Category): Boolean {
+        val selected = selectedId() ?: return false
+        return item.id == selected || (item.id.isEmpty() && selected.isEmpty())
+    }
+
+    fun refreshSelection() {
+        notifyDataSetChanged()
     }
 
     override fun getItemCount(): Int = items.size
