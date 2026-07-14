@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.FavoritesStore
+import com.gadir.tv.data.CatalogPreloader
 import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ProfileStore
@@ -226,6 +227,11 @@ class MainActivity : AppCompatActivity() {
         heroTrailer.setOnClickListener { openHeroTrailer() }
 
         setupMiniPlayer()
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            val activeProfile = PlaylistRepository.profile ?: return@launch
+            runCatching { CatalogPreloader.preloadRemaining(api, activeProfile) }
+        }
 
         showTab(Tab.HOME)
     }

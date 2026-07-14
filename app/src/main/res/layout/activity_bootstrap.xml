@@ -5,6 +5,7 @@
     android:background="@color/gtv_bg">
 
     <LinearLayout
+        android:id="@+id/bootstrapLoading"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
@@ -13,27 +14,35 @@
         android:padding="32dp">
 
         <ProgressBar
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
             android:indeterminateTint="@color/gtv_red" />
 
         <TextView
-            android:id="@+id/bootstrapMessage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
             android:gravity="center"
-            android:text="@string/loading"
+            android:text="@string/loading_playlist"
             android:textColor="@color/gtv_text_dim"
-            android:textSize="15sp" />
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp">
 
         <TextView
             android:id="@+id/bootstrapError"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
             android:gravity="center"
             android:textColor="@color/gtv_red_hi"
+            android:textSize="15sp"
             android:visibility="gone" />
 
         <com.google.android.material.button.MaterialButton

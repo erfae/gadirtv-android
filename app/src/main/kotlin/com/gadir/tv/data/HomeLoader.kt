@@ -1,8 +1,16 @@
 package com.gadir.tv.data
 
+import com.gadir.tv.model.Category
 import com.gadir.tv.model.Profile
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 
 object HomeLoader {
     fun recentMoviesFromCache(): List<VodMovie> {
@@ -34,23 +42,55 @@ object HomeLoader {
         ) { it.added }
 
     private suspend fun <T> loadRecent(
-        fetchCategories: suspend () -> List<com.gadir.tv.model.Category>,
+        fetchCategories: suspend () -> List<Category>,
         fetchStreams: suspend (String?) -> List<T>,
         addedAt: (T) -> Long,
-    ): List<T> {
+    ): List<T> = coroutineScope {
         val categories = fetchCategories()
-        val items = if (categories.isNotEmpty()) {
-            categories.take(4).flatMap { category ->
-                runCatching { fetchStreams(category.id) }.getOrDefault(emptyList())
-            }
-        } else {
-            emptyList()
-        }
-        val merged = if (items.isNotEmpty()) {
-            items
+        val merged = if (categories.isNotEmpty()) {
+            categories.take(4).map { category ->
+                async {
+                    runCatching { fetchStreams(category.id) }.getOrDefault(emptyList())
+                }
+            }.awaitAll().flatten()
         } else {
             runCatching { fetchStreams(null) }.getOrDefault(emptyList())
         }
-        return merged.sortedByDescending(addedAt).take(24)
+        merged.sortedByDescending(addedAt).take(24)
+    }
+}
+
+object CatalogPreloader {
+    private const val MAX_PARALLEL = 3
+
+    suspend fun preloadRemaining(api: XtreamApi, profile: Profile) = withContext(Dispatchers.IO) {
+        coroutineScope {
+            val semaphore = Semaphore(MAX_PARALLEL)
+            val vodJobs = PlaylistRepository.vodCategories
+                .filter { PlaylistRepository.cachedVod(it.id) == null }
+                .map { category ->
+                    async {
+                        semaphore.withPermit {
+                            PlaylistRepository.cacheVod(
+                                category.id,
+                                api.vodStreams(profile, category.id),
+                            )
+                        }
+                    }
+                }
+            val seriesJobs = PlaylistRepository.seriesCategories
+                .filter { PlaylistRepository.cachedSeries(it.id) == null }
+                .map { category ->
+                    async {
+                        semaphore.withPermit {
+                            PlaylistRepository.cacheSeries(
+                                category.id,
+                                api.seriesList(profile, category.id),
+                            )
+                        }
+                    }
+                }
+            awaitAll(*(vodJobs + seriesJobs).toTypedArray())
+        }
     }
 }
