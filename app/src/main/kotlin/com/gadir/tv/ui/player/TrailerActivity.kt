@@ -37,9 +37,32 @@ class TrailerActivity : BaseLocaleActivity() {
         webView.webViewClient = WebViewClient()
 
         if (videoId != null) {
-            webView.loadUrl("https://www.youtube.com/embed/$videoId?autoplay=1&rel=0")
+            val html = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta name="viewport" content="width=device-width, initial-scale=1">
+                  <style>
+                    html, body { margin:0; padding:0; background:#000; height:100%; overflow:hidden; }
+                    iframe { position:absolute; top:0; left:0; width:100%; height:100%; border:0; }
+                  </style>
+                </head>
+                <body>
+                  <iframe
+                    src="https://www.youtube.com/embed/$videoId?autoplay=1&rel=0&playsinline=1&modestbranding=1&fs=1&enablejsapi=1"
+                    allow="autoplay; encrypted-media; fullscreen"
+                    allowfullscreen>
+                  </iframe>
+                </body>
+                </html>
+            """.trimIndent()
+            webView.loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "UTF-8", null)
         } else {
-            val normalized = MetaExtractor.normalizeTrailerUrl(rawUrl) ?: rawUrl
+            val normalized = MetaExtractor.normalizeTrailerUrl(rawUrl)
+            if (normalized == null) {
+                finish()
+                return
+            }
             webView.loadUrl(normalized)
         }
 

@@ -14,7 +14,7 @@ object TrailerLauncher {
     )
 
     fun open(context: Context, rawUrl: String, title: String = "") {
-        val url = MetaExtractor.normalizeTrailerUrl(rawUrl) ?: rawUrl.trim()
+        val url = MetaExtractor.normalizeTrailerUrl(rawUrl) ?: return
         if (url.isEmpty()) return
 
         val videoId = extractYoutubeId(url)

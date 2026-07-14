@@ -18,8 +18,13 @@ object MetaExtractor {
         "youtube_trailer", "trailer", "youtube_id", "trailer_url",
         "youtube_trailer_id", "trailer_youtube", "yt_trailer", "video_trailer",
         "trailer_link", "trailer_youtube_id", "youtube_trailer_url",
-        "preview_url", "video_id", "trailer_1", "trailer_link_youtube",
+        "video_id", "trailer_1", "trailer_link_youtube",
         "movie_trailer", "serie_trailer", "series_trailer",
+    )
+
+    private val imageUrlPattern = Regex(
+        "\\.(jpg|jpeg|png|gif|webp|bmp|svg)(\\?|#|$)",
+        RegexOption.IGNORE_CASE,
     )
 
     fun plotFrom(vararg sources: JsonObject?): String {
@@ -128,11 +133,15 @@ object MetaExtractor {
 
     fun normalizeTrailerUrl(raw: String?): String? {
         val value = raw?.trim().orEmpty()
-        if (value.isEmpty()) return null
+        if (value.isEmpty() || isImageUrl(value)) return null
         if (value.startsWith("http")) return value
         if (value.length >= 8) return "https://www.youtube.com/watch?v=$value"
         return null
     }
+
+    fun isValidTrailerUrl(raw: String?): Boolean = normalizeTrailerUrl(raw) != null
+
+    private fun isImageUrl(url: String): Boolean = imageUrlPattern.containsMatchIn(url)
 
     private fun trailerFromElement(el: JsonElement?): String? {
         if (el == null || el.isJsonNull) return null
