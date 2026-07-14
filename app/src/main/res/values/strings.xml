@@ -35,6 +35,7 @@
     <string name="logout_user">Salir usuario</string>
     <string name="exit_app">Salir app</string>
     <string name="hero_play">REPRODUCIR</string>
+    <string name="hero_view_detail">VER DETALLE</string>
     <string name="hero_play_series">VER SERIE</string>
     <string name="hero_type_movie">Película</string>
     <string name="hero_type_series">Serie</string>

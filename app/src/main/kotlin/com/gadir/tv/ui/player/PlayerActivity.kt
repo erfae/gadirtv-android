@@ -132,14 +132,14 @@ class PlayerActivity : BaseLocaleActivity() {
                 showLiveOverlays()
             }
             findViewById<ImageButton>(R.id.btnFullscreen).visibility = View.GONE
-            showLiveOverlays()
+            hideLiveOverlays()
         } else {
             volumeControls.visibility = View.GONE
             epgPanel.visibility = View.GONE
             setupVodControls(channelTitle)
         }
 
-        player = PlayerFactory.create(this).also { exo ->
+        player = (if (isLive) PlayerFactory.createForLive(this) else PlayerFactory.create(this)).also { exo ->
             VolumeHelper.boostOnPlaybackStart(this)
             findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).player = exo
             exo.volume = 1f
@@ -149,7 +149,7 @@ class PlayerActivity : BaseLocaleActivity() {
                 playbackMonitor = LivePlaybackMonitor(
                     player = exo,
                     overlay = noSignal,
-                    timeoutMs = 10_000L,
+                    timeoutMs = 15_000L,
                     onBeforeNoSignal = { tryNextLiveUrl() },
                 ).also { it.start() }
             } else {
@@ -446,8 +446,12 @@ class PlayerActivity : BaseLocaleActivity() {
     }
 
     override fun onBackPressed() {
-        if (isLive && liveOverlaysVisible) {
-            hideLiveOverlays()
+        if (isLive) {
+            if (liveOverlaysVisible) {
+                hideLiveOverlays()
+                return
+            }
+            finish()
             return
         }
         if (!isLive && controlsVisible) {

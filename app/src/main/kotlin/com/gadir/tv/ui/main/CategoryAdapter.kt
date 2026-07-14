@@ -14,6 +14,7 @@ class CategoryAdapter(
     private val onClick: (Category) -> Unit,
     private val onFocus: ((Category) -> Unit)? = null,
     private val onMoveRight: (() -> Unit)? = null,
+    private val onMoveLeft: (() -> Unit)? = null,
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
@@ -49,7 +50,10 @@ class CategoryAdapter(
         holder.itemView.setOnKeyListener { _, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
             when (keyCode) {
-                KeyEvent.KEYCODE_DPAD_LEFT -> true
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    onMoveLeft?.invoke()
+                    onMoveLeft != null
+                }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     val pos = holder.bindingAdapterPosition
                     if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false

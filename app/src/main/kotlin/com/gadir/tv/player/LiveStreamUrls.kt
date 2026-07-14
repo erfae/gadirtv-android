@@ -9,8 +9,11 @@ object LiveStreamUrls {
         val ext = channel.extension.ifBlank { "ts" }
         val urls = linkedSetOf<String>()
         urls.add(api.streamUrl(profile, channel.streamId, ext))
-        if (ext != "m3u8") urls.add(api.streamUrl(profile, channel.streamId, "m3u8"))
-        if (ext != "ts") urls.add(api.streamUrl(profile, channel.streamId, "ts"))
+        urls.add(api.streamUrl(profile, channel.streamId, "m3u8"))
+        urls.add(api.streamUrl(profile, channel.streamId, "ts"))
+        if (ext !in setOf("m3u8", "ts", "mp4")) {
+            urls.add(api.streamUrl(profile, channel.streamId, "mp4"))
+        }
         return urls.toList()
     }
 
