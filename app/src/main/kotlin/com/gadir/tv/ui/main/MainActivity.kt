@@ -540,6 +540,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindHomeRail(list: RecyclerView, items: List<HomeRailAdapter.HomeRailItem>) {
+        list.clipChildren = false
+        list.clipToPadding = false
         list.adapter = HomeRailAdapter(
             items = items,
             onClick = { item -> onHomeRailClick(item) },

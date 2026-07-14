@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.gadir.tv.R
+import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ImageLoader
 
 class HomeRailAdapter(
@@ -60,8 +61,9 @@ class HomeRailAdapter(
         val fav = isFavorite?.invoke(item) == true
         holder.favoriteBadge.visibility = if (fav) View.VISIBLE else View.GONE
 
-        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
+        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             if (hasFocus) onFocus?.invoke(item)
+            view.post { FocusScaleHelper.applyConeFocus(view, hasFocus) }
         }
         holder.itemView.setOnClickListener { onClick(item) }
         holder.itemView.setOnLongClickListener {
