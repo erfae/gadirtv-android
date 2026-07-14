@@ -48,7 +48,7 @@ object HomeLoader {
     ): List<T> = coroutineScope {
         val categories = fetchCategories()
         val merged = if (categories.isNotEmpty()) {
-            categories.take(4).map { category ->
+            categories.take(6).map { category ->
                 async {
                     runCatching { fetchStreams(category.id) }.getOrDefault(emptyList())
                 }
@@ -61,7 +61,7 @@ object HomeLoader {
 }
 
 object CatalogPreloader {
-    private const val MAX_PARALLEL = 3
+    private const val MAX_PARALLEL = 5
 
     suspend fun preloadRemaining(api: XtreamApi, profile: Profile) = withContext(Dispatchers.IO) {
         coroutineScope {

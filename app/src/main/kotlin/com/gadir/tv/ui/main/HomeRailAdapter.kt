@@ -18,6 +18,7 @@ class HomeRailAdapter(
     private val onFocus: ((HomeRailItem) -> Unit)? = null,
     private val onToggleFavorite: ((HomeRailItem) -> Unit)? = null,
     private val isFavorite: ((HomeRailItem) -> Boolean)? = null,
+    private val onMoveUp: (() -> Unit)? = null,
 ) : RecyclerView.Adapter<HomeRailAdapter.Holder>() {
 
     data class HomeRailItem(
@@ -74,6 +75,13 @@ class HomeRailAdapter(
         holder.itemView.setOnKeyListener { _, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
             when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    if (holder.bindingAdapterPosition == 0) {
+                        onMoveUp?.invoke()
+                        return@setOnKeyListener onMoveUp != null
+                    }
+                    false
+                }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     onClick(item)
                     true

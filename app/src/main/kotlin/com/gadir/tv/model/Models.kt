@@ -100,6 +100,14 @@ data class EpgEntry(
     val end: Long = 0,
 )
 
+data class AccountInfo(
+    val username: String = "",
+    val status: String = "",
+    val expDate: String = "",
+    val activeConnections: String = "",
+    val maxConnections: String = "",
+)
+
 data class LoginResult(
     val ok: Boolean,
     val error: String? = null,

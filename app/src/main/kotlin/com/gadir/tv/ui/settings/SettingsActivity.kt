@@ -6,15 +6,22 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
+import com.gadir.tv.data.BootstrapLoader
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ProfileStore
 import com.gadir.tv.data.SearchRepository
+import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.ui.profiles.ProfilesActivity
 import com.gadir.tv.util.LocaleHelper
 
 class SettingsActivity : AppCompatActivity() {
+    private val api = XtreamApi()
     private lateinit var appSettings: AppSettings
     private lateinit var settingsPlayer: TextView
     private lateinit var btnPlayerMode: TextView
@@ -39,6 +46,7 @@ class SettingsActivity : AppCompatActivity() {
                 R.string.settings_version_label,
                 packageManager.getPackageInfo(packageName, 0).versionName.orEmpty(),
             )
+        updateAccountInfo()
 
         settingsPlayer = findViewById(R.id.settingsPlayer)
         btnPlayerMode = findViewById(R.id.btnPlayerMode)
@@ -59,6 +67,19 @@ class SettingsActivity : AppCompatActivity() {
         btnLanguage.setOnClickListener { cycleLanguage() }
 
         findViewById<TextView>(R.id.btnBack).setOnClickListener { finish() }
+
+        val btnLiveSort = findViewById<TextView>(R.id.btnLiveSort)
+        updateLiveSortLabel(btnLiveSort)
+        btnLiveSort.setOnClickListener {
+            appSettings.liveSortMode = if (appSettings.liveSortMode == AppSettings.LIVE_SORT_ALPHA) {
+                AppSettings.LIVE_SORT_PLAYLIST
+            } else {
+                AppSettings.LIVE_SORT_ALPHA
+            }
+            updateLiveSortLabel(btnLiveSort)
+        }
+
+        findViewById<TextView>(R.id.btnReloadPlaylist).setOnClickListener { reloadPlaylist() }
 
         findViewById<TextView>(R.id.btnClearCache).setOnClickListener {
             PlaylistRepository.clearContentCache()
@@ -109,6 +130,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun updatePlayerLabels() {
         settingsPlayer.text = when (appSettings.playerMode) {
             AppSettings.PLAYER_COMPAT -> getString(R.string.settings_player_compat)
+            AppSettings.PLAYER_VLC -> getString(R.string.settings_player_vlc)
             AppSettings.PLAYER_EXTERNAL -> {
                 val pkg = appSettings.externalPlayerPackage
                 if (pkg.isBlank()) {
@@ -125,6 +147,45 @@ class SettingsActivity : AppCompatActivity() {
             else -> getString(R.string.settings_player_exo)
         }
         btnPlayerMode.text = getString(R.string.settings_change_player)
+    }
+
+    private fun updateAccountInfo() {
+        val account = PlaylistRepository.accountInfo
+        val view = findViewById<TextView>(R.id.settingsAccount)
+        if (account == null || account.username.isBlank()) {
+            view.visibility = android.view.View.GONE
+            return
+        }
+        view.visibility = android.view.View.VISIBLE
+        val exp = if (account.expDate.isNotBlank()) account.expDate else "—"
+        val status = if (account.status.isNotBlank()) account.status else "—"
+        view.text = listOf(
+            getString(R.string.settings_account_label, account.username),
+            getString(R.string.settings_account_status, status),
+            getString(R.string.settings_account_expires, exp),
+        ).joinToString("\n")
+    }
+
+    private fun reloadPlaylist() {
+        val profile = PlaylistRepository.profile ?: return
+        Toast.makeText(this, R.string.loading_playlist, Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { BootstrapLoader.load(api, profile) }
+            }
+            if (result.isSuccess) {
+                updateAccountInfo()
+                Toast.makeText(this@SettingsActivity, R.string.reload_playlist, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun updateLiveSortLabel(view: TextView) {
+        view.text = if (appSettings.liveSortMode == AppSettings.LIVE_SORT_ALPHA) {
+            getString(R.string.settings_live_sort_alpha)
+        } else {
+            getString(R.string.settings_live_sort_playlist)
+        }
     }
 
     private fun updateAutoplayLabel(view: TextView) {

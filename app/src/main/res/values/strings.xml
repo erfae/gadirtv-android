@@ -63,6 +63,15 @@
     <string name="settings_player_external_named">Reproductor: %1$s (externo)</string>
     <string name="settings_player_standard_label">ExoPlayer estándar</string>
     <string name="settings_player_compat_label">ExoPlayer compatibilidad</string>
+    <string name="settings_player_vlc_label">VLC nativo (LibVLC)</string>
+    <string name="settings_player_vlc">Reproductor: VLC nativo (dentro de la app)</string>
+    <string name="reload_playlist">Recargar</string>
+    <string name="settings_reload_playlist">Recargar lista del servidor</string>
+    <string name="settings_live_sort_playlist">Orden canales: playlist</string>
+    <string name="settings_live_sort_alpha">Orden canales: A-Z</string>
+    <string name="settings_account_label">Cuenta: %1$s</string>
+    <string name="settings_account_status">Estado: %1$s</string>
+    <string name="settings_account_expires">Caduca: %1$s</string>
     <string name="settings_player_internal_hint">Reproduce dentro de la app</string>
     <string name="settings_change_player">Cambiar reproductor</string>
     <string name="settings_section_playback">REPRODUCTOR</string>

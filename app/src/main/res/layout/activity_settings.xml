@@ -71,6 +71,14 @@
                 android:textSize="14sp" />
 
             <TextView
+                android:id="@+id/settingsAccount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/gtv_text_dim"
+                android:textSize="13sp" />
+
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
@@ -151,6 +159,33 @@
                 android:nextFocusDown="@+id/btnClearCache"
                 android:paddingHorizontal="16dp"
                 android:paddingVertical="14dp"
+                android:textColor="@android:color/white"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/btnLiveSort"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/tab_bg"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="14dp"
+                android:textColor="@android:color/white"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/btnReloadPlaylist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/tab_bg"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="14dp"
+                android:text="@string/settings_reload_playlist"
                 android:textColor="@android:color/white"
                 android:textSize="14sp" />
 

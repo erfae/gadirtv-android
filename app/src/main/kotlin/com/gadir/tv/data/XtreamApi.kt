@@ -1,5 +1,6 @@
 package com.gadir.tv.data
 
+import com.gadir.tv.model.AccountInfo
 import com.gadir.tv.model.Category
 import com.gadir.tv.model.EpgEntry
 import com.gadir.tv.model.LiveChannel
@@ -71,9 +72,7 @@ class XtreamApi(
                     onProgress?.invoke("Reintentando POST…")
                     val post = NativeHttpClient.request(url, ua, "POST")
                     if (post.error == null && post.status == 200 && parseAuth(post.body)) {
-                        activeUserAgent = ua
-                        PlaylistRepository.userAgent = ua
-                        return LoginResult(true)
+                        return loginSuccess(ua, post.body)
                     }
                     lastDiag = "HTTP ${get.status} GET, POST ${post.status}"
                     continue
@@ -88,26 +87,20 @@ class XtreamApi(
                     continue
                 }
                 if (parseAuth(get.body)) {
-                    activeUserAgent = ua
-                    PlaylistRepository.userAgent = ua
-                    return LoginResult(true)
+                    return loginSuccess(ua, get.body)
                 }
 
                 if (get.body.isBlank()) {
                     onProgress?.invoke("Reintentando POST…")
                     val post = NativeHttpClient.request(url, ua, "POST")
                     if (post.error == null && post.status == 200 && parseAuth(post.body)) {
-                        activeUserAgent = ua
-                        PlaylistRepository.userAgent = ua
-                        return LoginResult(true)
+                        return loginSuccess(ua, post.body)
                     }
                 }
 
                 val post = NativeHttpClient.request(url, ua, "POST")
                 if (post.error == null && post.status == 200 && parseAuth(post.body)) {
-                    activeUserAgent = ua
-                    PlaylistRepository.userAgent = ua
-                    return LoginResult(true)
+                    return loginSuccess(ua, post.body)
                 }
                 lastDiag = when {
                     get.body.isBlank() -> "Respuesta vacía del servidor"
@@ -122,9 +115,7 @@ class XtreamApi(
 
         onProgress?.invoke("Probando vía M3U…")
         if (verifyM3u(profile)) {
-            activeUserAgent = userAgents.first()
-            PlaylistRepository.userAgent = activeUserAgent
-            return LoginResult(true)
+            return loginSuccess(userAgents.first(), "")
         }
 
         return LoginResult(
@@ -388,6 +379,32 @@ class XtreamApi(
             }
         } catch (_: Exception) {
             emptyList()
+        }
+    }
+
+    private fun loginSuccess(ua: String, body: String): LoginResult {
+        activeUserAgent = ua
+        PlaylistRepository.userAgent = ua
+        storeAccountInfo(body)
+        return LoginResult(true)
+    }
+
+    private fun storeAccountInfo(body: String) {
+        if (body.isBlank()) return
+        try {
+            val root = gson.fromJson(body, JsonObject::class.java) ?: return
+            val user = root.getAsJsonObject("user_info") ?: return
+            PlaylistRepository.setAccountInfo(
+                AccountInfo(
+                    username = user.get("username")?.asStringOrNull().orEmpty(),
+                    status = user.get("status")?.asStringOrNull().orEmpty(),
+                    expDate = user.get("exp_date")?.asStringOrNull().orEmpty(),
+                    activeConnections = user.get("active_cons")?.asStringOrNull().orEmpty(),
+                    maxConnections = user.get("max_connections")?.asStringOrNull().orEmpty(),
+                ),
+            )
+        } catch (_: Exception) {
+            PlaylistRepository.setAccountInfo(null)
         }
     }
 

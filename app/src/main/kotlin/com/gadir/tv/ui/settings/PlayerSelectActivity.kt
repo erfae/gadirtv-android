@@ -25,6 +25,7 @@ class PlayerSelectActivity : AppCompatActivity() {
         val options = mutableListOf<PlayerOption>()
         options.add(PlayerOption.Internal(AppSettings.PLAYER_STANDARD, getString(R.string.settings_player_standard_label)))
         options.add(PlayerOption.Internal(AppSettings.PLAYER_COMPAT, getString(R.string.settings_player_compat_label)))
+        options.add(PlayerOption.Internal(AppSettings.PLAYER_VLC, getString(R.string.settings_player_vlc_label)))
 
         val external = ExternalPlayerHelper.findInstalledPlayers(this)
         external.forEach { app ->

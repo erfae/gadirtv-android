@@ -1,5 +1,6 @@
 package com.gadir.tv.data
 
+import com.gadir.tv.model.AccountInfo
 import com.gadir.tv.model.Category
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.Profile
@@ -34,6 +35,9 @@ object PlaylistRepository {
     var bootstrapReady: Boolean = false
         private set
 
+    var accountInfo: AccountInfo? = null
+        private set
+
   var userAgent: String = "XCIPTV"
 
     fun setProfile(p: Profile) {
@@ -53,11 +57,23 @@ object PlaylistRepository {
         seriesCategories = cats.sortedBy { it.order }
     }
 
-    fun channelsFor(categoryId: String?): List<LiveChannel> {
-        if (categoryId.isNullOrEmpty()) return playlistOrderedChannels()
-        return allChannels
-            .filter { it.categoryId == categoryId }
-            .sortedWith(channelOrderComparator())
+    fun channelsFor(categoryId: String?, sortMode: String = AppSettings.LIVE_SORT_PLAYLIST): List<LiveChannel> {
+        val base = if (categoryId.isNullOrEmpty()) {
+            playlistOrderedChannels()
+        } else {
+            allChannels
+                .filter { it.categoryId == categoryId }
+                .sortedWith(channelOrderComparator())
+        }
+        return if (sortMode == AppSettings.LIVE_SORT_ALPHA) {
+            base.sortedBy { it.name.lowercase() }
+        } else {
+            base
+        }
+    }
+
+    fun setAccountInfo(info: AccountInfo?) {
+        accountInfo = info
     }
 
     private fun playlistOrderedChannels(): List<LiveChannel> {
@@ -116,6 +132,7 @@ object PlaylistRepository {
         homeRecentMovies = emptyList()
         homeRecentSeries = emptyList()
         bootstrapReady = false
+        accountInfo = null
         userAgent = "XCIPTV"
     }
 }
