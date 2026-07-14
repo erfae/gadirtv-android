@@ -4,6 +4,7 @@ import com.gadir.tv.model.Category
 import com.gadir.tv.model.Profile
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
+import com.gadir.tv.util.CategorySort
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -13,40 +14,58 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 object HomeLoader {
-    fun recentMoviesFromCache(): List<VodMovie> {
-        val cached = PlaylistRepository.homeRecentMovies
-        if (cached.isNotEmpty()) return cached
-        return PlaylistRepository.allCachedVod()
-            .sortedByDescending { it.added }
-            .take(24)
-    }
+    fun recentMoviesFromCache(): List<VodMovie> =
+        filterAdultMovies(PlaylistRepository.homeRecentMovies.ifEmpty {
+            PlaylistRepository.allCachedVod()
+                .sortedByDescending { it.added }
+                .take(48)
+        })
 
-    fun recentSeriesFromCache(): List<SeriesItem> {
-        val cached = PlaylistRepository.homeRecentSeries
-        if (cached.isNotEmpty()) return cached
-        return PlaylistRepository.allCachedSeries()
-            .sortedByDescending { it.added }
-            .take(24)
-    }
+    fun recentSeriesFromCache(): List<SeriesItem> =
+        filterAdultSeries(PlaylistRepository.homeRecentSeries.ifEmpty {
+            PlaylistRepository.allCachedSeries()
+                .sortedByDescending { it.added }
+                .take(48)
+        })
 
     suspend fun loadRecentMovies(api: XtreamApi, profile: Profile): List<VodMovie> =
-        loadRecent(
-            fetchCategories = { api.vodCategories(profile) },
-            fetchStreams = { categoryId -> api.vodStreams(profile, categoryId) },
-        ) { it.added }
+        filterAdultMovies(
+            loadRecent(
+                fetchCategories = { api.vodCategories(profile) },
+                fetchStreams = { categoryId -> api.vodStreams(profile, categoryId) },
+            ) { it.added },
+        )
 
     suspend fun loadRecentSeries(api: XtreamApi, profile: Profile): List<SeriesItem> =
-        loadRecent(
-            fetchCategories = { api.seriesCategories(profile) },
-            fetchStreams = { categoryId -> api.seriesList(profile, categoryId) },
-        ) { it.added }
+        filterAdultSeries(
+            loadRecent(
+                fetchCategories = { api.seriesCategories(profile) },
+                fetchStreams = { categoryId -> api.seriesList(profile, categoryId) },
+            ) { it.added },
+        )
+
+    private fun filterAdultMovies(movies: List<VodMovie>): List<VodMovie> {
+        val categoryNames = PlaylistRepository.vodCategories.associate { it.id to it.name }
+        return movies.filter { movie ->
+            val catName = categoryNames[movie.categoryId].orEmpty()
+            !CategorySort.isAdultContent(movie.name, catName)
+        }.take(24)
+    }
+
+    private fun filterAdultSeries(series: List<SeriesItem>): List<SeriesItem> {
+        val categoryNames = PlaylistRepository.seriesCategories.associate { it.id to it.name }
+        return series.filter { item ->
+            val catName = categoryNames[item.categoryId].orEmpty()
+            !CategorySort.isAdultContent(item.name, catName)
+        }.take(24)
+    }
 
     private suspend fun <T> loadRecent(
         fetchCategories: suspend () -> List<Category>,
         fetchStreams: suspend (String?) -> List<T>,
         addedAt: (T) -> Long,
     ): List<T> = coroutineScope {
-        val categories = fetchCategories()
+        val categories = fetchCategories().filter { !CategorySort.isAdultCategory(it.name) }
         val merged = if (categories.isNotEmpty()) {
             categories.take(6).map { category ->
                 async {

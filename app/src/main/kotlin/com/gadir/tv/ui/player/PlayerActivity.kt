@@ -149,7 +149,7 @@ class PlayerActivity : BaseLocaleActivity() {
                 playbackMonitor = LivePlaybackMonitor(
                     player = exo,
                     overlay = noSignal,
-                    timeoutMs = 12_000L,
+                    timeoutMs = 10_000L,
                     onBeforeNoSignal = { tryNextLiveUrl() },
                 ).also { it.start() }
             } else {

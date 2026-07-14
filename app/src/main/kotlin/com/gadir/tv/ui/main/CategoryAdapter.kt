@@ -49,6 +49,7 @@ class CategoryAdapter(
         holder.itemView.setOnKeyListener { _, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
             when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> true
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     val pos = holder.bindingAdapterPosition
                     if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false

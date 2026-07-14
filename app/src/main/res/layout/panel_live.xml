@@ -45,9 +45,8 @@
         android:layout_weight="0.48"
         android:background="@drawable/preview_focus_bg"
         android:clickable="true"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:nextFocusLeft="@+id/channelList">
+        android:focusable="false"
+        android:focusableInTouchMode="false">
 
         <androidx.media3.ui.PlayerView
             android:id="@+id/miniPlayer"

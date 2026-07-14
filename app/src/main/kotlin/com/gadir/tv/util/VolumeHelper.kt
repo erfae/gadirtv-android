@@ -4,8 +4,8 @@ import android.content.Context
 import android.media.AudioManager
 
 object VolumeHelper {
-    private const val MIN_PLAYBACK_RATIO = 0.55f
-    private const val ADJUST_STEP_RATIO = 0.06f
+    private const val MIN_PLAYBACK_RATIO = 0.50f
+    private const val ADJUST_STEP_RATIO = 0.05f
 
     fun boostOnPlaybackStart(context: Context) {
         val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager

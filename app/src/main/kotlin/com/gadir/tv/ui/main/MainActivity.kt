@@ -45,6 +45,7 @@ import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.ProfileAvatarHelper
+import com.gadir.tv.util.TvNavHelper
 import com.gadir.tv.util.VolumeHelper
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -365,9 +366,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun focusFirstChannel() {
         if (channels.isEmpty()) return
-        channelList.post {
-            channelList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
-        }
+        TvNavHelper.focusItem(channelList, 0)
     }
 
     private fun startHeaderClock() {
@@ -387,9 +386,7 @@ class MainActivity : BaseLocaleActivity() {
             return
         }
         channelList.scrollToPosition(index)
-        channelList.post {
-            channelList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
-        }
+        TvNavHelper.focusItem(channelList, index)
     }
 
     private fun zapChannel(delta: Int) {
@@ -403,27 +400,18 @@ class MainActivity : BaseLocaleActivity() {
         ?: 0
         val next = (index + delta).coerceIn(0, channels.lastIndex)
         channelList.scrollToPosition(next)
-        channelList.post {
-            channelList.findViewHolderForAdapterPosition(next)?.itemView?.requestFocus()
-        }
+        TvNavHelper.focusItem(channelList, next)
     }
 
     private fun focusChannelAt(channel: LiveChannel?) {
         val target = channel ?: currentPreviewChannel ?: return
         val index = channels.indexOfFirst { it.streamId == target.streamId }
         if (index < 0) return
-        channelList.scrollToPosition(index)
-        channelList.post {
-            channelList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
-        }
+        TvNavHelper.focusItem(channelList, index)
     }
 
     private fun focusCategoryList() {
-        val index = liveCategoryIndex()
-        liveCategoryList.scrollToPosition(index)
-        liveCategoryList.post {
-            liveCategoryList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
-        }
+        TvNavHelper.focusItem(liveCategoryList, liveCategoryIndex())
     }
 
     private fun liveCategoryIndex(): Int {
@@ -438,17 +426,12 @@ class MainActivity : BaseLocaleActivity() {
     private fun focusCatalogCategoryList() {
         val index = catalogCategories.indexOfFirst { it.id == selectedCatalogCategoryId }
             .takeIf { it >= 0 } ?: 0
-        catalogCategoryList.scrollToPosition(index)
-        catalogCategoryList.post {
-            catalogCategoryList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
-        }
+        TvNavHelper.focusItem(catalogCategoryList, index)
     }
 
     private fun focusFirstCatalogItem() {
         if (posterItems.isEmpty()) return
-        catalogGrid.post {
-            catalogGrid.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
-        }
+        TvNavHelper.focusItem(catalogGrid, 0)
     }
 
     private fun setupTabNavigation() {
@@ -1186,6 +1169,10 @@ class MainActivity : BaseLocaleActivity() {
                 selectedCatalogCategoryId = cat.id
                 loadCatalogItems(tab, cat.id)
             },
+            onFocus = { cat ->
+                selectedCatalogCategoryId = cat.id
+                loadCatalogItems(tab, cat.id)
+            },
             onMoveRight = { focusFirstCatalogItem() },
         )
 
@@ -1377,7 +1364,7 @@ class MainActivity : BaseLocaleActivity() {
         miniPlayer?.apply {
             setMediaItem(MediaItem.fromUri(url))
             prepare()
-            volume = if (appSettings.previewSound) 1f else 0f
+            volume = if (appSettings.previewSound) 0.8f else 0f
             playWhenReady = true
         }
     }
@@ -1491,46 +1478,15 @@ class MainActivity : BaseLocaleActivity() {
             setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_NEVER)
         }
         val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
+        noSignal.visibility = View.GONE
         panelLive.findViewById<View>(R.id.btnNoSignalSettings).setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
         val previewContainer = panelLive.findViewById<View>(R.id.previewContainer)
-        previewContainer.isFocusable = true
-        previewContainer.isFocusableInTouchMode = true
-        previewContainer.isClickable = true
         previewContainer.setOnClickListener {
             currentPreviewChannel?.let { openFullscreen(it) }
         }
-        previewContainer.setOnKeyListener { _, keyCode, event ->
-            if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
-            when (keyCode) {
-                android.view.KeyEvent.KEYCODE_DPAD_CENTER,
-                android.view.KeyEvent.KEYCODE_ENTER,
-                -> {
-                    currentPreviewChannel?.let { openFullscreen(it) }
-                    true
-                }
-                android.view.KeyEvent.KEYCODE_DPAD_UP,
-                android.view.KeyEvent.KEYCODE_CHANNEL_UP,
-                -> {
-                    zapChannel(-1)
-                    true
-                }
-                android.view.KeyEvent.KEYCODE_DPAD_DOWN,
-                android.view.KeyEvent.KEYCODE_CHANNEL_DOWN,
-                -> {
-                    zapChannel(1)
-                    true
-                }
-                android.view.KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    focusChannelAt(currentPreviewChannel)
-                    true
-                }
-                else -> false
-            }
-        }
-        channelList.nextFocusRightId = R.id.previewContainer
-        previewContainer.nextFocusRightId = R.id.btnVolDown
+        channelList.nextFocusRightId = View.NO_ID
         miniPlayer = PlayerFactory.create(this).also { player ->
             panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).player = player
             player.playWhenReady = true
@@ -1551,7 +1507,7 @@ class MainActivity : BaseLocaleActivity() {
             miniPlaybackMonitor = LivePlaybackMonitor(
                 player = player,
                 overlay = noSignal,
-                timeoutMs = 15_000L,
+                timeoutMs = 10_000L,
                 onBeforeNoSignal = { tryNextPreviewUrl() },
             )
         }

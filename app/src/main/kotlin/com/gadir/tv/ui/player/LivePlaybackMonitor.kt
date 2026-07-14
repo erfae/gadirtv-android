@@ -9,7 +9,7 @@ import androidx.media3.exoplayer.ExoPlayer
 class LivePlaybackMonitor(
     private val player: ExoPlayer,
     private val overlay: View,
-    private val timeoutMs: Long = 7_000L,
+    private val timeoutMs: Long = 10_000L,
     private val onBeforeNoSignal: (() -> Boolean)? = null,
 ) {
     private val handler = Handler(Looper.getMainLooper())
@@ -22,7 +22,10 @@ class LivePlaybackMonitor(
                     if (player.isPlaying) hideOverlay()
                     else scheduleCheck()
                 }
-                Player.STATE_BUFFERING -> scheduleCheck()
+                Player.STATE_BUFFERING -> {
+                    hideOverlay()
+                    scheduleCheck()
+                }
                 Player.STATE_ENDED -> tryShowOverlay()
                 Player.STATE_IDLE -> scheduleCheck()
             }
@@ -39,6 +42,10 @@ class LivePlaybackMonitor(
 
     private val checkRunnable = Runnable {
         if (!active) return@Runnable
+        if (player.playbackState == Player.STATE_BUFFERING) {
+            scheduleCheck()
+            return@Runnable
+        }
         val playing = player.playbackState == Player.STATE_READY && player.isPlaying
         if (!playing) tryShowOverlay()
     }
@@ -46,7 +53,7 @@ class LivePlaybackMonitor(
     fun start() {
         if (active) return
         active = true
-        overlay.visibility = View.GONE
+        hideOverlay()
         player.addListener(listener)
         scheduleCheck()
     }
