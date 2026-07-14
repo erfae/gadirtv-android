@@ -7,11 +7,11 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.R
 import com.gadir.tv.util.MetaExtractor
 
-class TrailerActivity : AppCompatActivity() {
+class TrailerActivity : BaseLocaleActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

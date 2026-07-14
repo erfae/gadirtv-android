@@ -5,14 +5,14 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
 import com.gadir.tv.player.ExternalPlayerHelper
 
-class PlayerSelectActivity : AppCompatActivity() {
+class PlayerSelectActivity : BaseLocaleActivity() {
     private lateinit var appSettings: AppSettings
 
     override fun onCreate(savedInstanceState: Bundle?) {

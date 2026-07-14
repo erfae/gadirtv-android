@@ -6,10 +6,11 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
@@ -27,6 +28,7 @@ import com.gadir.tv.data.ProfileStore
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.Category
+import com.gadir.tv.model.EpgEntry
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
@@ -40,6 +42,7 @@ import com.gadir.tv.ui.profiles.ProfilesActivity
 import com.gadir.tv.ui.search.SearchActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
 import com.gadir.tv.ui.settings.SettingsActivity
+import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.VolumeHelper
 import kotlinx.coroutines.Dispatchers
@@ -47,14 +50,19 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
     private lateinit var favoritesStore: FavoritesStore
     private lateinit var appSettings: AppSettings
     private var miniPlayer: ExoPlayer? = null
     private var miniPlaybackMonitor: LivePlaybackMonitor? = null
+    private var channelAdapter: ChannelAdapter? = null
     private var currentPreviewChannel: LiveChannel? = null
+    private var previewingStreamId: Int? = null
+    private val epgCache = mutableMapOf<Int, List<EpgEntry>>()
+    private val previewHandler = Handler(Looper.getMainLooper())
+    private var pendingPreview: Runnable? = null
     private var selectedLiveCategoryId: String? = null
     private var selectedCatalogCategoryId: String? = null
     private var currentTab = Tab.HOME
@@ -218,12 +226,16 @@ class MainActivity : AppCompatActivity() {
         moviesRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         seriesRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
 
-        heroPlay.setOnFocusChangeListener { _, hasFocus ->
+        heroPlay.setOnFocusChangeListener { view, hasFocus ->
+            FocusScaleHelper.applyConeFocus(view, hasFocus)
             if (hasFocus) {
                 railPreviewItem = null
                 bindHero(heroItems.getOrNull(heroIndex) ?: return@setOnFocusChangeListener)
                 startHeroRotation()
             }
+        }
+        heroTrailer.setOnFocusChangeListener { view, hasFocus ->
+            FocusScaleHelper.applyConeFocus(view, hasFocus)
         }
 
         setupLiveTab()
@@ -236,11 +248,16 @@ class MainActivity : AppCompatActivity() {
         tabSeries.nextFocusUpId = R.id.catalogCategoryList
         moviesRail.nextFocusUpId = heroPlay.id
         seriesRail.nextFocusUpId = heroPlay.id
-        heroPlay.nextFocusDownId = R.id.tabHome
+        (findViewById<View>(R.id.contentPanels) as ViewGroup).apply {
+            isFocusable = true
+            isFocusableInTouchMode = true
+            descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+        }
 
         setupMiniPlayer()
 
         lifecycleScope.launch(Dispatchers.IO) {
+            if (PlaylistRepository.bootstrapReady) return@launch
             val activeProfile = PlaylistRepository.profile ?: return@launch
             val needsPreload = PlaylistRepository.vodCategories.any {
                 PlaylistRepository.cachedVod(it.id) == null
@@ -256,6 +273,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupLiveTab() {
+        epgCache.clear()
+        previewingStreamId = null
         liveCategories.clear()
         liveCategories.add(Category(id = "", name = getString(R.string.category_all)))
         liveCategories.add(
@@ -281,6 +300,22 @@ class MainActivity : AppCompatActivity() {
             onFocus = onCategorySelected,
             onMoveRight = { focusFirstChannel() },
         )
+        channelList.setItemViewCacheSize(24)
+        channelAdapter = ChannelAdapter(
+            items = channels,
+            onFocus = { channel -> schedulePreview(channel) },
+            onMoveLeft = { focusCategoryList() },
+            isFavorite = { favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId) },
+            onToggleFavorite = { channel ->
+                favoritesStore.toggle(FavoritesStore.KIND_LIVE, channel.streamId)
+                if (selectedLiveCategoryId == FavoritesStore.FAVORITES_CATEGORY_ID) {
+                    reloadChannels(keepCategoryFocus = true)
+                } else {
+                    channelAdapter?.notifyDataSetChanged()
+                }
+            },
+        )
+        channelList.adapter = channelAdapter
         reloadChannels()
     }
 
@@ -469,14 +504,11 @@ class MainActivity : AppCompatActivity() {
     private fun reloadPlaylist() {
         val profile = PlaylistRepository.profile ?: return
         homeLoaded = false
+        homeLoading.text = getString(R.string.loading_playlist)
         homeLoading.visibility = View.VISIBLE
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    BootstrapLoader.load(this@MainActivity, api, profile) { message ->
-                        runOnUiThread { homeLoading.text = message }
-                    }
-                }
+                runCatching { BootstrapLoader.load(this@MainActivity, api, profile) }
             }
             result.onSuccess {
                 setupLiveTab()
@@ -686,11 +718,10 @@ class MainActivity : AppCompatActivity() {
                         positionMs = item.resumePositionMs,
                     )
                 } else {
-                    startActivity(
-                        SeriesDetailActivity.intent(
-                            this,
-                            SeriesItem(item.id, item.title, item.imageUrl, ""),
-                        ),
+                    playSeriesFirstEpisode(
+                        seriesId = item.id,
+                        title = item.title,
+                        imageUrl = item.imageUrl,
                     )
                 }
             }
@@ -765,6 +796,23 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun playSeriesFirstEpisode(seriesId: Int, title: String, imageUrl: String) {
+        val profile = PlaylistRepository.profile ?: return
+        lifecycleScope.launch {
+            val detail = withContext(Dispatchers.IO) { api.seriesInfo(profile, seriesId) } ?: return@launch
+            val firstSeason = detail.seasons.keys.minByOrNull { it.toIntOrNull() ?: Int.MAX_VALUE }
+            val episode = firstSeason?.let { detail.seasons[it]?.minByOrNull { ep -> ep.episodeNum } }
+                ?: return@launch
+            val episodeTitle = "$title — ${episode.season}x${episode.episodeNum}"
+            playSeriesEpisode(
+                title = episodeTitle,
+                episodeId = episode.id,
+                extension = episode.extension,
+                imageUrl = episode.image.ifBlank { imageUrl },
+            )
+        }
+    }
+
     private fun bindHero(item: HeroItem) {
         heroPlotRequestId += 1
         val requestId = heroPlotRequestId
@@ -788,7 +836,7 @@ class MainActivity : AppCompatActivity() {
             is HeroItem.Series -> {
                 applyHeroMeta(
                     badge = getString(R.string.hero_type_series),
-                    playLabel = getString(R.string.hero_play_series),
+                    playLabel = getString(R.string.hero_play),
                     backdrop = item.imageUrl,
                     poster = item.posterUrl,
                 )
@@ -798,7 +846,7 @@ class MainActivity : AppCompatActivity() {
                 applyHeroMeta(
                     badge = item.item.badge,
                     playLabel = when (item.item.kind) {
-                        HomeRailAdapter.HomeRailItem.KIND_SERIES -> getString(R.string.hero_play_series)
+                        HomeRailAdapter.HomeRailItem.KIND_SERIES -> getString(R.string.hero_play)
                         else -> getString(R.string.hero_play)
                     },
                     backdrop = item.imageUrl,
@@ -897,9 +945,11 @@ class MainActivity : AppCompatActivity() {
                 extension = hero.movie.extension,
                 imageUrl = hero.movie.icon,
             )
-            is HeroItem.Series -> {
-                startActivity(SeriesDetailActivity.intent(this, hero.series))
-            }
+            is HeroItem.Series -> playSeriesFirstEpisode(
+                seriesId = hero.series.seriesId,
+                title = hero.series.name,
+                imageUrl = hero.series.cover,
+            )
             is HeroItem.Rail -> playHomeItem(hero.item)
             null -> Unit
         }
@@ -924,11 +974,10 @@ class MainActivity : AppCompatActivity() {
                         positionMs = item.resumePositionMs,
                     )
                 } else {
-                    startActivity(
-                        SeriesDetailActivity.intent(
-                            this,
-                            SeriesItem(item.id, item.title, item.imageUrl, ""),
-                        ),
+                    playSeriesFirstEpisode(
+                        seriesId = item.id,
+                        title = item.title,
+                        imageUrl = item.imageUrl,
                     )
                 }
             }
@@ -1121,22 +1170,32 @@ class MainActivity : AppCompatActivity() {
                 else -> PlaylistRepository.channelsFor(selectedLiveCategoryId, appSettings.liveSortMode)
             },
         )
-        channelList.adapter = ChannelAdapter(
-            items = channels,
-            onFocus = { channel -> previewChannel(channel) },
-            onMoveLeft = { focusCategoryList() },
-            isFavorite = { favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId) },
-            onToggleFavorite = { channel ->
-                favoritesStore.toggle(FavoritesStore.KIND_LIVE, channel.streamId)
-                if (selectedLiveCategoryId == FavoritesStore.FAVORITES_CATEGORY_ID) {
-                    reloadChannels(keepCategoryFocus = true)
-                } else {
-                    channelList.adapter?.notifyDataSetChanged()
-                }
-            },
-        )
+        channelAdapter?.notifyDataSetChanged()
         if (!keepCategoryFocus && channels.isNotEmpty()) {
             focusFirstChannel()
+        }
+    }
+
+    private fun schedulePreview(channel: LiveChannel) {
+        pendingPreview?.let { previewHandler.removeCallbacks(it) }
+        val task = Runnable { previewChannel(channel) }
+        pendingPreview = task
+        previewHandler.postDelayed(task, 180L)
+    }
+
+    private fun applyEpg(channel: LiveChannel, epg: List<EpgEntry>) {
+        if (previewTitle.text != channel.name) return
+        if (epg.isEmpty()) {
+            epgNow.text = getString(R.string.epg_unavailable)
+            epgNext.visibility = View.GONE
+        } else {
+            epgNow.text = epg[0].title
+            if (epg.size > 1) {
+                epgNext.text = getString(R.string.epg_next) + ": " + epg[1].title
+                epgNext.visibility = View.VISIBLE
+            } else {
+                epgNext.visibility = View.GONE
+            }
         }
     }
 
@@ -1144,44 +1203,36 @@ class MainActivity : AppCompatActivity() {
         val profile = PlaylistRepository.profile ?: return
         currentPreviewChannel = channel
         previewTitle.text = channel.name
-        epgNow.text = getString(R.string.epg_unavailable)
-        epgNext.visibility = View.GONE
+        epgCache[channel.streamId]?.let { applyEpg(channel, it) } ?: run {
+            epgNow.text = getString(R.string.epg_unavailable)
+            epgNext.visibility = View.GONE
+        }
+
         if (appSettings.autoplayPreview) {
-            val urls = LiveStreamUrls.candidates(api, profile, channel)
-            val url = urls.first()
-            miniPlayer?.apply {
-                stop()
-                clearMediaItems()
-                setMediaItem(MediaItem.fromUri(url))
-                prepare()
-                volume = 1f
-                playWhenReady = true
+            if (previewingStreamId != channel.streamId) {
+                val urls = LiveStreamUrls.candidates(api, profile, channel)
+                miniPlayer?.apply {
+                    setMediaItem(MediaItem.fromUri(urls.first()))
+                    prepare()
+                    volume = 1f
+                    playWhenReady = true
+                }
+                previewingStreamId = channel.streamId
+                miniPlaybackMonitor?.start()
+                miniPlaybackMonitor?.reset()
             }
-            miniPlaybackMonitor?.start()
-            miniPlaybackMonitor?.reset()
         } else {
-            miniPlayer?.stop()
-            miniPlayer?.clearMediaItems()
+            miniPlayer?.pause()
             miniPlaybackMonitor?.stop()
         }
 
+        if (epgCache.containsKey(channel.streamId)) return
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {
                 api.shortEpg(profile, channel.streamId, limit = 2)
             }
-            if (previewTitle.text != channel.name) return@launch
-            if (epg.isEmpty()) {
-                epgNow.text = getString(R.string.epg_unavailable)
-                epgNext.visibility = View.GONE
-            } else {
-                epgNow.text = epg[0].title
-                if (epg.size > 1) {
-                    epgNext.text = getString(R.string.epg_next) + ": " + epg[1].title
-                    epgNext.visibility = View.VISIBLE
-                } else {
-                    epgNext.visibility = View.GONE
-                }
-            }
+            epgCache[channel.streamId] = epg
+            applyEpg(channel, epg)
         }
     }
 
@@ -1234,12 +1285,22 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (currentTab == Tab.LIVE && appSettings.autoplayPreview) {
+        if (currentTab == Tab.HOME) {
+            focusHeroPlay()
+        } else if (currentTab == Tab.LIVE && appSettings.autoplayPreview) {
             currentPreviewChannel?.let { previewChannel(it) }
         }
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && currentTab == Tab.HOME) {
+            focusHeroPlay()
+        }
+    }
+
     override fun onDestroy() {
+        pendingPreview?.let { previewHandler.removeCallbacks(it) }
         stopHeroRotation()
         miniPlaybackMonitor?.stop()
         miniPlaybackMonitor = null

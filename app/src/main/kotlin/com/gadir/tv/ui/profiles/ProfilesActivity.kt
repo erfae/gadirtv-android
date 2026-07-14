@@ -7,7 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -19,7 +19,7 @@ import com.gadir.tv.ui.login.LoginActivity
 import com.gadir.tv.util.DefaultCredentials
 import com.google.android.material.button.MaterialButton
 
-class ProfilesActivity : AppCompatActivity() {
+class ProfilesActivity : BaseLocaleActivity() {
     private lateinit var profileStore: ProfileStore
     private lateinit var profileGrid: RecyclerView
     private lateinit var btnManage: MaterialButton
