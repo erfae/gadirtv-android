@@ -30,12 +30,13 @@ object PlayerFactory {
             .setHandleAudioBecomingNoisy(true)
 
         if (settings.isCompatPlayer || settings.isVlcPlayer) {
+            val bufferMs = settings.networkBufferMs
             val loadControl = DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
-                    50_000,
-                    120_000,
-                    2_500,
-                    5_000,
+                    bufferMs * 40,
+                    bufferMs * 100,
+                    bufferMs * 2,
+                    bufferMs * 4,
                 )
                 .build()
             builder.setLoadControl(loadControl)

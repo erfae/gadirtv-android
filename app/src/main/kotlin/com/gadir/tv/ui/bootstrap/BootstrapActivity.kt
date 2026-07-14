@@ -24,6 +24,7 @@ class BootstrapActivity : BaseLocaleActivity() {
 
     private lateinit var loadingView: View
     private lateinit var errorView: TextView
+    private lateinit var progressView: TextView
     private lateinit var btnRetry: MaterialButton
     private lateinit var btnProfiles: MaterialButton
 
@@ -34,6 +35,7 @@ class BootstrapActivity : BaseLocaleActivity() {
 
         loadingView = findViewById(R.id.bootstrapLoading)
         errorView = findViewById(R.id.bootstrapError)
+        progressView = findViewById(R.id.bootstrapProgress)
         btnRetry = findViewById(R.id.btnRetry)
         btnProfiles = findViewById(R.id.btnProfiles)
         btnRetry.setOnClickListener { load() }
@@ -58,7 +60,19 @@ class BootstrapActivity : BaseLocaleActivity() {
 
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { BootstrapLoader.load(this@BootstrapActivity, api, profile) }
+                runCatching {
+                    BootstrapLoader.load(
+                        context = this@BootstrapActivity,
+                        api = api,
+                        profile = profile,
+                        onProgress = { message ->
+                            runOnUiThread {
+                                progressView.visibility = View.VISIBLE
+                                progressView.text = message
+                            }
+                        },
+                    )
+                }
             }
 
             result.onSuccess {
@@ -73,6 +87,7 @@ class BootstrapActivity : BaseLocaleActivity() {
     private fun showLoading() {
         loadingView.visibility = View.VISIBLE
         errorView.visibility = View.GONE
+        progressView.visibility = View.GONE
         btnRetry.visibility = View.GONE
         btnProfiles.visibility = View.GONE
     }

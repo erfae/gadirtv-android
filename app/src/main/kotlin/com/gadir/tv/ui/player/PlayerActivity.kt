@@ -132,7 +132,7 @@ class PlayerActivity : BaseLocaleActivity() {
                 showLiveOverlays()
             }
             findViewById<ImageButton>(R.id.btnFullscreen).visibility = View.GONE
-            hideLiveOverlays()
+            showLiveOverlays()
         } else {
             volumeControls.visibility = View.GONE
             epgPanel.visibility = View.GONE
@@ -146,7 +146,12 @@ class PlayerActivity : BaseLocaleActivity() {
             exo.addListener(playerListener)
             startPlayback(exo, url, positionMs)
             if (isLive) {
-                playbackMonitor = LivePlaybackMonitor(exo, noSignal).also { it.start() }
+                playbackMonitor = LivePlaybackMonitor(
+                    player = exo,
+                    overlay = noSignal,
+                    timeoutMs = 12_000L,
+                    onBeforeNoSignal = { tryNextLiveUrl() },
+                ).also { it.start() }
             }
         }
     }

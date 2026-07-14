@@ -10,6 +10,7 @@ class LivePlaybackMonitor(
     private val player: ExoPlayer,
     private val overlay: View,
     private val timeoutMs: Long = 7_000L,
+    private val onBeforeNoSignal: (() -> Boolean)? = null,
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private var active = false
@@ -22,7 +23,7 @@ class LivePlaybackMonitor(
                     else scheduleCheck()
                 }
                 Player.STATE_BUFFERING -> scheduleCheck()
-                Player.STATE_ENDED -> showOverlay()
+                Player.STATE_ENDED -> tryShowOverlay()
                 Player.STATE_IDLE -> scheduleCheck()
             }
         }
@@ -32,14 +33,14 @@ class LivePlaybackMonitor(
         }
 
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-            showOverlay()
+            tryShowOverlay()
         }
     }
 
     private val checkRunnable = Runnable {
         if (!active) return@Runnable
         val playing = player.playbackState == Player.STATE_READY && player.isPlaying
-        if (!playing) showOverlay()
+        if (!playing) tryShowOverlay()
     }
 
     fun start() {
@@ -66,6 +67,15 @@ class LivePlaybackMonitor(
     private fun scheduleCheck() {
         handler.removeCallbacks(checkRunnable)
         if (active) handler.postDelayed(checkRunnable, timeoutMs)
+    }
+
+    private fun tryShowOverlay() {
+        if (onBeforeNoSignal?.invoke() == true) {
+            hideOverlay()
+            scheduleCheck()
+            return
+        }
+        showOverlay()
     }
 
     private fun showOverlay() {
