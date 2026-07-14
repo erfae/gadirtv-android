@@ -19,6 +19,7 @@ import com.gadir.tv.data.SearchRepository
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.ui.profiles.ProfilesActivity
 import com.gadir.tv.util.LocaleHelper
+import com.gadir.tv.util.TvFocusHelper
 
 class SettingsActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
@@ -53,22 +54,28 @@ class SettingsActivity : BaseLocaleActivity() {
         btnLanguage = findViewById(R.id.btnLanguage)
 
         val btnAutoplay = findViewById<TextView>(R.id.btnAutoplay)
+        val btnPreviewSound = findViewById<TextView>(R.id.btnPreviewSound)
+        val btnNetworkBuffer = findViewById<TextView>(R.id.btnNetworkBuffer)
+        val btnLiveSort = findViewById<TextView>(R.id.btnLiveSort)
+        val btnReloadPlaylist = findViewById<TextView>(R.id.btnReloadPlaylist)
+        val btnClearCache = findViewById<TextView>(R.id.btnClearCache)
+        val btnChangeProfile = findViewById<TextView>(R.id.btnChangeProfile)
+        val btnBack = findViewById<TextView>(R.id.btnBack)
+
         updateAutoplayLabel(btnAutoplay)
-        btnAutoplay.setOnClickListener {
+        TvFocusHelper.bindButton(btnAutoplay) {
             appSettings.autoplayPreview = !appSettings.autoplayPreview
             updateAutoplayLabel(btnAutoplay)
         }
 
-        val btnPreviewSound = findViewById<TextView>(R.id.btnPreviewSound)
         updatePreviewSoundLabel(btnPreviewSound)
-        btnPreviewSound.setOnClickListener {
+        TvFocusHelper.bindButton(btnPreviewSound) {
             appSettings.previewSound = !appSettings.previewSound
             updatePreviewSoundLabel(btnPreviewSound)
         }
 
-        val btnNetworkBuffer = findViewById<TextView>(R.id.btnNetworkBuffer)
         updateNetworkBufferLabel(btnNetworkBuffer)
-        btnNetworkBuffer.setOnClickListener {
+        TvFocusHelper.bindButton(btnNetworkBuffer) {
             appSettings.networkBufferMs = when (appSettings.networkBufferMs) {
                 AppSettings.BUFFER_FAST_MS -> AppSettings.BUFFER_NORMAL_MS
                 AppSettings.BUFFER_NORMAL_MS -> AppSettings.BUFFER_STABLE_MS
@@ -77,18 +84,17 @@ class SettingsActivity : BaseLocaleActivity() {
             updateNetworkBufferLabel(btnNetworkBuffer)
         }
 
-        btnPlayerMode.setOnClickListener {
+        TvFocusHelper.bindButton(btnPlayerMode) {
             pickPlayer.launch(Intent(this, PlayerSelectActivity::class.java))
         }
 
         updateLanguageLabel()
-        btnLanguage.setOnClickListener { cycleLanguage() }
+        TvFocusHelper.bindButton(btnLanguage) { cycleLanguage() }
 
-        findViewById<TextView>(R.id.btnBack).setOnClickListener { finish() }
+        TvFocusHelper.bindButton(btnBack) { finish() }
 
-        val btnLiveSort = findViewById<TextView>(R.id.btnLiveSort)
         updateLiveSortLabel(btnLiveSort)
-        btnLiveSort.setOnClickListener {
+        TvFocusHelper.bindButton(btnLiveSort) {
             appSettings.liveSortMode = if (appSettings.liveSortMode == AppSettings.LIVE_SORT_ALPHA) {
                 AppSettings.LIVE_SORT_PLAYLIST
             } else {
@@ -97,15 +103,15 @@ class SettingsActivity : BaseLocaleActivity() {
             updateLiveSortLabel(btnLiveSort)
         }
 
-        findViewById<TextView>(R.id.btnReloadPlaylist).setOnClickListener { reloadPlaylist() }
+        TvFocusHelper.bindButton(btnReloadPlaylist) { reloadPlaylist() }
 
-        findViewById<TextView>(R.id.btnClearCache).setOnClickListener {
+        TvFocusHelper.bindButton(btnClearCache) {
             PlaylistRepository.clearContentCache()
             SearchRepository.invalidate()
             Toast.makeText(this, R.string.settings_cache_cleared, Toast.LENGTH_SHORT).show()
         }
 
-        findViewById<TextView>(R.id.btnChangeProfile).setOnClickListener {
+        TvFocusHelper.bindButton(btnChangeProfile) {
             ProfileStore(this).clearActive()
             PlaylistRepository.clear()
             startActivity(

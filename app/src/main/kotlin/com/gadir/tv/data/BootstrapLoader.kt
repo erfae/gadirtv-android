@@ -37,6 +37,11 @@ object BootstrapLoader {
             PlaylistRepository.updateVodCategories(vodCategories.await())
             PlaylistRepository.updateSeriesCategories(seriesCategories.await())
 
+            onProgress?.invoke(context.getString(R.string.bootstrap_home))
+            val recentMovies = async { HomeLoader.loadRecentMovies(api, profile) }
+            val recentSeries = async { HomeLoader.loadRecentSeries(api, profile) }
+            PlaylistRepository.setHomeRecent(recentMovies.await(), recentSeries.await())
+
             PlaylistRepository.markBootstrapReady()
         }
     }

@@ -21,8 +21,8 @@ android {
         minSdk = 21
         targetSdk = 33
         // Must exceed Flutter v2.5.8 (versionCode 84) so native can replace it.
-        versionCode = 128
-        versionName = "1.21.0"
+        versionCode = 129
+        versionName = "1.21.1"
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
