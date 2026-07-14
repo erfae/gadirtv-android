@@ -76,7 +76,7 @@ class SeriesDetailActivity : AppCompatActivity() {
             }
             loadingView.visibility = View.GONE
             if (detail == null) {
-                findViewById<TextView>(R.id.seriesPlot).text = "No se pudo cargar la serie"
+                findViewById<TextView>(R.id.seriesPlot).text = getString(R.string.series_load_failed)
                 return@launch
             }
 
@@ -227,7 +227,7 @@ class SeriesDetailActivity : AppCompatActivity() {
             val label = if (item.title.isNotEmpty()) {
                 "${item.episodeNum}. ${item.title}"
             } else {
-                "Episodio ${item.episodeNum}"
+                holder.itemView.context.getString(R.string.episode_label, item.episodeNum)
             }
             holder.title.text = label
             holder.plot.text = item.plot

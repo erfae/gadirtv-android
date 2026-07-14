@@ -23,6 +23,7 @@ class BootstrapActivity : AppCompatActivity() {
     private lateinit var profileStore: ProfileStore
 
     private lateinit var loadingView: View
+    private lateinit var progressView: TextView
     private lateinit var errorView: TextView
     private lateinit var btnRetry: MaterialButton
     private lateinit var btnProfiles: MaterialButton
@@ -33,6 +34,7 @@ class BootstrapActivity : AppCompatActivity() {
         setContentView(R.layout.activity_bootstrap)
 
         loadingView = findViewById(R.id.bootstrapLoading)
+        progressView = findViewById(R.id.bootstrapProgress)
         errorView = findViewById(R.id.bootstrapError)
         btnRetry = findViewById(R.id.btnRetry)
         btnProfiles = findViewById(R.id.btnProfiles)
@@ -58,7 +60,11 @@ class BootstrapActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { BootstrapLoader.load(api, profile) }
+                runCatching {
+                    BootstrapLoader.load(this@BootstrapActivity, api, profile) { message ->
+                        runOnUiThread { progressView.text = message }
+                    }
+                }
             }
 
             result.onSuccess {

@@ -63,7 +63,11 @@ object HomeLoader {
 object CatalogPreloader {
     private const val MAX_PARALLEL = 5
 
-    suspend fun preloadRemaining(api: XtreamApi, profile: Profile) = withContext(Dispatchers.IO) {
+    suspend fun preloadRemaining(
+        api: XtreamApi,
+        profile: Profile,
+        onCategory: ((String) -> Unit)? = null,
+    ) = withContext(Dispatchers.IO) {
         coroutineScope {
             val semaphore = Semaphore(MAX_PARALLEL)
             val vodJobs = PlaylistRepository.vodCategories
@@ -71,6 +75,7 @@ object CatalogPreloader {
                 .map { category ->
                     async {
                         semaphore.withPermit {
+                            onCategory?.invoke(category.name)
                             PlaylistRepository.cacheVod(
                                 category.id,
                                 api.vodStreams(profile, category.id),
@@ -83,6 +88,7 @@ object CatalogPreloader {
                 .map { category ->
                     async {
                         semaphore.withPermit {
+                            onCategory?.invoke(category.name)
                             PlaylistRepository.cacheSeries(
                                 category.id,
                                 api.seriesList(profile, category.id),

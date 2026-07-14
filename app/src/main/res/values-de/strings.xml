@@ -101,7 +101,10 @@
     <string name="bootstrap_movies">Filme…</string>
     <string name="bootstrap_series">Serien…</string>
     <string name="bootstrap_home">Startseite wird vorbereitet…</string>
+    <string name="bootstrap_catalog">Vollständiger Katalog wird heruntergeladen…</string>
     <string name="bootstrap_loading_group">Wird geladen: %1$s…</string>
+    <string name="series_load_failed">Serie konnte nicht geladen werden</string>
+    <string name="episode_label">Folge %1$d</string>
     <string name="movie_director">Regisseur: %1$s</string>
     <string name="movie_cast">Besetzung: %1$s</string>
     <string name="epg_guide">Programmführer</string>

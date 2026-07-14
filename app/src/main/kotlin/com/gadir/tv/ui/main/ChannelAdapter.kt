@@ -43,7 +43,10 @@ class ChannelAdapter(
             if (isFavorite(item)) R.drawable.ic_favorite_on else R.drawable.ic_favorite_off,
         )
 
-        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
+        holder.itemView.isSelected = holder.itemView.hasFocus()
+
+        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+            view.isSelected = hasFocus
             if (hasFocus) onFocus(item)
         }
 
