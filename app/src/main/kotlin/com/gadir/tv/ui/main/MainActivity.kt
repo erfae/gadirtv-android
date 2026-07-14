@@ -13,8 +13,6 @@ import android.widget.TextView
 import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.core.widget.NestedScrollView
 import androidx.lifecycle.lifecycleScope
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -35,13 +33,13 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.Profile
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.ui.movie.MovieDetailActivity
-import com.gadir.tv.ui.player.LivePlaybackMonitor
 import com.gadir.tv.player.LiveStreamUrls
+import com.gadir.tv.player.LiveVlcPlayer
 import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
-import com.gadir.tv.player.PlayerFactory
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.ui.profiles.ProfilesActivity
+import org.videolan.libvlc.util.VLCVideoLayout
 import com.gadir.tv.ui.search.SearchActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
 import com.gadir.tv.ui.settings.SettingsActivity
@@ -67,8 +65,8 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var favoritesStore: FavoritesStore
     private lateinit var liveChannelStore: LiveChannelStore
     private lateinit var appSettings: AppSettings
-    private var miniPlayer: ExoPlayer? = null
-    private var miniPlaybackMonitor: LivePlaybackMonitor? = null
+    private var miniVlcPlayer: LiveVlcPlayer? = null
+    private lateinit var miniVlcView: VLCVideoLayout
     private var channelAdapter: ChannelAdapter? = null
     private var currentPreviewChannel: LiveChannel? = null
     private var previewingStreamId: Int? = null
@@ -570,8 +568,7 @@ class MainActivity : BaseLocaleActivity() {
                 panelHome.visibility = View.VISIBLE
                 panelLive.visibility = View.GONE
                 panelCatalog.visibility = View.GONE
-                miniPlayer?.pause()
-                miniPlaybackMonitor?.stop()
+                miniVlcPlayer?.pause()
                 hideMiniPreviewControls()
                 if (!homeLoaded) {
                     loadHome()
@@ -585,9 +582,8 @@ class MainActivity : BaseLocaleActivity() {
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
                 VolumeHelper.boostOnPlaybackStart(this)
-                miniPlayer?.playWhenReady = true
                 if (appSettings.autoplayPreview) {
-                    miniPlaybackMonitor?.start()
+                    currentPreviewChannel?.let { schedulePreview(it) }
                 }
                 restoreLiveTabSession()
             }
@@ -596,8 +592,7 @@ class MainActivity : BaseLocaleActivity() {
                 panelLive.visibility = View.GONE
                 panelCatalog.visibility = View.VISIBLE
                 stopHeroRotation()
-                miniPlayer?.pause()
-                miniPlaybackMonitor?.stop()
+                miniVlcPlayer?.pause()
                 val ready = if (tab == Tab.MOVIES) moviesCatalogReady else seriesCatalogReady
                 if (!ready) {
                     setupCatalogTab(tab)
@@ -1715,8 +1710,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun cancelMiniPreviewPlayback() {
-        miniPlayer?.stop()
-        miniPlayer?.clearMediaItems()
+        miniVlcPlayer?.stop()
         previewingStreamId = null
         previewWorkingUrl = null
     }
@@ -1731,11 +1725,8 @@ class MainActivity : BaseLocaleActivity() {
             previewWorkingUrl = null
             previewingStreamId = channel.streamId
             playMiniPreviewUrl(previewUrls.firstOrNull().orEmpty(), token)
-            miniPlaybackMonitor?.start()
-            miniPlaybackMonitor?.reset()
         } else {
             cancelMiniPreviewPlayback()
-            miniPlaybackMonitor?.stop()
             setPreviewVideoVisible(false)
         }
     }
@@ -1743,25 +1734,21 @@ class MainActivity : BaseLocaleActivity() {
     private fun playMiniPreviewUrl(url: String, token: Int) {
         if (token != previewToken || url.isBlank()) return
         setPreviewVideoVisible(false)
-        miniPlayer?.apply {
-            setMediaItem(LiveStreamUrls.mediaItem(url))
-            prepare()
-            volume = if (appSettings.previewSound) PREVIEW_PLAYER_VOLUME else 0f
-            playWhenReady = true
+        val volume = if (appSettings.previewSound) {
+            LiveVlcPlayer.VOLUME_PREVIEW
+        } else {
+            0
         }
+        miniVlcPlayer?.play(url, volume)
     }
 
     private fun previewIsSettled(): Boolean {
-        val player = miniPlayer ?: return false
         if (previewWorkingUrl.isNullOrBlank()) return false
-        return player.playbackState == Player.STATE_READY &&
-            player.isPlaying &&
-            player.currentPosition > 5_000L
+        return miniVlcPlayer?.isPlaying() == true
     }
 
     private fun setPreviewVideoVisible(visible: Boolean) {
-        panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).alpha =
-            if (visible) 1f else 0f
+        miniVlcView.alpha = if (visible) 1f else 0f
         if (!visible && currentPreviewChannel?.icon?.isNotEmpty() == true) {
             previewLogo.visibility = View.VISIBLE
         } else if (visible) {
@@ -1794,7 +1781,6 @@ class MainActivity : BaseLocaleActivity() {
         previewUrlIndex += 1
         panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
         playMiniPreviewUrl(previewUrls[previewUrlIndex], token)
-        miniPlaybackMonitor?.reset()
         return true
     }
 
@@ -1817,9 +1803,7 @@ class MainActivity : BaseLocaleActivity() {
     fun openFullscreen(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         VolumeHelper.boostOnPlaybackStart(this)
-        miniPlayer?.stop()
-        miniPlayer?.clearMediaItems()
-        miniPlaybackMonitor?.stop()
+        miniVlcPlayer?.stop()
         val candidates = LiveStreamUrls.candidates(api, profile, channel)
         val urls = buildList {
             if (previewingStreamId == channel.streamId) {
@@ -1909,7 +1893,7 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onStop() {
         super.onStop()
-        miniPlayer?.pause()
+        miniVlcPlayer?.pause()
         stopHeroRotation()
     }
 
@@ -1933,10 +1917,8 @@ class MainActivity : BaseLocaleActivity() {
         clockHandler.removeCallbacks(clockRunnable)
         miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
         stopHeroRotation()
-        miniPlaybackMonitor?.stop()
-        miniPlaybackMonitor = null
-        miniPlayer?.release()
-        miniPlayer = null
+        miniVlcPlayer?.release()
+        miniVlcPlayer = null
         super.onDestroy()
     }
 
@@ -1944,11 +1926,8 @@ class MainActivity : BaseLocaleActivity() {
         miniPreviewControls = panelLive.findViewById(R.id.miniPreviewControls)
         miniPreviewControls.visibility = View.GONE
 
-        panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).apply {
-            useController = false
-            setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_NEVER)
-            alpha = 0f
-        }
+        miniVlcView = panelLive.findViewById(R.id.miniVlcPlayer)
+        miniVlcView.alpha = 0f
         val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
         noSignal.visibility = View.GONE
         panelLive.findViewById<View>(R.id.btnNoSignalSettings).setOnClickListener {
@@ -1958,46 +1937,24 @@ class MainActivity : BaseLocaleActivity() {
             currentPreviewChannel?.let { openFullscreen(it) }
         }
         channelList.nextFocusRightId = View.NO_ID
-        miniPlayer = PlayerFactory.createForLivePreview(this).also { player ->
-            panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).player = player
-            player.playWhenReady = true
-            player.addListener(object : androidx.media3.common.Player.Listener {
-                override fun onRenderedFirstFrame() {
-                    if (previewUrlIndex in previewUrls.indices) {
-                        previewWorkingUrl = previewUrls[previewUrlIndex]
-                        setPreviewVideoVisible(true)
-                        panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
-                    }
+        miniVlcPlayer = LiveVlcPlayer(
+            context = this,
+            videoLayout = miniVlcView,
+            networkBufferMs = appSettings.networkBufferMs,
+            onError = {
+                setPreviewVideoVisible(false)
+                if (!tryNextPreviewUrl()) {
+                    noSignal.visibility = View.VISIBLE
                 }
-
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == androidx.media3.common.Player.STATE_READY &&
-                        player.isPlaying &&
-                        previewUrlIndex in previewUrls.indices
-                    ) {
-                        previewWorkingUrl = previewUrls[previewUrlIndex]
-                    }
+            },
+            onPlaying = {
+                if (previewUrlIndex in previewUrls.indices) {
+                    previewWorkingUrl = previewUrls[previewUrlIndex]
                 }
-
-                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                    setPreviewVideoVisible(false)
-                    if (!tryNextPreviewUrl()) {
-                        panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.VISIBLE
-                    }
-                }
-            })
-            miniPlaybackMonitor = LivePlaybackMonitor(
-                player = player,
-                overlay = noSignal,
-                timeoutMs = 20_000L,
-                bufferingFallbackMs = 25_000L,
-                shouldHoldStream = { previewIsSettled() },
-                onBeforeNoSignal = {
-                    setPreviewVideoVisible(false)
-                    tryNextPreviewUrl()
-                },
-            )
-        }
+                setPreviewVideoVisible(true)
+                noSignal.visibility = View.GONE
+            },
+        )
         panelLive.findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
             VolumeHelper.adjust(this, raise = true)
             scheduleHideMiniControls()
@@ -2009,9 +1966,5 @@ class MainActivity : BaseLocaleActivity() {
         panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
             currentPreviewChannel?.let { openFullscreen(it) }
         }
-    }
-
-    private companion object {
-        const val PREVIEW_PLAYER_VOLUME = 0.55f
     }
 }

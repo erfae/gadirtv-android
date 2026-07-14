@@ -48,13 +48,11 @@
         android:focusable="false"
         android:focusableInTouchMode="false">
 
-        <androidx.media3.ui.PlayerView
-            android:id="@+id/miniPlayer"
+        <org.videolan.libvlc.util.VLCVideoLayout
+            android:id="@+id/miniVlcPlayer"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:keepScreenOn="true"
-            app:show_buffering="when_playing"
-            app:use_controller="false" />
+            android:keepScreenOn="true" />
 
         <include
             android:id="@+id/miniNoSignal"
