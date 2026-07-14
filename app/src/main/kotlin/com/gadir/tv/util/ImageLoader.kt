@@ -23,22 +23,26 @@ object ImageLoader {
         .error(R.drawable.tv_banner)
 
     fun loadChannelIcon(target: ImageView, url: String) {
-        if (url.isBlank()) {
-            target.setImageResource(R.drawable.tv_banner)
-            return
-        }
-        Glide.with(target)
-            .load(glideUrl(url))
-            .apply(channelOptions)
-            .into(target)
+        loadPoster(target, url, 128, 128, channelOptions)
     }
 
     fun loadPoster(target: ImageView, url: String, width: Int = 0, height: Int = 0) {
-        if (url.isBlank()) {
+        loadPoster(target, url, width, height, posterOptions)
+    }
+
+    private fun loadPoster(
+        target: ImageView,
+        url: String,
+        width: Int,
+        height: Int,
+        options: RequestOptions,
+    ) {
+        val resolved = ImageUrlResolver.resolve(url)
+        if (resolved.isEmpty()) {
             target.setImageResource(R.drawable.tv_banner)
             return
         }
-        var request = Glide.with(target).load(glideUrl(url)).apply(posterOptions)
+        var request = Glide.with(target).load(glideUrl(resolved)).apply(options)
         if (width > 0 && height > 0) {
             request = request.override(width, height)
         }
@@ -47,11 +51,15 @@ object ImageLoader {
 
     private fun glideUrl(url: String): Any {
         if (!url.startsWith("http")) return url
+        val referer = PlaylistRepository.profile?.host
+            ?.let { HostUtils.baseUrl(it) + "/" }
+            ?: url
         return GlideUrl(
             url,
             LazyHeaders.Builder()
                 .addHeader("User-Agent", PlaylistRepository.userAgent)
                 .addHeader("Accept", "image/*,*/*")
+                .addHeader("Referer", referer)
                 .build(),
         )
     }

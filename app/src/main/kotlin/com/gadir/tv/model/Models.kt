@@ -70,11 +70,13 @@ data class SeriesEpisode(
 data class SeriesDetail(
     val name: String,
     val cover: String,
+    val backdrop: String = "",
     val plot: String,
     val genre: String,
     val releaseDate: String,
     val rating: String,
     val trailerUrl: String = "",
+    val cast: String = "",
     val seasons: Map<String, List<SeriesEpisode>>,
 )
 
