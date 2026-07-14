@@ -7,7 +7,7 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.R
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ResumeStore
@@ -17,7 +17,7 @@ import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
 
-class VlcPlayerActivity : AppCompatActivity() {
+class VlcPlayerActivity : BaseLocaleActivity() {
     private var libVlc: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
     private var overlaysVisible = false

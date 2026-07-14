@@ -103,7 +103,7 @@
                         android:paddingHorizontal="24dp"
                         android:paddingVertical="10dp"
                         android:text="@string/hero_play"
-                        android:textColor="@android:color/black"
+                        android:textColor="@color/hero_play_text"
                         android:textSize="13sp"
                         android:textStyle="bold" />
 
@@ -123,7 +123,7 @@
                         android:paddingHorizontal="20dp"
                         android:paddingVertical="10dp"
                         android:text="@string/hero_trailer"
-                        android:textColor="@android:color/white"
+                        android:textColor="@color/hero_trailer_text"
                         android:textSize="13sp"
                         android:textStyle="bold"
                         android:visibility="gone" />

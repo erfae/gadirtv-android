@@ -6,7 +6,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.lifecycle.lifecycleScope
 import com.gadir.tv.R
 import com.gadir.tv.data.PlaylistRepository
@@ -21,7 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class MovieDetailActivity : AppCompatActivity() {
+class MovieDetailActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
     private var streamId = 0
     private var extension = "mp4"

@@ -19,32 +19,25 @@ object BootstrapLoader {
             PlaylistRepository.setProfile(profile)
             PlaylistRepository.clearContentCache()
 
-            onProgress?.invoke(context.getString(R.string.connecting))
+            onProgress?.invoke(context.getString(R.string.loading_playlist))
+
             val login = api.login(profile)
             if (!login.ok) {
                 throw IllegalStateException(login.error ?: context.getString(R.string.connection_failed))
             }
             PlaylistRepository.userAgent = api.activeUserAgent
 
-            onProgress?.invoke(context.getString(R.string.bootstrap_live))
             val liveCategories = async { api.liveCategories(profile) }
-            onProgress?.invoke(context.getString(R.string.bootstrap_channels))
             val liveStreams = async { api.liveStreams(profile) }
-            onProgress?.invoke(context.getString(R.string.bootstrap_movies))
             val vodCategories = async { api.vodCategories(profile) }
-            onProgress?.invoke(context.getString(R.string.bootstrap_series))
             val seriesCategories = async { api.seriesCategories(profile) }
 
             PlaylistRepository.updateCatalog(liveCategories.await(), liveStreams.await())
             PlaylistRepository.updateVodCategories(vodCategories.await())
             PlaylistRepository.updateSeriesCategories(seriesCategories.await())
 
-            onProgress?.invoke(context.getString(R.string.bootstrap_catalog))
-            CatalogPreloader.preloadRemaining(api, profile) { categoryName ->
-                onProgress?.invoke(context.getString(R.string.bootstrap_loading_group, categoryName))
-            }
+            CatalogPreloader.preloadRemaining(api, profile)
 
-            onProgress?.invoke(context.getString(R.string.bootstrap_home))
             val recentMovies = HomeLoader.loadRecentMovies(api, profile)
             val recentSeries = HomeLoader.loadRecentSeries(api, profile)
             PlaylistRepository.setHomeRecent(recentMovies, recentSeries)

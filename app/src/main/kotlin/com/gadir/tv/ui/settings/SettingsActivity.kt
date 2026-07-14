@@ -5,7 +5,7 @@ import android.os.Bundle
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
+import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -20,7 +20,7 @@ import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.ui.profiles.ProfilesActivity
 import com.gadir.tv.util.LocaleHelper
 
-class SettingsActivity : AppCompatActivity() {
+class SettingsActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
     private lateinit var appSettings: AppSettings
     private lateinit var settingsPlayer: TextView

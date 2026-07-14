@@ -9,7 +9,7 @@ import android.text.TextWatcher
 import android.view.KeyEvent
 import android.view.View
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.lifecycle.lifecycleScope
 import com.gadir.tv.R
 import com.gadir.tv.data.ProfileStore
@@ -26,7 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class LoginActivity : AppCompatActivity() {
+class LoginActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
     private lateinit var profileStore: ProfileStore
     private val draftHandler = Handler(Looper.getMainLooper())

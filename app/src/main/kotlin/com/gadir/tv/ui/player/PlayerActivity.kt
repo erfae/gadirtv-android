@@ -11,7 +11,7 @@ import android.view.View
 import android.widget.ImageButton
 import android.widget.SeekBar
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -31,7 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class PlayerActivity : AppCompatActivity() {
+class PlayerActivity : BaseLocaleActivity() {
     private var player: ExoPlayer? = null
     private var playbackMonitor: LivePlaybackMonitor? = null
     private lateinit var resumeStore: ResumeStore
