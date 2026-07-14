@@ -59,6 +59,24 @@ class SettingsActivity : BaseLocaleActivity() {
             updateAutoplayLabel(btnAutoplay)
         }
 
+        val btnPreviewSound = findViewById<TextView>(R.id.btnPreviewSound)
+        updatePreviewSoundLabel(btnPreviewSound)
+        btnPreviewSound.setOnClickListener {
+            appSettings.previewSound = !appSettings.previewSound
+            updatePreviewSoundLabel(btnPreviewSound)
+        }
+
+        val btnNetworkBuffer = findViewById<TextView>(R.id.btnNetworkBuffer)
+        updateNetworkBufferLabel(btnNetworkBuffer)
+        btnNetworkBuffer.setOnClickListener {
+            appSettings.networkBufferMs = when (appSettings.networkBufferMs) {
+                AppSettings.BUFFER_FAST_MS -> AppSettings.BUFFER_NORMAL_MS
+                AppSettings.BUFFER_NORMAL_MS -> AppSettings.BUFFER_STABLE_MS
+                else -> AppSettings.BUFFER_FAST_MS
+            }
+            updateNetworkBufferLabel(btnNetworkBuffer)
+        }
+
         btnPlayerMode.setOnClickListener {
             pickPlayer.launch(Intent(this, PlayerSelectActivity::class.java))
         }
@@ -194,5 +212,22 @@ class SettingsActivity : BaseLocaleActivity() {
         } else {
             getString(R.string.settings_autoplay_off)
         }
+    }
+
+    private fun updatePreviewSoundLabel(view: TextView) {
+        view.text = if (appSettings.previewSound) {
+            getString(R.string.settings_preview_sound_on)
+        } else {
+            getString(R.string.settings_preview_sound_off)
+        }
+    }
+
+    private fun updateNetworkBufferLabel(view: TextView) {
+        val label = when (appSettings.networkBufferMs) {
+            AppSettings.BUFFER_FAST_MS -> getString(R.string.settings_buffer_fast)
+            AppSettings.BUFFER_STABLE_MS -> getString(R.string.settings_buffer_stable)
+            else -> getString(R.string.settings_buffer_normal)
+        }
+        view.text = getString(R.string.settings_network_buffer, label)
     }
 }

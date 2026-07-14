@@ -45,6 +45,7 @@ import com.gadir.tv.ui.series.SeriesDetailActivity
 import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ImageLoader
+import com.gadir.tv.util.ProfileAvatarHelper
 import com.gadir.tv.util.VolumeHelper
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -197,11 +198,11 @@ class MainActivity : BaseLocaleActivity() {
         headerClock = findViewById(R.id.headerClock)
         headerDate = findViewById(R.id.headerDate)
         profileAvatar = findViewById(R.id.profileAvatar)
-        val initial = profile.name.trim().firstOrNull()?.uppercaseChar()?.toString().orEmpty()
-        if (initial.isNotEmpty()) {
-            profileAvatar.text = initial
-            profileAvatar.visibility = View.VISIBLE
-        }
+        ProfileAvatarHelper.bind(
+            findViewById(R.id.profileAvatarCircle),
+            profileAvatar,
+            profile,
+        )
         startHeaderClock()
         findViewById<TextView>(R.id.btnSearch).setOnClickListener {
             startActivity(Intent(this, SearchActivity::class.java))
@@ -289,9 +290,14 @@ class MainActivity : BaseLocaleActivity() {
         }
 
         setupMiniPlayer()
+        startBackgroundCatalogPreload()
 
+        showTab(Tab.HOME)
+    }
+
+    private fun startBackgroundCatalogPreload() {
         lifecycleScope.launch(Dispatchers.IO) {
-            if (PlaylistRepository.bootstrapReady) return@launch
+            if (!PlaylistRepository.bootstrapReady) return@launch
             val activeProfile = PlaylistRepository.profile ?: return@launch
             val needsPreload = PlaylistRepository.vodCategories.any {
                 PlaylistRepository.cachedVod(it.id) == null
@@ -302,8 +308,6 @@ class MainActivity : BaseLocaleActivity() {
                 runCatching { CatalogPreloader.preloadRemaining(api, activeProfile) }
             }
         }
-
-        showTab(Tab.HOME)
     }
 
     private fun setupLiveTab() {
@@ -1306,7 +1310,6 @@ class MainActivity : BaseLocaleActivity() {
 
         if (appSettings.autoplayPreview) {
             if (previewingStreamId != channel.streamId) {
-                VolumeHelper.boostOnPlaybackStart(this)
                 previewUrls = LiveStreamUrls.candidates(api, profile, channel)
                 previewUrlIndex = 0
                 previewWorkingUrl = null
@@ -1335,7 +1338,7 @@ class MainActivity : BaseLocaleActivity() {
         miniPlayer?.apply {
             setMediaItem(MediaItem.fromUri(url))
             prepare()
-            volume = 1f
+            volume = if (appSettings.previewSound) 1f else 0f
             playWhenReady = true
         }
     }
@@ -1494,7 +1497,12 @@ class MainActivity : BaseLocaleActivity() {
                     tryNextPreviewUrl()
                 }
             })
-            miniPlaybackMonitor = LivePlaybackMonitor(player, noSignal)
+            miniPlaybackMonitor = LivePlaybackMonitor(
+                player = player,
+                overlay = noSignal,
+                timeoutMs = 15_000L,
+                onBeforeNoSignal = { tryNextPreviewUrl() },
+            )
         }
         panelLive.findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
             VolumeHelper.adjust(this, raise = true)

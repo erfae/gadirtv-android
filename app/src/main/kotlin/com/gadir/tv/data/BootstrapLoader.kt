@@ -27,6 +27,7 @@ object BootstrapLoader {
             }
             PlaylistRepository.userAgent = api.activeUserAgent
 
+            onProgress?.invoke(context.getString(R.string.bootstrap_live))
             val liveCategories = async { api.liveCategories(profile) }
             val liveStreams = async { api.liveStreams(profile) }
             val vodCategories = async { api.vodCategories(profile) }
@@ -35,12 +36,6 @@ object BootstrapLoader {
             PlaylistRepository.updateCatalog(liveCategories.await(), liveStreams.await())
             PlaylistRepository.updateVodCategories(vodCategories.await())
             PlaylistRepository.updateSeriesCategories(seriesCategories.await())
-
-            CatalogPreloader.preloadRemaining(api, profile)
-
-            val recentMovies = HomeLoader.loadRecentMovies(api, profile)
-            val recentSeries = HomeLoader.loadRecentSeries(api, profile)
-            PlaylistRepository.setHomeRecent(recentMovies, recentSeries)
 
             PlaylistRepository.markBootstrapReady()
         }

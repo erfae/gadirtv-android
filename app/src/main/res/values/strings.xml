@@ -94,6 +94,12 @@
     <string name="settings_version_label">Versión %1$s</string>
     <string name="settings_autoplay_on">Vista previa automática: ACTIVADA</string>
     <string name="settings_autoplay_off">Vista previa automática: DESACTIVADA</string>
+    <string name="settings_preview_sound_on">Sonido en vista previa: ACTIVADO</string>
+    <string name="settings_preview_sound_off">Sonido en vista previa: DESACTIVADO</string>
+    <string name="settings_network_buffer">Buffer de red: %1$s</string>
+    <string name="settings_buffer_fast">Rápido (600 ms)</string>
+    <string name="settings_buffer_normal">Normal (1200 ms)</string>
+    <string name="settings_buffer_stable">Estable (2500 ms)</string>
     <string name="rail_continue">Continuar viendo</string>
     <string name="resume_progress">Continuar — %1$d%%</string>
     <string name="hero_synopsis_label">SINOPSIS</string>
