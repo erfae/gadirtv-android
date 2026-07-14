@@ -18,9 +18,14 @@ object LiveStreamUrls {
         if (ext.isNotEmpty() && ext !in setOf("ts", "m3u8")) {
             urls.add(api.streamUrl(profile, channel.streamId, ext))
         }
-        // HLS suele tener mejor audio en muchos canales IPTV.
-        urls.add(api.streamUrl(profile, channel.streamId, "m3u8"))
-        urls.add(api.streamUrl(profile, channel.streamId, "ts"))
+        // TS primero en canales nativos (más fluido); HLS como alternativa con audio.
+        if (ext == "m3u8") {
+            urls.add(api.streamUrl(profile, channel.streamId, "m3u8"))
+            urls.add(api.streamUrl(profile, channel.streamId, "ts"))
+        } else {
+            urls.add(api.streamUrl(profile, channel.streamId, "ts"))
+            urls.add(api.streamUrl(profile, channel.streamId, "m3u8"))
+        }
         urls.add(api.streamUrlWithoutExtension(profile, channel.streamId))
         if (ext == "mp4") {
             urls.add(api.streamUrl(profile, channel.streamId, "mp4"))

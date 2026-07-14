@@ -13,6 +13,7 @@ import android.widget.TextView
 import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.core.widget.NestedScrollView
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -1667,6 +1668,10 @@ class MainActivity : BaseLocaleActivity() {
     private fun schedulePreview(channel: LiveChannel) {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val channelChanged = previewingStreamId != channel.streamId
+        if (!channelChanged && previewIsSettled()) {
+            updatePreviewInfo(channel)
+            return
+        }
         if (channelChanged) {
             previewToken++
             cancelMiniPreviewPlayback()
@@ -1679,7 +1684,7 @@ class MainActivity : BaseLocaleActivity() {
             if (token == previewToken) previewChannel(channel, token)
         }
         pendingPreview = task
-        previewHandler.postDelayed(task, 200L)
+        previewHandler.postDelayed(task, 400L)
     }
 
     private fun updatePreviewInfo(channel: LiveChannel) {
@@ -1739,13 +1744,19 @@ class MainActivity : BaseLocaleActivity() {
         if (token != previewToken || url.isBlank()) return
         setPreviewVideoVisible(false)
         miniPlayer?.apply {
-            stop()
-            clearMediaItems()
             setMediaItem(LiveStreamUrls.mediaItem(url))
             prepare()
             volume = if (appSettings.previewSound) PREVIEW_PLAYER_VOLUME else 0f
             playWhenReady = true
         }
+    }
+
+    private fun previewIsSettled(): Boolean {
+        val player = miniPlayer ?: return false
+        if (previewWorkingUrl.isNullOrBlank()) return false
+        return player.playbackState == Player.STATE_READY &&
+            player.isPlaying &&
+            player.currentPosition > 5_000L
     }
 
     private fun setPreviewVideoVisible(visible: Boolean) {
@@ -1978,7 +1989,9 @@ class MainActivity : BaseLocaleActivity() {
             miniPlaybackMonitor = LivePlaybackMonitor(
                 player = player,
                 overlay = noSignal,
-                timeoutMs = 6_000L,
+                timeoutMs = 20_000L,
+                bufferingFallbackMs = 25_000L,
+                shouldHoldStream = { previewIsSettled() },
                 onBeforeNoSignal = {
                     setPreviewVideoVisible(false)
                     tryNextPreviewUrl()
