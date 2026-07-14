@@ -13,8 +13,8 @@ import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.VodMovie
-import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
+import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.TrailerLauncher
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +23,7 @@ import kotlinx.coroutines.withContext
 
 class MovieDetailActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
+    private lateinit var resumeStore: ResumeStore
     private var streamId = 0
     private var extension = "mp4"
     private var fallbackCover = ""
@@ -34,6 +35,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
 
         streamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
         extension = intent.getStringExtra(EXTRA_EXTENSION).orEmpty().ifBlank { "mp4" }
+        resumeStore = ResumeStore(this)
         val movieName = intent.getStringExtra(EXTRA_MOVIE_NAME).orEmpty()
         fallbackCover = intent.getStringExtra(EXTRA_MOVIE_COVER).orEmpty()
 
@@ -108,8 +110,9 @@ class MovieDetailActivity : BaseLocaleActivity() {
         val profile = PlaylistRepository.profile ?: return
         val title = findViewById<TextView>(R.id.movieTitle).text.toString()
         val cover = fallbackCover
-        PlaybackLauncher.play(
+        ResumePlaybackHelper.play(
             context = this,
+            resumeStore = resumeStore,
             request = PlaybackRequest(
                 title = title,
                 url = api.movieStreamUrl(profile, streamId, extension),

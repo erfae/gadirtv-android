@@ -71,14 +71,17 @@ object HomeLoader {
         idOf: (T) -> Int,
     ): List<T> = coroutineScope {
         val categories = fetchCategories().filter { !CategorySort.isAdultCategory(it.name) }
-        val merged = if (categories.isNotEmpty()) {
-            categories.take(12).map { category ->
+        val allStreams = runCatching { fetchStreams(null) }.getOrDefault(emptyList())
+        val merged = if (allStreams.isNotEmpty()) {
+            allStreams
+        } else if (categories.isNotEmpty()) {
+            categories.map { category ->
                 async {
                     runCatching { fetchStreams(category.id) }.getOrDefault(emptyList())
                 }
             }.awaitAll().flatten()
         } else {
-            runCatching { fetchStreams(null) }.getOrDefault(emptyList())
+            emptyList()
         }
         merged
             .distinctBy(idOf)
