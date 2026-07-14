@@ -17,7 +17,7 @@
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="24dp"
+            android:layout_marginEnd="16dp"
             android:orientation="vertical">
 
             <TextView
@@ -48,38 +48,6 @@
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_weight="1" />
-
-        <FrameLayout
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginEnd="10dp">
-
-            <View
-                android:id="@+id/profileAvatarCircle"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@drawable/avatar_bg" />
-
-            <TextView
-                android:id="@+id/profileAvatar"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:textColor="@android:color/white"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-        </FrameLayout>
-
-        <TextView
-            android:id="@+id/profileLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:maxWidth="120dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/gtv_text_dim"
-            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/btnSearch"
@@ -157,6 +125,7 @@
             android:id="@+id/btnExit"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginEnd="12dp"
             android:background="@drawable/tab_bg"
             android:contentDescription="@string/exit_app"
             android:drawableStart="@drawable/ic_exit"
@@ -169,6 +138,44 @@
             android:text="@string/exit_app"
             android:textColor="@android:color/white"
             android:textSize="11sp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/headerExpiration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/gtv_text_dim"
+                android:textSize="10sp" />
+
+            <FrameLayout
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_gravity="end"
+                android:layout_marginTop="4dp">
+
+                <View
+                    android:id="@+id/profileAvatarCircle"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/avatar_bg" />
+
+                <TextView
+                    android:id="@+id/profileAvatar"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:textColor="@android:color/white"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+        </LinearLayout>
     </LinearLayout>
 
     <View
