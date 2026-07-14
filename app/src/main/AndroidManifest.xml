@@ -13,6 +13,7 @@
         android:required="false" />
 
     <application
+        android:name=".GadirApplication"
         android:allowBackup="true"
         android:banner="@drawable/tv_banner"
         android:icon="@mipmap/ic_launcher"
@@ -71,6 +72,15 @@
         <activity
             android:name=".ui.settings.SettingsActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".ui.settings.PlayerSelectActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.player.TrailerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.GadirTV.Player" />
 
         <meta-data
             android:name="com.google.android.tv.feature"

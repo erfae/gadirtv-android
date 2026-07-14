@@ -811,22 +811,59 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun playHero() {
-        railPreviewItem?.let {
-            onHomeRailClick(it)
+        val item = railPreviewItem
+            ?: (heroItems.getOrNull(heroIndex) as? HeroItem.Rail)?.item
+        if (item != null) {
+            playHomeItem(item)
             return
         }
-        val item = heroItems.getOrNull(heroIndex) ?: return
-        when (item) {
+        when (val hero = heroItems.getOrNull(heroIndex)) {
             is HeroItem.Movie -> playMovie(
-                title = item.title,
-                streamId = item.movie.streamId,
-                extension = item.movie.extension,
-                imageUrl = item.movie.icon,
+                title = hero.title,
+                streamId = hero.movie.streamId,
+                extension = hero.movie.extension,
+                imageUrl = hero.movie.icon,
             )
             is HeroItem.Series -> {
-                startActivity(SeriesDetailActivity.intent(this, item.series))
+                startActivity(SeriesDetailActivity.intent(this, hero.series))
             }
-            is HeroItem.Rail -> onHomeRailClick(item.item)
+            is HeroItem.Rail -> playHomeItem(hero.item)
+            null -> Unit
+        }
+    }
+
+    private fun playHomeItem(item: HomeRailAdapter.HomeRailItem) {
+        when (item.kind) {
+            HomeRailAdapter.HomeRailItem.KIND_MOVIE -> playMovie(
+                title = item.title,
+                streamId = item.id,
+                extension = item.extension,
+                imageUrl = item.imageUrl,
+                positionMs = item.resumePositionMs,
+            )
+            HomeRailAdapter.HomeRailItem.KIND_SERIES -> {
+                if (item.resumePositionMs > 0L) {
+                    playSeriesEpisode(
+                        title = item.title,
+                        episodeId = item.id,
+                        extension = item.extension,
+                        imageUrl = item.imageUrl,
+                        positionMs = item.resumePositionMs,
+                    )
+                } else {
+                    startActivity(
+                        SeriesDetailActivity.intent(
+                            this,
+                            SeriesItem(item.id, item.title, item.imageUrl, ""),
+                        ),
+                    )
+                }
+            }
+            HomeRailAdapter.HomeRailItem.KIND_LIVE -> {
+                val channel = PlaylistRepository.allChannels.firstOrNull { it.streamId == item.id }
+                    ?: return
+                openFullscreen(channel)
+            }
         }
     }
 

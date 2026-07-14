@@ -36,6 +36,10 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var resumeStore: ResumeStore
     private val api = XtreamApi()
     private var isLive = false
+    private var liveOverlaysVisible = false
+
+    private lateinit var volumeControls: View
+    private lateinit var epgPanel: View
 
     private lateinit var vodControls: View
     private lateinit var vodTitle: TextView
@@ -49,6 +53,7 @@ class PlayerActivity : AppCompatActivity() {
     private var controlsVisible = false
 
     private val hideControlsRunnable = Runnable { hideVodControls() }
+    private val hideLiveOverlaysRunnable = Runnable { hideLiveOverlays() }
     private val progressRunnable = object : Runnable {
         override fun run() {
             updateVodProgress()
@@ -88,29 +93,34 @@ class PlayerActivity : AppCompatActivity() {
             setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_NEVER)
         }
 
+        enableImmersiveMode()
+
         val noSignal = findViewById<View>(R.id.playerNoSignal)
         findViewById<View>(R.id.btnNoSignalSettings).setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
 
-        val volumeControls = findViewById<View>(R.id.playerVolumeControls)
-        val epgPanel = findViewById<View>(R.id.playerEpgPanel)
+        volumeControls = findViewById(R.id.playerVolumeControls)
+        epgPanel = findViewById(R.id.playerEpgPanel)
         vodControls = findViewById(R.id.playerVodControls)
-        volumeControls.visibility = if (isLive) View.VISIBLE else View.GONE
-        epgPanel.visibility = if (isLive) View.VISIBLE else View.GONE
-        vodControls.visibility = if (isLive) View.GONE else View.VISIBLE
+        vodControls.visibility = View.GONE
 
         if (isLive) {
             findViewById<TextView>(R.id.playerChannelTitle).text = channelTitle
             findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
                 VolumeHelper.adjust(this, raise = true)
+                showLiveOverlays()
             }
             findViewById<ImageButton>(R.id.btnVolDown).setOnClickListener {
                 VolumeHelper.adjust(this, raise = false)
+                showLiveOverlays()
             }
             findViewById<ImageButton>(R.id.btnFullscreen).visibility = View.GONE
+            hideLiveOverlays()
             loadFullscreenEpg(streamId)
         } else {
+            volumeControls.visibility = View.GONE
+            epgPanel.visibility = View.GONE
             setupVodControls(channelTitle)
         }
 
@@ -125,10 +135,45 @@ class PlayerActivity : AppCompatActivity() {
             exo.playWhenReady = true
             if (isLive) {
                 playbackMonitor = LivePlaybackMonitor(exo, noSignal).also { it.start() }
-            } else {
-                showVodControls()
             }
         }
+    }
+
+    private fun enableImmersiveMode() {
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            )
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) enableImmersiveMode()
+    }
+
+    private fun showLiveOverlays() {
+        if (!isLive) return
+        liveOverlaysVisible = true
+        volumeControls.visibility = View.VISIBLE
+        epgPanel.visibility = View.VISIBLE
+        hideHandler.removeCallbacks(hideLiveOverlaysRunnable)
+        hideHandler.postDelayed(hideLiveOverlaysRunnable, CONTROLS_HIDE_MS)
+    }
+
+    private fun hideLiveOverlays() {
+        if (!isLive) return
+        liveOverlaysVisible = false
+        volumeControls.visibility = View.GONE
+        epgPanel.visibility = View.GONE
+        hideHandler.removeCallbacks(hideLiveOverlaysRunnable)
+    }
+
+    private fun scheduleHideLiveOverlays() {
+        hideHandler.removeCallbacks(hideLiveOverlaysRunnable)
+        hideHandler.postDelayed(hideLiveOverlaysRunnable, CONTROLS_HIDE_MS)
     }
 
     private fun setupVodControls(title: String) {
@@ -250,6 +295,34 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN && isLive) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_MENU,
+                -> {
+                    if (!liveOverlaysVisible) {
+                        showLiveOverlays()
+                        return true
+                    }
+                    scheduleHideLiveOverlays()
+                }
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (!liveOverlaysVisible) {
+                        VolumeHelper.adjust(this, raise = false)
+                        showLiveOverlays()
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (!liveOverlaysVisible) {
+                        VolumeHelper.adjust(this, raise = true)
+                        showLiveOverlays()
+                        return true
+                    }
+                }
+            }
+        }
         if (!isLive && event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
@@ -318,6 +391,10 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
+        if (isLive && liveOverlaysVisible) {
+            hideLiveOverlays()
+            return
+        }
         if (!isLive && controlsVisible) {
             hideVodControls()
             return
