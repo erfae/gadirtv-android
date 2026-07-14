@@ -8,7 +8,7 @@
     <string name="hint_name">Nombre del perfil</string>
     <string name="connect">CONECTAR</string>
     <string name="loading">Cargando contenido…</string>
-    <string name="loading_playlist">Cargando…</string>
+    <string name="loading_playlist">Cargando playlist</string>
     <string name="category_all">Todos</string>
     <string name="select_channel">Selecciona un canal</string>
     <string name="version_label">v1.12.0</string>
