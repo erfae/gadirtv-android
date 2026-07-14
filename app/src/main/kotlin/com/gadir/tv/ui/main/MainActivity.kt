@@ -1438,8 +1438,31 @@ class MainActivity : BaseLocaleActivity() {
     override fun onBackPressed() {
         when (currentTab) {
             Tab.HOME -> logoutUser()
-            else -> showTab(Tab.HOME)
+            Tab.LIVE -> {
+                if (isFocusInList(liveCategoryList)) {
+                    showTab(Tab.HOME)
+                } else {
+                    focusCategoryList()
+                }
+            }
+            Tab.MOVIES, Tab.SERIES -> {
+                if (isFocusInList(catalogCategoryList)) {
+                    showTab(Tab.HOME)
+                } else {
+                    focusCatalogCategoryList()
+                }
+            }
         }
+    }
+
+    private fun isFocusInList(list: RecyclerView): Boolean {
+        val focused = currentFocus ?: return false
+        var parent = focused.parent
+        while (parent != null) {
+            if (parent === list) return true
+            parent = parent.parent
+        }
+        return false
     }
 
     override fun onStop() {
