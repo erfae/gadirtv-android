@@ -14,11 +14,12 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.data.PlaylistRepository
+import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.SeriesEpisode
 import com.gadir.tv.model.SeriesItem
-import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
+import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.TrailerLauncher
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,7 @@ import kotlinx.coroutines.withContext
 
 class SeriesDetailActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
+    private lateinit var resumeStore: ResumeStore
     private var seasons: Map<String, List<SeriesEpisode>> = emptyMap()
     private var selectedSeason: String? = null
     private var fallbackCover = ""
@@ -41,6 +43,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_series_detail)
 
+        resumeStore = ResumeStore(this)
         val seriesId = intent.getIntExtra(EXTRA_SERIES_ID, 0)
         seriesName = intent.getStringExtra(EXTRA_SERIES_NAME).orEmpty()
         fallbackCover = intent.getStringExtra(EXTRA_SERIES_COVER).orEmpty()
@@ -159,8 +162,9 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         val title = "${seriesName.ifBlank { ep.title }} — ${ep.season}x${ep.episodeNum}"
         val url = api.seriesStreamUrl(profile, ep.id, ep.extension)
         val image = ep.image.ifEmpty { fallbackCover }
-        PlaybackLauncher.play(
+        ResumePlaybackHelper.play(
             context = this,
+            resumeStore = resumeStore,
             request = PlaybackRequest(
                 title = title,
                 url = url,

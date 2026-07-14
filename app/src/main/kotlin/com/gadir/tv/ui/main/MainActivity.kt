@@ -7,10 +7,13 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -28,11 +31,15 @@ import com.gadir.tv.model.Category
 import com.gadir.tv.model.EpgEntry
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.SeriesItem
+import com.gadir.tv.model.Profile
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.ui.movie.MovieDetailActivity
+import com.gadir.tv.ui.player.LivePlaybackMonitor
 import com.gadir.tv.player.LiveStreamUrls
 import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
+import com.gadir.tv.player.PlayerFactory
+import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.ui.profiles.ProfilesActivity
 import com.gadir.tv.ui.search.SearchActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
@@ -57,9 +64,18 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var favoritesStore: FavoritesStore
     private lateinit var liveChannelStore: LiveChannelStore
     private lateinit var appSettings: AppSettings
+    private var miniPlayer: ExoPlayer? = null
+    private var miniPlaybackMonitor: LivePlaybackMonitor? = null
     private var channelAdapter: ChannelAdapter? = null
     private var currentPreviewChannel: LiveChannel? = null
+    private var previewingStreamId: Int? = null
+    private var previewUrls = listOf<String>()
+    private var previewUrlIndex = 0
+    private var previewWorkingUrl: String? = null
     private val epgCache = mutableMapOf<Int, List<EpgEntry>>()
+    private val previewHandler = Handler(Looper.getMainLooper())
+    private var pendingPreview: Runnable? = null
+    private var previewToken = 0
     private var selectedLiveCategoryId: String? = null
     private var selectedCatalogCategoryId: String? = null
     private var movieCategoryId: String? = null
@@ -129,6 +145,9 @@ class MainActivity : BaseLocaleActivity() {
     private var railPreviewItem: HomeRailAdapter.HomeRailItem? = null
     private var homeLoaded = false
     private var shouldFocusHeroOnResume = true
+    private lateinit var miniPreviewControls: View
+    private val miniControlsHandler = Handler(Looper.getMainLooper())
+    private val hideMiniControlsRunnable = Runnable { hideMiniPreviewControls() }
     private val heroHandler = Handler(Looper.getMainLooper())
     private val clockRunnable = object : Runnable {
         override fun run() {
@@ -300,7 +319,7 @@ class MainActivity : BaseLocaleActivity() {
         tabMovies.nextFocusUpId = R.id.btnSettings
         tabSeries.nextFocusUpId = R.id.btnSettings
 
-        setupLivePreview()
+        setupMiniPlayer()
         setupHeaderFocusChain()
 
         showTab(Tab.HOME)
@@ -342,12 +361,12 @@ class MainActivity : BaseLocaleActivity() {
             onFocus = applyLiveCategory,
             onMoveRight = { focusFirstChannel() },
             onMoveUp = { focusHeader() },
-            onMoveDown = { },
+            onMoveDown = { focusFirstChannel() },
         )
         channelList.setItemViewCacheSize(24)
         channelAdapter = ChannelAdapter(
             items = channels,
-            onFocus = { channel -> showChannelPreview(channel) },
+            onFocus = { channel -> schedulePreview(channel) },
             onOpen = { channel -> openFullscreen(channel) },
             onMoveLeft = { focusCategoryList() },
             onMoveUp = { focusCategoryList() },
@@ -529,6 +548,9 @@ class MainActivity : BaseLocaleActivity() {
                 panelHome.visibility = View.VISIBLE
                 panelLive.visibility = View.GONE
                 panelCatalog.visibility = View.GONE
+                miniPlayer?.pause()
+                miniPlaybackMonitor?.stop()
+                hideMiniPreviewControls()
                 if (!homeLoaded) {
                     loadHome()
                 } else {
@@ -540,6 +562,10 @@ class MainActivity : BaseLocaleActivity() {
                 panelLive.visibility = View.VISIBLE
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
+                miniPlayer?.playWhenReady = true
+                if (appSettings.autoplayPreview) {
+                    miniPlaybackMonitor?.start()
+                }
                 restoreLiveTabSession()
             }
             Tab.MOVIES, Tab.SERIES -> {
@@ -547,6 +573,8 @@ class MainActivity : BaseLocaleActivity() {
                 panelLive.visibility = View.GONE
                 panelCatalog.visibility = View.VISIBLE
                 stopHeroRotation()
+                miniPlayer?.pause()
+                miniPlaybackMonitor?.stop()
                 val ready = if (tab == Tab.MOVIES) moviesCatalogReady else seriesCatalogReady
                 if (!ready) {
                     setupCatalogTab(tab)
@@ -568,6 +596,7 @@ class MainActivity : BaseLocaleActivity() {
             homeLoading.visibility = View.GONE
             homeLoaded = true
             focusHeroPlay()
+            refreshHomeIfNeeded(profile, cachedMovies.size)
             return
         }
 
@@ -588,6 +617,21 @@ class MainActivity : BaseLocaleActivity() {
             homeLoading.visibility = View.GONE
             homeLoaded = true
             focusHeroPlay()
+        }
+    }
+
+    private fun refreshHomeIfNeeded(profile: Profile, cachedMovieCount: Int) {
+        if (cachedMovieCount >= 12) return
+        lifecycleScope.launch {
+            val movies = withContext(Dispatchers.IO) {
+                HomeLoader.loadRecentMovies(api, profile)
+            }
+            val series = withContext(Dispatchers.IO) {
+                HomeLoader.loadRecentSeries(api, profile)
+            }
+            if (movies.size <= cachedMovieCount && series.size <= recentSeries.size) return@launch
+            PlaylistRepository.setHomeRecent(movies, series)
+            applyHomeData(movies, series)
         }
     }
 
@@ -886,7 +930,7 @@ class MainActivity : BaseLocaleActivity() {
                         positionMs = item.resumePositionMs,
                     )
                 } else {
-                    openMovieDetail(
+                    openMovieEntry(
                         streamId = item.id,
                         title = item.title,
                         cover = item.imageUrl,
@@ -917,6 +961,32 @@ class MainActivity : BaseLocaleActivity() {
                 openFullscreen(channel)
             }
         }
+    }
+
+    private fun openMovieEntry(
+        streamId: Int,
+        title: String,
+        cover: String,
+        extension: String = "mp4",
+    ) {
+        val record = resumeStore.get(ResumeStore.KIND_MOVIE, streamId.toString())
+        if (record != null) {
+            val profile = PlaylistRepository.profile ?: return
+            ResumePlaybackHelper.play(
+                context = this,
+                resumeStore = resumeStore,
+                request = PlaybackRequest(
+                    title = title,
+                    url = api.movieStreamUrl(profile, streamId, extension),
+                    kind = ResumeStore.KIND_MOVIE,
+                    contentId = streamId.toString(),
+                    imageUrl = cover,
+                    extension = extension,
+                ),
+            )
+            return
+        }
+        openMovieDetail(streamId, title, cover, extension)
     }
 
     private fun openMovieDetail(
@@ -959,8 +1029,9 @@ class MainActivity : BaseLocaleActivity() {
     ) {
         val profile = PlaylistRepository.profile ?: return
         val url = api.movieStreamUrl(profile, streamId, extension)
-        PlaybackLauncher.play(
+        ResumePlaybackHelper.play(
             context = this,
+            resumeStore = resumeStore,
             request = PlaybackRequest(
                 title = title,
                 url = url,
@@ -982,8 +1053,9 @@ class MainActivity : BaseLocaleActivity() {
     ) {
         val profile = PlaylistRepository.profile ?: return
         val url = api.seriesStreamUrl(profile, episodeId, extension)
-        PlaybackLauncher.play(
+        ResumePlaybackHelper.play(
             context = this,
+            resumeStore = resumeStore,
             request = PlaybackRequest(
                 title = title,
                 url = url,
@@ -1144,7 +1216,7 @@ class MainActivity : BaseLocaleActivity() {
             return
         }
         when (val hero = heroItems.getOrNull(heroIndex)) {
-            is HeroItem.Movie -> openMovieDetail(
+            is HeroItem.Movie -> openMovieEntry(
                 streamId = hero.movie.streamId,
                 title = hero.title,
                 cover = hero.movie.icon,
@@ -1172,7 +1244,7 @@ class MainActivity : BaseLocaleActivity() {
                         positionMs = item.resumePositionMs,
                     )
                 } else {
-                    openMovieDetail(
+                    openMovieEntry(
                         streamId = item.id,
                         title = item.title,
                         cover = item.imageUrl,
@@ -1321,7 +1393,7 @@ class MainActivity : BaseLocaleActivity() {
             onFocus = applyCategory,
             onMoveRight = { focusFirstCatalogItem() },
             onMoveUp = { focusHeader() },
-            onMoveDown = { },
+            onMoveDown = { focusFirstCatalogItem() },
         )
     }
 
@@ -1406,7 +1478,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun onPosterClick(tab: Tab, item: PosterAdapter.PosterItem) {
         when (tab) {
-            Tab.MOVIES -> openMovieDetail(
+            Tab.MOVIES -> openMovieEntry(
                 streamId = item.id,
                 title = item.title,
                 cover = item.imageUrl,
@@ -1440,8 +1512,24 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun showChannelPreview(channel: LiveChannel) {
-        val profile = PlaylistRepository.profile ?: return
+    private fun schedulePreview(channel: LiveChannel) {
+        pendingPreview?.let { previewHandler.removeCallbacks(it) }
+        val channelChanged = previewingStreamId != channel.streamId
+        if (channelChanged) {
+            previewToken++
+            cancelMiniPreviewPlayback()
+            setPreviewVideoVisible(false)
+        }
+        updatePreviewInfo(channel)
+        val token = previewToken
+        val task = Runnable {
+            if (token == previewToken) previewChannel(channel, token)
+        }
+        pendingPreview = task
+        previewHandler.postDelayed(task, 320L)
+    }
+
+    private fun updatePreviewInfo(channel: LiveChannel) {
         currentPreviewChannel = channel
         liveChannelStore.lastStreamId = channel.streamId
         liveChannelStore.lastCategoryId = selectedLiveCategoryId ?: ""
@@ -1456,7 +1544,7 @@ class MainActivity : BaseLocaleActivity() {
             epgNow.text = getString(R.string.epg_unavailable)
             epgNext.visibility = View.GONE
         }
-
+        val profile = PlaylistRepository.profile ?: return
         if (epgCache.containsKey(channel.streamId)) return
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {
@@ -1466,6 +1554,80 @@ class MainActivity : BaseLocaleActivity() {
             epgCache[channel.streamId] = epg
             applyEpg(channel, epg)
         }
+    }
+
+    private fun cancelMiniPreviewPlayback() {
+        miniPlayer?.stop()
+        miniPlayer?.clearMediaItems()
+        previewingStreamId = null
+        previewWorkingUrl = null
+    }
+
+    private fun previewChannel(channel: LiveChannel, token: Int) {
+        if (token != previewToken) return
+        val profile = PlaylistRepository.profile ?: return
+        updatePreviewInfo(channel)
+        if (appSettings.autoplayPreview) {
+            previewUrls = LiveStreamUrls.candidates(api, profile, channel)
+            previewUrlIndex = 0
+            previewWorkingUrl = null
+            previewingStreamId = channel.streamId
+            playMiniPreviewUrl(previewUrls.firstOrNull().orEmpty(), token)
+            miniPlaybackMonitor?.start()
+            miniPlaybackMonitor?.reset()
+        } else {
+            cancelMiniPreviewPlayback()
+            miniPlaybackMonitor?.stop()
+            setPreviewVideoVisible(false)
+        }
+    }
+
+    private fun playMiniPreviewUrl(url: String, token: Int) {
+        if (token != previewToken || url.isBlank()) return
+        setPreviewVideoVisible(false)
+        miniPlayer?.apply {
+            stop()
+            clearMediaItems()
+            setMediaItem(MediaItem.fromUri(url))
+            prepare()
+            volume = if (appSettings.previewSound) 1f else 0f
+            playWhenReady = true
+        }
+    }
+
+    private fun setPreviewVideoVisible(visible: Boolean) {
+        panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).alpha =
+            if (visible) 1f else 0f
+        if (!visible && currentPreviewChannel?.icon?.isNotEmpty() == true) {
+            previewLogo.visibility = View.VISIBLE
+        } else if (visible) {
+            previewLogo.visibility = View.GONE
+        }
+    }
+
+    private fun showMiniPreviewControls() {
+        miniPreviewControls.visibility = View.VISIBLE
+        miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
+        miniControlsHandler.postDelayed(hideMiniControlsRunnable, 5_000L)
+    }
+
+    private fun hideMiniPreviewControls() {
+        miniPreviewControls.visibility = View.GONE
+        miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
+    }
+
+    private fun scheduleHideMiniControls() {
+        miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
+        miniControlsHandler.postDelayed(hideMiniControlsRunnable, 5_000L)
+    }
+
+    private fun tryNextPreviewUrl(token: Int = previewToken): Boolean {
+        if (token != previewToken) return false
+        if (previewUrlIndex >= previewUrls.lastIndex) return false
+        previewUrlIndex += 1
+        playMiniPreviewUrl(previewUrls[previewUrlIndex], token)
+        miniPlaybackMonitor?.reset()
+        return true
     }
 
     private fun applyEpg(channel: LiveChannel, epg: List<EpgEntry>) {
@@ -1487,18 +1649,27 @@ class MainActivity : BaseLocaleActivity() {
     fun openFullscreen(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         VolumeHelper.boostOnPlaybackStart(this)
+        miniPlayer?.stop()
+        miniPlayer?.clearMediaItems()
+        miniPlaybackMonitor?.stop()
         val candidates = LiveStreamUrls.candidates(api, profile, channel)
+        val urls = buildList {
+            if (previewingStreamId == channel.streamId) {
+                previewWorkingUrl?.let { add(it) }
+            }
+            addAll(candidates)
+        }.distinct()
         PlaybackLauncher.play(
             context = this,
             request = PlaybackRequest(
                 title = channel.name,
-                url = candidates.first(),
+                url = urls.first(),
                 kind = ResumeStore.KIND_LIVE,
                 contentId = channel.streamId.toString(),
                 imageUrl = channel.icon,
                 streamId = channel.streamId,
                 extension = channel.extension,
-                alternateUrls = candidates.drop(1),
+                alternateUrls = urls.drop(1),
             ),
         )
     }
@@ -1570,6 +1741,7 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onStop() {
         super.onStop()
+        miniPlayer?.pause()
         stopHeroRotation()
     }
 
@@ -1580,25 +1752,83 @@ class MainActivity : BaseLocaleActivity() {
         } else if (currentTab == Tab.LIVE) {
             focusChannelAt(currentPreviewChannel)
             liveCategoryList.adapter?.let { (it as? CategoryAdapter)?.refreshSelection() }
-            currentPreviewChannel?.let { showChannelPreview(it) }
+            if (appSettings.autoplayPreview) {
+                currentPreviewChannel?.let { schedulePreview(it) }
+            }
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
             (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
         }
     }
 
     override fun onDestroy() {
+        pendingPreview?.let { previewHandler.removeCallbacks(it) }
         clockHandler.removeCallbacks(clockRunnable)
+        miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
         stopHeroRotation()
+        miniPlaybackMonitor?.stop()
+        miniPlaybackMonitor = null
+        miniPlayer?.release()
+        miniPlayer = null
         super.onDestroy()
     }
 
-    private fun setupLivePreview() {
-        panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).visibility = View.GONE
-        panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
-        panelLive.findViewById<View>(R.id.miniPreviewControls).visibility = View.GONE
+    private fun setupMiniPlayer() {
+        miniPreviewControls = panelLive.findViewById(R.id.miniPreviewControls)
+        miniPreviewControls.visibility = View.GONE
+
+        panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).apply {
+            useController = false
+            setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_NEVER)
+            alpha = 0f
+        }
+        val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
+        noSignal.visibility = View.GONE
+        panelLive.findViewById<View>(R.id.btnNoSignalSettings).setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
         panelLive.findViewById<View>(R.id.previewContainer).setOnClickListener {
             currentPreviewChannel?.let { openFullscreen(it) }
         }
         channelList.nextFocusRightId = View.NO_ID
+        miniPlayer = PlayerFactory.createForLivePreview(this).also { player ->
+            panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).player = player
+            player.playWhenReady = true
+            player.addListener(object : androidx.media3.common.Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == androidx.media3.common.Player.STATE_READY &&
+                        player.isPlaying &&
+                        previewUrlIndex in previewUrls.indices
+                    ) {
+                        previewWorkingUrl = previewUrls[previewUrlIndex]
+                        setPreviewVideoVisible(true)
+                    }
+                }
+
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    setPreviewVideoVisible(false)
+                    tryNextPreviewUrl()
+                }
+            })
+            miniPlaybackMonitor = LivePlaybackMonitor(
+                player = player,
+                overlay = noSignal,
+                timeoutMs = 10_000L,
+                onBeforeNoSignal = {
+                    setPreviewVideoVisible(false)
+                    tryNextPreviewUrl()
+                },
+            )
+        }
+        panelLive.findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
+            VolumeHelper.adjust(this, raise = true)
+            scheduleHideMiniControls()
+        }
+        panelLive.findViewById<ImageButton>(R.id.btnVolDown).setOnClickListener {
+            VolumeHelper.adjust(this, raise = false)
+            scheduleHideMiniControls()
+        }
+        panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
+            currentPreviewChannel?.let { openFullscreen(it) }
+        }
     }
 }
