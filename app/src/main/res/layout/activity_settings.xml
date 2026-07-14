@@ -76,7 +76,20 @@
         android:gravity="center_vertical"
         android:paddingHorizontal="16dp"
         android:paddingVertical="14dp"
-        android:text="@string/settings_player_switch_compat"
+        android:text="@string/settings_change_player"
+        android:textColor="@android:color/white"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/btnLanguage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/tab_bg"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="14dp"
         android:textColor="@android:color/white"
         android:textSize="14sp" />
 
