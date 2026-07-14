@@ -3,7 +3,8 @@ package com.gadir.tv.data
 import android.content.Context
 
 class AppSettings(context: Context) {
-    private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val prefs = (context.applicationContext ?: context)
+        .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     var autoplayPreview: Boolean
         get() = prefs.getBoolean(KEY_AUTOPLAY, true)
