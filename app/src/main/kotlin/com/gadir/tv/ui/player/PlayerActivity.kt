@@ -139,6 +139,7 @@ class PlayerActivity : BaseLocaleActivity() {
             volumeControls.visibility = View.GONE
             epgPanel.visibility = View.GONE
             setupVodControls(channelTitle)
+            showVodControls()
         }
 
         player = (if (isLive) PlayerFactory.createForLive(this) else PlayerFactory.create(this)).also { exo ->
@@ -566,7 +567,7 @@ class PlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_STREAM_ID = "stream_id"
         private const val EXTRA_ALTERNATE_URLS = "alternate_urls"
         private const val SEEK_STEP_MS = 10_000L
-        private const val CONTROLS_HIDE_MS = 5_000L
+        private const val CONTROLS_HIDE_MS = 8_000L
 
         fun intent(
             context: Context,
