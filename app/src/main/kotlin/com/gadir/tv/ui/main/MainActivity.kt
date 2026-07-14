@@ -48,6 +48,7 @@ import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.MetaExtractor
 import com.gadir.tv.util.ProfileAvatarHelper
+import com.gadir.tv.util.TvFocusHelper
 import com.gadir.tv.util.TvNavHelper
 import com.gadir.tv.util.VolumeHelper
 import java.text.SimpleDateFormat
@@ -222,15 +223,20 @@ class MainActivity : BaseLocaleActivity() {
             profile,
         )
         startHeaderClock()
-        findViewById<TextView>(R.id.btnSearch).also { btnSearch = it }.setOnClickListener {
+        findViewById<TextView>(R.id.btnSearch).also { btnSearch = it }
+        TvFocusHelper.bindButton(btnSearch) {
             startActivity(Intent(this, SearchActivity::class.java))
         }
-        findViewById<TextView>(R.id.btnReload).also { btnReload = it }.setOnClickListener { reloadPlaylist() }
-        findViewById<TextView>(R.id.btnSettings).also { btnSettings = it }.setOnClickListener {
+        findViewById<TextView>(R.id.btnReload).also { btnReload = it }
+        TvFocusHelper.bindButton(btnReload) { reloadPlaylist() }
+        findViewById<TextView>(R.id.btnSettings).also { btnSettings = it }
+        TvFocusHelper.bindButton(btnSettings) {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
-        findViewById<TextView>(R.id.btnLogout).also { btnLogout = it }.setOnClickListener { logoutUser() }
-        findViewById<TextView>(R.id.btnExit).also { btnExit = it }.setOnClickListener { exitApp() }
+        findViewById<TextView>(R.id.btnLogout).also { btnLogout = it }
+        TvFocusHelper.bindButton(btnLogout) { logoutUser() }
+        findViewById<TextView>(R.id.btnExit).also { btnExit = it }
+        TvFocusHelper.bindButton(btnExit) { exitApp() }
 
         tabHome = findViewById(R.id.tabHome)
         tabLive = findViewById(R.id.tabLive)
@@ -829,9 +835,18 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun reloadPlaylist() {
         val profile = PlaylistRepository.profile ?: return
+        android.widget.Toast.makeText(
+            this,
+            getString(R.string.loading_playlist),
+            android.widget.Toast.LENGTH_SHORT,
+        ).show()
         homeLoaded = false
-        homeLoading.text = getString(R.string.loading_playlist)
-        homeLoading.visibility = View.VISIBLE
+        moviesCatalogReady = false
+        seriesCatalogReady = false
+        if (currentTab == Tab.HOME) {
+            homeLoading.text = getString(R.string.loading_playlist)
+            homeLoading.visibility = View.VISIBLE
+        }
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching { BootstrapLoader.load(this@MainActivity, api, profile) }
@@ -839,11 +854,27 @@ class MainActivity : BaseLocaleActivity() {
             result.onSuccess {
                 setupLiveTab()
                 loadHome()
-                if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
-                    setupCatalogTab(currentTab)
+                when (currentTab) {
+                    Tab.MOVIES, Tab.SERIES -> {
+                        moviesCatalogReady = true
+                        seriesCatalogReady = true
+                        setupCatalogTab(currentTab)
+                    }
+                    Tab.LIVE -> currentPreviewChannel?.let { schedulePreview(it) }
+                    Tab.HOME -> Unit
                 }
-            }.onFailure {
+                android.widget.Toast.makeText(
+                    this@MainActivity,
+                    getString(R.string.playlist_reloaded),
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+            }.onFailure { e ->
                 homeLoading.visibility = View.GONE
+                android.widget.Toast.makeText(
+                    this@MainActivity,
+                    e.message ?: getString(R.string.connection_failed),
+                    android.widget.Toast.LENGTH_LONG,
+                ).show()
             }
         }
     }
@@ -1690,7 +1721,7 @@ class MainActivity : BaseLocaleActivity() {
             clearMediaItems()
             setMediaItem(LiveStreamUrls.mediaItem(url))
             prepare()
-            volume = if (appSettings.previewSound) 1f else 0f
+            volume = if (appSettings.previewSound) PREVIEW_PLAYER_VOLUME else 0f
             playWhenReady = true
         }
     }
@@ -1943,5 +1974,9 @@ class MainActivity : BaseLocaleActivity() {
         panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
             currentPreviewChannel?.let { openFullscreen(it) }
         }
+    }
+
+    private companion object {
+        const val PREVIEW_PLAYER_VOLUME = 0.85f
     }
 }

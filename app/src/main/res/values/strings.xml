@@ -67,6 +67,7 @@
     <string name="settings_player_vlc_label">VLC nativo (LibVLC)</string>
     <string name="settings_player_vlc">Reproductor: VLC nativo (dentro de la app)</string>
     <string name="reload_playlist">Recargar</string>
+    <string name="playlist_reloaded">Lista actualizada</string>
     <string name="settings_reload_playlist">Recargar lista del servidor</string>
     <string name="settings_live_sort_playlist">Orden canales: playlist</string>
     <string name="settings_live_sort_alpha">Orden canales: A-Z</string>

@@ -18,9 +18,14 @@ object PlayerFactory {
         .setConnectTimeoutMs(25_000)
         .setReadTimeoutMs(25_000)
 
-    private fun audioAttributes() = AudioAttributes.Builder()
+    private fun vodAudioAttributes() = AudioAttributes.Builder()
         .setUsage(C.USAGE_MEDIA)
         .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+        .build()
+
+    private fun liveAudioAttributes() = AudioAttributes.Builder()
+        .setUsage(C.USAGE_MEDIA)
+        .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
         .build()
 
     private fun build(
@@ -29,6 +34,8 @@ object PlayerFactory {
         maxBuffer: Int,
         playbackBuffer: Int,
         rebuffer: Int,
+        audioAttributes: AudioAttributes,
+        handleAudioFocus: Boolean,
     ): ExoPlayer {
         val renderersFactory = DefaultRenderersFactory(context)
             .setEnableDecoderFallback(true)
@@ -39,7 +46,7 @@ object PlayerFactory {
 
         return ExoPlayer.Builder(context, renderersFactory)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory()))
-            .setAudioAttributes(audioAttributes(), true)
+            .setAudioAttributes(audioAttributes, handleAudioFocus)
             .setHandleAudioBecomingNoisy(true)
             .setLoadControl(loadControl)
             .build()
@@ -54,6 +61,8 @@ object PlayerFactory {
             maxBuffer = bufferMs * 100,
             playbackBuffer = bufferMs * 2,
             rebuffer = bufferMs * 4,
+            audioAttributes = vodAudioAttributes(),
+            handleAudioFocus = true,
         )
     }
 
@@ -64,6 +73,8 @@ object PlayerFactory {
             maxBuffer = 12_000,
             playbackBuffer = 750,
             rebuffer = 2_000,
+            audioAttributes = liveAudioAttributes(),
+            handleAudioFocus = false,
         )
 
     fun createForLive(context: Context): ExoPlayer {
@@ -74,6 +85,8 @@ object PlayerFactory {
             maxBuffer = (bufferMs * 12).coerceIn(12_000, 45_000),
             playbackBuffer = (bufferMs * 2).coerceIn(1_500, 8_000),
             rebuffer = (bufferMs * 3).coerceIn(2_500, 12_000),
+            audioAttributes = liveAudioAttributes(),
+            handleAudioFocus = true,
         )
     }
 }
