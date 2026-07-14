@@ -30,20 +30,24 @@ class SeriesDetailActivity : AppCompatActivity() {
     private var seasons: Map<String, List<SeriesEpisode>> = emptyMap()
     private var selectedSeason: String? = null
     private var fallbackCover = ""
+    private var seriesName = ""
 
     private lateinit var seasonList: RecyclerView
     private lateinit var episodeList: RecyclerView
     private lateinit var loadingView: TextView
+    private lateinit var btnSeriesPlay: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_series_detail)
 
         val seriesId = intent.getIntExtra(EXTRA_SERIES_ID, 0)
-        val seriesName = intent.getStringExtra(EXTRA_SERIES_NAME).orEmpty()
+        seriesName = intent.getStringExtra(EXTRA_SERIES_NAME).orEmpty()
         fallbackCover = intent.getStringExtra(EXTRA_SERIES_COVER).orEmpty()
 
         findViewById<TextView>(R.id.seriesTitle).text = seriesName
+        btnSeriesPlay = findViewById(R.id.btnSeriesPlay)
+        btnSeriesPlay.setOnClickListener { playFirstEpisode() }
         if (fallbackCover.isNotEmpty()) {
             ImageLoader.loadPoster(findViewById(R.id.seriesPoster), fallbackCover, 280, 420)
             ImageLoader.loadPoster(findViewById(R.id.seriesBackdrop), fallbackCover)
@@ -107,7 +111,7 @@ class SeriesDetailActivity : AppCompatActivity() {
             if (detail.trailerUrl.isNotBlank()) {
                 trailerBtn.visibility = View.VISIBLE
                 trailerBtn.setOnClickListener {
-                    TrailerLauncher.open(this@SeriesDetailActivity, detail.trailerUrl)
+                    TrailerLauncher.open(this@SeriesDetailActivity, detail.trailerUrl, detail.name)
                 }
             } else {
                 trailerBtn.visibility = View.GONE
@@ -116,9 +120,12 @@ class SeriesDetailActivity : AppCompatActivity() {
             seasons = detail.seasons
             val keys = seasons.keys.sortedBy { it.toIntOrNull() ?: 0 }
             if (keys.isEmpty()) {
-                findViewById<TextView>(R.id.seriesPlot).text = "Esta serie no tiene episodios"
+                findViewById<TextView>(R.id.seriesPlot).text = getString(R.string.hero_plot_empty)
                 return@launch
             }
+
+            btnSeriesPlay.visibility = View.VISIBLE
+            selectedSeason = keys.first()
 
             seasonList.visibility = View.VISIBLE
             episodeList.visibility = View.VISIBLE
@@ -126,9 +133,16 @@ class SeriesDetailActivity : AppCompatActivity() {
                 selectedSeason = season
                 reloadEpisodes()
             }
-            selectedSeason = keys.first()
             reloadEpisodes()
-            seasonList.post { seasonList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus() }
+            btnSeriesPlay.requestFocus()
+        }
+    }
+
+    private fun playFirstEpisode() {
+        val season = selectedSeason ?: seasons.keys.sortedBy { it.toIntOrNull() ?: 0 }.firstOrNull()
+        val episode = season?.let { seasons[it]?.firstOrNull() }
+        if (episode != null) {
+            playEpisode(episode)
         }
     }
 
@@ -142,7 +156,7 @@ class SeriesDetailActivity : AppCompatActivity() {
 
     private fun playEpisode(ep: SeriesEpisode) {
         val profile = PlaylistRepository.profile ?: return
-        val title = "${ep.season}x${ep.episodeNum} — ${ep.title}"
+        val title = "${seriesName.ifBlank { ep.title }} — ${ep.season}x${ep.episodeNum}"
         val url = api.seriesStreamUrl(profile, ep.id, ep.extension)
         val image = ep.image.ifEmpty { fallbackCover }
         PlaybackLauncher.play(

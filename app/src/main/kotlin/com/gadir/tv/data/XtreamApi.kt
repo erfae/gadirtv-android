@@ -164,6 +164,7 @@ class XtreamApi(
                 icon = imageUrl(row, "stream_icon"),
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
                 num = row.channelNum(index),
+                extension = row.get("container_extension")?.asStringOrNull()?.ifBlank { "ts" } ?: "ts",
             )
         }.filter { it.streamId > 0 }
     }

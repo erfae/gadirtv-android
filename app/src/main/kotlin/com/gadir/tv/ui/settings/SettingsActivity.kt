@@ -77,6 +77,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         updatePlayerLabels()
+        btnPlayerMode.post { btnPlayerMode.requestFocus() }
     }
 
     private fun cycleLanguage() {

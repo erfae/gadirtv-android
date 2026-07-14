@@ -30,6 +30,9 @@ class TrailerActivity : AppCompatActivity() {
         val webView = findViewById<WebView>(R.id.trailerWebView)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+        webView.settings.mediaPlaybackRequiresUserGesture = false
+        webView.settings.userAgentString =
+            "Mozilla/5.0 (Linux; Android 10; TV) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
         webView.webChromeClient = WebChromeClient()
         webView.webViewClient = WebViewClient()
 

@@ -29,6 +29,8 @@
     <string name="tab_series">剧集</string>
     <string name="catalog_empty">此分组暂无内容</string>
     <string name="season_label">第 %1$s 季</string>
+    <string name="seasons_label">季</string>
+    <string name="episodes_label">集</string>
     <string name="tab_home">首页</string>
     <string name="logout_user">退出用户</string>
     <string name="exit_app">退出应用</string>
@@ -63,6 +65,9 @@
     <string name="settings_player_compat_label">兼容模式 ExoPlayer</string>
     <string name="settings_player_internal_hint">在应用内播放</string>
     <string name="settings_change_player">更换播放器</string>
+    <string name="settings_section_playback">播放器</string>
+    <string name="settings_section_language">语言</string>
+    <string name="settings_section_general">常规</string>
     <string name="settings_player_select_title">选择播放器</string>
     <string name="settings_no_external_player">未找到外部播放器</string>
     <string name="settings_pick_external_player">请在设置中选择外部播放器</string>

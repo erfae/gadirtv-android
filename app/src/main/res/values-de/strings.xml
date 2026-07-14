@@ -29,6 +29,8 @@
     <string name="tab_series">Serien</string>
     <string name="catalog_empty">Keine Inhalte in dieser Gruppe</string>
     <string name="season_label">Staffel %1$s</string>
+    <string name="seasons_label">STAFFELN</string>
+    <string name="episodes_label">FOLGEN</string>
     <string name="tab_home">Startseite</string>
     <string name="logout_user">Benutzer abmelden</string>
     <string name="exit_app">App beenden</string>
@@ -63,6 +65,9 @@
     <string name="settings_player_compat_label">Kompatibilitäts-ExoPlayer</string>
     <string name="settings_player_internal_hint">Wiedergabe in der App</string>
     <string name="settings_change_player">Player wechseln</string>
+    <string name="settings_section_playback">PLAYER</string>
+    <string name="settings_section_language">SPRACHE</string>
+    <string name="settings_section_general">ALLGEMEIN</string>
     <string name="settings_player_select_title">Player auswählen</string>
     <string name="settings_no_external_player">Keine externen Player gefunden</string>
     <string name="settings_pick_external_player">Externen Player in den Einstellungen auswählen</string>

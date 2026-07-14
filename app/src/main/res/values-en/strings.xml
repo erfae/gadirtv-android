@@ -29,6 +29,8 @@
     <string name="tab_series">Series</string>
     <string name="catalog_empty">No content in this group</string>
     <string name="season_label">Season %1$s</string>
+    <string name="seasons_label">SEASONS</string>
+    <string name="episodes_label">EPISODES</string>
     <string name="tab_home">Home</string>
     <string name="logout_user">Log out user</string>
     <string name="exit_app">Exit app</string>
@@ -63,6 +65,9 @@
     <string name="settings_player_compat_label">Compatibility ExoPlayer</string>
     <string name="settings_player_internal_hint">Plays within the app</string>
     <string name="settings_change_player">Change player</string>
+    <string name="settings_section_playback">PLAYER</string>
+    <string name="settings_section_language">LANGUAGE</string>
+    <string name="settings_section_general">GENERAL</string>
     <string name="settings_player_select_title">Choose player</string>
     <string name="settings_no_external_player">No external players found</string>
     <string name="settings_pick_external_player">Select an external player in Settings</string>
