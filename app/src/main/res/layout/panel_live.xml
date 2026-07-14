@@ -29,7 +29,7 @@
         android:clipToPadding="false"
         android:descendantFocusability="afterDescendants"
         android:nextFocusLeft="@+id/categoryList"
-        android:nextFocusRight="@+id/btnVolDown"
+        android:nextFocusRight="@+id/previewContainer"
         android:padding="8dp"
         android:scrollbars="vertical" />
 
@@ -43,7 +43,11 @@
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="0.36"
-        android:background="@android:color/black">
+        android:background="@drawable/preview_focus_bg"
+        android:clickable="true"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:nextFocusLeft="@+id/channelList">
 
         <androidx.media3.ui.PlayerView
             android:id="@+id/miniPlayer"

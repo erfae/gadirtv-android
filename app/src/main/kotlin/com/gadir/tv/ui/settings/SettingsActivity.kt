@@ -171,7 +171,7 @@ class SettingsActivity : AppCompatActivity() {
         Toast.makeText(this, R.string.loading_playlist, Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { BootstrapLoader.load(api, profile) }
+                runCatching { BootstrapLoader.load(this@SettingsActivity, api, profile) }
             }
             if (result.isSuccess) {
                 updateAccountInfo()

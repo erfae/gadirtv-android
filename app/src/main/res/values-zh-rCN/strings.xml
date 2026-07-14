@@ -101,7 +101,10 @@
     <string name="bootstrap_movies">电影…</string>
     <string name="bootstrap_series">剧集…</string>
     <string name="bootstrap_home">正在准备首页…</string>
+    <string name="bootstrap_catalog">正在下载完整目录…</string>
     <string name="bootstrap_loading_group">正在加载：%1$s…</string>
+    <string name="series_load_failed">无法加载剧集</string>
+    <string name="episode_label">第 %1$d 集</string>
     <string name="movie_director">导演：%1$s</string>
     <string name="movie_cast">演员：%1$s</string>
     <string name="epg_guide">节目指南</string>

@@ -231,13 +231,25 @@ class MainActivity : AppCompatActivity() {
         heroPlay.setOnClickListener { playHero() }
         heroTrailer.setOnClickListener { openHeroTrailer() }
         tabHome.nextFocusUpId = heroPlay.id
+        tabLive.nextFocusUpId = R.id.categoryList
+        tabMovies.nextFocusUpId = R.id.catalogCategoryList
+        tabSeries.nextFocusUpId = R.id.catalogCategoryList
         moviesRail.nextFocusUpId = heroPlay.id
+        seriesRail.nextFocusUpId = heroPlay.id
+        heroPlay.nextFocusDownId = R.id.tabHome
 
         setupMiniPlayer()
 
         lifecycleScope.launch(Dispatchers.IO) {
             val activeProfile = PlaylistRepository.profile ?: return@launch
-            runCatching { CatalogPreloader.preloadRemaining(api, activeProfile) }
+            val needsPreload = PlaylistRepository.vodCategories.any {
+                PlaylistRepository.cachedVod(it.id) == null
+            } || PlaylistRepository.seriesCategories.any {
+                PlaylistRepository.cachedSeries(it.id) == null
+            }
+            if (needsPreload) {
+                runCatching { CatalogPreloader.preloadRemaining(api, activeProfile) }
+            }
         }
 
         showTab(Tab.HOME)
@@ -327,6 +339,7 @@ class MainActivity : AppCompatActivity() {
                     loadHome()
                 } else {
                     startHeroRotation()
+                    focusHeroPlay()
                 }
             }
             Tab.LIVE -> {
@@ -360,19 +373,20 @@ class MainActivity : AppCompatActivity() {
         if (cachedMovies.isNotEmpty() || cachedSeries.isNotEmpty()) {
             applyHomeData(cachedMovies, cachedSeries)
             homeLoading.visibility = View.GONE
-        } else {
-            homeLoading.visibility = View.VISIBLE
-            homeEmpty.visibility = View.GONE
+            homeLoaded = true
+            focusHeroPlay()
+            return
         }
+
+        homeLoading.visibility = View.VISIBLE
+        homeEmpty.visibility = View.GONE
 
         lifecycleScope.launch {
             val moviesDeferred = async(Dispatchers.IO) {
-                if (cachedMovies.isNotEmpty()) cachedMovies
-                else HomeLoader.loadRecentMovies(api, profile)
+                HomeLoader.loadRecentMovies(api, profile)
             }
             val seriesDeferred = async(Dispatchers.IO) {
-                if (cachedSeries.isNotEmpty()) cachedSeries
-                else HomeLoader.loadRecentSeries(api, profile)
+                HomeLoader.loadRecentSeries(api, profile)
             }
             val movies = moviesDeferred.await()
             val series = seriesDeferred.await()
@@ -380,6 +394,15 @@ class MainActivity : AppCompatActivity() {
             applyHomeData(movies, series)
             homeLoading.visibility = View.GONE
             homeLoaded = true
+            focusHeroPlay()
+        }
+    }
+
+    private fun focusHeroPlay() {
+        if (currentTab != Tab.HOME || heroItems.isEmpty()) return
+        heroPlay.post {
+            if (heroPlay.requestFocus()) return@post
+            heroPlay.postDelayed({ heroPlay.requestFocus() }, 120L)
         }
     }
 
@@ -439,6 +462,7 @@ class MainActivity : AppCompatActivity() {
             homeEmpty.visibility = View.GONE
             bindHero(heroItems[heroIndex])
             startHeroRotation()
+            focusHeroPlay()
         }
     }
 
@@ -448,7 +472,11 @@ class MainActivity : AppCompatActivity() {
         homeLoading.visibility = View.VISIBLE
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { BootstrapLoader.load(api, profile) }
+                runCatching {
+                    BootstrapLoader.load(this@MainActivity, api, profile) { message ->
+                        runOnUiThread { homeLoading.text = message }
+                    }
+                }
             }
             result.onSuccess {
                 setupLiveTab()
@@ -1229,6 +1257,27 @@ class MainActivity : AppCompatActivity() {
         panelLive.findViewById<View>(R.id.btnNoSignalSettings).setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
+        val previewContainer = panelLive.findViewById<View>(R.id.previewContainer)
+        previewContainer.isFocusable = true
+        previewContainer.isFocusableInTouchMode = true
+        previewContainer.isClickable = true
+        previewContainer.setOnClickListener {
+            currentPreviewChannel?.let { openFullscreen(it) }
+        }
+        previewContainer.setOnKeyListener { _, keyCode, event ->
+            if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                android.view.KeyEvent.KEYCODE_ENTER,
+                -> {
+                    currentPreviewChannel?.let { openFullscreen(it) }
+                    true
+                }
+                else -> false
+            }
+        }
+        channelList.nextFocusRightId = R.id.previewContainer
+        previewContainer.nextFocusRightId = R.id.btnVolDown
         miniPlayer = PlayerFactory.create(this).also { player ->
             panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).player = player
             player.playWhenReady = true

@@ -11,13 +11,15 @@ object MetaExtractor {
 
     private val trailerSpanishKeys = listOf(
         "youtube_trailer_es", "trailer_es", "trailer_spanish", "youtube_id_es",
-        "trailer_lang_es", "youtube_trailer_spanish",
+        "trailer_lang_es", "youtube_trailer_spanish", "trailer_url_es",
     )
 
     private val trailerKeys = listOf(
         "youtube_trailer", "trailer", "youtube_id", "trailer_url",
         "youtube_trailer_id", "trailer_youtube", "yt_trailer", "video_trailer",
-        "trailer_link", "trailer_youtube_id",
+        "trailer_link", "trailer_youtube_id", "youtube_trailer_url",
+        "preview_url", "video_id", "trailer_1", "trailer_link_youtube",
+        "movie_trailer", "serie_trailer", "series_trailer",
     )
 
     fun plotFrom(vararg sources: JsonObject?): String {
@@ -49,6 +51,29 @@ object MetaExtractor {
             if (source == null) continue
             trailerFromElement(source.get("trailers"))?.let { return it }
             trailerFromElement(source.get("videos"))?.let { return it }
+            trailerFromElement(source.get("youtube_trailers"))?.let { return it }
+        }
+        for (source in sources) {
+            if (source == null) continue
+            deepScanTrailer(source)?.let { return it }
+        }
+        return null
+    }
+
+    private fun deepScanTrailer(obj: JsonObject): String? {
+        for ((_, value) in obj.entrySet()) {
+            when {
+                value.isJsonPrimitive -> {
+                    val text = value.asStringOrNull() ?: continue
+                    if (text.contains("youtube.com", ignoreCase = true) ||
+                        text.contains("youtu.be", ignoreCase = true)
+                    ) {
+                        normalizeTrailerUrl(text)?.let { return it }
+                    }
+                }
+                value.isJsonObject -> deepScanTrailer(value.asJsonObject)?.let { return it }
+                value.isJsonArray -> trailerFromElement(value)?.let { return it }
+            }
         }
         return null
     }
@@ -114,10 +139,25 @@ object MetaExtractor {
         return when {
             el.isJsonPrimitive -> normalizeTrailerUrl(el.asString)
             el.isJsonArray -> {
+                var fallback: String? = null
                 for (item in el.asJsonArray) {
-                    trailerFromElement(item)?.let { return it }
+                    if (item.isJsonObject) {
+                        val obj = item.asJsonObject
+                        val type = obj.get("type")?.asStringOrNull()?.lowercase().orEmpty()
+                        val url = normalizeTrailerUrl(obj.get("url")?.asStringOrNull())
+                            ?: normalizeTrailerUrl(obj.get("trailer")?.asStringOrNull())
+                            ?: normalizeTrailerUrl(obj.get("youtube_id")?.asStringOrNull())
+                            ?: normalizeTrailerUrl(obj.get("id")?.asStringOrNull())
+                            ?: normalizeTrailerUrl(obj.get("source")?.asStringOrNull())
+                        if (url != null) {
+                            if (type.contains("trailer") || type.contains("teaser")) return url
+                            if (fallback == null) fallback = url
+                        }
+                    } else {
+                        trailerFromElement(item)?.let { return it }
+                    }
                 }
-                null
+                fallback
             }
             el.isJsonObject -> {
                 val obj = el.asJsonObject
