@@ -16,6 +16,8 @@ object MetaExtractor {
 
     private val trailerKeys = listOf(
         "youtube_trailer", "trailer", "youtube_id", "trailer_url",
+        "youtube_trailer_id", "trailer_youtube", "yt_trailer", "video_trailer",
+        "trailer_link", "trailer_youtube_id",
     )
 
     fun plotFrom(vararg sources: JsonObject?): String {
@@ -34,14 +36,19 @@ object MetaExtractor {
         for (source in sources) {
             if (source == null) continue
             for (key in trailerSpanishKeys) {
-                normalizeTrailerUrl(source.get(key)?.asStringOrNull())?.let { return it }
+                trailerFromElement(source.get(key))?.let { return it }
             }
         }
         for (source in sources) {
             if (source == null) continue
             for (key in trailerKeys) {
-                normalizeTrailerUrl(source.get(key)?.asStringOrNull())?.let { return it }
+                trailerFromElement(source.get(key))?.let { return it }
             }
+        }
+        for (source in sources) {
+            if (source == null) continue
+            trailerFromElement(source.get("trailers"))?.let { return it }
+            trailerFromElement(source.get("videos"))?.let { return it }
         }
         return null
     }
@@ -85,6 +92,8 @@ object MetaExtractor {
             val el = json.get(key) ?: continue
             val value = when {
                 el.isJsonArray -> el.asJsonArray.firstString()
+                el.isJsonPrimitive -> el.asStringOrNull()
+                el.isJsonObject -> imageFrom(el.asJsonObject, "url", "path", "cover", "image")
                 else -> el.asStringOrNull()
             }
             if (!value.isNullOrBlank()) return value
@@ -98,6 +107,28 @@ object MetaExtractor {
         if (value.startsWith("http")) return value
         if (value.length >= 8) return "https://www.youtube.com/watch?v=$value"
         return null
+    }
+
+    private fun trailerFromElement(el: JsonElement?): String? {
+        if (el == null || el.isJsonNull) return null
+        return when {
+            el.isJsonPrimitive -> normalizeTrailerUrl(el.asString)
+            el.isJsonArray -> {
+                for (item in el.asJsonArray) {
+                    trailerFromElement(item)?.let { return it }
+                }
+                null
+            }
+            el.isJsonObject -> {
+                val obj = el.asJsonObject
+                normalizeTrailerUrl(obj.get("url")?.asStringOrNull())
+                    ?: normalizeTrailerUrl(obj.get("trailer")?.asStringOrNull())
+                    ?: normalizeTrailerUrl(obj.get("youtube_id")?.asStringOrNull())
+                    ?: normalizeTrailerUrl(obj.get("id")?.asStringOrNull())
+                    ?: normalizeTrailerUrl(obj.get("source")?.asStringOrNull())
+            }
+            else -> null
+        }
     }
 
     fun stripHtml(text: String?): String {
@@ -114,7 +145,11 @@ object MetaExtractor {
 
     private fun JsonArray.firstString(): String? {
         for (el in this) {
-            val value = el.asStringOrNull()
+            val value = when {
+                el.isJsonPrimitive -> el.asStringOrNull()
+                el.isJsonObject -> imageFrom(el.asJsonObject, "url", "path", "cover", "image")
+                else -> null
+            }
             if (!value.isNullOrBlank()) return value
         }
         return null

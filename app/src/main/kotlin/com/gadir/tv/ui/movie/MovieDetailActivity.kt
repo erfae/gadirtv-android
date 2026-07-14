@@ -2,7 +2,6 @@ package com.gadir.tv.ui.movie
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageView
@@ -17,6 +16,7 @@ import com.gadir.tv.model.VodMovie
 import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.util.ImageLoader
+import com.gadir.tv.util.TrailerLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -96,7 +96,7 @@ class MovieDetailActivity : AppCompatActivity() {
                 trailerUrl = info.trailerUrl
                 trailerBtn.visibility = View.VISIBLE
                 trailerBtn.setOnClickListener {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.trailerUrl)))
+                    TrailerLauncher.open(this@MovieDetailActivity, info.trailerUrl)
                 }
             }
 

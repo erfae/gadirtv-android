@@ -1,7 +1,7 @@
 package com.gadir.tv.ui.main
 
 import android.content.Intent
-import android.net.Uri
+import com.gadir.tv.util.TrailerLauncher
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -769,7 +769,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun openHeroTrailer() {
         val url = heroTrailerUrl ?: return
-        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        TrailerLauncher.open(this, url)
     }
 
     private fun loadMoviePlot(streamId: Int, requestId: Int) {
@@ -802,7 +802,8 @@ class MainActivity : AppCompatActivity() {
                 .filter { it.isNotBlank() }
                 .joinToString(" · ")
             if (detail.cover.isNotEmpty()) {
-                loadHeroImage(heroImage, detail.cover)
+                val backdrop = detail.backdrop.ifBlank { detail.cover }
+                loadHeroImage(heroImage, backdrop)
                 loadHeroImage(heroPoster, detail.cover)
             }
             showHeroTrailer(detail.trailerUrl.ifBlank { null })

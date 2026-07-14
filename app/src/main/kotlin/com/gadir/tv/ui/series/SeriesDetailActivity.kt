@@ -2,9 +2,11 @@ package com.gadir.tv.ui.series
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -18,9 +20,7 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.util.ImageLoader
-import android.view.LayoutInflater
-import android.view.ViewGroup
-import android.widget.ImageView
+import com.gadir.tv.util.TrailerLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -44,6 +44,10 @@ class SeriesDetailActivity : AppCompatActivity() {
         fallbackCover = intent.getStringExtra(EXTRA_SERIES_COVER).orEmpty()
 
         findViewById<TextView>(R.id.seriesTitle).text = seriesName
+        if (fallbackCover.isNotEmpty()) {
+            ImageLoader.loadPoster(findViewById(R.id.seriesPoster), fallbackCover, 280, 420)
+            ImageLoader.loadPoster(findViewById(R.id.seriesBackdrop), fallbackCover)
+        }
 
         seasonList = findViewById(R.id.seasonList)
         episodeList = findViewById(R.id.episodeList)
@@ -82,13 +86,28 @@ class SeriesDetailActivity : AppCompatActivity() {
             findViewById<TextView>(R.id.seriesMeta).text = meta
             findViewById<TextView>(R.id.seriesPlot).text =
                 detail.plot.ifBlank { getString(R.string.hero_plot_empty) }
-            if (detail.cover.isNotEmpty()) fallbackCover = detail.cover
+
+            val castView = findViewById<TextView>(R.id.seriesCast)
+            if (detail.cast.isNotBlank()) {
+                castView.visibility = View.VISIBLE
+                castView.text = getString(R.string.movie_cast, detail.cast)
+            }
+
+            val backdrop = detail.backdrop.ifBlank { detail.cover.ifBlank { fallbackCover } }
+            if (backdrop.isNotEmpty()) {
+                ImageLoader.loadPoster(findViewById(R.id.seriesBackdrop), backdrop)
+            }
+            val poster = detail.cover.ifBlank { fallbackCover }
+            if (poster.isNotEmpty()) {
+                fallbackCover = poster
+                ImageLoader.loadPoster(findViewById(R.id.seriesPoster), poster, 280, 420)
+            }
 
             val trailerBtn = findViewById<TextView>(R.id.btnSeriesTrailer)
             if (detail.trailerUrl.isNotBlank()) {
                 trailerBtn.visibility = View.VISIBLE
                 trailerBtn.setOnClickListener {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(detail.trailerUrl)))
+                    TrailerLauncher.open(this@SeriesDetailActivity, detail.trailerUrl)
                 }
             } else {
                 trailerBtn.visibility = View.GONE

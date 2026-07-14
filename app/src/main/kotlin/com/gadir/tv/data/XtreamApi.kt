@@ -12,6 +12,7 @@ import com.gadir.tv.model.VodInfo
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.net.NativeHttpClient
 import com.gadir.tv.util.HostUtils
+import com.gadir.tv.util.ImageUrlResolver
 import com.gadir.tv.util.MetaExtractor
 import com.google.gson.Gson
 import com.google.gson.JsonArray
@@ -160,7 +161,7 @@ class XtreamApi(
             LiveChannel(
                 streamId = row.get("stream_id")?.asIntOrZero() ?: 0,
                 name = row.get("name")?.asStringOrNull() ?: "",
-                icon = row.get("stream_icon")?.asStringOrNull() ?: "",
+                icon = imageUrl(row, "stream_icon"),
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
                 num = row.channelNum(index),
             )
@@ -176,9 +177,7 @@ class XtreamApi(
             VodMovie(
                 streamId = row.get("stream_id")?.asIntOrZero() ?: row.get("num")?.asIntOrZero() ?: 0,
                 name = row.get("name")?.asStringOrNull() ?: "",
-                icon = row.get("stream_icon")?.asStringOrNull()
-                    ?: row.get("cover")?.asStringOrNull()
-                    ?: "",
+                icon = imageUrl(row, "stream_icon", "cover"),
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
                 extension = row.get("container_extension")?.asStringOrNull() ?: "mp4",
                 added = row.addedTimestamp(),
@@ -195,9 +194,7 @@ class XtreamApi(
             SeriesItem(
                 seriesId = row.get("series_id")?.asIntOrZero() ?: 0,
                 name = row.get("name")?.asStringOrNull() ?: "",
-                cover = row.get("cover")?.asStringOrNull()
-                    ?: row.get("stream_icon")?.asStringOrNull()
-                    ?: "",
+                cover = imageUrl(row, "cover", "stream_icon", "cover_big"),
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
                 added = row.addedTimestamp(),
             )
@@ -232,9 +229,8 @@ class XtreamApi(
                         season = seasonKey,
                         extension = ep.get("container_extension")?.asStringOrNull() ?: "mp4",
                         plot = epInfo?.get("plot")?.asStringOrNull() ?: "",
-                        image = epInfo?.get("movie_image")?.asStringOrNull()
-                            ?: epInfo?.get("cover_big")?.asStringOrNull()
-                            ?: "",
+                        image = imageUrl(epInfo, "movie_image", "cover_big", "cover")
+                            .ifBlank { imageUrl(ep, "movie_image", "cover_big", "cover") },
                     )
                 }.filter { it.id > 0 }
                 if (eps.isNotEmpty()) seasons[seasonKey] = eps
@@ -242,14 +238,16 @@ class XtreamApi(
             val name = info?.get("name")?.asStringOrNull() ?: ""
             SeriesDetail(
                 name = name,
-                cover = MetaExtractor.imageFrom(info, "cover", "stream_icon"),
+                cover = imageUrl(info, "cover", "cover_big", "stream_icon", "movie_image"),
+                backdrop = imageUrl(info, "backdrop_path", "cover_big", "cover", "stream_icon"),
                 plot = MetaExtractor.plotFrom(info),
                 genre = info?.get("genre")?.asStringOrNull() ?: "",
                 releaseDate = info?.get("releaseDate")?.asStringOrNull() ?: "",
                 rating = info?.get("rating_5based")?.asStringOrNull()
                     ?: info?.get("rating")?.asStringOrNull()
                     ?: "",
-                trailerUrl = MetaExtractor.trailerFrom(name, info).orEmpty(),
+                trailerUrl = MetaExtractor.trailerFrom(name, info, root).orEmpty(),
+                cast = MetaExtractor.castFrom(info),
                 seasons = seasons,
             )
         } catch (_: Exception) {
@@ -278,16 +276,10 @@ class XtreamApi(
             VodInfo(
                 name = name,
                 plot = MetaExtractor.plotFrom(info, movieData),
-                cover = MetaExtractor.imageFrom(
-                    info,
-                    "movie_image", "cover", "cover_big",
-                ).ifBlank {
-                    MetaExtractor.imageFrom(movieData, "stream_icon", "cover")
-                },
-                backdrop = MetaExtractor.imageFrom(
-                    info,
-                    "backdrop_path", "cover_big", "movie_image", "cover",
-                ),
+                cover = imageUrl(info, "movie_image", "cover", "cover_big")
+                    .ifBlank { imageUrl(movieData, "stream_icon", "cover", "movie_image") },
+                backdrop = imageUrl(info, "backdrop_path", "cover_big", "movie_image", "cover")
+                    .ifBlank { imageUrl(movieData, "backdrop_path", "cover_big", "cover") },
                 rating = info?.get("rating")?.asStringOrNull()
                     ?: info?.get("rating_5based")?.asStringOrNull()
                     ?: "",
@@ -295,7 +287,7 @@ class XtreamApi(
                 releaseDate = info?.get("releasedate")?.asStringOrNull()
                     ?: info?.get("releaseDate")?.asStringOrNull()
                     ?: "",
-                trailerUrl = MetaExtractor.trailerFrom(name, info, movieData).orEmpty(),
+                trailerUrl = MetaExtractor.trailerFrom(name, info, movieData, root).orEmpty(),
                 cast = MetaExtractor.castFrom(info, movieData),
                 director = MetaExtractor.directorFrom(info, movieData),
             )
@@ -409,6 +401,9 @@ class XtreamApi(
             false
         }
     }
+
+    private fun imageUrl(json: JsonObject?, vararg keys: String): String =
+        ImageUrlResolver.resolve(MetaExtractor.imageFrom(json, *keys))
 
     private fun encode(value: String): String =
         URLEncoder.encode(value, Charsets.UTF_8.name())
