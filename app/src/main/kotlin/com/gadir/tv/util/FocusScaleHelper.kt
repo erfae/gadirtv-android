@@ -4,8 +4,8 @@ import android.view.View
 import android.view.animation.DecelerateInterpolator
 
 object FocusScaleHelper {
-    private const val SCALE = 1.22f
-    private const val ROTATION_X = -10f
+    private const val SCALE = 1.12f
+    private const val ROTATION_X = -6f
     private const val DURATION_MS = 180L
 
     fun applyConeFocus(view: View, hasFocus: Boolean) {

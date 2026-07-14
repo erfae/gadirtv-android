@@ -14,6 +14,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -37,6 +38,9 @@ class PlayerActivity : AppCompatActivity() {
     private val api = XtreamApi()
     private var isLive = false
     private var liveOverlaysVisible = false
+    private var epgLoaded = false
+    private var liveStreamId = 0
+    private val pendingLiveUrls = ArrayDeque<String>()
 
     private lateinit var volumeControls: View
     private lateinit var epgPanel: View
@@ -74,6 +78,10 @@ class PlayerActivity : AppCompatActivity() {
             }
             updatePlayPauseIcon()
         }
+
+        override fun onPlayerError(error: PlaybackException) {
+            if (isLive && tryNextLiveUrl()) return
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -87,6 +95,14 @@ class PlayerActivity : AppCompatActivity() {
         val streamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
         val channelTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         isLive = kind == ResumeStore.KIND_LIVE
+        liveStreamId = streamId
+        if (isLive) {
+            pendingLiveUrls.clear()
+            pendingLiveUrls.add(url)
+            intent.getStringArrayListExtra(EXTRA_ALTERNATE_URLS)?.forEach { alt ->
+                if (alt.isNotBlank() && alt !in pendingLiveUrls) pendingLiveUrls.add(alt)
+            }
+        }
 
         findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).apply {
             useController = false
@@ -117,7 +133,6 @@ class PlayerActivity : AppCompatActivity() {
             }
             findViewById<ImageButton>(R.id.btnFullscreen).visibility = View.GONE
             hideLiveOverlays()
-            loadFullscreenEpg(streamId)
         } else {
             volumeControls.visibility = View.GONE
             epgPanel.visibility = View.GONE
@@ -127,16 +142,36 @@ class PlayerActivity : AppCompatActivity() {
         player = PlayerFactory.create(this).also { exo ->
             findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).player = exo
             exo.addListener(playerListener)
-            exo.setMediaItem(MediaItem.fromUri(Uri.parse(url)))
-            exo.prepare()
-            if (positionMs > 0L) {
-                exo.seekTo(positionMs)
-            }
-            exo.playWhenReady = true
+            startPlayback(exo, url, positionMs)
             if (isLive) {
                 playbackMonitor = LivePlaybackMonitor(exo, noSignal).also { it.start() }
             }
         }
+    }
+
+    private fun startPlayback(exo: ExoPlayer, url: String, positionMs: Long) {
+        exo.setMediaItem(MediaItem.fromUri(Uri.parse(url)))
+        exo.prepare()
+        if (positionMs > 0L) {
+            exo.seekTo(positionMs)
+        }
+        exo.playWhenReady = true
+    }
+
+    private fun tryNextLiveUrl(): Boolean {
+        if (pendingLiveUrls.isEmpty()) return false
+        pendingLiveUrls.removeFirst()
+        val next = pendingLiveUrls.firstOrNull() ?: return false
+        val exo = player ?: return false
+        playbackMonitor?.reset()
+        startPlayback(exo, next, 0L)
+        return true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        enableImmersiveMode()
+        player?.playWhenReady = true
     }
 
     private fun enableImmersiveMode() {
@@ -159,6 +194,10 @@ class PlayerActivity : AppCompatActivity() {
         liveOverlaysVisible = true
         volumeControls.visibility = View.VISIBLE
         epgPanel.visibility = View.VISIBLE
+        if (!epgLoaded) {
+            epgLoaded = true
+            loadFullscreenEpg(liveStreamId)
+        }
         hideHandler.removeCallbacks(hideLiveOverlaysRunnable)
         hideHandler.postDelayed(hideLiveOverlaysRunnable, CONTROLS_HIDE_MS)
     }
@@ -470,6 +509,7 @@ class PlayerActivity : AppCompatActivity() {
         private const val EXTRA_EXTENSION = "extension"
         private const val EXTRA_POSITION_MS = "position_ms"
         private const val EXTRA_STREAM_ID = "stream_id"
+        private const val EXTRA_ALTERNATE_URLS = "alternate_urls"
         private const val SEEK_STEP_MS = 10_000L
         private const val CONTROLS_HIDE_MS = 5_000L
 
@@ -483,6 +523,7 @@ class PlayerActivity : AppCompatActivity() {
             extension: String = "mp4",
             positionMs: Long = 0L,
             streamId: Int = 0,
+            alternateUrls: List<String> = emptyList(),
         ): Intent = Intent(context, PlayerActivity::class.java)
             .putExtra(EXTRA_TITLE, title)
             .putExtra(EXTRA_URL, url)
@@ -492,5 +533,6 @@ class PlayerActivity : AppCompatActivity() {
             .putExtra(EXTRA_EXTENSION, extension)
             .putExtra(EXTRA_POSITION_MS, positionMs)
             .putExtra(EXTRA_STREAM_ID, streamId)
+            .putStringArrayListExtra(EXTRA_ALTERNATE_URLS, ArrayList(alternateUrls))
     }
 }

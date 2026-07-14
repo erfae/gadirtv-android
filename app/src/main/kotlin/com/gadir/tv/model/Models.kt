@@ -38,6 +38,7 @@ data class LiveChannel(
     val icon: String,
     val categoryId: String,
     val num: Int = 0,
+    val extension: String = "ts",
 )
 
 data class VodMovie(

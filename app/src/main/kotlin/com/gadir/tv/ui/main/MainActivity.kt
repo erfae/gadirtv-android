@@ -31,6 +31,7 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.ui.movie.MovieDetailActivity
 import com.gadir.tv.ui.player.LivePlaybackMonitor
+import com.gadir.tv.player.LiveStreamUrls
 import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.PlayerFactory
@@ -1074,14 +1075,21 @@ class MainActivity : AppCompatActivity() {
         epgNow.text = getString(R.string.epg_unavailable)
         epgNext.visibility = View.GONE
         if (appSettings.autoplayPreview) {
-            val url = api.streamUrl(profile, channel.streamId)
-            miniPlayer?.setMediaItem(MediaItem.fromUri(url))
-            miniPlayer?.prepare()
-            miniPlayer?.playWhenReady = true
+            val urls = LiveStreamUrls.candidates(api, profile, channel)
+            val url = urls.first()
+            miniPlayer?.apply {
+                stop()
+                clearMediaItems()
+                setMediaItem(MediaItem.fromUri(url))
+                prepare()
+                volume = 1f
+                playWhenReady = true
+            }
             miniPlaybackMonitor?.start()
             miniPlaybackMonitor?.reset()
         } else {
             miniPlayer?.stop()
+            miniPlayer?.clearMediaItems()
             miniPlaybackMonitor?.stop()
         }
 
@@ -1107,16 +1115,20 @@ class MainActivity : AppCompatActivity() {
 
     fun openFullscreen(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
-        val url = api.streamUrl(profile, channel.streamId)
+        miniPlayer?.stop()
+        miniPlayer?.clearMediaItems()
+        val urls = LiveStreamUrls.candidates(api, profile, channel)
         PlaybackLauncher.play(
             context = this,
             request = PlaybackRequest(
                 title = channel.name,
-                url = url,
+                url = urls.first(),
                 kind = ResumeStore.KIND_LIVE,
                 contentId = channel.streamId.toString(),
                 imageUrl = channel.icon,
                 streamId = channel.streamId,
+                extension = channel.extension,
+                alternateUrls = urls.drop(1),
             ),
         )
     }
@@ -1148,6 +1160,13 @@ class MainActivity : AppCompatActivity() {
         stopHeroRotation()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (currentTab == Tab.LIVE && appSettings.autoplayPreview) {
+            currentPreviewChannel?.let { previewChannel(it) }
+        }
+    }
+
     override fun onDestroy() {
         stopHeroRotation()
         miniPlaybackMonitor?.stop()
@@ -1169,6 +1188,15 @@ class MainActivity : AppCompatActivity() {
         miniPlayer = PlayerFactory.create(this).also { player ->
             panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).player = player
             player.playWhenReady = true
+            val previewOverlay = panelLive.findViewById<View>(R.id.miniPreviewOverlay)
+            player.addListener(object : androidx.media3.common.Player.Listener {
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    if (!appSettings.autoplayPreview) return
+                    val showInfo = !isPlaying
+                    previewTitle.visibility = if (showInfo) View.VISIBLE else View.GONE
+                    previewOverlay.visibility = if (showInfo) View.VISIBLE else View.GONE
+                }
+            })
             miniPlaybackMonitor = LivePlaybackMonitor(player, noSignal)
         }
         panelLive.findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {

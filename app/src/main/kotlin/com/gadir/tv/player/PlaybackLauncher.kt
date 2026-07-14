@@ -59,6 +59,7 @@ object PlaybackLauncher {
                 extension = request.extension,
                 positionMs = request.positionMs,
                 streamId = request.streamId,
+                alternateUrls = request.alternateUrls,
             ),
         )
     }

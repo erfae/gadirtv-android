@@ -1,6 +1,8 @@
 package com.gadir.tv.player
 
 import android.content.Context
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import com.gadir.tv.data.AppSettings
@@ -8,7 +10,15 @@ import com.gadir.tv.data.AppSettings
 object PlayerFactory {
     fun create(context: Context): ExoPlayer {
         val settings = AppSettings(context)
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+            .build()
+
         val builder = ExoPlayer.Builder(context)
+            .setAudioAttributes(audioAttributes, true)
+            .setHandleAudioBecomingNoisy(true)
+
         if (settings.isCompatPlayer) {
             val loadControl = DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
@@ -20,6 +30,8 @@ object PlayerFactory {
                 .build()
             builder.setLoadControl(loadControl)
         }
-        return builder.build()
+        return builder.build().apply {
+            volume = 1f
+        }
     }
 }
