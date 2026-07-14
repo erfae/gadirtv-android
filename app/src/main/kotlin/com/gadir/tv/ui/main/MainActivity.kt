@@ -44,6 +44,7 @@ import com.gadir.tv.ui.series.SeriesDetailActivity
 import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ImageLoader
+import com.gadir.tv.util.MetaExtractor
 import com.gadir.tv.util.ProfileAvatarHelper
 import com.gadir.tv.util.TvNavHelper
 import com.gadir.tv.util.VolumeHelper
@@ -835,10 +836,10 @@ class MainActivity : BaseLocaleActivity() {
                         positionMs = item.resumePositionMs,
                     )
                 } else {
-                    playSeriesFirstEpisode(
+                    openSeriesDetail(
                         seriesId = item.id,
                         title = item.title,
-                        imageUrl = item.imageUrl,
+                        cover = item.imageUrl,
                     )
                 }
             }
@@ -863,6 +864,20 @@ class MainActivity : BaseLocaleActivity() {
                 name = title,
                 cover = cover,
                 extension = extension,
+            ),
+        )
+    }
+
+    private fun openSeriesDetail(seriesId: Int, title: String, cover: String) {
+        startActivity(
+            SeriesDetailActivity.intent(
+                context = this,
+                series = SeriesItem(
+                    seriesId = seriesId,
+                    name = title,
+                    cover = cover,
+                    categoryId = "",
+                ),
             ),
         )
     }
@@ -996,11 +1011,12 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun showHeroTrailer(url: String?) {
-        if (url.isNullOrBlank()) {
+        val valid = url?.takeIf { MetaExtractor.isValidTrailerUrl(it) }
+        if (valid.isNullOrBlank()) {
             heroTrailer.visibility = View.GONE
             heroTrailerUrl = null
         } else {
-            heroTrailerUrl = url
+            heroTrailerUrl = valid
             heroTrailer.visibility = View.VISIBLE
         }
     }
@@ -1262,16 +1278,16 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun onPosterClick(tab: Tab, item: PosterAdapter.PosterItem) {
         when (tab) {
-            Tab.MOVIES -> playMovie(
-                title = item.title,
+            Tab.MOVIES -> openMovieDetail(
                 streamId = item.id,
+                title = item.title,
+                cover = item.imageUrl,
                 extension = item.extension,
-                imageUrl = item.imageUrl,
             )
-            Tab.SERIES -> playSeriesFirstEpisode(
+            Tab.SERIES -> openSeriesDetail(
                 seriesId = item.id,
                 title = item.title,
-                imageUrl = item.imageUrl,
+                cover = item.imageUrl,
             )
             Tab.LIVE, Tab.HOME -> Unit
         }
@@ -1438,20 +1454,30 @@ class MainActivity : BaseLocaleActivity() {
     override fun onBackPressed() {
         when (currentTab) {
             Tab.HOME -> logoutUser()
-            Tab.LIVE -> {
-                if (isFocusInList(liveCategoryList)) {
+            Tab.LIVE, Tab.MOVIES, Tab.SERIES -> {
+                if (isFocusInBottomNav()) {
                     showTab(Tab.HOME)
                 } else {
-                    focusCategoryList()
+                    focusBottomTab(currentTab)
                 }
             }
-            Tab.MOVIES, Tab.SERIES -> {
-                if (isFocusInList(catalogCategoryList)) {
-                    showTab(Tab.HOME)
-                } else {
-                    focusCatalogCategoryList()
-                }
-            }
+        }
+    }
+
+    private fun isFocusInBottomNav(): Boolean {
+        val focused = currentFocus ?: return false
+        return focused === tabHome ||
+            focused === tabLive ||
+            focused === tabMovies ||
+            focused === tabSeries
+    }
+
+    private fun focusBottomTab(tab: Tab) {
+        when (tab) {
+            Tab.LIVE -> tabLive.requestFocus()
+            Tab.MOVIES -> tabMovies.requestFocus()
+            Tab.SERIES -> tabSeries.requestFocus()
+            Tab.HOME -> tabHome.requestFocus()
         }
     }
 
@@ -1510,7 +1536,7 @@ class MainActivity : BaseLocaleActivity() {
             currentPreviewChannel?.let { openFullscreen(it) }
         }
         channelList.nextFocusRightId = View.NO_ID
-        miniPlayer = PlayerFactory.create(this).also { player ->
+        miniPlayer = PlayerFactory.createForLivePreview(this).also { player ->
             panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).player = player
             player.playWhenReady = true
             player.addListener(object : androidx.media3.common.Player.Listener {

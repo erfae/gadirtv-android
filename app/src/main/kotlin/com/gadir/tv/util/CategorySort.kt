@@ -4,7 +4,7 @@ import com.gadir.tv.model.Category
 
 object CategorySort {
     private val adultPattern = Regex(
-        "(?i)(adult|adultos|adulto|xxx|18\\+|for\\s*adults|foradults|erotic|er[oó]tico|porn|hot|madur)",
+        "(?i)(\\b(adult|adultos|adulto|xxx|for\\s*adults|foradults|erotic|er[oó]tico|porn|madur)\\b|18\\+)",
     )
 
     fun isAdultCategory(name: String): Boolean = adultPattern.containsMatchIn(name)

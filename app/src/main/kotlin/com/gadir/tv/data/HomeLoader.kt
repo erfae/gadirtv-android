@@ -33,7 +33,9 @@ object HomeLoader {
             loadRecent(
                 fetchCategories = { api.vodCategories(profile) },
                 fetchStreams = { categoryId -> api.vodStreams(profile, categoryId) },
-            ) { it.added },
+                addedAt = { it.added },
+                idOf = { it.streamId },
+            ),
         )
 
     suspend fun loadRecentSeries(api: XtreamApi, profile: Profile): List<SeriesItem> =
@@ -41,7 +43,9 @@ object HomeLoader {
             loadRecent(
                 fetchCategories = { api.seriesCategories(profile) },
                 fetchStreams = { categoryId -> api.seriesList(profile, categoryId) },
-            ) { it.added },
+                addedAt = { it.added },
+                idOf = { it.seriesId },
+            ),
         )
 
     private fun filterAdultMovies(movies: List<VodMovie>): List<VodMovie> {
@@ -64,10 +68,11 @@ object HomeLoader {
         fetchCategories: suspend () -> List<Category>,
         fetchStreams: suspend (String?) -> List<T>,
         addedAt: (T) -> Long,
+        idOf: (T) -> Int,
     ): List<T> = coroutineScope {
         val categories = fetchCategories().filter { !CategorySort.isAdultCategory(it.name) }
         val merged = if (categories.isNotEmpty()) {
-            categories.take(6).map { category ->
+            categories.take(12).map { category ->
                 async {
                     runCatching { fetchStreams(category.id) }.getOrDefault(emptyList())
                 }
@@ -75,7 +80,10 @@ object HomeLoader {
         } else {
             runCatching { fetchStreams(null) }.getOrDefault(emptyList())
         }
-        merged.sortedByDescending(addedAt).take(24)
+        merged
+            .distinctBy(idOf)
+            .sortedByDescending(addedAt)
+            .take(48)
     }
 }
 
