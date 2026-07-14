@@ -29,6 +29,7 @@ data class LoginDraft(
 data class Category(
     val id: String,
     val name: String,
+    val order: Int = 0,
 )
 
 data class LiveChannel(
@@ -36,6 +37,7 @@ data class LiveChannel(
     val name: String,
     val icon: String,
     val categoryId: String,
+    val num: Int = 0,
 )
 
 data class VodMovie(

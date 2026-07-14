@@ -43,7 +43,7 @@ object SearchRepository {
         val needle = query.trim().lowercase()
         if (needle.isEmpty()) return Results()
 
-        val channels = PlaylistRepository.allChannels
+        val channels = PlaylistRepository.channelsFor(null)
             .filter { it.name.lowercase().contains(needle) }
             .take(40)
 
