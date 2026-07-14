@@ -140,7 +140,9 @@ class PlayerActivity : BaseLocaleActivity() {
         }
 
         player = PlayerFactory.create(this).also { exo ->
+            VolumeHelper.boostOnPlaybackStart(this)
             findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).player = exo
+            exo.volume = 1f
             exo.addListener(playerListener)
             startPlayback(exo, url, positionMs)
             if (isLive) {

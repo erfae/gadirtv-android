@@ -47,9 +47,11 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         options.add("--http-user-agent=${PlaylistRepository.userAgent}")
         options.add("--network-caching=1200")
         options.add("--live-caching=1200")
+        options.add("--gain=8")
         libVlc = LibVLC(this, options)
         mediaPlayer = MediaPlayer(libVlc).apply {
             attachViews(findViewById<VLCVideoLayout>(R.id.vlcVideo), null, false, false)
+            volume = 100
             setEventListener { event ->
                 if (event.type == MediaPlayer.Event.EncounteredError) {
                     tryNextUrl()
@@ -57,6 +59,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             }
         }
         playUrl(url)
+        VolumeHelper.boostOnPlaybackStart(this)
     }
 
     private fun playUrl(url: String) {
@@ -65,6 +68,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         val media = Media(vlc, Uri.parse(url))
         player.media = media
         media.release()
+        player.volume = 100
         player.play()
     }
 
