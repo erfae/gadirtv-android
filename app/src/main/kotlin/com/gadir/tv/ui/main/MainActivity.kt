@@ -12,10 +12,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -77,7 +74,6 @@ class MainActivity : BaseLocaleActivity() {
     private val previewHandler = Handler(Looper.getMainLooper())
     private var pendingPreview: Runnable? = null
     private var previewToken = 0
-    private var previewAudioCheck: Runnable? = null
     private var selectedLiveCategoryId: String? = null
     private var selectedCatalogCategoryId: String? = null
     private var movieCategoryId: String? = null
@@ -316,10 +312,10 @@ class MainActivity : BaseLocaleActivity() {
         setupTabNavigation()
         heroPlay.setOnClickListener { openHeroContent() }
         heroTrailer.setOnClickListener { openHeroTrailer() }
-        tabHome.nextFocusUpId = heroPlay.id
-        tabLive.nextFocusUpId = R.id.categoryList
-        tabMovies.nextFocusUpId = R.id.catalogCategoryList
-        tabSeries.nextFocusUpId = R.id.catalogCategoryList
+        tabHome.nextFocusUpId = R.id.btnSettings
+        tabLive.nextFocusUpId = R.id.btnSettings
+        tabMovies.nextFocusUpId = R.id.btnSettings
+        tabSeries.nextFocusUpId = R.id.btnSettings
 
         setupMiniPlayer()
         setupHeaderFocusChain()
@@ -357,7 +353,6 @@ class MainActivity : BaseLocaleActivity() {
             onFocus = onCategorySelected,
             onMoveRight = { focusFirstChannel() },
             onMoveLeft = { focusBottomTab(Tab.LIVE) },
-            onMoveUp = { focusHeader() },
         )
         channelList.setItemViewCacheSize(24)
         channelAdapter = ChannelAdapter(
@@ -382,7 +377,9 @@ class MainActivity : BaseLocaleActivity() {
             },
         )
         channelList.adapter = channelAdapter
-        reloadChannels()
+        selectedLiveCategoryId = liveChannelStore.lastCategoryId?.takeIf { it.isNotEmpty() }
+        reloadChannels(keepCategoryFocus = true)
+        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
     }
 
     private fun focusFirstChannel() {
@@ -393,6 +390,16 @@ class MainActivity : BaseLocaleActivity() {
     private fun startHeaderClock() {
         clockHandler.removeCallbacks(clockRunnable)
         clockRunnable.run()
+    }
+
+    private fun restoreLiveTabSession() {
+        val savedCategory = liveChannelStore.lastCategoryId?.takeIf { it.isNotEmpty() }
+        if (savedCategory != selectedLiveCategoryId) {
+            selectedLiveCategoryId = savedCategory
+            reloadChannels(keepCategoryFocus = true)
+        }
+        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+        restoreLastChannel()
     }
 
     private fun restoreLastChannel() {
@@ -549,7 +556,7 @@ class MainActivity : BaseLocaleActivity() {
                 if (appSettings.autoplayPreview) {
                     miniPlaybackMonitor?.start()
                 }
-                restoreLastChannel()
+                restoreLiveTabSession()
             }
             Tab.MOVIES, Tab.SERIES -> {
                 panelHome.visibility = View.GONE
@@ -1269,7 +1276,6 @@ class MainActivity : BaseLocaleActivity() {
                 favoritesStore.toggle(kind, item.id)
             },
             onMoveLeft = { focusCatalogCategoryList() },
-            onMoveUp = { focusHeader() },
         )
 
         if (catalogCategories.isEmpty()) {
@@ -1327,7 +1333,6 @@ class MainActivity : BaseLocaleActivity() {
             onFocus = onCategoryPicked,
             onMoveRight = { focusFirstCatalogItem() },
             onMoveLeft = { focusBottomTab(tab) },
-            onMoveUp = { focusHeader() },
         )
     }
 
@@ -1446,15 +1451,17 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun schedulePreview(channel: LiveChannel) {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
-        previewAudioCheck?.let { previewHandler.removeCallbacks(it) }
-        previewToken++
-        cancelMiniPreviewPlayback()
+        val channelChanged = previewingStreamId != channel.streamId
+        if (channelChanged) {
+            previewToken++
+            cancelMiniPreviewPlayback()
+        }
         val token = previewToken
         val task = Runnable {
             if (token == previewToken) previewChannel(channel, token)
         }
         pendingPreview = task
-        previewHandler.postDelayed(task, 280L)
+        previewHandler.postDelayed(task, 320L)
     }
 
     private fun cancelMiniPreviewPlayback() {
@@ -1485,7 +1492,7 @@ class MainActivity : BaseLocaleActivity() {
         val profile = PlaylistRepository.profile ?: return
         currentPreviewChannel = channel
         liveChannelStore.lastStreamId = channel.streamId
-        liveChannelStore.lastCategoryId = selectedLiveCategoryId
+        liveChannelStore.lastCategoryId = selectedLiveCategoryId ?: ""
         previewTitle.text = channel.name
         if (channel.icon.isNotEmpty()) {
             previewLogo.visibility = View.VISIBLE
@@ -1524,7 +1531,6 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun playMiniPreviewUrl(url: String, token: Int) {
         if (token != previewToken || url.isBlank()) return
-        previewAudioCheck?.let { previewHandler.removeCallbacks(it) }
         miniPlayer?.apply {
             stop()
             clearMediaItems()
@@ -1533,26 +1539,6 @@ class MainActivity : BaseLocaleActivity() {
             volume = if (appSettings.previewSound) 1f else 0f
             playWhenReady = true
         }
-        schedulePreviewAudioCheck(token)
-    }
-
-    private fun schedulePreviewAudioCheck(token: Int) {
-        previewAudioCheck?.let { previewHandler.removeCallbacks(it) }
-        val check = Runnable {
-            if (token != previewToken) return@Runnable
-            val player = miniPlayer ?: return@Runnable
-            if (player.playbackState != Player.STATE_READY) return@Runnable
-            if (!hasSelectedAudio(player.currentTracks) && tryNextPreviewUrl(token)) return@Runnable
-        }
-        previewAudioCheck = check
-        previewHandler.postDelayed(check, 2_500L)
-    }
-
-    private fun hasSelectedAudio(tracks: Tracks): Boolean {
-        for (group in tracks.groups) {
-            if (group.type == C.TRACK_TYPE_AUDIO && group.isSelected) return true
-        }
-        return false
     }
 
     private fun showMiniPreviewControls() {
@@ -1630,7 +1616,7 @@ class MainActivity : BaseLocaleActivity() {
                     isFocusInHeader() -> focusBottomTab(Tab.LIVE)
                     isFocusInList(channelList) -> focusCategoryList()
                     isFocusInList(liveCategoryList) -> focusBottomTab(Tab.LIVE)
-                    isFocusInBottomNav() -> focusHeader()
+                    isFocusInBottomNav() -> Unit
                     else -> focusChannelAt(currentPreviewChannel)
                 }
             }
@@ -1639,7 +1625,7 @@ class MainActivity : BaseLocaleActivity() {
                     isFocusInHeader() -> focusBottomTab(currentTab)
                     isFocusInList(catalogGrid) -> focusCatalogCategoryList()
                     isFocusInList(catalogCategoryList) -> focusBottomTab(currentTab)
-                    isFocusInBottomNav() -> focusHeader()
+                    isFocusInBottomNav() -> Unit
                     else -> focusFirstCatalogItem()
                 }
             }
@@ -1696,7 +1682,6 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onDestroy() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
-        previewAudioCheck?.let { previewHandler.removeCallbacks(it) }
         clockHandler.removeCallbacks(clockRunnable)
         miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
         stopHeroRotation()

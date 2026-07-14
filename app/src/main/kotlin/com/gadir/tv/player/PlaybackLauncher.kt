@@ -10,6 +10,10 @@ import com.gadir.tv.ui.player.VlcPlayerActivity
 object PlaybackLauncher {
     fun play(context: Context, request: PlaybackRequest) {
         val settings = AppSettings(context)
+        if (request.kind == com.gadir.tv.data.ResumeStore.KIND_LIVE) {
+            launchVlc(context, request)
+            return
+        }
         when (settings.playerMode) {
             AppSettings.PLAYER_EXTERNAL -> launchExternal(context, request, settings)
             AppSettings.PLAYER_VLC -> launchVlc(context, request)

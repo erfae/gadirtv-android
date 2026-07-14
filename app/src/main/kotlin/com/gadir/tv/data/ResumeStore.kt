@@ -86,6 +86,22 @@ class ResumeStore(context: Context) {
         prefs.edit().putString(KEY, gson.toJson(jsonMap)).apply()
     }
 
+    fun remove(kind: String, id: String) {
+        val all = loadAll().associateBy { "${it.kind}:${it.id}" }.toMutableMap()
+        all.remove("$kind:$id")
+        val jsonMap = all.mapValues { (_, record) ->
+            mapOf(
+                "pos" to record.positionMs,
+                "dur" to record.durationMs,
+                "ts" to record.updatedAt,
+                "title" to record.title,
+                "img" to record.imageUrl,
+                "ext" to record.extension,
+            )
+        }
+        prefs.edit().putString(KEY, gson.toJson(jsonMap)).apply()
+    }
+
     private fun parseRecord(key: String, json: JsonObject): Record? {
         val parts = key.split(":", limit = 2)
         if (parts.size != 2) return null
