@@ -14,8 +14,7 @@ import com.gadir.tv.model.LiveChannel
 class ChannelAdapter(
     private val items: List<LiveChannel>,
     private val onFocus: (LiveChannel) -> Unit,
-    private val onSelect: ((LiveChannel) -> Unit)? = null,
-    private val onDoubleSelect: ((LiveChannel) -> Unit)? = null,
+    private val onOpen: ((LiveChannel) -> Unit)? = null,
     private val onMoveLeft: (() -> Unit)? = null,
     private val onMoveUp: (() -> Unit)? = null,
     private val onMoveDown: (() -> Unit)? = null,
@@ -23,27 +22,11 @@ class ChannelAdapter(
     private val onToggleFavorite: ((LiveChannel) -> Unit)? = null,
 ) : RecyclerView.Adapter<ChannelAdapter.Holder>() {
 
-    private var lastSelectId = -1
-    private var lastSelectAt = 0L
-
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
         val number: TextView = view.findViewById(R.id.channelNumber)
         val icon: ImageView = view.findViewById(R.id.channelIcon)
         val name: TextView = view.findViewById(R.id.channelName)
         val favorite: ImageView = view.findViewById(R.id.channelFavorite)
-    }
-
-    private fun handleSelect(item: LiveChannel) {
-        val now = System.currentTimeMillis()
-        if (item.streamId == lastSelectId && now - lastSelectAt <= DOUBLE_TAP_MS) {
-            lastSelectId = -1
-            lastSelectAt = 0L
-            onDoubleSelect?.invoke(item) ?: onSelect?.invoke(item) ?: onFocus(item)
-            return
-        }
-        lastSelectId = item.streamId
-        lastSelectAt = now
-        onSelect?.invoke(item) ?: onFocus(item)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
@@ -74,7 +57,7 @@ class ChannelAdapter(
             if (hasFocus) onFocus(item)
         }
 
-        holder.itemView.setOnClickListener { handleSelect(item) }
+        holder.itemView.setOnClickListener { openChannel(item) }
 
         holder.itemView.setOnLongClickListener {
             onToggleFavorite?.invoke(item)
@@ -91,7 +74,7 @@ class ChannelAdapter(
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     onMoveLeft?.invoke()
-                    true
+                    onMoveLeft != null
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     if (pos == 0) {
@@ -110,7 +93,7 @@ class ChannelAdapter(
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                    handleSelect(item)
+                    openChannel(item)
                     true
                 }
                 else -> false
@@ -118,9 +101,9 @@ class ChannelAdapter(
         }
     }
 
-    override fun getItemCount(): Int = items.size
-
-    companion object {
-        private const val DOUBLE_TAP_MS = 450L
+    private fun openChannel(item: LiveChannel) {
+        onOpen?.invoke(item) ?: onFocus(item)
     }
+
+    override fun getItemCount(): Int = items.size
 }

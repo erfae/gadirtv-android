@@ -119,6 +119,6 @@
     <string name="player_play_pause">Play or pause</string>
     <string name="player_rewind">Rewind 10 seconds</string>
     <string name="player_forward">Forward 10 seconds</string>
-    <string name="preview_fullscreen_hint">OK on preview for fullscreen</string>
+    <string name="preview_fullscreen_hint">OK on channel for fullscreen</string>
     <string name="channel_zap_hint">↑↓ to change channel</string>
 </resources>
