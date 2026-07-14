@@ -120,7 +120,9 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var resumeRailTitle: TextView
     private lateinit var resumeRail: RecyclerView
     private lateinit var moviesRail: RecyclerView
+    private lateinit var moviesRailTitle: TextView
     private lateinit var seriesRail: RecyclerView
+    private lateinit var seriesRailTitle: TextView
     private lateinit var homeScrollView: NestedScrollView
 
     private lateinit var headerClock: TextView
@@ -276,7 +278,9 @@ class MainActivity : BaseLocaleActivity() {
         resumeRailTitle = panelHome.findViewById(R.id.resumeRailTitle)
         resumeRail = panelHome.findViewById(R.id.resumeRail)
         moviesRail = panelHome.findViewById(R.id.moviesRail)
+        moviesRailTitle = panelHome.findViewById(R.id.moviesRailTitle)
         seriesRail = panelHome.findViewById(R.id.seriesRail)
+        seriesRailTitle = panelHome.findViewById(R.id.seriesRailTitle)
         homeScrollView = panelHome.findViewById(R.id.homeScrollView)
 
         liveCategoryList.layoutManager = LinearLayoutManager(this)
@@ -676,8 +680,8 @@ class MainActivity : BaseLocaleActivity() {
     private fun focusHomeMoviesOnStart() {
         if (currentTab != Tab.HOME) return
         when {
-            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail)
-            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail)
+            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail, moviesRailTitle)
+            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail, seriesRailTitle)
             heroItems.isNotEmpty() -> focusHeroPlay()
             else -> Unit
         }
@@ -687,29 +691,30 @@ class MainActivity : BaseLocaleActivity() {
     private fun focusFirstHomeRail() {
         when {
             resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
-                focusHomeRailItem(resumeRail)
+                focusHomeRailItem(resumeRail, resumeRailTitle)
             favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
-                focusHomeRailItem(favoritesRail)
-            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail)
-            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail)
+                focusHomeRailItem(favoritesRail, favoritesRailTitle)
+            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail, moviesRailTitle)
+            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail, seriesRailTitle)
         }
     }
 
-    private fun focusHomeRailItem(rail: RecyclerView) {
+    private fun focusHomeRailItem(rail: RecyclerView, titleView: View? = null) {
         homeScrollView.post {
-            homeScrollView.smoothScrollTo(0, rail.top)
+            val scrollY = (titleView?.top ?: rail.top).coerceAtLeast(0)
+            homeScrollView.smoothScrollTo(0, scrollY)
             TvNavHelper.focusItem(rail, 0)
         }
     }
 
     private fun focusLastHomeRail() {
         when {
-            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail)
-            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail)
+            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail, seriesRailTitle)
+            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail, moviesRailTitle)
             favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
-                focusHomeRailItem(favoritesRail)
+                focusHomeRailItem(favoritesRail, favoritesRailTitle)
             resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
-                focusHomeRailItem(resumeRail)
+                focusHomeRailItem(resumeRail, resumeRailTitle)
             else -> heroPlay.requestFocus()
         }
     }
@@ -717,17 +722,17 @@ class MainActivity : BaseLocaleActivity() {
     private fun focusHomeRailBelowResume() {
         when {
             favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
-                focusHomeRailItem(favoritesRail)
-            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail)
-            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail)
+                focusHomeRailItem(favoritesRail, favoritesRailTitle)
+            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail, moviesRailTitle)
+            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail, seriesRailTitle)
             else -> tabHome.requestFocus()
         }
     }
 
     private fun focusHomeRailBelowFavorites() {
         when {
-            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail)
-            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail)
+            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail, moviesRailTitle)
+            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail, seriesRailTitle)
             else -> tabHome.requestFocus()
         }
     }
@@ -735,7 +740,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun focusHomeRailAboveFavorites() {
         when {
             resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
-                focusHomeRailItem(resumeRail)
+                focusHomeRailItem(resumeRail, resumeRailTitle)
             else -> heroPlay.requestFocus()
         }
     }
@@ -743,27 +748,27 @@ class MainActivity : BaseLocaleActivity() {
     private fun focusHomeRailAboveMovies() {
         when {
             favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
-                focusHomeRailItem(favoritesRail)
+                focusHomeRailItem(favoritesRail, favoritesRailTitle)
             resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
-                focusHomeRailItem(resumeRail)
+                focusHomeRailItem(resumeRail, resumeRailTitle)
             else -> heroPlay.requestFocus()
         }
     }
 
     private fun focusHomeRailBelowMovies() {
         when {
-            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail)
+            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail, seriesRailTitle)
             else -> tabHome.requestFocus()
         }
     }
 
     private fun focusHomeRailAboveSeries() {
         when {
-            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail)
+            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail, moviesRailTitle)
             favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
-                focusHomeRailItem(favoritesRail)
+                focusHomeRailItem(favoritesRail, favoritesRailTitle)
             resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
-                focusHomeRailItem(resumeRail)
+                focusHomeRailItem(resumeRail, resumeRailTitle)
             else -> heroPlay.requestFocus()
         }
     }
