@@ -1192,6 +1192,7 @@ function LivePreview({ channel, profile, fsSignal, onClose, onFullscreen }) {
 }
 
 function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }) {
+  const isElectron = typeof window !== "undefined" && !!window.electronAPI;
   const [tab, setTab] = useState("home");
   const [liveChannel, setLiveChannel] = useState(() => {
     try { return JSON.parse(localStorage.getItem("g_last_channel") || "null"); }
@@ -1262,9 +1263,9 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
       </div>
       )}
 
-      <div className="fixed top-11 right-6 z-30 flex items-center gap-3">
-        <button onClick={onSwitch} data-testid="switch-profile-btn" title="Cambiar perfil" className="w-9 h-9 rounded-lg bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center font-medium text-white shadow-lg">{profile.name.charAt(0).toUpperCase()}</button>
+      <div className={`fixed top-3 z-50 flex items-center gap-2 ${isElectron ? "right-28" : "right-4"}`}>
         <button onClick={onLogout} data-testid="logout-btn" title="Cerrar sesión" className="w-9 h-9 rounded-lg bg-black/60 hover:bg-black/80 flex items-center justify-center text-neutral-400 hover:text-white backdrop-blur"><LogOut size={16}/></button>
+        <button onClick={onSwitch} data-testid="switch-profile-btn" title="Cambiar perfil" className="w-9 h-9 rounded-lg bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center font-medium text-white shadow-lg">{profile.name.charAt(0).toUpperCase()}</button>
       </div>
 
       <div className="relative" style={{zIndex: 1}}>
