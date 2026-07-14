@@ -1,5 +1,6 @@
 package com.gadir.tv.data
 
+import com.gadir.tv.util.CategorySort
 import com.gadir.tv.model.AccountInfo
 import com.gadir.tv.model.Category
 import com.gadir.tv.model.LiveChannel
@@ -45,16 +46,16 @@ object PlaylistRepository {
     }
 
     fun updateCatalog(cats: List<Category>, channels: List<LiveChannel>) {
-        categories = cats.sortedBy { it.order }
+        categories = CategorySort.sortWithAdultLast(cats)
         allChannels = channels
     }
 
     fun updateVodCategories(cats: List<Category>) {
-        vodCategories = cats.sortedBy { it.order }
+        vodCategories = CategorySort.sortWithAdultLast(cats)
     }
 
     fun updateSeriesCategories(cats: List<Category>) {
-        seriesCategories = cats.sortedBy { it.order }
+        seriesCategories = CategorySort.sortWithAdultLast(cats)
     }
 
     fun channelsFor(categoryId: String?, sortMode: String = AppSettings.LIVE_SORT_PLAYLIST): List<LiveChannel> {

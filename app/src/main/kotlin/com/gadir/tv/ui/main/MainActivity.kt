@@ -23,6 +23,7 @@ import com.gadir.tv.data.FavoritesStore
 import com.gadir.tv.data.BootstrapLoader
 import com.gadir.tv.data.CatalogPreloader
 import com.gadir.tv.data.HomeLoader
+import com.gadir.tv.data.LiveChannelStore
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ProfileStore
 import com.gadir.tv.data.ResumeStore
@@ -45,6 +46,9 @@ import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.VolumeHelper
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -54,12 +58,16 @@ class MainActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
     private lateinit var favoritesStore: FavoritesStore
+    private lateinit var liveChannelStore: LiveChannelStore
     private lateinit var appSettings: AppSettings
     private var miniPlayer: ExoPlayer? = null
     private var miniPlaybackMonitor: LivePlaybackMonitor? = null
     private var channelAdapter: ChannelAdapter? = null
     private var currentPreviewChannel: LiveChannel? = null
     private var previewingStreamId: Int? = null
+    private var previewUrls = listOf<String>()
+    private var previewUrlIndex = 0
+    private var previewWorkingUrl: String? = null
     private val epgCache = mutableMapOf<Int, List<EpgEntry>>()
     private val previewHandler = Handler(Looper.getMainLooper())
     private var pendingPreview: Runnable? = null
@@ -78,6 +86,7 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var liveCategoryList: RecyclerView
     private lateinit var channelList: RecyclerView
     private lateinit var previewTitle: TextView
+    private lateinit var previewLogo: ImageView
     private lateinit var epgNow: TextView
     private lateinit var epgNext: TextView
 
@@ -103,7 +112,11 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var moviesRail: RecyclerView
     private lateinit var seriesRail: RecyclerView
 
-    private val liveCategories = mutableListOf<Category>()
+    private lateinit var headerClock: TextView
+    private lateinit var headerDate: TextView
+    private lateinit var profileAvatar: TextView
+
+    private val clockHandler = Handler(Looper.getMainLooper())
     private val channels = mutableListOf<LiveChannel>()
     private val catalogCategories = mutableListOf<Category>()
     private val posterItems = mutableListOf<PosterAdapter.PosterItem>()
@@ -118,6 +131,16 @@ class MainActivity : BaseLocaleActivity() {
     private var railPreviewItem: HomeRailAdapter.HomeRailItem? = null
     private var homeLoaded = false
     private val heroHandler = Handler(Looper.getMainLooper())
+    private val clockRunnable = object : Runnable {
+        override fun run() {
+            val now = Date()
+            headerClock.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
+            headerDate.text = SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(now)
+            clockHandler.postDelayed(this, 30_000L)
+        }
+    }
+
+    private val liveCategories = mutableListOf<Category>()
     private val heroRotateRunnable = object : Runnable {
         override fun run() {
             if (railPreviewItem != null) return
@@ -166,10 +189,20 @@ class MainActivity : BaseLocaleActivity() {
         }
 
         favoritesStore = FavoritesStore(this)
+        liveChannelStore = LiveChannelStore(this)
         resumeStore = ResumeStore(this)
         appSettings = AppSettings(this)
 
         findViewById<TextView>(R.id.profileLabel).text = profile.name
+        headerClock = findViewById(R.id.headerClock)
+        headerDate = findViewById(R.id.headerDate)
+        profileAvatar = findViewById(R.id.profileAvatar)
+        val initial = profile.name.trim().firstOrNull()?.uppercaseChar()?.toString().orEmpty()
+        if (initial.isNotEmpty()) {
+            profileAvatar.text = initial
+            profileAvatar.visibility = View.VISIBLE
+        }
+        startHeaderClock()
         findViewById<TextView>(R.id.btnSearch).setOnClickListener {
             startActivity(Intent(this, SearchActivity::class.java))
         }
@@ -191,6 +224,7 @@ class MainActivity : BaseLocaleActivity() {
         liveCategoryList = panelLive.findViewById(R.id.categoryList)
         channelList = panelLive.findViewById(R.id.channelList)
         previewTitle = panelLive.findViewById(R.id.previewTitle)
+        previewLogo = panelLive.findViewById(R.id.previewLogo)
         val previewControls = panelLive.findViewById<View>(R.id.miniPreviewControls)
         epgNow = previewControls.findViewById(R.id.epgNow)
         epgNext = previewControls.findViewById(R.id.epgNext)
@@ -304,7 +338,13 @@ class MainActivity : BaseLocaleActivity() {
         channelAdapter = ChannelAdapter(
             items = channels,
             onFocus = { channel -> schedulePreview(channel) },
+            onSelect = { channel ->
+                schedulePreview(channel)
+                panelLive.findViewById<View>(R.id.previewContainer).requestFocus()
+            },
             onMoveLeft = { focusCategoryList() },
+            onMoveUp = { zapChannel(-1) },
+            onMoveDown = { zapChannel(1) },
             isFavorite = { favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId) },
             onToggleFavorite = { channel ->
                 favoritesStore.toggle(FavoritesStore.KIND_LIVE, channel.streamId)
@@ -323,6 +363,54 @@ class MainActivity : BaseLocaleActivity() {
         if (channels.isEmpty()) return
         channelList.post {
             channelList.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+        }
+    }
+
+    private fun startHeaderClock() {
+        clockHandler.removeCallbacks(clockRunnable)
+        clockRunnable.run()
+    }
+
+    private fun restoreLastChannel() {
+        val lastId = liveChannelStore.lastStreamId
+        if (lastId <= 0 || channels.isEmpty()) {
+            focusCategoryList()
+            return
+        }
+        val index = channels.indexOfFirst { it.streamId == lastId }
+        if (index < 0) {
+            focusCategoryList()
+            return
+        }
+        channelList.scrollToPosition(index)
+        channelList.post {
+            channelList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
+        }
+    }
+
+    private fun zapChannel(delta: Int) {
+        if (channels.isEmpty()) return
+        val current = currentPreviewChannel
+        val index = if (current != null) {
+            channels.indexOfFirst { it.streamId == current.streamId }.takeIf { it >= 0 }
+        } else {
+            null
+        } ?: channelList.getChildAdapterPosition(channelList.focusedChild).takeIf { it >= 0 }
+        ?: 0
+        val next = (index + delta).coerceIn(0, channels.lastIndex)
+        channelList.scrollToPosition(next)
+        channelList.post {
+            channelList.findViewHolderForAdapterPosition(next)?.itemView?.requestFocus()
+        }
+    }
+
+    private fun focusChannelAt(channel: LiveChannel?) {
+        val target = channel ?: currentPreviewChannel ?: return
+        val index = channels.indexOfFirst { it.streamId == target.streamId }
+        if (index < 0) return
+        channelList.scrollToPosition(index)
+        channelList.post {
+            channelList.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
         }
     }
 
@@ -386,7 +474,7 @@ class MainActivity : BaseLocaleActivity() {
                 if (appSettings.autoplayPreview) {
                     miniPlaybackMonitor?.start()
                 }
-                focusCategoryList()
+                restoreLastChannel()
             }
             Tab.MOVIES, Tab.SERIES -> {
                 panelHome.visibility = View.GONE
@@ -1202,7 +1290,15 @@ class MainActivity : BaseLocaleActivity() {
     private fun previewChannel(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         currentPreviewChannel = channel
+        liveChannelStore.lastStreamId = channel.streamId
+        liveChannelStore.lastCategoryId = selectedLiveCategoryId
         previewTitle.text = channel.name
+        if (channel.icon.isNotEmpty()) {
+            previewLogo.visibility = View.VISIBLE
+            ImageLoader.loadChannelIcon(previewLogo, channel.icon)
+        } else {
+            previewLogo.visibility = View.GONE
+        }
         epgCache[channel.streamId]?.let { applyEpg(channel, it) } ?: run {
             epgNow.text = getString(R.string.epg_unavailable)
             epgNext.visibility = View.GONE
@@ -1211,13 +1307,10 @@ class MainActivity : BaseLocaleActivity() {
         if (appSettings.autoplayPreview) {
             if (previewingStreamId != channel.streamId) {
                 VolumeHelper.boostOnPlaybackStart(this)
-                val urls = LiveStreamUrls.candidates(api, profile, channel)
-                miniPlayer?.apply {
-                    setMediaItem(MediaItem.fromUri(urls.first()))
-                    prepare()
-                    volume = 1f
-                    playWhenReady = true
-                }
+                previewUrls = LiveStreamUrls.candidates(api, profile, channel)
+                previewUrlIndex = 0
+                previewWorkingUrl = null
+                playMiniPreviewUrl(previewUrls.firstOrNull().orEmpty())
                 previewingStreamId = channel.streamId
                 miniPlaybackMonitor?.start()
                 miniPlaybackMonitor?.reset()
@@ -1237,12 +1330,37 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun playMiniPreviewUrl(url: String) {
+        if (url.isBlank()) return
+        miniPlayer?.apply {
+            setMediaItem(MediaItem.fromUri(url))
+            prepare()
+            volume = 1f
+            playWhenReady = true
+        }
+    }
+
+    private fun tryNextPreviewUrl(): Boolean {
+        if (previewUrlIndex >= previewUrls.lastIndex) return false
+        previewUrlIndex += 1
+        playMiniPreviewUrl(previewUrls[previewUrlIndex])
+        miniPlaybackMonitor?.reset()
+        return true
+    }
+
     fun openFullscreen(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         VolumeHelper.boostOnPlaybackStart(this)
         miniPlayer?.stop()
         miniPlayer?.clearMediaItems()
-        val urls = LiveStreamUrls.candidates(api, profile, channel)
+        miniPlaybackMonitor?.stop()
+        val candidates = LiveStreamUrls.candidates(api, profile, channel)
+        val urls = buildList {
+            if (previewingStreamId == channel.streamId) {
+                previewWorkingUrl?.let { add(it) }
+            }
+            addAll(candidates)
+        }.distinct()
         PlaybackLauncher.play(
             context = this,
             request = PlaybackRequest(
@@ -1303,6 +1421,7 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onDestroy() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
+        clockHandler.removeCallbacks(clockRunnable)
         stopHeroRotation()
         miniPlaybackMonitor?.stop()
         miniPlaybackMonitor = null
@@ -1336,6 +1455,22 @@ class MainActivity : BaseLocaleActivity() {
                     currentPreviewChannel?.let { openFullscreen(it) }
                     true
                 }
+                android.view.KeyEvent.KEYCODE_DPAD_UP,
+                android.view.KeyEvent.KEYCODE_CHANNEL_UP,
+                -> {
+                    zapChannel(-1)
+                    true
+                }
+                android.view.KeyEvent.KEYCODE_DPAD_DOWN,
+                android.view.KeyEvent.KEYCODE_CHANNEL_DOWN,
+                -> {
+                    zapChannel(1)
+                    true
+                }
+                android.view.KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    focusChannelAt(currentPreviewChannel)
+                    true
+                }
                 else -> false
             }
         }
@@ -1349,8 +1484,14 @@ class MainActivity : BaseLocaleActivity() {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     if (!appSettings.autoplayPreview || previewOverlay == null) return
                     val showInfo = !isPlaying
-                    previewTitle.visibility = if (showInfo) View.VISIBLE else View.GONE
                     previewOverlay.visibility = if (showInfo) View.VISIBLE else View.GONE
+                    if (isPlaying && previewUrlIndex in previewUrls.indices) {
+                        previewWorkingUrl = previewUrls[previewUrlIndex]
+                    }
+                }
+
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    tryNextPreviewUrl()
                 }
             })
             miniPlaybackMonitor = LivePlaybackMonitor(player, noSignal)
