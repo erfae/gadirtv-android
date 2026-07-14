@@ -1603,7 +1603,6 @@ class MainActivity : BaseLocaleActivity() {
     private fun playMiniPreviewUrl(url: String, token: Int) {
         if (token != previewToken || url.isBlank()) return
         setPreviewVideoVisible(false)
-        VolumeHelper.boostOnPlaybackStart(this)
         miniPlayer?.apply {
             stop()
             clearMediaItems()
