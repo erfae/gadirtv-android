@@ -12,7 +12,6 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -1519,6 +1518,7 @@ class MainActivity : BaseLocaleActivity() {
             previewToken++
             cancelMiniPreviewPlayback()
             setPreviewVideoVisible(false)
+            panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
         }
         updatePreviewInfo(channel)
         val token = previewToken
@@ -1526,7 +1526,7 @@ class MainActivity : BaseLocaleActivity() {
             if (token == previewToken) previewChannel(channel, token)
         }
         pendingPreview = task
-        previewHandler.postDelayed(task, 320L)
+        previewHandler.postDelayed(task, 200L)
     }
 
     private fun updatePreviewInfo(channel: LiveChannel) {
@@ -1585,10 +1585,11 @@ class MainActivity : BaseLocaleActivity() {
     private fun playMiniPreviewUrl(url: String, token: Int) {
         if (token != previewToken || url.isBlank()) return
         setPreviewVideoVisible(false)
+        VolumeHelper.boostOnPlaybackStart(this)
         miniPlayer?.apply {
             stop()
             clearMediaItems()
-            setMediaItem(MediaItem.fromUri(url))
+            setMediaItem(LiveStreamUrls.mediaItem(url))
             prepare()
             volume = if (appSettings.previewSound) 1f else 0f
             playWhenReady = true
@@ -1623,8 +1624,12 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun tryNextPreviewUrl(token: Int = previewToken): Boolean {
         if (token != previewToken) return false
-        if (previewUrlIndex >= previewUrls.lastIndex) return false
+        if (previewUrlIndex >= previewUrls.lastIndex) {
+            panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.VISIBLE
+            return false
+        }
         previewUrlIndex += 1
+        panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
         playMiniPreviewUrl(previewUrls[previewUrlIndex], token)
         miniPlaybackMonitor?.reset()
         return true
@@ -1794,25 +1799,34 @@ class MainActivity : BaseLocaleActivity() {
             panelLive.findViewById<androidx.media3.ui.PlayerView>(R.id.miniPlayer).player = player
             player.playWhenReady = true
             player.addListener(object : androidx.media3.common.Player.Listener {
+                override fun onRenderedFirstFrame() {
+                    if (previewUrlIndex in previewUrls.indices) {
+                        previewWorkingUrl = previewUrls[previewUrlIndex]
+                        setPreviewVideoVisible(true)
+                        panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
+                    }
+                }
+
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == androidx.media3.common.Player.STATE_READY &&
                         player.isPlaying &&
                         previewUrlIndex in previewUrls.indices
                     ) {
                         previewWorkingUrl = previewUrls[previewUrlIndex]
-                        setPreviewVideoVisible(true)
                     }
                 }
 
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                     setPreviewVideoVisible(false)
-                    tryNextPreviewUrl()
+                    if (!tryNextPreviewUrl()) {
+                        panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.VISIBLE
+                    }
                 }
             })
             miniPlaybackMonitor = LivePlaybackMonitor(
                 player = player,
                 overlay = noSignal,
-                timeoutMs = 10_000L,
+                timeoutMs = 6_000L,
                 onBeforeNoSignal = {
                     setPreviewVideoVisible(false)
                     tryNextPreviewUrl()

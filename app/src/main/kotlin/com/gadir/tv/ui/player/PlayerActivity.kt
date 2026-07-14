@@ -24,6 +24,7 @@ import com.gadir.tv.R
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
+import com.gadir.tv.player.LiveStreamUrls
 import com.gadir.tv.player.PlayerFactory
 import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.TimeFormat
@@ -167,7 +168,8 @@ class PlayerActivity : BaseLocaleActivity() {
     }
 
     private fun startPlayback(exo: ExoPlayer, url: String, positionMs: Long) {
-        exo.setMediaItem(MediaItem.fromUri(Uri.parse(url)))
+        val item = if (isLive) LiveStreamUrls.mediaItem(url) else MediaItem.fromUri(Uri.parse(url))
+        exo.setMediaItem(item)
         exo.prepare()
         if (positionMs > 0L) {
             exo.seekTo(positionMs)

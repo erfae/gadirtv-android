@@ -156,6 +156,7 @@ class XtreamApi(
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
                 num = row.channelNum(index),
                 extension = row.get("container_extension")?.asStringOrNull()?.ifBlank { "ts" } ?: "ts",
+                directSource = row.get("direct_source")?.asStringOrNull().orEmpty().trim(),
             )
         }.filter { it.streamId > 0 }
     }
@@ -290,6 +291,13 @@ class XtreamApi(
 
     fun streamUrl(profile: Profile, streamId: Int, ext: String = "ts"): String =
         buildStreamUrl(profile, "live", streamId, ext)
+
+    fun streamUrlWithoutExtension(profile: Profile, streamId: Int): String {
+        val host = HostUtils.baseUrl(profile.host)
+        val u = encode(profile.username)
+        val pw = encode(profile.password)
+        return "$host/live/$u/$pw/$streamId"
+    }
 
     fun movieStreamUrl(profile: Profile, streamId: Int, ext: String = "mp4"): String =
         buildStreamUrl(profile, "movie", streamId, ext)
