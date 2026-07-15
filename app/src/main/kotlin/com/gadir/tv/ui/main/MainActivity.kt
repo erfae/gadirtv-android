@@ -47,6 +47,7 @@ import com.gadir.tv.ui.series.SeriesDetailActivity
 import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.AccountFormat
 import com.gadir.tv.util.FocusScaleHelper
+import com.gadir.tv.util.ChannelIconHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.MetaExtractor
 import com.gadir.tv.util.ProfileAvatarHelper
@@ -54,6 +55,7 @@ import com.gadir.tv.util.TvFocusHelper
 import com.gadir.tv.util.TvNavHelper
 import com.gadir.tv.util.VolumeHelper
 import com.gadir.tv.util.HeaderClockHelper
+import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -1754,12 +1756,8 @@ class MainActivity : BaseLocaleActivity() {
         liveChannelStore.lastStreamId = channel.streamId
         liveChannelStore.lastCategoryId = selectedLiveCategoryId ?: ""
         previewTitle.text = channel.name
-        if (channel.icon.isNotEmpty()) {
-            previewLogo.visibility = View.VISIBLE
-            ImageLoader.loadChannelIcon(previewLogo, channel.icon)
-        } else {
-            previewLogo.visibility = View.GONE
-        }
+        previewLogo.visibility = View.VISIBLE
+        ChannelIconHelper.load(previewLogo, channel)
         epgCache[channel.streamId]?.takeIf { it.isNotEmpty() }?.let { applyEpg(channel, it) } ?: run {
             epgNow.text = getString(R.string.epg_loading)
             epgNext.visibility = View.GONE
