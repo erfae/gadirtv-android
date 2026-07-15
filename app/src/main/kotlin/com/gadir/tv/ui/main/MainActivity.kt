@@ -1738,6 +1738,7 @@ class MainActivity : BaseLocaleActivity() {
         if (channelChanged) {
             previewToken++
             cancelMiniPreviewPlayback()
+            recreateMiniVlcPlayer()
             setPreviewVideoVisible(false)
             panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
         }
@@ -1814,8 +1815,11 @@ class MainActivity : BaseLocaleActivity() {
         playMiniPreviewUrl(url, token)
     }
 
+    private var previewPlaybackToken = 0
+
     private fun playMiniPreviewUrl(url: String, token: Int) {
         if (token != previewToken || url.isBlank()) return
+        previewPlaybackToken = token
         setPreviewVideoVisible(false)
         val volume = if (appSettings.previewSound) {
             LiveVlcPlayer.VOLUME_PREVIEW
@@ -2088,6 +2092,7 @@ class MainActivity : BaseLocaleActivity() {
                 }
             },
             onPlaying = {
+                if (previewPlaybackToken != previewToken) return@LiveVlcPlayer
                 if (previewUrlIndex in previewUrls.indices) {
                     previewWorkingUrl = previewUrls[previewUrlIndex]
                 }

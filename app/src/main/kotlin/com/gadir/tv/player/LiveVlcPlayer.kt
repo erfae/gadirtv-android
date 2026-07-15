@@ -33,6 +33,9 @@ class LiveVlcPlayer(
             setEventListener { event ->
                 when (event.type) {
                     MediaPlayer.Event.Playing -> onPlaying()
+                    MediaPlayer.Event.Vout -> {
+                        if (event.voutCount > 0) onPlaying()
+                    }
                     MediaPlayer.Event.EncounteredError -> onError()
                 }
             }
@@ -40,6 +43,7 @@ class LiveVlcPlayer(
     }
 
     fun play(url: String, volume: Int) {
+        mediaPlayer.stop()
         val media = Media(libVlc, Uri.parse(url))
         mediaPlayer.media = media
         media.release()
