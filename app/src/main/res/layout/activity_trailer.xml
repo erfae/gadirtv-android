@@ -38,12 +38,28 @@
             android:background="@drawable/tab_bg"
             android:focusable="true"
             android:focusableInTouchMode="true"
-            android:nextFocusDown="@+id/trailerWebView"
+            android:nextFocusRight="@+id/btnTrailerYoutube"
             android:paddingHorizontal="16dp"
             android:paddingVertical="8dp"
             android:text="@string/back"
             android:textColor="@android:color/white"
             android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/btnTrailerYoutube"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/btn_trailer_hero"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:nextFocusLeft="@+id/btnTrailerBack"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="8dp"
+            android:text="@string/trailer_open_youtube"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/trailerTitle"

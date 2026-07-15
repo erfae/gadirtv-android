@@ -1,8 +1,6 @@
 package com.gadir.tv.util
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import com.gadir.tv.R
 import com.gadir.tv.data.ResumeStore
@@ -25,23 +23,37 @@ object TrailerLauncher {
                     return
                 }
                 is TrailerSource.Youtube -> {
-                    if (YoutubeTrailerHelper.openInYoutubeApp(context, source.videoId)) return
+                    openInApp(context, source.videoId, title)
+                    return
                 }
                 is TrailerSource.ExternalLink -> {
-                    if (openExternalViewer(context, source.url)) return
+                    if (MetaExtractor.isDirectVideoUrl(source.url)) {
+                        playDirectVideo(context, title, source.url)
+                        return
+                    }
                 }
                 is TrailerSource.WebPage -> {
-                    if (openExternalViewer(context, source.url)) return
+                    if (MetaExtractor.isDirectVideoUrl(source.url)) {
+                        playDirectVideo(context, title, source.url)
+                        return
+                    }
                 }
             }
         }
 
         val webUrl = TrailerResolver.firstWebUrl(sources)
         if (webUrl != null) {
-            context.startActivity(TrailerActivity.intent(context, webUrl, title))
+            openInApp(context, webUrl, title)
             return
         }
         Toast.makeText(context, R.string.trailer_unavailable, Toast.LENGTH_LONG).show()
+    }
+
+    private fun openInApp(context: Context, urlOrId: String, title: String) {
+        val url = YoutubeTrailerHelper.extractId(urlOrId)?.let { id ->
+            "https://www.youtube.com/watch?v=$id"
+        } ?: urlOrId
+        context.startActivity(TrailerActivity.intent(context, url, title))
     }
 
     private fun playDirectVideo(context: Context, title: String, url: String) {
@@ -53,17 +65,5 @@ object TrailerLauncher {
                 kind = ResumeStore.KIND_MOVIE,
             ),
         )
-    }
-
-    private fun openExternalViewer(context: Context, url: String): Boolean {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (intent.resolveActivity(context.packageManager) == null) return false
-        return try {
-            context.startActivity(intent)
-            true
-        } catch (_: Exception) {
-            false
-        }
     }
 }
