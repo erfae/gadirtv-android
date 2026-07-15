@@ -188,6 +188,15 @@
                 android:layout_marginTop="2dp"
                 android:text="@string/back_profiles"
                 style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDeleteProfile"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/delete_profile"
+                android:textColor="@color/gtv_red_hi"
+                android:visibility="gone"
+                style="@style/Widget.MaterialComponents.Button.TextButton" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

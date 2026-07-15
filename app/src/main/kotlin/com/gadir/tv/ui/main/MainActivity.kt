@@ -348,19 +348,23 @@ class MainActivity : BaseLocaleActivity() {
         liveCategories.addAll(PlaylistRepository.categories)
 
         val applyLiveCategory: (Category) -> Unit = { cat ->
-            val newId = when (cat.id) {
-                "" -> null
-                FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
-                else -> cat.id
-            }
-            if (newId != selectedLiveCategoryId) {
-                stopLivePreview()
-                val oldIndex = liveCategoryIndex()
-                selectedLiveCategoryId = newId
-                (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelectionAt(
-                    oldIndex,
-                    liveCategoryIndex(),
-                )
+            try {
+                val newId = when (cat.id) {
+                    "" -> null
+                    FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
+                    else -> cat.id
+                }
+                if (newId != selectedLiveCategoryId) {
+                    stopLivePreview()
+                    val oldIndex = liveCategoryIndex()
+                    selectedLiveCategoryId = newId
+                    (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelectionAt(
+                        oldIndex,
+                        liveCategoryIndex(),
+                    )
+                    reloadChannels(keepCategoryFocus = true)
+                }
+            } catch (_: Exception) {
                 reloadChannels(keepCategoryFocus = true)
             }
         }
@@ -376,7 +380,13 @@ class MainActivity : BaseLocaleActivity() {
         channelList.setItemViewCacheSize(24)
         channelAdapter = ChannelAdapter(
             items = channels,
-            onFocus = { channel -> schedulePreview(channel) },
+            onFocus = { channel ->
+                if (DeviceUi.isCompact(this)) {
+                    updatePreviewInfo(channel)
+                } else {
+                    schedulePreview(channel)
+                }
+            },
             onOpen = { channel -> openFullscreen(channel) },
             onMoveLeft = { focusCategoryList() },
             onMoveRight = { focusPreviewPanel() },
@@ -1665,21 +1675,26 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun reloadChannels(keepCategoryFocus: Boolean = false) {
-        channels.clear()
-        channels.addAll(
-            when (selectedLiveCategoryId) {
-                FavoritesStore.FAVORITES_CATEGORY_ID ->
-                    PlaylistRepository.channelsFor(null, appSettings.liveSortMode).filter {
-                        favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId)
-                    }
-                else -> PlaylistRepository.channelsFor(selectedLiveCategoryId, appSettings.liveSortMode)
-            },
-        )
-        channelList.post {
-            channelAdapter?.notifyDataSetChanged()
-            if (!keepCategoryFocus && channels.isNotEmpty()) {
-                focusFirstChannel()
+        try {
+            channels.clear()
+            channels.addAll(
+                when (selectedLiveCategoryId) {
+                    FavoritesStore.FAVORITES_CATEGORY_ID ->
+                        PlaylistRepository.channelsFor(null, appSettings.liveSortMode).filter {
+                            favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId)
+                        }
+                    else -> PlaylistRepository.channelsFor(selectedLiveCategoryId, appSettings.liveSortMode)
+                },
+            )
+            channelList.post {
+                channelAdapter?.notifyDataSetChanged()
+                if (!keepCategoryFocus && channels.isNotEmpty() && !DeviceUi.isCompact(this)) {
+                    focusFirstChannel()
+                }
             }
+        } catch (_: Exception) {
+            channels.clear()
+            channelList.post { channelAdapter?.notifyDataSetChanged() }
         }
     }
 
@@ -1703,6 +1718,10 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun schedulePreview(channel: LiveChannel) {
+        if (DeviceUi.isCompact(this)) {
+            updatePreviewInfo(channel)
+            return
+        }
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val channelChanged = previewingStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) {
@@ -1766,6 +1785,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun previewChannel(channel: LiveChannel, token: Int) {
+        if (DeviceUi.isCompact(this)) return
         if (token != previewToken) return
         val profile = PlaylistRepository.profile ?: return
         updatePreviewInfo(channel)
@@ -2054,6 +2074,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun recreateMiniVlcPlayer() {
+        if (DeviceUi.isCompact(this)) return
         miniVlcPlayer?.release()
         val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
         miniVlcPlayer = LiveVlcPlayer(

@@ -22,6 +22,7 @@ import com.gadir.tv.ui.profiles.ProfilesActivity
 import com.gadir.tv.util.DefaultCredentials
 import com.gadir.tv.util.HostUtils
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -42,6 +43,7 @@ class LoginActivity : BaseLocaleActivity() {
     private lateinit var loginProgress: TextView
     private lateinit var btnConnect: MaterialButton
     private lateinit var btnBack: MaterialButton
+    private lateinit var btnDeleteProfile: MaterialButton
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,6 +56,7 @@ class LoginActivity : BaseLocaleActivity() {
 
         btnConnect.setOnClickListener { connect() }
         btnBack.setOnClickListener { finish() }
+        btnDeleteProfile.setOnClickListener { confirmDeleteProfile() }
 
         btnConnect.setOnKeyListener { _, keyCode, event ->
             if (event.action == KeyEvent.ACTION_DOWN &&
@@ -85,6 +88,22 @@ class LoginActivity : BaseLocaleActivity() {
         inputUser.setText(existing.username)
         inputPass.setText(existing.password)
         inputName.setText(existing.name)
+        btnDeleteProfile.visibility = View.VISIBLE
+    }
+
+    private fun confirmDeleteProfile() {
+        val profileId = editingProfileId ?: return
+        val profile = profileStore.loadAll().firstOrNull { it.id == profileId } ?: return
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.delete_profile_title)
+            .setMessage(getString(R.string.delete_profile_message, profile.displayName))
+            .setPositiveButton(R.string.delete_profile_confirm) { _, _ ->
+                profileStore.remove(profile)
+                startActivity(Intent(this, ProfilesActivity::class.java))
+                finish()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun bindViews() {
@@ -96,6 +115,7 @@ class LoginActivity : BaseLocaleActivity() {
         loginProgress = findViewById(R.id.loginProgress)
         btnConnect = findViewById(R.id.btnConnect)
         btnBack = findViewById(R.id.btnBack)
+        btnDeleteProfile = findViewById(R.id.btnDeleteProfile)
     }
 
     private fun loadDraft() {
