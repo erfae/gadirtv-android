@@ -60,11 +60,13 @@ class HomeRailAdapter(
         val item = items[position]
         holder.title.text = item.title
         val compact = DeviceUi.isCompact(holder.itemView.context)
+        val landscape = DeviceUi.isLandscape(holder.itemView.context)
         if (item.imageUrl.isNotEmpty()) {
-            if (compact) {
-                ImageLoader.loadPoster(holder.image, item.imageUrl, 130, 180)
-            } else {
-                ImageLoader.loadPoster(holder.image, item.imageUrl, 440, 248)
+            when {
+                compact && landscape -> ImageLoader.loadPoster(holder.image, item.imageUrl, 96, 108)
+                compact -> ImageLoader.loadPoster(holder.image, item.imageUrl, 130, 180)
+                landscape -> ImageLoader.loadPoster(holder.image, item.imageUrl, 180, 100)
+                else -> ImageLoader.loadPoster(holder.image, item.imageUrl, 440, 248)
             }
         } else {
             holder.image.setImageResource(R.drawable.tv_banner)

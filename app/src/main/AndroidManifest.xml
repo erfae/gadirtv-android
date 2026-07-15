@@ -25,7 +25,8 @@
 
         <activity
             android:name=".ui.profiles.ProfilesActivity"
-            android:exported="true">
+            android:exported="true"
+            android:screenOrientation="sensorLandscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
@@ -39,23 +40,28 @@
         <activity
             android:name=".ui.login.LoginActivity"
             android:exported="false"
+            android:screenOrientation="sensorLandscape"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.bootstrap.BootstrapActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="sensorLandscape" />
 
         <activity
             android:name=".ui.main.MainActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="sensorLandscape" />
 
         <activity
             android:name=".ui.series.SeriesDetailActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="sensorLandscape" />
 
         <activity
             android:name=".ui.movie.MovieDetailActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="sensorLandscape" />
 
         <activity
             android:name=".ui.player.PlayerActivity"
@@ -74,15 +80,18 @@
         <activity
             android:name=".ui.search.SearchActivity"
             android:exported="false"
+            android:screenOrientation="sensorLandscape"
             android:windowSoftInputMode="stateVisible|adjustResize" />
 
         <activity
             android:name=".ui.settings.SettingsActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="sensorLandscape" />
 
         <activity
             android:name=".ui.settings.PlayerSelectActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="sensorLandscape" />
 
         <activity
             android:name=".ui.player.TrailerActivity"
