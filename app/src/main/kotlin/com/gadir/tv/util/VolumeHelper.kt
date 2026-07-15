@@ -12,7 +12,7 @@ object VolumeHelper {
         val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         if (max <= 0) return
         val current = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
-        val target = (max * 0.35f).toInt().coerceIn(1, max)
+        val target = (max * 0.70f).toInt().coerceIn(1, max)
         if (current < target) {
             audio.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
         }

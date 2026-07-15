@@ -53,6 +53,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         options.add("--http-user-agent=${PlaylistRepository.userAgent}")
         options.add("--network-caching=$bufferMs")
         options.add("--live-caching=$bufferMs")
+        options.add("--gain=2")
+        options.add("--audio-resampler=soxr")
         libVlc = LibVLC(this, options)
         mediaPlayer = MediaPlayer(libVlc).apply {
             attachViews(findViewById<VLCVideoLayout>(R.id.vlcVideo), null, false, false)
@@ -99,6 +101,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     override fun onResume() {
         super.onResume()
         mediaPlayer?.play()
+        mediaPlayer?.volume = VLC_VOLUME
+        VolumeHelper.boostOnPlaybackStart(this)
     }
 
     override fun onStop() {

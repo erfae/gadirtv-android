@@ -18,19 +18,30 @@ object TrailerLauncher {
         if (url.isEmpty()) return
 
         val videoId = extractYoutubeId(url)
-        if (videoId != null && openYoutube(context, videoId)) return
+        if (videoId != null) {
+            if (openYoutubeTv(context, videoId)) return
+            context.startActivity(TrailerActivity.intent(context, url, title.ifBlank { videoId }))
+            return
+        }
 
         context.startActivity(TrailerActivity.intent(context, url, title))
     }
 
-    private fun openYoutube(context: Context, videoId: String): Boolean {
-        val uri = Uri.parse("https://www.youtube.com/watch?v=$videoId")
-        for (pkg in youtubePackages) {
-            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                setPackage(pkg)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            if (intent.resolveActivity(context.packageManager) != null) {
+    /** Abre YouTube TV sin selector de cuenta (evita el diálogo de elegir usuario). */
+    private fun openYoutubeTv(context: Context, videoId: String): Boolean {
+        val uris = listOf(
+            Uri.parse("https://www.youtube.com/tv#/watch?v=$videoId"),
+            Uri.parse("vnd.youtube:$videoId"),
+            Uri.parse("https://www.youtube.com/watch?v=$videoId"),
+        )
+        for (uri in uris) {
+            for (pkg in youtubePackages) {
+                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                    setPackage(pkg)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    putExtra("force_fullscreen", true)
+                }
+                if (intent.resolveActivity(context.packageManager) == null) continue
                 return try {
                     context.startActivity(intent)
                     true
@@ -39,18 +50,7 @@ object TrailerLauncher {
                 }
             }
         }
-        val generic = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return try {
-            if (generic.resolveActivity(context.packageManager) != null) {
-                context.startActivity(generic)
-                true
-            } else {
-                false
-            }
-        } catch (_: Exception) {
-            Toast.makeText(context, R.string.trailer_unavailable, Toast.LENGTH_SHORT).show()
-            false
-        }
+        return false
     }
 
     private fun extractYoutubeId(url: String): String? {

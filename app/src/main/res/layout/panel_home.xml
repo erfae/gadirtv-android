@@ -7,7 +7,7 @@
     <FrameLayout
         android:id="@+id/heroContainer"
         android:layout_width="match_parent"
-        android:layout_height="230dp"
+        android:layout_height="180dp"
         android:background="@color/gtv_bg"
         android:descendantFocusability="afterDescendants">
 
@@ -237,6 +237,7 @@
                 android:visibility="gone" />
 
             <TextView
+                android:id="@+id/moviesRailTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="32dp"
@@ -258,6 +259,7 @@
                 android:scrollbars="none" />
 
             <TextView
+                android:id="@+id/seriesRailTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="32dp"

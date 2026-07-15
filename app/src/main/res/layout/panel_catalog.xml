@@ -8,7 +8,7 @@
         android:id="@+id/catalogCategoryList"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="0.25"
+        android:layout_weight="0.28"
         android:clipToPadding="false"
         android:descendantFocusability="afterDescendants"
         android:nextFocusRight="@+id/catalogGrid"
@@ -23,7 +23,7 @@
     <FrameLayout
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="0.75">
+        android:layout_weight="0.72">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/catalogGrid"

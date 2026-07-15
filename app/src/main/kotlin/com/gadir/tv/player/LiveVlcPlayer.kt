@@ -25,6 +25,8 @@ class LiveVlcPlayer(
         options.add("--network-caching=$networkBufferMs")
         options.add("--live-caching=$networkBufferMs")
         options.add("--no-video-title-show")
+        options.add("--gain=2")
+        options.add("--audio-resampler=soxr")
         libVlc = LibVLC(context.applicationContext, options)
         mediaPlayer = MediaPlayer(libVlc).apply {
             attachViews(videoLayout, null, false, false)
