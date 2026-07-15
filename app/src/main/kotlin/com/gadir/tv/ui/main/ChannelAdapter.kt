@@ -17,6 +17,7 @@ class ChannelAdapter(
     private val onFocus: (LiveChannel) -> Unit,
     private val onOpen: ((LiveChannel) -> Unit)? = null,
     private val onMoveLeft: (() -> Unit)? = null,
+    private val onMoveRight: (() -> Unit)? = null,
     private val onMoveUp: (() -> Unit)? = null,
     private val onMoveDown: (() -> Unit)? = null,
     private val isFavorite: (LiveChannel) -> Boolean = { false },
@@ -77,6 +78,10 @@ class ChannelAdapter(
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     onMoveLeft?.invoke()
                     onMoveLeft != null
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    onMoveRight?.invoke()
+                    onMoveRight != null
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     if (pos == 0) {

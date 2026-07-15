@@ -16,6 +16,7 @@ class PosterAdapter(
     private val kind: String? = null,
     private val isFavorite: ((PosterItem) -> Boolean)? = null,
     private val onToggleFavorite: ((PosterItem) -> Unit)? = null,
+    private val columnCount: Int = 5,
     private val onMoveLeft: (() -> Unit)? = null,
     private val onMoveUp: (() -> Unit)? = null,
 ) : RecyclerView.Adapter<PosterAdapter.Holder>() {
@@ -68,7 +69,7 @@ class PosterAdapter(
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     val pos = holder.bindingAdapterPosition
                     if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
-                    if (pos % 5 == 0) {
+                    if (pos % columnCount == 0) {
                         onMoveLeft?.invoke()
                         true
                     } else {
@@ -78,7 +79,7 @@ class PosterAdapter(
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     val pos = holder.bindingAdapterPosition
                     if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
-                    if (pos < 5) {
+                    if (pos < columnCount) {
                         onMoveUp?.invoke()
                         onMoveUp != null
                     } else {
