@@ -21,8 +21,7 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.util.ImageLoader
-import com.gadir.tv.util.MetaExtractor
-import com.gadir.tv.util.TrailerCatalog
+import com.gadir.tv.util.TrailerAvailability
 import com.gadir.tv.util.TrailerLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -113,15 +112,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             }
 
             val trailerBtn = findViewById<TextView>(R.id.btnSeriesTrailer)
-            val resolvedTrailer = resolveTrailerUrl(detail.trailerUrl, detail.name, seriesName)
-            if (resolvedTrailer != null) {
-                trailerBtn.visibility = View.VISIBLE
-                trailerBtn.setOnClickListener {
-                    TrailerLauncher.open(this@SeriesDetailActivity, resolvedTrailer, detail.name)
-                }
-            } else {
-                trailerBtn.visibility = View.GONE
-            }
+            bindTrailerButton(trailerBtn, detail.name.ifEmpty { seriesName }, detail.trailerUrl)
 
             seasons = detail.seasons
             val keys = seasons.keys.sortedBy { it.toIntOrNull() ?: 0 }
@@ -144,15 +135,17 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun resolveTrailerUrl(vararg candidates: String): String? {
-        for (candidate in candidates) {
-            if (candidate.isBlank()) continue
-            MetaExtractor.normalizeTrailerUrl(candidate)?.let { return it }
-            TrailerCatalog.find(candidate)?.let { catalog ->
-                MetaExtractor.normalizeTrailerUrl(catalog)?.let { return it }
+    private fun bindTrailerButton(button: TextView, title: String, serverUrl: String) {
+        button.visibility = View.GONE
+        lifecycleScope.launch {
+            val match = withContext(Dispatchers.IO) {
+                TrailerAvailability.resolve(title, serverUrl)
+            } ?: return@launch
+            button.visibility = View.VISIBLE
+            button.setOnClickListener {
+                TrailerLauncher.open(this@SeriesDetailActivity, match.url, title)
             }
         }
-        return null
     }
 
     private fun playFirstEpisode() {
