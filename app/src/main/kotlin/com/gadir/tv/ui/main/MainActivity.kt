@@ -368,6 +368,7 @@ class MainActivity : BaseLocaleActivity() {
                 else -> cat.id
             }
             if (newId != selectedLiveCategoryId) {
+                stopLivePreview()
                 val oldIndex = liveCategoryIndex()
                 selectedLiveCategoryId = newId
                 (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelectionAt(
@@ -520,6 +521,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun focusCategoryList() {
+        stopLivePreview()
         TvNavHelper.focusItem(liveCategoryList, liveCategoryIndex())
     }
 
@@ -1683,6 +1685,25 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun stopLivePreview() {
+        pendingPreview?.let { previewHandler.removeCallbacks(it) }
+        pendingPreview = null
+        previewToken++
+        cancelMiniPreviewPlayback()
+        currentPreviewChannel = null
+        previewingStreamId = null
+        previewUrls = emptyList()
+        previewUrlIndex = 0
+        previewWorkingUrl = null
+        setPreviewVideoVisible(false)
+        miniVlcView.alpha = 0f
+        previewLogo.visibility = View.GONE
+        panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
+        previewTitle.text = getString(R.string.select_channel)
+        epgNow.text = getString(R.string.epg_unavailable)
+        epgNext.visibility = View.GONE
+    }
+
     private fun schedulePreview(channel: LiveChannel) {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val channelChanged = previewingStreamId != channel.streamId
@@ -1716,18 +1737,25 @@ class MainActivity : BaseLocaleActivity() {
         } else {
             previewLogo.visibility = View.GONE
         }
-        epgCache[channel.streamId]?.let { applyEpg(channel, it) } ?: run {
-            epgNow.text = getString(R.string.epg_unavailable)
+        epgCache[channel.streamId]?.takeIf { it.isNotEmpty() }?.let { applyEpg(channel, it) } ?: run {
+            epgNow.text = getString(R.string.epg_loading)
             epgNext.visibility = View.GONE
         }
         val profile = PlaylistRepository.profile ?: return
-        if (epgCache.containsKey(channel.streamId)) return
+        if (epgCache[channel.streamId]?.isNotEmpty() == true) return
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {
-                api.shortEpg(profile, channel.streamId, limit = 4)
+                api.shortEpg(
+                    profile,
+                    streamId = channel.streamId,
+                    epgChannelId = channel.epgChannelId,
+                    limit = 4,
+                )
             }
             if (currentPreviewChannel?.streamId != channel.streamId) return@launch
-            epgCache[channel.streamId] = epg
+            if (epg.isNotEmpty()) {
+                epgCache[channel.streamId] = epg
+            }
             applyEpg(channel, epg)
         }
     }
@@ -1820,6 +1848,7 @@ class MainActivity : BaseLocaleActivity() {
         }.takeIf { it >= 0 } ?: 0
         val current = epg[currentIndex]
         epgNow.text = current.title
+        epgNow.visibility = View.VISIBLE
         val next = epg.getOrNull(currentIndex + 1)
         if (next != null) {
             epgNext.text = getString(R.string.epg_next) + ": " + next.title

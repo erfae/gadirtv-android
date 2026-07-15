@@ -49,10 +49,12 @@ class LiveVlcPlayer(
 
     fun stop() {
         mediaPlayer.stop()
+        mediaPlayer.volume = 0
     }
 
     fun pause() {
         mediaPlayer.pause()
+        mediaPlayer.volume = 0
     }
 
     fun resume() {
