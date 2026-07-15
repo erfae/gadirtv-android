@@ -868,6 +868,11 @@ class MainActivity : BaseLocaleActivity() {
         favoritesRail.visibility =
             if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
 
+        moviesRailTitle.visibility = if (recentMovies.isEmpty()) View.GONE else View.VISIBLE
+        moviesRail.visibility = if (recentMovies.isEmpty()) View.GONE else View.VISIBLE
+        seriesRailTitle.visibility = if (recentSeries.isEmpty()) View.GONE else View.VISIBLE
+        seriesRail.visibility = if (recentSeries.isEmpty()) View.GONE else View.VISIBLE
+
         heroItems.clear()
         recentMovies.take(6).forEach { heroItems.add(HeroItem.Rail(it)) }
         recentSeries.take(6).forEach { heroItems.add(HeroItem.Rail(it)) }
@@ -1062,6 +1067,7 @@ class MainActivity : BaseLocaleActivity() {
     ) {
         list.clipChildren = false
         list.clipToPadding = false
+        list.isNestedScrollingEnabled = false
         list.adapter = HomeRailAdapter(
             items = items,
             onClick = { item -> onHomeRailClick(item) },
