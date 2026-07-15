@@ -34,6 +34,7 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.Profile
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.ui.movie.MovieDetailActivity
+import com.gadir.tv.player.LiveChannelNavigator
 import com.gadir.tv.player.LiveStreamUrls
 import com.gadir.tv.player.LiveVlcPlayer
 import com.gadir.tv.player.PlaybackLauncher
@@ -1892,6 +1893,7 @@ class MainActivity : BaseLocaleActivity() {
 
     fun openFullscreen(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
+        LiveChannelNavigator.setPlaybackContext(this, channel, selectedLiveCategoryId)
         VolumeHelper.boostOnPlaybackStart(this)
         miniVlcPlayer?.stop()
         val candidates = LiveStreamUrls.candidates(api, profile, channel)
@@ -1910,6 +1912,7 @@ class MainActivity : BaseLocaleActivity() {
                 contentId = channel.streamId.toString(),
                 imageUrl = channel.icon,
                 streamId = channel.streamId,
+                epgChannelId = channel.epgChannelId,
                 extension = channel.extension,
                 alternateUrls = urls.drop(1),
             ),

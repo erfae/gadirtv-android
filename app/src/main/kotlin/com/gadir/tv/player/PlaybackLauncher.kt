@@ -65,6 +65,7 @@ object PlaybackLauncher {
                 url = request.url,
                 alternateUrls = request.alternateUrls,
                 streamId = request.streamId,
+                epgChannelId = request.epgChannelId,
             ),
         )
     }
