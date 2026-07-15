@@ -255,9 +255,8 @@ class MainActivity : BaseLocaleActivity() {
         channelList = panelLive.findViewById(R.id.channelList)
         previewTitle = panelLive.findViewById(R.id.previewTitle)
         previewLogo = panelLive.findViewById(R.id.previewLogo)
-        val previewControls = panelLive.findViewById<View>(R.id.miniPreviewControls)
-        epgNow = previewControls.findViewById(R.id.epgNow)
-        epgNext = previewControls.findViewById(R.id.epgNext)
+        epgNow = panelLive.findViewById(R.id.epgNow)
+        epgNext = panelLive.findViewById(R.id.epgNext)
 
         catalogCategoryList = panelCatalog.findViewById(R.id.catalogCategoryList)
         catalogGrid = panelCatalog.findViewById(R.id.catalogGrid)
@@ -1250,12 +1249,7 @@ class MainActivity : BaseLocaleActivity() {
         heroPlotRequestId += 1
         val requestId = heroPlotRequestId
         heroTrailerUrl = null
-        val catalogTrailer = TrailerCatalog.find(item.title)
-        if (catalogTrailer != null) {
-            showHeroTrailer(catalogTrailer)
-        } else {
-            heroTrailer.visibility = View.GONE
-        }
+        showHeroTrailer(resolveTrailerUrl(item.title))
 
         heroTitle.text = item.title
         heroSubtitle.text = ""
@@ -1331,6 +1325,17 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun resolveTrailerUrl(vararg candidates: String): String? {
+        for (candidate in candidates) {
+            if (candidate.isBlank()) continue
+            MetaExtractor.normalizeTrailerUrl(candidate)?.let { return it }
+            TrailerCatalog.find(candidate)?.let { catalog ->
+                MetaExtractor.normalizeTrailerUrl(catalog)?.let { return it }
+            }
+        }
+        return null
+    }
+
     private fun openHeroTrailer() {
         val url = heroTrailerUrl ?: return
         TrailerLauncher.open(this, url)
@@ -1350,7 +1355,7 @@ class MainActivity : BaseLocaleActivity() {
             val backdrop = info.backdrop.ifBlank { info.cover }
             if (backdrop.isNotEmpty()) loadHeroImage(heroImage, backdrop)
             if (info.cover.isNotEmpty()) loadHeroImage(heroPoster, info.cover)
-            showHeroTrailer(info.trailerUrl.ifBlank { null })
+            showHeroTrailer(resolveTrailerUrl(info.trailerUrl, info.name, heroTitle.text.toString()))
         }
     }
 
@@ -1370,7 +1375,7 @@ class MainActivity : BaseLocaleActivity() {
                 loadHeroImage(heroImage, backdrop)
                 loadHeroImage(heroPoster, detail.cover)
             }
-            showHeroTrailer(detail.trailerUrl.ifBlank { null })
+            showHeroTrailer(resolveTrailerUrl(detail.trailerUrl, detail.name, heroTitle.text.toString()))
         }
     }
 
@@ -1719,7 +1724,7 @@ class MainActivity : BaseLocaleActivity() {
         if (epgCache.containsKey(channel.streamId)) return
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {
-                api.shortEpg(profile, channel.streamId, limit = 2)
+                api.shortEpg(profile, channel.streamId, limit = 4)
             }
             if (currentPreviewChannel?.streamId != channel.streamId) return@launch
             epgCache[channel.streamId] = epg
@@ -1803,18 +1808,24 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun applyEpg(channel: LiveChannel, epg: List<EpgEntry>) {
-        if (previewTitle.text != channel.name) return
+        if (currentPreviewChannel?.streamId != channel.streamId) return
         if (epg.isEmpty()) {
             epgNow.text = getString(R.string.epg_unavailable)
             epgNext.visibility = View.GONE
+            return
+        }
+        val now = System.currentTimeMillis() / 1000L
+        val currentIndex = epg.indexOfFirst { entry ->
+            entry.start > 0L && entry.end > 0L && now >= entry.start && now < entry.end
+        }.takeIf { it >= 0 } ?: 0
+        val current = epg[currentIndex]
+        epgNow.text = current.title
+        val next = epg.getOrNull(currentIndex + 1)
+        if (next != null) {
+            epgNext.text = getString(R.string.epg_next) + ": " + next.title
+            epgNext.visibility = View.VISIBLE
         } else {
-            epgNow.text = epg[0].title
-            if (epg.size > 1) {
-                epgNext.text = getString(R.string.epg_next) + ": " + epg[1].title
-                epgNext.visibility = View.VISIBLE
-            } else {
-                epgNext.visibility = View.GONE
-            }
+            epgNext.visibility = View.GONE
         }
     }
 

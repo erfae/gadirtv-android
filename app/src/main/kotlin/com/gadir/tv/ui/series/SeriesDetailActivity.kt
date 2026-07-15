@@ -21,6 +21,8 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.util.ImageLoader
+import com.gadir.tv.util.MetaExtractor
+import com.gadir.tv.util.TrailerCatalog
 import com.gadir.tv.util.TrailerLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -111,10 +113,11 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             }
 
             val trailerBtn = findViewById<TextView>(R.id.btnSeriesTrailer)
-            if (detail.trailerUrl.isNotBlank()) {
+            val resolvedTrailer = resolveTrailerUrl(detail.trailerUrl, detail.name, seriesName)
+            if (resolvedTrailer != null) {
                 trailerBtn.visibility = View.VISIBLE
                 trailerBtn.setOnClickListener {
-                    TrailerLauncher.open(this@SeriesDetailActivity, detail.trailerUrl, detail.name)
+                    TrailerLauncher.open(this@SeriesDetailActivity, resolvedTrailer, detail.name)
                 }
             } else {
                 trailerBtn.visibility = View.GONE
@@ -139,6 +142,17 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             reloadEpisodes()
             btnSeriesPlay.requestFocus()
         }
+    }
+
+    private fun resolveTrailerUrl(vararg candidates: String): String? {
+        for (candidate in candidates) {
+            if (candidate.isBlank()) continue
+            MetaExtractor.normalizeTrailerUrl(candidate)?.let { return it }
+            TrailerCatalog.find(candidate)?.let { catalog ->
+                MetaExtractor.normalizeTrailerUrl(catalog)?.let { return it }
+            }
+        }
+        return null
     }
 
     private fun playFirstEpisode() {

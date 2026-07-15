@@ -7,6 +7,7 @@ import com.google.gson.JsonObject
 object MetaExtractor {
     private val plotKeys = listOf(
         "plot", "description", "overview", "synopsis", "bio", "storyline", "summary",
+        "descripcion", "sinopsis", "argumento", "descr",
     )
 
     private val trailerSpanishKeys = listOf(

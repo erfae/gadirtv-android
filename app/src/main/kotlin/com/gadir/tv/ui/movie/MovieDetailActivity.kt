@@ -16,6 +16,8 @@ import com.gadir.tv.model.VodMovie
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.util.ImageLoader
+import com.gadir.tv.util.MetaExtractor
+import com.gadir.tv.util.TrailerCatalog
 import com.gadir.tv.util.TrailerLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -94,16 +96,30 @@ class MovieDetailActivity : BaseLocaleActivity() {
             }
 
             val trailerBtn = findViewById<TextView>(R.id.btnMovieTrailer)
-            if (info.trailerUrl.isNotBlank()) {
-                trailerUrl = info.trailerUrl
+            val resolvedTrailer = resolveTrailerUrl(info.trailerUrl, info.name, movieName)
+            if (resolvedTrailer != null) {
+                trailerUrl = resolvedTrailer
                 trailerBtn.visibility = View.VISIBLE
                 trailerBtn.setOnClickListener {
-                    TrailerLauncher.open(this@MovieDetailActivity, info.trailerUrl)
+                    TrailerLauncher.open(this@MovieDetailActivity, resolvedTrailer, info.name)
                 }
+            } else {
+                trailerBtn.visibility = View.GONE
             }
 
             findViewById<TextView>(R.id.btnMoviePlay).requestFocus()
         }
+    }
+
+    private fun resolveTrailerUrl(vararg candidates: String): String? {
+        for (candidate in candidates) {
+            if (candidate.isBlank()) continue
+            MetaExtractor.normalizeTrailerUrl(candidate)?.let { return it }
+            TrailerCatalog.find(candidate)?.let { catalog ->
+                MetaExtractor.normalizeTrailerUrl(catalog)?.let { return it }
+            }
+        }
+        return null
     }
 
     private fun playMovie() {
