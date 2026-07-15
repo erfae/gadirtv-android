@@ -101,7 +101,7 @@
             android:id="@+id/btnLogout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="14dp"
+            android:layout_marginEnd="4dp"
             android:background="@drawable/tab_bg"
             android:contentDescription="@string/logout_user"
             android:drawableStart="@drawable/ic_logout"
@@ -112,6 +112,27 @@
             android:paddingHorizontal="8dp"
             android:paddingVertical="6dp"
             android:text="" />
+
+        <FrameLayout
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="6dp">
+
+            <View
+                android:id="@+id/profileAvatarCircle"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/avatar_bg" />
+
+            <TextView
+                android:id="@+id/profileAvatar"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:textColor="@android:color/white"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </FrameLayout>
 
         <TextView
             android:id="@+id/btnExit"
@@ -129,43 +150,15 @@
             android:paddingVertical="6dp"
             android:text="" />
 
-        <LinearLayout
+        <TextView
+            android:id="@+id/headerExpiration"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:ellipsize="end"
             android:gravity="end"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/headerExpiration"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="@color/gtv_text_dim"
-                android:textSize="9sp" />
-
-            <FrameLayout
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_gravity="end"
-                android:layout_marginTop="4dp">
-
-                <View
-                    android:id="@+id/profileAvatarCircle"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="@drawable/avatar_bg" />
-
-                <TextView
-                    android:id="@+id/profileAvatar"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:textColor="@android:color/white"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-            </FrameLayout>
-        </LinearLayout>
+            android:maxLines="1"
+            android:textColor="@color/gtv_text_dim"
+            android:textSize="9sp" />
     </LinearLayout>
 
     <View
