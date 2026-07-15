@@ -7,17 +7,29 @@
     <WebView
         android:id="@+id/trailerWebView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:focusable="false"
+        android:focusableInTouchMode="false" />
+
+    <TextView
+        android:id="@+id/trailerStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="@string/trailer_loading"
+        android:textColor="@color/gtv_text_dim"
+        android:textSize="15sp"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/trailerHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#99000000"
+        android:background="#CC000000"
+        android:elevation="8dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="12dp"
-        android:visibility="gone">
+        android:padding="12dp">
 
         <TextView
             android:id="@+id/btnTrailerBack"
@@ -26,6 +38,7 @@
             android:background="@drawable/tab_bg"
             android:focusable="true"
             android:focusableInTouchMode="true"
+            android:nextFocusDown="@+id/trailerWebView"
             android:paddingHorizontal="16dp"
             android:paddingVertical="8dp"
             android:text="@string/back"

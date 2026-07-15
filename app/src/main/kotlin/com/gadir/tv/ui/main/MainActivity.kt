@@ -388,7 +388,7 @@ class MainActivity : BaseLocaleActivity() {
             onClick = applyLiveCategory,
             onFocus = applyLiveCategory,
             onMoveRight = { focusFirstChannel() },
-            onMoveUp = { focusHeader() },
+            onMoveUp = { focusBottomTab(Tab.LIVE) },
         )
         channelList.setItemViewCacheSize(24)
         channelAdapter = ChannelAdapter(
@@ -1586,7 +1586,7 @@ class MainActivity : BaseLocaleActivity() {
             onClick = applyCategory,
             onFocus = applyCategory,
             onMoveRight = { focusFirstCatalogItem() },
-            onMoveUp = { focusHeader() },
+            onMoveUp = { focusBottomTab(tab) },
         )
     }
 
@@ -1946,21 +1946,21 @@ class MainActivity : BaseLocaleActivity() {
             Tab.LIVE -> {
                 when {
                     isFocusInHeader() -> focusBottomTab(Tab.LIVE)
+                    isFocusInBottomNav() -> focusCategoryList()
                     isFocusInLivePreviewControls() -> focusChannelAt(currentPreviewChannel)
                     isFocusInPreviewPanel() -> focusChannelAt(currentPreviewChannel)
                     isFocusInList(channelList) -> focusCategoryList()
-                    isFocusInList(liveCategoryList) -> focusHeader()
-                    isFocusInBottomNav() -> focusHeader()
-                    else -> focusChannelAt(currentPreviewChannel)
+                    isFocusInList(liveCategoryList) -> focusBottomTab(Tab.LIVE)
+                    else -> focusCategoryList()
                 }
             }
             Tab.MOVIES, Tab.SERIES -> {
                 when {
                     isFocusInHeader() -> focusBottomTab(currentTab)
+                    isFocusInBottomNav() -> focusCatalogCategoryList()
                     isFocusInList(catalogGrid) -> focusCatalogCategoryList()
-                    isFocusInList(catalogCategoryList) -> focusHeader()
-                    isFocusInBottomNav() -> focusHeader()
-                    else -> focusFirstCatalogItem()
+                    isFocusInList(catalogCategoryList) -> focusBottomTab(currentTab)
+                    else -> focusCatalogCategoryList()
                 }
             }
         }

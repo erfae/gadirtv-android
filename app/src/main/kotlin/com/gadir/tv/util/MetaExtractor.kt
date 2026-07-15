@@ -72,7 +72,9 @@ object MetaExtractor {
                 value.isJsonPrimitive -> {
                     val text = value.asStringOrNull() ?: continue
                     if (text.contains("youtube.com", ignoreCase = true) ||
-                        text.contains("youtu.be", ignoreCase = true)
+                        text.contains("youtu.be", ignoreCase = true) ||
+                        text.contains("vimeo.com", ignoreCase = true) ||
+                        isDirectVideoUrl(text)
                     ) {
                         normalizeTrailerUrl(text)?.let { return it }
                     }
@@ -135,12 +137,21 @@ object MetaExtractor {
     fun normalizeTrailerUrl(raw: String?): String? {
         val value = raw?.trim().orEmpty()
         if (value.isEmpty() || isImageUrl(value)) return null
+        if (isDirectVideoUrl(value)) return value
         if (value.startsWith("http")) return value
         if (value.length >= 8) return "https://www.youtube.com/watch?v=$value"
         return null
     }
 
+    fun isDirectVideoUrl(url: String): Boolean =
+        directVideoPattern.containsMatchIn(url)
+
     fun isValidTrailerUrl(raw: String?): Boolean = normalizeTrailerUrl(raw) != null
+
+    private val directVideoPattern = Regex(
+        "\\.(mp4|m3u8|webm|mkv|mov)(\\?|#|$)",
+        RegexOption.IGNORE_CASE,
+    )
 
     private fun isImageUrl(url: String): Boolean = imageUrlPattern.containsMatchIn(url)
 
