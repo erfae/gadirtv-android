@@ -23,7 +23,8 @@ object TrailerLauncher {
                     return
                 }
                 is TrailerSource.Youtube -> {
-                    openInApp(context, source.videoId, title)
+                    if (YoutubeTrailerHelper.openInYoutubeApp(context, source.videoId)) return
+                    openInApp(context, "https://www.youtube.com/watch?v=${source.videoId}", title)
                     return
                 }
                 is TrailerSource.ExternalLink -> {
@@ -31,28 +32,31 @@ object TrailerLauncher {
                         playDirectVideo(context, title, source.url)
                         return
                     }
+                    YoutubeTrailerHelper.vimeoEmbedUrl(source.url)?.let { vimeo ->
+                        openInApp(context, vimeo, title)
+                        return
+                    }
+                    openInApp(context, source.url, title)
+                    return
                 }
                 is TrailerSource.WebPage -> {
                     if (MetaExtractor.isDirectVideoUrl(source.url)) {
                         playDirectVideo(context, title, source.url)
                         return
                     }
+                    YoutubeTrailerHelper.extractId(source.url)?.let { id ->
+                        if (YoutubeTrailerHelper.openInYoutubeApp(context, id)) return
+                    }
+                    openInApp(context, source.url, title)
+                    return
                 }
             }
         }
 
-        val webUrl = TrailerResolver.firstWebUrl(sources)
-        if (webUrl != null) {
-            openInApp(context, webUrl, title)
-            return
-        }
         Toast.makeText(context, R.string.trailer_unavailable, Toast.LENGTH_LONG).show()
     }
 
-    private fun openInApp(context: Context, urlOrId: String, title: String) {
-        val url = YoutubeTrailerHelper.extractId(urlOrId)?.let { id ->
-            "https://www.youtube.com/watch?v=$id"
-        } ?: urlOrId
+    private fun openInApp(context: Context, url: String, title: String) {
         context.startActivity(TrailerActivity.intent(context, url, title))
     }
 
