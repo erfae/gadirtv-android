@@ -152,6 +152,7 @@ class MainActivity : BaseLocaleActivity() {
     private var homeLoaded = false
     private var shouldFocusHomeRailsOnResume = true
     private lateinit var miniPreviewControls: View
+    private lateinit var previewContainer: View
     private val miniControlsHandler = Handler(Looper.getMainLooper())
     private val hideMiniControlsRunnable = Runnable { hideMiniPreviewControls() }
     private val heroHandler = Handler(Looper.getMainLooper())
@@ -257,6 +258,7 @@ class MainActivity : BaseLocaleActivity() {
         previewLogo = panelLive.findViewById(R.id.previewLogo)
         epgNow = panelLive.findViewById(R.id.epgNow)
         epgNext = panelLive.findViewById(R.id.epgNext)
+        previewContainer = panelLive.findViewById(R.id.previewContainer)
 
         catalogCategoryList = panelCatalog.findViewById(R.id.catalogCategoryList)
         catalogGrid = panelCatalog.findViewById(R.id.catalogGrid)
@@ -386,7 +388,6 @@ class MainActivity : BaseLocaleActivity() {
             onFocus = applyLiveCategory,
             onMoveRight = { focusFirstChannel() },
             onMoveUp = { focusHeader() },
-            onMoveDown = { focusFirstChannel() },
         )
         channelList.setItemViewCacheSize(24)
         channelAdapter = ChannelAdapter(
@@ -394,8 +395,8 @@ class MainActivity : BaseLocaleActivity() {
             onFocus = { channel -> schedulePreview(channel) },
             onOpen = { channel -> openFullscreen(channel) },
             onMoveLeft = { focusCategoryList() },
+            onMoveRight = { focusPreviewPanel() },
             onMoveUp = { focusCategoryList() },
-            onMoveDown = { zapChannel(1) },
             isFavorite = { favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId) },
             onToggleFavorite = { channel ->
                 favoritesStore.toggle(FavoritesStore.KIND_LIVE, channel.streamId)
@@ -447,7 +448,7 @@ class MainActivity : BaseLocaleActivity() {
         TvNavHelper.focusItem(channelList, index)
     }
 
-    private fun zapChannel(delta: Int) {
+    private fun zapChannel(delta: Int, keepPreviewFocus: Boolean = false) {
         if (channels.isEmpty()) return
         val current = currentPreviewChannel
         val index = if (current != null) {
@@ -457,8 +458,25 @@ class MainActivity : BaseLocaleActivity() {
         } ?: channelList.getChildAdapterPosition(channelList.focusedChild).takeIf { it >= 0 }
         ?: 0
         val next = (index + delta).coerceIn(0, channels.lastIndex)
+        if (next == index) return
+        val channel = channels[next]
         channelList.scrollToPosition(next)
-        TvNavHelper.focusItem(channelList, next)
+        if (keepPreviewFocus) {
+            schedulePreview(channel)
+            previewContainer.post { previewContainer.requestFocus() }
+        } else {
+            TvNavHelper.focusItem(channelList, next)
+        }
+    }
+
+    private fun focusPreviewPanel() {
+        if (currentPreviewChannel == null) return
+        previewContainer.requestFocus()
+    }
+
+    private fun isFocusInPreviewPanel(): Boolean {
+        val focused = currentFocus ?: return false
+        return focused === previewContainer
     }
 
     private fun focusChannelAt(channel: LiveChannel?) {
@@ -1502,7 +1520,9 @@ class MainActivity : BaseLocaleActivity() {
                 }
                 favoritesStore.toggle(kind, item.id)
             },
+            columnCount = (catalogGrid.layoutManager as GridLayoutManager).spanCount,
             onMoveLeft = { focusCatalogCategoryList() },
+            onMoveUp = { focusCatalogCategoryList() },
         )
 
         if (catalogCategories.isEmpty()) {
@@ -1566,7 +1586,6 @@ class MainActivity : BaseLocaleActivity() {
             onFocus = applyCategory,
             onMoveRight = { focusFirstCatalogItem() },
             onMoveUp = { focusHeader() },
-            onMoveDown = { focusFirstCatalogItem() },
         )
     }
 
@@ -1912,6 +1931,7 @@ class MainActivity : BaseLocaleActivity() {
                 when {
                     isFocusInHeader() -> focusBottomTab(Tab.LIVE)
                     isFocusInLivePreviewControls() -> focusChannelAt(currentPreviewChannel)
+                    isFocusInPreviewPanel() -> focusChannelAt(currentPreviewChannel)
                     isFocusInList(channelList) -> focusCategoryList()
                     isFocusInList(liveCategoryList) -> focusHeader()
                     isFocusInBottomNav() -> focusHeader()
@@ -1999,10 +2019,31 @@ class MainActivity : BaseLocaleActivity() {
         panelLive.findViewById<View>(R.id.btnNoSignalSettings).setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
-        panelLive.findViewById<View>(R.id.previewContainer).setOnClickListener {
+        previewContainer.setOnClickListener {
             currentPreviewChannel?.let { openFullscreen(it) }
         }
-        channelList.nextFocusRightId = View.NO_ID
+        previewContainer.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    focusChannelAt(currentPreviewChannel)
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                    currentPreviewChannel?.let { openFullscreen(it) }
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    zapChannel(-1, keepPreviewFocus = true)
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    zapChannel(1, keepPreviewFocus = true)
+                    true
+                }
+                else -> false
+            }
+        }
         miniVlcPlayer = LiveVlcPlayer(
             context = this,
             videoLayout = miniVlcView,

@@ -45,8 +45,10 @@
         android:layout_weight="0.44"
         android:background="@drawable/preview_focus_bg"
         android:clickable="true"
-        android:focusable="false"
-        android:focusableInTouchMode="false">
+        android:descendantFocusability="blocksDescendants"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:nextFocusLeft="@+id/channelList">
 
         <org.videolan.libvlc.util.VLCVideoLayout
             android:id="@+id/miniVlcPlayer"
