@@ -29,6 +29,30 @@ object YoutubeTrailerHelper {
     fun pipedEmbedUrl(videoId: String): String =
         "https://piped.video/embed/$videoId?autoplay=1"
 
+    fun invidiousEmbedUrls(videoId: String): List<String> = listOf(
+        "https://yewtu.be/embed/$videoId?autoplay=1",
+        "https://inv.nadeko.net/embed/$videoId?autoplay=1",
+        "https://invidious.fdn.fr/embed/$videoId?autoplay=1",
+    )
+
+    fun dailymotionEmbedUrl(url: String): String? {
+        val match = Regex("dailymotion\\.com/video/([\\w-]+)").find(url) ?: return null
+        return "https://www.dailymotion.com/embed/video/${match.groupValues[1]}?autoplay=1"
+    }
+
+    fun isAllowedEmbedUrl(url: String): Boolean {
+        val lower = url.lowercase()
+        return lower.contains("/embed/") ||
+            lower.contains("player.vimeo.com") ||
+            lower.contains("piped.video/embed") ||
+            lower.contains("yewtu.be/embed") ||
+            lower.contains("inv.nadeko.net/embed") ||
+            lower.contains("invidious.fdn.fr/embed") ||
+            lower.contains("youtube-nocookie.com/embed") ||
+            lower.contains("youtube.com/embed") ||
+            lower.startsWith("data:text/html")
+    }
+
     fun embedHeaders(): Map<String, String> = mapOf(
         "Referer" to "https://www.youtube.com",
         "Origin" to "https://www.youtube.com",

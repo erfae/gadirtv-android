@@ -7,6 +7,10 @@ object ImageUrlResolver {
         var url = raw?.trim().orEmpty()
         if (url.isEmpty()) return ""
 
+        url = url
+            .replace("&amp;", "&")
+            .replace("\\/", "/")
+
         if (url.startsWith("//")) {
             url = "http:$url"
         }
