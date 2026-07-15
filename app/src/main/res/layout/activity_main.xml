@@ -14,40 +14,50 @@
         android:paddingTop="8dp"
         android:paddingBottom="4dp">
 
-        <LinearLayout
+        <ImageView
+            android:layout_width="96dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="8dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/app_name"
+            android:scaleType="fitStart"
+            android:src="@drawable/gadir_logo" />
+
+        <TextView
+            android:id="@+id/headerExpiration"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="10dp"
+            android:layout_marginEnd="8dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:maxWidth="120dp"
+            android:textColor="@color/gtv_text_dim"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
             android:orientation="vertical">
 
             <TextView
                 android:id="@+id/headerClock"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:gravity="center"
                 android:textColor="@android:color/white"
-                android:textSize="14sp"
+                android:textSize="24sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/headerDate"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:gravity="center"
                 android:textColor="@color/gtv_text_dim"
-                android:textSize="9sp" />
+                android:textSize="13sp" />
         </LinearLayout>
-
-        <ImageView
-            android:layout_width="96dp"
-            android:layout_height="28dp"
-            android:adjustViewBounds="true"
-            android:contentDescription="@string/app_name"
-            android:scaleType="fitStart"
-            android:src="@drawable/gadir_logo" />
-
-        <View
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
 
         <TextView
             android:id="@+id/btnSearch"
@@ -150,15 +160,6 @@
             android:paddingVertical="6dp"
             android:text="" />
 
-        <TextView
-            android:id="@+id/headerExpiration"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:gravity="end"
-            android:maxLines="1"
-            android:textColor="@color/gtv_text_dim"
-            android:textSize="9sp" />
     </LinearLayout>
 
     <View

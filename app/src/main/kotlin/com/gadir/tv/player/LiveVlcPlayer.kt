@@ -2,7 +2,6 @@ package com.gadir.tv.player
 
 import android.content.Context
 import android.net.Uri
-import com.gadir.tv.data.PlaylistRepository
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
@@ -20,13 +19,7 @@ class LiveVlcPlayer(
     val mediaPlayer: MediaPlayer
 
     init {
-        val options = ArrayList<String>()
-        options.add("--http-user-agent=${PlaylistRepository.userAgent}")
-        options.add("--network-caching=$networkBufferMs")
-        options.add("--live-caching=$networkBufferMs")
-        options.add("--no-video-title-show")
-        options.add("--gain=2")
-        options.add("--audio-resampler=soxr")
+        val options = VlcAudioOptions.baseOptions(networkBufferMs)
         libVlc = LibVLC(context.applicationContext, options)
         mediaPlayer = MediaPlayer(libVlc).apply {
             attachViews(videoLayout, null, false, false)
@@ -75,7 +68,7 @@ class LiveVlcPlayer(
     }
 
     companion object {
-        const val VOLUME_FULLSCREEN = 75
-        const val VOLUME_PREVIEW = 100
+        const val VOLUME_FULLSCREEN = VlcAudioOptions.VOLUME_FULLSCREEN
+        const val VOLUME_PREVIEW = VlcAudioOptions.VOLUME_PREVIEW
     }
 }

@@ -5,17 +5,19 @@ import android.media.AudioManager
 
 object VolumeHelper {
     private const val ADJUST_STEP_RATIO = 0.05f
+    private const val MIN_BOOST_RATIO = 0.12f
+    private const val TARGET_BOOST_RATIO = 0.35f
 
-    /** Sube el volumen del sistema si está bajo (libVLC usa el volumen del TV). */
+    /** Solo sube un poco el volumen del sistema si está casi en silencio (evita distorsión). */
     fun boostOnPlaybackStart(context: Context) {
         val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         if (max <= 0) return
         val current = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
-        val target = (max * 0.70f).toInt().coerceIn(1, max)
-        if (current < target) {
-            audio.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
-        }
+        val minThreshold = (max * MIN_BOOST_RATIO).toInt().coerceAtLeast(1)
+        if (current >= minThreshold) return
+        val target = (max * TARGET_BOOST_RATIO).toInt().coerceIn(1, max)
+        audio.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
     }
 
     fun adjust(context: Context, raise: Boolean) {

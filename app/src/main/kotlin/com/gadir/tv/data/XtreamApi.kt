@@ -159,10 +159,11 @@ class XtreamApi(
                 "channel_icon",
                 "epg_icon",
             ).ifBlank { fallbackLiveIcon(profile, streamId) }
+            val sanitizedIcon = if (icon.isNotBlank() && !looksLikeImageUrl(icon)) "" else icon
             LiveChannel(
                 streamId = streamId,
                 name = row.get("name")?.asStringOrNull() ?: "",
-                icon = icon,
+                icon = sanitizedIcon.ifBlank { fallbackLiveIcon(profile, streamId) },
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
                 num = row.channelNum(index),
                 extension = row.get("container_extension")?.asStringOrNull()?.ifBlank { "ts" } ?: "ts",
@@ -543,6 +544,18 @@ class XtreamApi(
         if (streamId <= 0) return ""
         val base = HostUtils.baseUrl(profile.host)
         return "$base/images/$streamId.png"
+    }
+
+    private fun looksLikeImageUrl(url: String): Boolean {
+        val lower = url.lowercase()
+        return lower.startsWith("http") ||
+            lower.startsWith("//") ||
+            lower.contains(".png") ||
+            lower.contains(".jpg") ||
+            lower.contains(".jpeg") ||
+            lower.contains(".webp") ||
+            lower.contains(".gif") ||
+            lower.contains("/images/")
     }
 
     private fun encode(value: String): String =

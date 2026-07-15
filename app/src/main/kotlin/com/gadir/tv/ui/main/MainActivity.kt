@@ -47,15 +47,15 @@ import com.gadir.tv.ui.series.SeriesDetailActivity
 import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.AccountFormat
 import com.gadir.tv.util.FocusScaleHelper
+import com.gadir.tv.util.ChannelIconHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.MetaExtractor
 import com.gadir.tv.util.ProfileAvatarHelper
 import com.gadir.tv.util.TvFocusHelper
 import com.gadir.tv.util.TvNavHelper
 import com.gadir.tv.util.VolumeHelper
-import java.text.SimpleDateFormat
+import com.gadir.tv.util.HeaderClockHelper
 import java.util.Date
-import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -160,9 +160,9 @@ class MainActivity : BaseLocaleActivity() {
     private val clockRunnable = object : Runnable {
         override fun run() {
             val now = Date()
-            headerClock.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
-            headerDate.text = SimpleDateFormat("d MMM", Locale.getDefault()).format(now)
-            clockHandler.postDelayed(this, 30_000L)
+            headerClock.text = HeaderClockHelper.formatTime(this@MainActivity, now)
+            headerDate.text = HeaderClockHelper.formatDate(this@MainActivity, now)
+            clockHandler.postDelayed(this, 1_000L)
         }
     }
 
@@ -1756,12 +1756,8 @@ class MainActivity : BaseLocaleActivity() {
         liveChannelStore.lastStreamId = channel.streamId
         liveChannelStore.lastCategoryId = selectedLiveCategoryId ?: ""
         previewTitle.text = channel.name
-        if (channel.icon.isNotEmpty()) {
-            previewLogo.visibility = View.VISIBLE
-            ImageLoader.loadChannelIcon(previewLogo, channel.icon)
-        } else {
-            previewLogo.visibility = View.GONE
-        }
+        previewLogo.visibility = View.VISIBLE
+        ChannelIconHelper.load(previewLogo, channel)
         epgCache[channel.streamId]?.takeIf { it.isNotEmpty() }?.let { applyEpg(channel, it) } ?: run {
             epgNow.text = getString(R.string.epg_loading)
             epgNext.visibility = View.GONE

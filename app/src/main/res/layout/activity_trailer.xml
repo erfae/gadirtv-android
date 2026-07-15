@@ -1,8 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/black">
+
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/trailerPlayerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        app:show_buffering="when_playing"
+        app:use_controller="true" />
 
     <WebView
         android:id="@+id/trailerWebView"
@@ -16,6 +25,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
+        android:gravity="center"
+        android:paddingHorizontal="24dp"
         android:text="@string/trailer_loading"
         android:textColor="@color/gtv_text_dim"
         android:textSize="15sp"
@@ -38,7 +49,7 @@
             android:background="@drawable/tab_bg"
             android:focusable="true"
             android:focusableInTouchMode="true"
-            android:nextFocusRight="@+id/btnTrailerYoutube"
+            android:nextFocusRight="@+id/btnTrailerRetry"
             android:paddingHorizontal="16dp"
             android:paddingVertical="8dp"
             android:text="@string/back"
@@ -46,7 +57,7 @@
             android:textSize="13sp" />
 
         <TextView
-            android:id="@+id/btnTrailerYoutube"
+            android:id="@+id/btnTrailerRetry"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="10dp"
@@ -56,7 +67,7 @@
             android:nextFocusLeft="@+id/btnTrailerBack"
             android:paddingHorizontal="14dp"
             android:paddingVertical="8dp"
-            android:text="@string/trailer_open_youtube"
+            android:text="@string/trailer_retry"
             android:textColor="@android:color/white"
             android:textSize="12sp"
             android:visibility="gone" />

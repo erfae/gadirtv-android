@@ -2,6 +2,7 @@ package com.gadir.tv.ui.player
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -17,24 +18,35 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.TextView
-import android.widget.Toast
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import com.gadir.tv.R
+import com.gadir.tv.player.PlayerFactory
 import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.util.MetaExtractor
+import com.gadir.tv.util.TrailerResolver
+import com.gadir.tv.util.TrailerSource
 import com.gadir.tv.util.YoutubeTrailerHelper
 
 class TrailerActivity : BaseLocaleActivity() {
-    private var videoId: String? = null
     private lateinit var webView: WebView
+    private lateinit var playerView: PlayerView
     private lateinit var statusView: TextView
     private lateinit var btnBack: TextView
-    private lateinit var btnExternal: TextView
+    private lateinit var btnRetry: TextView
+    private var exoPlayer: ExoPlayer? = null
     private var customView: View? = null
     private var customCallback: WebChromeClient.CustomViewCallback? = null
-    private var embedMode = EmbedMode.DIRECT_EMBED
     private var playbackStarted = false
     private val handler = Handler(Looper.getMainLooper())
     private val timeoutRunnable = Runnable { onLoadTimeout() }
+
+    private var sources: List<TrailerSource> = emptyList()
+    private var sourceIndex = 0
+    private var youtubeStep = 0
+    private var currentYoutubeId: String? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,12 +59,16 @@ class TrailerActivity : BaseLocaleActivity() {
         findViewById<TextView>(R.id.trailerTitle).text = title
         statusView = findViewById(R.id.trailerStatus)
         btnBack = findViewById(R.id.btnTrailerBack)
-        btnExternal = findViewById(R.id.btnTrailerYoutube)
-
-        videoId = YoutubeTrailerHelper.extractId(rawUrl)
-            ?: MetaExtractor.normalizeTrailerUrl(rawUrl)?.let { YoutubeTrailerHelper.extractId(it) }
-
+        btnRetry = findViewById(R.id.btnTrailerRetry)
+        playerView = findViewById(R.id.trailerPlayerView)
         webView = findViewById(R.id.trailerWebView)
+
+        sources = TrailerResolver.resolveAll(rawUrl, title)
+        if (sources.isEmpty()) {
+            showFailed()
+            return
+        }
+
         webView.setBackgroundColor(Color.BLACK)
         webView.isFocusable = false
         webView.isFocusableInTouchMode = false
@@ -126,15 +142,15 @@ class TrailerActivity : BaseLocaleActivity() {
                 error: android.webkit.WebResourceError,
             ) {
                 if (!request.isForMainFrame) return
-                advanceEmbedMode()
+                advancePlayback()
             }
         }
 
         btnBack.setOnClickListener { finish() }
-        btnExternal.setOnClickListener { openExternally() }
-        btnExternal.visibility = View.GONE
+        btnRetry.setOnClickListener { retryPlayback() }
+        btnRetry.visibility = View.GONE
         btnBack.requestFocus()
-        startPlayback(rawUrl)
+        startCurrentSource()
     }
 
     override fun onBackPressed() {
@@ -151,117 +167,209 @@ class TrailerActivity : BaseLocaleActivity() {
         return super.dispatchKeyEvent(event)
     }
 
-    private fun startPlayback(rawUrl: String) {
+    private fun retryPlayback() {
+        sourceIndex = 0
+        youtubeStep = 0
+        currentYoutubeId = null
+        releasePlayer()
+        startCurrentSource()
+    }
+
+    private fun startCurrentSource() {
+        if (sourceIndex >= sources.size) {
+            showFailed()
+            return
+        }
         playbackStarted = false
         statusView.visibility = View.VISIBLE
         statusView.text = getString(R.string.trailer_loading)
+        btnRetry.visibility = View.GONE
         scheduleLoadTimeout()
 
-        val vimeo = YoutubeTrailerHelper.vimeoEmbedUrl(rawUrl)
-        if (vimeo != null) {
-            webView.loadUrl(vimeo)
-            return
+        when (val source = sources[sourceIndex]) {
+            is TrailerSource.DirectVideo -> playDirectVideo(source.url)
+            is TrailerSource.Youtube -> playYoutube(source.videoId)
+            is TrailerSource.ExternalLink -> playExternal(source.url)
+            is TrailerSource.WebPage -> playWebPage(source.url)
         }
-
-        val id = videoId
-        if (id != null) {
-            loadYoutubeEmbed(id)
-            return
-        }
-
-        val normalized = MetaExtractor.normalizeTrailerUrl(rawUrl)
-        if (normalized != null && MetaExtractor.isDirectVideoUrl(normalized)) {
-            showFailed()
-            return
-        }
-        YoutubeTrailerHelper.extractId(normalized.orEmpty())?.let {
-            videoId = it
-            loadYoutubeEmbed(it)
-            return
-        }
-        if (normalized != null) {
-            webView.loadUrl(normalized)
-            return
-        }
-        showFailed()
     }
 
-    private fun loadYoutubeEmbed(id: String) {
+    private fun playDirectVideo(url: String) {
+        hideWebView()
+        playerView.visibility = View.VISIBLE
+        releasePlayer()
+        exoPlayer = PlayerFactory.create(this).also { player ->
+            playerView.player = player
+            player.addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(state: Int) {
+                    if (state == Player.STATE_READY && player.isPlaying) {
+                        markPlaybackStarted()
+                    }
+                }
+
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    advancePlayback()
+                }
+            })
+            player.setMediaItem(MediaItem.fromUri(Uri.parse(url)))
+            player.prepare()
+            player.playWhenReady = true
+        }
+    }
+
+    private fun playYoutube(videoId: String) {
+        currentYoutubeId = videoId
+        showWebView()
         val origin = "https://www.youtube.com"
-        when (embedMode) {
-            EmbedMode.DIRECT_EMBED -> {
-                webView.loadUrl(YoutubeTrailerHelper.directEmbedUrl(id, origin), YoutubeTrailerHelper.embedHeaders())
+        when (youtubeStep) {
+            0 -> webView.loadUrl(
+                YoutubeTrailerHelper.directEmbedUrl(videoId, origin),
+                YoutubeTrailerHelper.embedHeaders(),
+            )
+            1 -> webView.loadUrl(YoutubeTrailerHelper.pipedEmbedUrl(videoId))
+            2, 3, 4 -> {
+                val mirrors = YoutubeTrailerHelper.invidiousEmbedUrls(videoId)
+                val index = youtubeStep - 2
+                if (index < mirrors.size) {
+                    webView.loadUrl(mirrors[index])
+                } else {
+                    advancePlayback()
+                    return
+                }
             }
-            EmbedMode.PIPED -> {
-                webView.loadUrl(YoutubeTrailerHelper.pipedEmbedUrl(id))
-            }
-            EmbedMode.NOCOOKIE -> {
-                webView.loadDataWithBaseURL(
-                    "https://www.youtube-nocookie.com",
-                    YoutubeTrailerHelper.nocookieIframeHtml(id, origin),
-                    "text/html",
-                    "UTF-8",
-                    null,
-                )
-            }
-            EmbedMode.IFRAME_API -> {
-                webView.loadDataWithBaseURL(
-                    origin,
-                    YoutubeTrailerHelper.iframeApiHtml(id, origin),
-                    "text/html",
-                    "UTF-8",
-                    null,
-                )
-            }
+            5 -> webView.loadDataWithBaseURL(
+                "https://www.youtube-nocookie.com",
+                YoutubeTrailerHelper.nocookieIframeHtml(videoId, origin),
+                "text/html",
+                "UTF-8",
+                null,
+            )
+            else -> webView.loadDataWithBaseURL(
+                origin,
+                YoutubeTrailerHelper.iframeApiHtml(videoId, origin),
+                "text/html",
+                "UTF-8",
+                null,
+            )
         }
         scheduleLoadTimeout()
     }
 
-    private fun advanceEmbedMode() {
+    private fun playExternal(url: String) {
+        if (MetaExtractor.isDirectVideoUrl(url)) {
+            playDirectVideo(url)
+            return
+        }
+        YoutubeTrailerHelper.vimeoEmbedUrl(url)?.let {
+            loadWebEmbed(it)
+            return
+        }
+        YoutubeTrailerHelper.dailymotionEmbedUrl(url)?.let {
+            loadWebEmbed(it)
+            return
+        }
+        YoutubeTrailerHelper.extractId(url)?.let {
+            currentYoutubeId = it
+            youtubeStep = 0
+            playYoutube(it)
+            return
+        }
+        loadWebEmbed(url)
+    }
+
+    private fun playWebPage(url: String) {
+        if (MetaExtractor.isDirectVideoUrl(url)) {
+            playDirectVideo(url)
+            return
+        }
+        YoutubeTrailerHelper.extractId(url)?.let {
+            currentYoutubeId = it
+            youtubeStep = 0
+            playYoutube(it)
+            return
+        }
+        YoutubeTrailerHelper.vimeoEmbedUrl(url)?.let {
+            loadWebEmbed(it)
+            return
+        }
+        loadWebEmbed(url)
+    }
+
+    private fun loadWebEmbed(url: String) {
+        showWebView()
+        if (YoutubeTrailerHelper.isAllowedEmbedUrl(url)) {
+            webView.loadUrl(url)
+        } else {
+            advancePlayback()
+            return
+        }
+        scheduleLoadTimeout()
+    }
+
+    private fun advancePlayback() {
         if (playbackStarted) return
-        val id = videoId ?: run {
+        cancelLoadTimeout()
+        releasePlayer()
+
+        val current = sources.getOrNull(sourceIndex)
+        if (current is TrailerSource.Youtube || currentYoutubeId != null) {
+            youtubeStep++
+            if (youtubeStep <= YOUTUBE_STEPS_LAST) {
+                val id = currentYoutubeId
+                    ?: (current as? TrailerSource.Youtube)?.videoId
+                if (id != null) {
+                    playYoutube(id)
+                    return
+                }
+            }
+        }
+
+        sourceIndex++
+        youtubeStep = 0
+        currentYoutubeId = null
+        if (sourceIndex >= sources.size) {
             showFailed()
             return
         }
-        embedMode = when (embedMode) {
-            EmbedMode.DIRECT_EMBED -> EmbedMode.PIPED
-            EmbedMode.PIPED -> EmbedMode.NOCOOKIE
-            EmbedMode.NOCOOKIE -> EmbedMode.IFRAME_API
-            EmbedMode.IFRAME_API -> {
-                showFailed()
-                return
-            }
-        }
-        loadYoutubeEmbed(id)
+        startCurrentSource()
     }
 
     private fun onLoadTimeout() {
         if (playbackStarted) return
-        advanceEmbedMode()
+        advancePlayback()
     }
 
     private fun markPlaybackStarted() {
         playbackStarted = true
         cancelLoadTimeout()
         statusView.visibility = View.GONE
-        btnExternal.visibility = View.GONE
+        btnRetry.visibility = View.GONE
     }
 
     private fun showFailed() {
         cancelLoadTimeout()
+        releasePlayer()
+        showWebView()
         statusView.visibility = View.VISIBLE
         statusView.text = getString(R.string.trailer_playback_failed)
-        btnExternal.visibility = View.VISIBLE
+        btnRetry.visibility = View.VISIBLE
         btnBack.requestFocus()
     }
 
-    private fun openExternally() {
-        val id = videoId
-        if (id != null && YoutubeTrailerHelper.openExternally(this, id)) {
-            finish()
-            return
-        }
-        Toast.makeText(this, R.string.trailer_unavailable, Toast.LENGTH_LONG).show()
+    private fun showWebView() {
+        playerView.visibility = View.GONE
+        webView.visibility = View.VISIBLE
+    }
+
+    private fun hideWebView() {
+        webView.stopLoading()
+        webView.visibility = View.GONE
+    }
+
+    private fun releasePlayer() {
+        exoPlayer?.release()
+        exoPlayer = null
+        playerView.player = null
     }
 
     private fun scheduleLoadTimeout() {
@@ -274,11 +382,21 @@ class TrailerActivity : BaseLocaleActivity() {
     }
 
     private fun blockNavigation(url: String): Boolean {
+        if (url.isBlank()) return false
         if (isBlockedGuestUrl(url)) return true
         val lower = url.lowercase()
+        if (lower.startsWith("intent:") ||
+            lower.startsWith("market:") ||
+            lower.contains("vnd.youtube:") ||
+            lower.contains("youtube://")
+        ) {
+            return true
+        }
+        if (YoutubeTrailerHelper.isAllowedEmbedUrl(url)) return false
         return lower.contains("youtube.com/watch") ||
             lower.contains("youtu.be/") ||
-            lower.contains("vnd.youtube:")
+            lower.contains("accounts.google.com") ||
+            lower.contains("play.google.com/store")
     }
 
     private fun hideFullscreenCustomView(): Boolean {
@@ -310,8 +428,14 @@ class TrailerActivity : BaseLocaleActivity() {
             lower.contains("addaccount")
     }
 
+    override fun onStop() {
+        exoPlayer?.pause()
+        super.onStop()
+    }
+
     override fun onDestroy() {
         cancelLoadTimeout()
+        releasePlayer()
         if (::webView.isInitialized) {
             webView.removeJavascriptInterface("TrailerBridge")
             webView.stopLoading()
@@ -328,23 +452,17 @@ class TrailerActivity : BaseLocaleActivity() {
 
         @JavascriptInterface
         fun onPlayerError(code: Int) {
-            if (code == 150 || code == 151 || code == 153) {
-                runOnUiThread { advanceEmbedMode() }
+            if (code == 2 || code == 5 || code == 100 || code == 101 || code == 150 || code == 151 || code == 153) {
+                runOnUiThread { advancePlayback() }
             }
         }
-    }
-
-    private enum class EmbedMode {
-        DIRECT_EMBED,
-        PIPED,
-        NOCOOKIE,
-        IFRAME_API,
     }
 
     companion object {
         private const val EXTRA_URL = "trailer_url"
         private const val EXTRA_TITLE = "trailer_title"
-        private const val LOAD_TIMEOUT_MS = 20_000L
+        private const val LOAD_TIMEOUT_MS = 18_000L
+        private const val YOUTUBE_STEPS_LAST = 6
         private const val EMBED_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 10; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
