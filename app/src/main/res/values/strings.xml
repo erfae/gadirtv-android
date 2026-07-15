@@ -70,6 +70,10 @@
     <string name="playlist_reloaded">Lista actualizada</string>
     <string name="header_expires">Caduca: %1$s</string>
     <string name="edit_profile">Editar perfil</string>
+    <string name="rename_profile">Renombrar</string>
+    <string name="rename_profile_title">Renombrar perfil</string>
+    <string name="rename_profile_save">GUARDAR NOMBRE</string>
+    <string name="edit_connection">Editar conexión</string>
     <string name="save_profile">GUARDAR</string>
     <string name="login_edit_title">Editar perfil</string>
     <string name="settings_reload_playlist">Recargar lista del servidor</string>

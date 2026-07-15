@@ -19,6 +19,9 @@ import com.gadir.tv.ui.bootstrap.BootstrapActivity
 import com.gadir.tv.ui.login.LoginActivity
 import com.gadir.tv.util.DefaultCredentials
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 
 class ProfilesActivity : BaseLocaleActivity() {
     private lateinit var profileStore: ProfileStore
@@ -99,9 +102,7 @@ class ProfilesActivity : BaseLocaleActivity() {
                 profileStore.setActive(profile)
                 startActivity(Intent(this, BootstrapActivity::class.java))
             },
-            onEdit = { profile ->
-                startActivity(LoginActivity.editIntent(this, profile))
-            },
+            onRename = { profile -> showRenameDialog(profile) },
             onAdd = {
                 startActivity(Intent(this, LoginActivity::class.java))
             },
@@ -116,6 +117,43 @@ class ProfilesActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun showRenameDialog(profile: Profile) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_rename_profile, null)
+        val nameLayout = dialogView.findViewById<TextInputLayout>(R.id.renameNameLayout)
+        val nameInput = dialogView.findViewById<TextInputEditText>(R.id.renameNameInput)
+        nameInput.setText(profile.displayName)
+        nameInput.setSelection(nameInput.text?.length ?: 0)
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.rename_profile_title)
+            .setView(dialogView)
+            .setPositiveButton(R.string.rename_profile_save, null)
+            .setNeutralButton(R.string.edit_connection, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val newName = nameInput.text?.toString()?.trim().orEmpty()
+                if (newName.isEmpty()) {
+                    nameLayout.error = getString(R.string.hint_name)
+                    return@setOnClickListener
+                }
+                nameLayout.error = null
+                profileStore.rename(profile, newName)
+                dialog.dismiss()
+                reload()
+            }
+            dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                dialog.dismiss()
+                startActivity(LoginActivity.editIntent(this, profile))
+            }
+        }
+
+        dialog.show()
+        nameInput.post { nameInput.requestFocus() }
+    }
+
     private sealed class ProfileItem {
         data class Saved(val profile: Profile) : ProfileItem()
         data object Add : ProfileItem()
@@ -126,7 +164,7 @@ class ProfilesActivity : BaseLocaleActivity() {
         private val manageMode: Boolean,
         private val colorFor: (Int) -> Int,
         private val onSelect: (Profile) -> Unit,
-        private val onEdit: (Profile) -> Unit,
+        private val onRename: (Profile) -> Unit,
         private val onAdd: () -> Unit,
         private val onDelete: (Profile) -> Unit,
     ) : RecyclerView.Adapter<ProfileAdapter.Holder>() {
@@ -136,6 +174,7 @@ class ProfilesActivity : BaseLocaleActivity() {
             val initial: TextView = view.findViewById(R.id.avatarInitial)
             val label: TextView = view.findViewById(R.id.avatarLabel)
             val delete: TextView = view.findViewById(R.id.avatarDelete)
+            val rename: TextView = view.findViewById(R.id.avatarRename)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
@@ -168,6 +207,7 @@ class ProfilesActivity : BaseLocaleActivity() {
             holder.initial.text = "+"
             holder.label.text = holder.itemView.context.getString(R.string.add_profile)
             holder.delete.visibility = View.GONE
+            holder.rename.visibility = View.GONE
             holder.itemView.setOnClickListener { onAdd() }
         }
 
@@ -188,14 +228,16 @@ class ProfilesActivity : BaseLocaleActivity() {
             holder.initial.text = initial
             holder.label.text = profile.displayName
             holder.delete.visibility = if (manageMode) View.VISIBLE else View.GONE
+            holder.rename.visibility = if (manageMode) View.VISIBLE else View.GONE
 
             holder.itemView.setOnClickListener {
                 if (manageMode) {
-                    onEdit(profile)
+                    onRename(profile)
                 } else {
                     onSelect(profile)
                 }
             }
+            holder.rename.setOnClickListener { onRename(profile) }
             holder.delete.setOnClickListener { onDelete(profile) }
         }
 

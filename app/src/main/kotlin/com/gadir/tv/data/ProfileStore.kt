@@ -40,6 +40,16 @@ class ProfileStore(context: Context) {
         return all
     }
 
+    fun rename(profile: Profile, newName: String): Profile {
+        val trimmed = newName.trim()
+        val updated = normalizeProfile(profile.copy(name = trimmed))
+        upsert(updated)
+        if (getActive()?.id == profile.id) {
+            setActive(updated)
+        }
+        return updated
+    }
+
     fun remove(profile: Profile): List<Profile> {
         val all = loadAll().filter { it.id != profile.id }
         saveAll(all)
