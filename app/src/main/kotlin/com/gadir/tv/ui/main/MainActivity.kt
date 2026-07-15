@@ -44,6 +44,7 @@ import com.gadir.tv.ui.search.SearchActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
 import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.AccountFormat
+import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ChannelIconHelper
 import com.gadir.tv.util.ImageLoader
@@ -148,6 +149,7 @@ class MainActivity : BaseLocaleActivity() {
     private var railPreviewItem: HomeRailAdapter.HomeRailItem? = null
     private var homeLoaded = false
     private var shouldFocusHomeRailsOnResume = true
+    private var catalogLoadToken = 0
     private lateinit var miniPreviewControls: View
     private lateinit var previewContainer: View
     private val miniControlsHandler = Handler(Looper.getMainLooper())
@@ -284,7 +286,7 @@ class MainActivity : BaseLocaleActivity() {
         liveCategoryList.layoutManager = LinearLayoutManager(this)
         channelList.layoutManager = LinearLayoutManager(this)
         catalogCategoryList.layoutManager = LinearLayoutManager(this)
-        catalogGrid.layoutManager = GridLayoutManager(this, 5)
+        configureCatalogGrid()
         favoritesRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         resumeRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         moviesRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
@@ -367,7 +369,7 @@ class MainActivity : BaseLocaleActivity() {
             items = liveCategories,
             selectedId = { liveSelectedCategoryKey() },
             onClick = applyLiveCategory,
-            onFocus = applyLiveCategory,
+            onFocus = if (DeviceUi.isCompact(this)) null else applyLiveCategory,
             onMoveRight = { focusFirstChannel() },
             onMoveUp = { focusBottomTab(Tab.LIVE) },
         )
@@ -1477,7 +1479,7 @@ class MainActivity : BaseLocaleActivity() {
                 }
                 favoritesStore.toggle(kind, item.id)
             },
-            columnCount = (catalogGrid.layoutManager as GridLayoutManager).spanCount,
+            columnCount = catalogGridSpanCount(),
             onMoveLeft = { focusCatalogCategoryList() },
             onMoveUp = { focusCatalogCategoryList() },
         )
@@ -1540,11 +1542,19 @@ class MainActivity : BaseLocaleActivity() {
             items = catalogCategories,
             selectedId = { selectedCatalogCategoryId },
             onClick = applyCategory,
-            onFocus = applyCategory,
+            onFocus = if (DeviceUi.isCompact(this)) null else applyCategory,
             onMoveRight = { focusFirstCatalogItem() },
             onMoveUp = { focusBottomTab(tab) },
         )
     }
+
+    private fun configureCatalogGrid() {
+        val span = if (DeviceUi.isCompact(this)) 3 else 5
+        catalogGrid.layoutManager = GridLayoutManager(this, span)
+    }
+
+    private fun catalogGridSpanCount(): Int =
+        (catalogGrid.layoutManager as? GridLayoutManager)?.spanCount ?: 5
 
     private fun loadCatalogItems(tab: Tab, categoryId: String) {
         when (tab) {
@@ -1560,33 +1570,45 @@ class MainActivity : BaseLocaleActivity() {
         }
 
         val profile = PlaylistRepository.profile ?: return
+        val token = ++catalogLoadToken
         catalogLoading.visibility = View.VISIBLE
         catalogEmpty.visibility = View.GONE
         catalogGrid.visibility = View.INVISIBLE
 
         lifecycleScope.launch {
-            val items = withContext(Dispatchers.IO) {
-                when (tab) {
-                    Tab.MOVIES -> {
-                        val movies = api.vodStreams(profile, categoryId)
-                        PlaylistRepository.cacheVod(categoryId, movies)
-                        movies
+            try {
+                val items = withContext(Dispatchers.IO) {
+                    when (tab) {
+                        Tab.MOVIES -> {
+                            val movies = api.vodStreams(profile, categoryId)
+                            PlaylistRepository.cacheVod(categoryId, movies)
+                            movies
+                        }
+                        Tab.SERIES -> {
+                            val series = api.seriesList(profile, categoryId)
+                            PlaylistRepository.cacheSeries(categoryId, series)
+                            series
+                        }
+                        Tab.LIVE, Tab.HOME -> emptyList<Any>()
                     }
-                    Tab.SERIES -> {
-                        val series = api.seriesList(profile, categoryId)
-                        PlaylistRepository.cacheSeries(categoryId, series)
-                        series
-                    }
-                    Tab.LIVE, Tab.HOME -> emptyList<Any>()
                 }
-            }
 
-            catalogLoading.visibility = View.GONE
-            catalogGrid.visibility = View.VISIBLE
-            when (tab) {
-                Tab.MOVIES -> bindMovies(items as List<VodMovie>)
-                Tab.SERIES -> bindSeries(items as List<SeriesItem>)
-                Tab.LIVE, Tab.HOME -> Unit
+                if (token != catalogLoadToken) return@launch
+                catalogLoading.visibility = View.GONE
+                catalogGrid.visibility = View.VISIBLE
+                when (tab) {
+                    Tab.MOVIES -> bindMovies(items as List<VodMovie>)
+                    Tab.SERIES -> bindSeries(items as List<SeriesItem>)
+                    Tab.LIVE, Tab.HOME -> Unit
+                }
+            } catch (_: Exception) {
+                if (token != catalogLoadToken) return@launch
+                catalogLoading.visibility = View.GONE
+                catalogGrid.visibility = View.VISIBLE
+                posterItems.clear()
+                catalogGrid.adapter?.notifyDataSetChanged()
+                catalogEmpty.visibility = View.VISIBLE
+                catalogEmpty.text = getString(R.string.catalog_load_failed)
             }
         }
     }

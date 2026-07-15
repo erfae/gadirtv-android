@@ -18,6 +18,7 @@ import com.gadir.tv.model.Profile
 import com.gadir.tv.ui.bootstrap.BootstrapActivity
 import com.gadir.tv.ui.login.LoginActivity
 import com.gadir.tv.util.DefaultCredentials
+import com.gadir.tv.util.DeviceUi
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
@@ -50,7 +51,8 @@ class ProfilesActivity : BaseLocaleActivity() {
 
         profileGrid = findViewById(R.id.profileGrid)
         btnManage = findViewById(R.id.btnManage)
-        profileGrid.layoutManager = GridLayoutManager(this, 4)
+        val profileColumns = if (DeviceUi.isCompact(this)) 3 else 4
+        profileGrid.layoutManager = GridLayoutManager(this, profileColumns)
 
         btnManage.setOnClickListener {
             manageMode = !manageMode

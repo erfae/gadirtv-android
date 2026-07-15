@@ -28,6 +28,7 @@
     <string name="tab_movies">Películas</string>
     <string name="tab_series">Series</string>
     <string name="catalog_empty">No hay contenido en este grupo</string>
+    <string name="catalog_load_failed">No se pudo cargar este grupo</string>
     <string name="season_label">Temporada %1$s</string>
     <string name="seasons_label">TEMPORADAS</string>
     <string name="episodes_label">CAPÍTULOS</string>

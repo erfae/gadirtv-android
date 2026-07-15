@@ -53,6 +53,7 @@ class PlayerActivity : BaseLocaleActivity() {
     private lateinit var vodDuration: TextView
     private lateinit var vodSeekBar: SeekBar
     private lateinit var btnVodPlayPause: ImageButton
+    private lateinit var btnPlayerBack: ImageButton
 
     private val hideHandler = Handler(Looper.getMainLooper())
     private var userSeeking = false
@@ -117,7 +118,13 @@ class PlayerActivity : BaseLocaleActivity() {
         findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).apply {
             useController = false
             setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_NEVER)
+            setOnClickListener {
+                if (!isLive) showVodControls()
+            }
         }
+
+        btnPlayerBack = findViewById(R.id.btnPlayerBack)
+        btnPlayerBack.setOnClickListener { finish() }
 
         enableImmersiveMode()
 
@@ -345,6 +352,7 @@ class PlayerActivity : BaseLocaleActivity() {
         if (isLive) return
         controlsVisible = true
         vodControls.visibility = View.VISIBLE
+        btnPlayerBack.visibility = View.VISIBLE
         updateVodProgress()
         updatePlayPauseIcon()
         hideHandler.removeCallbacks(hideControlsRunnable)
@@ -358,6 +366,7 @@ class PlayerActivity : BaseLocaleActivity() {
         if (isLive) return
         controlsVisible = false
         vodControls.visibility = View.GONE
+        btnPlayerBack.visibility = View.GONE
         hideHandler.removeCallbacks(hideControlsRunnable)
         hideHandler.removeCallbacks(progressRunnable)
     }

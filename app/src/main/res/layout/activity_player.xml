@@ -38,4 +38,18 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom" />
+
+    <ImageButton
+        android:id="@+id/btnPlayerBack"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="16dp"
+        android:background="@drawable/player_control_bg"
+        android:contentDescription="@string/back"
+        android:focusable="true"
+        android:padding="10dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_back"
+        android:visibility="gone" />
 </FrameLayout>

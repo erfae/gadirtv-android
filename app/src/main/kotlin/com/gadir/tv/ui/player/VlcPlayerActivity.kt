@@ -64,6 +64,10 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         epgNowView = findViewById(R.id.vlcEpgNow)
         epgNextView = findViewById(R.id.vlcEpgNext)
         findViewById<ImageButton>(R.id.btnFullscreen).visibility = View.GONE
+        findViewById<ImageButton>(R.id.btnVlcBack).setOnClickListener { finish() }
+        findViewById<org.videolan.libvlc.util.VLCVideoLayout>(R.id.vlcVideo).setOnClickListener {
+            showOverlays()
+        }
         currentStreamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
         isLivePlayback = currentStreamId > 0
         loadLiveEpg(currentStreamId, intent.getStringExtra(EXTRA_EPG_CHANNEL_ID).orEmpty())
@@ -254,6 +258,9 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         overlaysVisible = true
         findViewById<View>(R.id.vlcOverlay).visibility = View.VISIBLE
         findViewById<View>(R.id.vlcVolumeControls).visibility = View.VISIBLE
+        if (!isLivePlayback) {
+            findViewById<View>(R.id.btnVlcBack).visibility = View.VISIBLE
+        }
         scheduleHideOverlays()
     }
 
@@ -261,6 +268,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         overlaysVisible = false
         findViewById<View>(R.id.vlcOverlay).visibility = View.GONE
         findViewById<View>(R.id.vlcVolumeControls).visibility = View.GONE
+        findViewById<View>(R.id.btnVlcBack).visibility = View.GONE
         hideHandler.removeCallbacks(hideOverlaysRunnable)
     }
 
