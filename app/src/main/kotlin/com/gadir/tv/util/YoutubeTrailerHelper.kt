@@ -1,5 +1,6 @@
 package com.gadir.tv.util
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -20,29 +21,52 @@ object YoutubeTrailerHelper {
         return null
     }
 
+    fun directEmbedUrl(videoId: String, origin: String = "https://www.youtube.com"): String =
+        "https://www.youtube.com/embed/$videoId" +
+            "?autoplay=1&rel=0&modestbranding=1&fs=1&playsinline=1&controls=1" +
+            "&enablejsapi=1&iv_load_policy=3&origin=$origin"
+
+    fun pipedEmbedUrl(videoId: String): String =
+        "https://piped.video/embed/$videoId?autoplay=1"
+
+    fun embedHeaders(): Map<String, String> = mapOf(
+        "Referer" to "https://www.youtube.com",
+        "Origin" to "https://www.youtube.com",
+    )
+
     fun openInYoutubeApp(context: Context, videoId: String): Boolean {
         val watchUri = Uri.parse("https://www.youtube.com/watch?v=$videoId")
-        val candidates = listOf(
+        val packages = listOf(
             "com.google.android.youtube.tv",
             "com.google.android.youtube",
         )
-        for (packageName in candidates) {
+        for (packageName in packages) {
             if (!isPackageInstalled(context, packageName)) continue
-            val intent = Intent(Intent.ACTION_VIEW, watchUri)
-                .setPackage(packageName)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val intent = Intent(Intent.ACTION_VIEW, watchUri).setPackage(packageName)
+            if (context !is Activity) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
             if (intent.resolveActivity(context.packageManager) != null) {
                 context.startActivity(intent)
                 return true
             }
         }
-        val generic = Intent(Intent.ACTION_VIEW, Uri.parse("vnd.youtube:$videoId"))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (generic.resolveActivity(context.packageManager) != null) {
-            context.startActivity(generic)
-            return true
-        }
         return false
+    }
+
+    fun openExternally(context: Context, videoId: String): Boolean {
+        if (openInYoutubeApp(context, videoId)) return true
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=$videoId"))
+        if (context !is Activity) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        if (intent.resolveActivity(context.packageManager) == null) return false
+        return try {
+            context.startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     fun iframeApiHtml(videoId: String, origin: String): String = """
@@ -62,32 +86,22 @@ object YoutubeTrailerHelper {
             tag.src = "https://www.youtube.com/iframe_api";
             var firstScriptTag = document.getElementsByTagName('script')[0];
             firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-            var player;
             function onYouTubeIframeAPIReady() {
-              player = new YT.Player('player', {
+              new YT.Player('player', {
                 width: '100%',
                 height: '100%',
                 videoId: '$videoId',
                 playerVars: {
-                  autoplay: 1,
-                  rel: 0,
-                  modestbranding: 1,
-                  fs: 1,
-                  playsinline: 0,
-                  controls: 1,
-                  iv_load_policy: 3,
-                  origin: '$origin'
+                  autoplay: 1, rel: 0, modestbranding: 1, fs: 1,
+                  playsinline: 1, controls: 1, iv_load_policy: 3, origin: '$origin'
                 },
                 events: {
-                  onReady: function(event) {
-                    event.target.playVideo();
-                    if (window.TrailerBridge) TrailerBridge.onReady();
+                  onReady: function(e) { e.target.playVideo(); },
+                  onError: function(e) {
+                    if (window.TrailerBridge) TrailerBridge.onPlayerError(e.data);
                   },
-                  onError: function(event) {
-                    if (window.TrailerBridge) TrailerBridge.onPlayerError(event.data);
-                  },
-                  onStateChange: function(event) {
-                    if (event.data === YT.PlayerState.PLAYING && window.TrailerBridge) {
+                  onStateChange: function(e) {
+                    if (e.data === YT.PlayerState.PLAYING && window.TrailerBridge) {
                       TrailerBridge.onPlaying();
                     }
                   }
@@ -111,13 +125,18 @@ object YoutubeTrailerHelper {
         </head>
         <body>
           <iframe
-            src="https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&rel=0&modestbranding=1&fs=1&playsinline=0&controls=1&iv_load_policy=3&enablejsapi=1&origin=$origin"
+            src="https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&rel=0&modestbranding=1&fs=1&playsinline=1&controls=1&iv_load_policy=3&enablejsapi=1&origin=$origin"
             allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
             allowfullscreen>
           </iframe>
         </body>
         </html>
     """.trimIndent()
+
+    fun vimeoEmbedUrl(url: String): String? {
+        val match = Regex("vimeo\\.com/(?:video/)?([0-9]+)").find(url) ?: return null
+        return "https://player.vimeo.com/video/${match.groupValues[1]}?autoplay=1"
+    }
 
     private fun isPackageInstalled(context: Context, packageName: String): Boolean {
         return try {
