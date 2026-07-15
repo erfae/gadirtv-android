@@ -190,13 +190,23 @@
                 style="@style/Widget.MaterialComponents.Button.TextButton" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnManageProfiles"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/manage_profiles"
+                android:visibility="gone"
+                style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnDeleteProfile"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
                 android:text="@string/delete_profile"
                 android:textColor="@color/gtv_red_hi"
                 android:visibility="gone"
-                style="@style/Widget.MaterialComponents.Button.TextButton" />
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

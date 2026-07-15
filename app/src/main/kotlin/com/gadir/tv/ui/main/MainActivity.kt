@@ -67,7 +67,7 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var liveChannelStore: LiveChannelStore
     private lateinit var appSettings: AppSettings
     private var miniVlcPlayer: LiveVlcPlayer? = null
-    private lateinit var miniVlcView: VLCVideoLayout
+    private var miniVlcView: VLCVideoLayout? = null
     private var channelAdapter: ChannelAdapter? = null
     private var currentPreviewChannel: LiveChannel? = null
     private var previewingStreamId: Int? = null
@@ -347,25 +347,30 @@ class MainActivity : BaseLocaleActivity() {
         )
         liveCategories.addAll(PlaylistRepository.categories)
 
-        val applyLiveCategory: (Category) -> Unit = { cat ->
-            try {
-                val newId = when (cat.id) {
-                    "" -> null
-                    FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
-                    else -> cat.id
-                }
-                if (newId != selectedLiveCategoryId) {
-                    stopLivePreview()
-                    val oldIndex = liveCategoryIndex()
+        val applyLiveCategory: (Category) -> Unit = liveCat@{ cat ->
+            val newId = when (cat.id) {
+                "" -> null
+                FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
+                else -> cat.id
+            }
+            if (newId == selectedLiveCategoryId) return@liveCat
+            val compact = DeviceUi.isCompact(this)
+            val oldIndex = liveCategoryIndex()
+            liveCategoryList.post {
+                try {
+                    if (!compact) stopLivePreview()
                     selectedLiveCategoryId = newId
-                    (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelectionAt(
-                        oldIndex,
-                        liveCategoryIndex(),
-                    )
+                    (liveCategoryList.adapter as? CategoryAdapter)?.let { adapter ->
+                        if (compact) {
+                            adapter.refreshSelection()
+                        } else {
+                            adapter.refreshSelectionAt(oldIndex, liveCategoryIndex())
+                        }
+                    }
+                    reloadChannels(keepCategoryFocus = true)
+                } catch (_: Exception) {
                     reloadChannels(keepCategoryFocus = true)
                 }
-            } catch (_: Exception) {
-                reloadChannels(keepCategoryFocus = true)
             }
         }
 
@@ -1709,7 +1714,7 @@ class MainActivity : BaseLocaleActivity() {
         previewUrlIndex = 0
         previewWorkingUrl = null
         setPreviewVideoVisible(false)
-        miniVlcView.alpha = 0f
+        miniVlcView?.alpha = 0f
         previewLogo.visibility = View.GONE
         panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
         previewTitle.text = getString(R.string.select_channel)
@@ -1829,7 +1834,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun setPreviewVideoVisible(visible: Boolean) {
-        miniVlcView.alpha = if (visible) 1f else 0f
+        miniVlcView?.alpha = if (visible) 1f else 0f
         if (!visible && currentPreviewChannel?.icon?.isNotEmpty() == true) {
             previewLogo.visibility = View.VISIBLE
         } else if (visible) {
@@ -2027,8 +2032,6 @@ class MainActivity : BaseLocaleActivity() {
         miniPreviewControls = panelLive.findViewById(R.id.miniPreviewControls)
         miniPreviewControls.visibility = View.GONE
 
-        miniVlcView = panelLive.findViewById(R.id.miniVlcPlayer)
-        miniVlcView.alpha = 0f
         val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
         noSignal.visibility = View.GONE
         panelLive.findViewById<View>(R.id.btnNoSignalSettings).setOnClickListener {
@@ -2059,27 +2062,35 @@ class MainActivity : BaseLocaleActivity() {
                 else -> false
             }
         }
-        recreateMiniVlcPlayer()
-        panelLive.findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
-            VolumeHelper.adjust(this, raise = true)
-            scheduleHideMiniControls()
-        }
-        panelLive.findViewById<ImageButton>(R.id.btnVolDown).setOnClickListener {
-            VolumeHelper.adjust(this, raise = false)
-            scheduleHideMiniControls()
-        }
-        panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
-            currentPreviewChannel?.let { openFullscreen(it) }
+        if (!DeviceUi.isCompact(this)) {
+            miniVlcView = panelLive.findViewById(R.id.miniVlcPlayer)
+            miniVlcView?.alpha = 0f
+            recreateMiniVlcPlayer()
+            panelLive.findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
+                VolumeHelper.adjust(this, raise = true)
+                scheduleHideMiniControls()
+            }
+            panelLive.findViewById<ImageButton>(R.id.btnVolDown).setOnClickListener {
+                VolumeHelper.adjust(this, raise = false)
+                scheduleHideMiniControls()
+            }
+            panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
+                currentPreviewChannel?.let { openFullscreen(it) }
+            }
+        } else {
+            panelLive.findViewById<View>(R.id.miniVlcPlayer)?.visibility = View.GONE
+            miniPreviewControls.visibility = View.GONE
         }
     }
 
     private fun recreateMiniVlcPlayer() {
         if (DeviceUi.isCompact(this)) return
+        val videoLayout = miniVlcView ?: return
         miniVlcPlayer?.release()
         val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
         miniVlcPlayer = LiveVlcPlayer(
             context = this,
-            videoLayout = miniVlcView,
+            videoLayout = videoLayout,
             networkBufferMs = appSettings.networkBufferMs,
             onError = {
                 setPreviewVideoVisible(false)

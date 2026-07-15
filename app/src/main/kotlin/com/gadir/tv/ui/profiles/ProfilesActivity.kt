@@ -46,6 +46,7 @@ class ProfilesActivity : BaseLocaleActivity() {
         super.onCreate(savedInstanceState)
         profileStore = ProfileStore(this)
         forcePicker = intent.getBooleanExtra(EXTRA_FORCE_PICKER, false)
+        manageMode = intent.getBooleanExtra(EXTRA_MANAGE_MODE, false)
         ensureDefaultProfile()
         setContentView(R.layout.activity_profiles)
 
@@ -60,6 +61,10 @@ class ProfilesActivity : BaseLocaleActivity() {
                 if (manageMode) R.string.done_profiles else R.string.manage_profiles,
             )
             reload()
+        }
+
+        if (manageMode) {
+            btnManage.text = getString(R.string.done_profiles)
         }
 
         reload()
@@ -105,6 +110,9 @@ class ProfilesActivity : BaseLocaleActivity() {
                 startActivity(Intent(this, BootstrapActivity::class.java))
             },
             onRename = { profile -> showRenameDialog(profile) },
+            onEditConnection = { profile ->
+                startActivity(LoginActivity.editIntent(this, profile))
+            },
             onAdd = {
                 startActivity(Intent(this, LoginActivity::class.java))
             },
@@ -181,6 +189,7 @@ class ProfilesActivity : BaseLocaleActivity() {
         private val colorFor: (Int) -> Int,
         private val onSelect: (Profile) -> Unit,
         private val onRename: (Profile) -> Unit,
+        private val onEditConnection: (Profile) -> Unit,
         private val onAdd: () -> Unit,
         private val onDelete: (Profile) -> Unit,
     ) : RecyclerView.Adapter<ProfileAdapter.Holder>() {
@@ -191,6 +200,7 @@ class ProfilesActivity : BaseLocaleActivity() {
             val label: TextView = view.findViewById(R.id.avatarLabel)
             val delete: TextView = view.findViewById(R.id.avatarDelete)
             val rename: TextView = view.findViewById(R.id.avatarRename)
+            val edit: TextView = view.findViewById(R.id.avatarEdit)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
@@ -224,6 +234,7 @@ class ProfilesActivity : BaseLocaleActivity() {
             holder.label.text = holder.itemView.context.getString(R.string.add_profile)
             holder.delete.visibility = View.GONE
             holder.rename.visibility = View.GONE
+            holder.edit.visibility = View.GONE
             holder.itemView.setOnClickListener { onAdd() }
         }
 
@@ -245,6 +256,7 @@ class ProfilesActivity : BaseLocaleActivity() {
             holder.label.text = profile.displayName
             holder.delete.visibility = if (manageMode) View.VISIBLE else View.GONE
             holder.rename.visibility = if (manageMode) View.VISIBLE else View.GONE
+            holder.edit.visibility = if (manageMode) View.VISIBLE else View.GONE
 
             holder.itemView.setOnClickListener {
                 if (manageMode) {
@@ -254,6 +266,7 @@ class ProfilesActivity : BaseLocaleActivity() {
                 }
             }
             holder.rename.setOnClickListener { onRename(profile) }
+            holder.edit.setOnClickListener { onEditConnection(profile) }
             holder.delete.setOnClickListener { onDelete(profile) }
         }
 
@@ -262,5 +275,6 @@ class ProfilesActivity : BaseLocaleActivity() {
 
     companion object {
         const val EXTRA_FORCE_PICKER = "force_picker"
+        const val EXTRA_MANAGE_MODE = "manage_mode"
     }
 }

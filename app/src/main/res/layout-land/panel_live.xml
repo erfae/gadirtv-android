@@ -48,11 +48,12 @@
         android:focusableInTouchMode="true"
         android:nextFocusLeft="@+id/channelList">
 
-        <org.videolan.libvlc.util.VLCVideoLayout
+        <View
             android:id="@+id/miniVlcPlayer"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:keepScreenOn="true" />
+            android:background="#141414"
+            android:visibility="gone" />
 
         <include
             android:id="@+id/miniNoSignal"
