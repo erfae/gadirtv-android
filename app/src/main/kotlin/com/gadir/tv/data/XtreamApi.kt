@@ -167,6 +167,9 @@ class XtreamApi(
                 num = row.channelNum(index),
                 extension = row.get("container_extension")?.asStringOrNull()?.ifBlank { "ts" } ?: "ts",
                 directSource = row.get("direct_source")?.asStringOrNull().orEmpty().trim(),
+                epgChannelId = row.get("epg_channel_id")?.asStringOrNull()
+                    ?: row.get("channel_id")?.asStringOrNull()
+                    ?: "",
             )
         }.filter { it.streamId > 0 }
     }
@@ -315,23 +318,70 @@ class XtreamApi(
     fun seriesStreamUrl(profile: Profile, episodeId: Int, ext: String = "mp4"): String =
         buildStreamUrl(profile, "series", episodeId, ext)
 
-    fun shortEpg(profile: Profile, streamId: Int, limit: Int = 2): List<EpgEntry> {
+    fun shortEpg(
+        profile: Profile,
+        streamId: Int,
+        epgChannelId: String = "",
+        limit: Int = 4,
+    ): List<EpgEntry> {
+        if (streamId <= 0) return emptyList()
+        fetchEpgListings(profile, mapOf("stream_id" to streamId.toString()), limit)
+            .takeIf { it.isNotEmpty() }
+            ?.let { return it }
+        if (epgChannelId.isNotBlank() && epgChannelId != streamId.toString()) {
+            fetchEpgListings(profile, mapOf("stream_id" to epgChannelId), limit)
+                .takeIf { it.isNotEmpty() }
+                ?.let { return it }
+            fetchEpgListings(profile, mapOf("epg_channel_id" to epgChannelId), limit)
+                .takeIf { it.isNotEmpty() }
+                ?.let { return it }
+        }
+        fetchEpgListings(
+            profile,
+            mapOf("stream_id" to streamId.toString()),
+            limit,
+            actionOverride = "get_simple_data_table",
+        ).takeIf { it.isNotEmpty() }?.let { return it }
+        return emptyList()
+    }
+
+    private fun fetchEpgListings(
+        profile: Profile,
+        params: Map<String, String>,
+        limit: Int,
+        actionOverride: String = "get_short_epg",
+    ): List<EpgEntry> {
         val host = HostUtils.baseUrl(profile.host)
+        val action = actionOverride
         val query = buildString {
             append("username=").append(encode(profile.username))
             append("&password=").append(encode(profile.password))
-            append("&action=get_short_epg")
-            append("&stream_id=").append(streamId)
-            append("&limit=").append(limit)
+            append("&action=").append(action)
+            params.forEach { (key, value) ->
+                if (key != "action") {
+                    append("&").append(key).append("=").append(encode(value))
+                }
+            }
+            if (!params.containsKey("limit")) {
+                append("&limit=").append(limit)
+            }
         }
         val url = "$host/player_api.php?$query"
         val response = NativeHttpClient.request(url, activeUserAgent)
         if (response.status != 200 || response.body.isBlank()) return emptyList()
+        return parseEpgListings(response.body)
+    }
+
+    private fun parseEpgListings(body: String): List<EpgEntry> {
         return try {
-            val root = gson.fromJson(response.body, JsonElement::class.java) ?: return emptyList()
+            val root = gson.fromJson(body, JsonElement::class.java) ?: return emptyList()
             val listings = when {
                 root.isJsonArray -> root.asJsonArray
-                root.isJsonObject -> root.asJsonObject.getAsJsonArray("epg_listings")
+                root.isJsonObject -> {
+                    val obj = root.asJsonObject
+                    obj.getAsJsonArray("epg_listings")
+                        ?: obj.getAsJsonArray("data")
+                }
                 else -> null
             } ?: return emptyList()
             listings.mapNotNull { el ->
@@ -358,10 +408,13 @@ class XtreamApi(
                     text.toLongOrNull() ?: parseEpgDateTime(text)
                 }
             }
-            if (value > 0L) return value
+            if (value > 0L) return normalizeEpgEpoch(value)
         }
         return 0L
     }
+
+    private fun normalizeEpgEpoch(value: Long): Long =
+        if (value > 9_999_999_999L) value / 1000L else value
 
     private fun parseEpgDateTime(raw: String): Long {
         if (raw.isBlank()) return 0L
@@ -385,12 +438,17 @@ class XtreamApi(
     private fun decodeEpgTitle(raw: String): String {
         if (raw.isBlank()) return ""
         val trimmed = raw.trim()
-        return try {
+        val base64Decoded = try {
             val bytes = android.util.Base64.decode(trimmed, android.util.Base64.DEFAULT)
-            val decoded = String(bytes, Charsets.UTF_8).trim()
-            if (decoded.isNotBlank() && decoded.none { it == '\u0000' }) decoded else trimmed
+            String(bytes, Charsets.UTF_8).trim()
         } catch (_: Exception) {
-            trimmed
+            ""
+        }
+        val candidate = base64Decoded.ifBlank { trimmed }
+        return try {
+            java.net.URLDecoder.decode(candidate, Charsets.UTF_8.name()).trim()
+        } catch (_: Exception) {
+            candidate
         }
     }
 
