@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.gadir.tv.R
+import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ImageLoader
 
@@ -46,16 +47,25 @@ class HomeRailAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_poster_rail_wide, parent, false)
+        val layout = if (DeviceUi.isCompact(parent.context)) {
+            R.layout.item_poster_rail
+        } else {
+            R.layout.item_poster_rail_wide
+        }
+        val view = LayoutInflater.from(parent.context).inflate(layout, parent, false)
         return Holder(view)
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val item = items[position]
         holder.title.text = item.title
+        val compact = DeviceUi.isCompact(holder.itemView.context)
         if (item.imageUrl.isNotEmpty()) {
-            ImageLoader.loadPoster(holder.image, item.imageUrl, 440, 248)
+            if (compact) {
+                ImageLoader.loadPoster(holder.image, item.imageUrl, 130, 180)
+            } else {
+                ImageLoader.loadPoster(holder.image, item.imageUrl, 440, 248)
+            }
         } else {
             holder.image.setImageResource(R.drawable.tv_banner)
         }
