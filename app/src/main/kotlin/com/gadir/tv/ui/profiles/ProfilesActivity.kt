@@ -106,10 +106,7 @@ class ProfilesActivity : BaseLocaleActivity() {
             onAdd = {
                 startActivity(Intent(this, LoginActivity::class.java))
             },
-            onDelete = { profile ->
-                profileStore.remove(profile)
-                reload()
-            },
+            onDelete = { profile -> showDeleteDialog(profile) },
         )
 
         profileGrid.post {
@@ -132,6 +129,11 @@ class ProfilesActivity : BaseLocaleActivity() {
             .setNegativeButton(android.R.string.cancel, null)
             .create()
 
+        dialogView.findViewById<MaterialButton>(R.id.btnDeleteProfile).setOnClickListener {
+            dialog.dismiss()
+            showDeleteDialog(profile)
+        }
+
         dialog.setOnShowListener {
             dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val newName = nameInput.text?.toString()?.trim().orEmpty()
@@ -152,6 +154,18 @@ class ProfilesActivity : BaseLocaleActivity() {
 
         dialog.show()
         nameInput.post { nameInput.requestFocus() }
+    }
+
+    private fun showDeleteDialog(profile: Profile) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.delete_profile_title)
+            .setMessage(getString(R.string.delete_profile_message, profile.displayName))
+            .setPositiveButton(R.string.delete_profile_confirm) { _, _ ->
+                profileStore.remove(profile)
+                reload()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private sealed class ProfileItem {
