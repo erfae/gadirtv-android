@@ -10,14 +10,14 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="6dp">
+        android:paddingHorizontal="10dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="4dp">
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="16dp"
+            android:layout_marginEnd="10dp"
             android:orientation="vertical">
 
             <TextView
@@ -25,7 +25,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@android:color/white"
-                android:textSize="16sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -33,12 +33,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/gtv_text_dim"
-                android:textSize="10sp" />
+                android:textSize="9sp" />
         </LinearLayout>
 
         <ImageView
-            android:layout_width="120dp"
-            android:layout_height="36dp"
+            android:layout_width="96dp"
+            android:layout_height="28dp"
             android:adjustViewBounds="true"
             android:contentDescription="@string/app_name"
             android:scaleType="fitStart"
@@ -53,91 +53,81 @@
             android:id="@+id/btnSearch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="4dp"
             android:background="@drawable/tab_bg"
             android:contentDescription="@string/search_title"
             android:drawableStart="@drawable/ic_search"
-            android:drawablePadding="6dp"
             android:focusable="true"
             android:focusableInTouchMode="true"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="7dp"
-            android:text="@string/search_title"
-            android:textColor="@android:color/white"
-            android:textSize="11sp" />
+            android:gravity="center"
+            android:minWidth="36dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="6dp"
+            android:text="" />
 
         <TextView
             android:id="@+id/btnReload"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="4dp"
             android:background="@drawable/tab_bg"
             android:contentDescription="@string/reload_playlist"
             android:drawableStart="@drawable/ic_reload"
-            android:drawablePadding="6dp"
             android:focusable="true"
             android:focusableInTouchMode="true"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="7dp"
-            android:text="@string/reload_playlist"
-            android:textColor="@android:color/white"
-            android:textSize="11sp" />
+            android:gravity="center"
+            android:minWidth="36dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="6dp"
+            android:text="" />
 
         <TextView
             android:id="@+id/btnSettings"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="4dp"
             android:background="@drawable/tab_bg"
             android:contentDescription="@string/settings_title"
             android:drawableStart="@drawable/ic_settings"
-            android:drawablePadding="6dp"
             android:focusable="true"
             android:focusableInTouchMode="true"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="7dp"
-            android:text="@string/settings_title"
-            android:textColor="@android:color/white"
-            android:textSize="11sp" />
+            android:gravity="center"
+            android:minWidth="36dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="6dp"
+            android:text="" />
 
         <TextView
             android:id="@+id/btnLogout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="4dp"
             android:background="@drawable/tab_bg"
             android:contentDescription="@string/logout_user"
             android:drawableStart="@drawable/ic_logout"
-            android:drawablePadding="6dp"
             android:focusable="true"
             android:focusableInTouchMode="true"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="7dp"
-            android:text="@string/logout_user"
-            android:textColor="@android:color/white"
-            android:textSize="11sp" />
+            android:gravity="center"
+            android:minWidth="36dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="6dp"
+            android:text="" />
 
         <TextView
             android:id="@+id/btnExit"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="12dp"
+            android:layout_marginEnd="8dp"
             android:background="@drawable/tab_bg"
             android:contentDescription="@string/exit_app"
             android:drawableStart="@drawable/ic_exit"
-            android:drawablePadding="6dp"
             android:focusable="true"
             android:focusableInTouchMode="true"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="7dp"
-            android:text="@string/exit_app"
-            android:textColor="@android:color/white"
-            android:textSize="11sp" />
+            android:gravity="center"
+            android:minWidth="36dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="6dp"
+            android:text="" />
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -152,11 +142,11 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="@color/gtv_text_dim"
-                android:textSize="10sp" />
+                android:textSize="9sp" />
 
             <FrameLayout
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:layout_gravity="end"
                 android:layout_marginTop="4dp">
 
@@ -172,7 +162,7 @@
                     android:layout_height="match_parent"
                     android:gravity="center"
                     android:textColor="@android:color/white"
-                    android:textSize="14sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
             </FrameLayout>
         </LinearLayout>

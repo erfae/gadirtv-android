@@ -149,10 +149,20 @@ class XtreamApi(
     fun liveStreams(profile: Profile, categoryId: String? = null): List<LiveChannel> {
         val extra = if (!categoryId.isNullOrEmpty()) mapOf("category_id" to categoryId) else emptyMap()
         return fetchList(profile, "get_live_streams", extra).mapIndexed { index, row ->
+            val streamId = row.get("stream_id")?.asIntOrZero() ?: 0
+            val icon = imageUrl(
+                row,
+                "stream_icon",
+                "logo",
+                "tvg_logo",
+                "icon",
+                "channel_icon",
+                "epg_icon",
+            ).ifBlank { fallbackLiveIcon(profile, streamId) }
             LiveChannel(
-                streamId = row.get("stream_id")?.asIntOrZero() ?: 0,
+                streamId = streamId,
                 name = row.get("name")?.asStringOrNull() ?: "",
-                icon = imageUrl(row, "stream_icon"),
+                icon = icon,
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
                 num = row.channelNum(index),
                 extension = row.get("container_extension")?.asStringOrNull()?.ifBlank { "ts" } ?: "ts",
@@ -430,6 +440,12 @@ class XtreamApi(
 
     private fun imageUrl(json: JsonObject?, vararg keys: String): String =
         ImageUrlResolver.resolve(MetaExtractor.imageFrom(json, *keys))
+
+    private fun fallbackLiveIcon(profile: Profile, streamId: Int): String {
+        if (streamId <= 0) return ""
+        val base = HostUtils.baseUrl(profile.host)
+        return "$base/images/$streamId.png"
+    }
 
     private fun encode(value: String): String =
         URLEncoder.encode(value, Charsets.UTF_8.name())
