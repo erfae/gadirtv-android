@@ -9,4 +9,8 @@ object DeviceUi {
 
     fun isLandscape(context: Context): Boolean =
         context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    fun isTelevision(context: Context): Boolean =
+        (context.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK) ==
+            Configuration.UI_MODE_TYPE_TELEVISION
 }
