@@ -53,9 +53,7 @@ import com.gadir.tv.util.ProfileAvatarHelper
 import com.gadir.tv.util.TvFocusHelper
 import com.gadir.tv.util.TvNavHelper
 import com.gadir.tv.util.VolumeHelper
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.gadir.tv.util.HeaderClockHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -160,9 +158,9 @@ class MainActivity : BaseLocaleActivity() {
     private val clockRunnable = object : Runnable {
         override fun run() {
             val now = Date()
-            headerClock.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
-            headerDate.text = SimpleDateFormat("d MMM", Locale.getDefault()).format(now)
-            clockHandler.postDelayed(this, 30_000L)
+            headerClock.text = HeaderClockHelper.formatTime(this@MainActivity, now)
+            headerDate.text = HeaderClockHelper.formatDate(this@MainActivity, now)
+            clockHandler.postDelayed(this, 1_000L)
         }
     }
 

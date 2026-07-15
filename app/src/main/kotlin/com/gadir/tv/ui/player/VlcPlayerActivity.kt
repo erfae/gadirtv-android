@@ -70,12 +70,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
         val settings = AppSettings(this)
         val bufferMs = settings.networkBufferMs
-        val options = ArrayList<String>()
-        options.add("--http-user-agent=${PlaylistRepository.userAgent}")
-        options.add("--network-caching=$bufferMs")
-        options.add("--live-caching=$bufferMs")
-        options.add("--gain=2")
-        options.add("--audio-resampler=soxr")
+        val options = com.gadir.tv.player.VlcAudioOptions.baseOptions(bufferMs)
         libVlc = LibVLC(this, options)
         mediaPlayer = MediaPlayer(libVlc).apply {
             attachViews(findViewById<VLCVideoLayout>(R.id.vlcVideo), null, false, false)
@@ -280,7 +275,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_ALTERNATE_URLS = "alternate_urls"
         private const val EXTRA_STREAM_ID = "stream_id"
         private const val EXTRA_EPG_CHANNEL_ID = "epg_channel_id"
-        private const val VLC_VOLUME = 100
+        private const val VLC_VOLUME = com.gadir.tv.player.VlcAudioOptions.VOLUME_FULLSCREEN
         private const val CONTROLS_HIDE_MS = 8_000L
 
         fun intent(
