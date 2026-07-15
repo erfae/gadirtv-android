@@ -61,6 +61,7 @@ object PlaybackLauncher {
                 title = request.title,
                 url = request.url,
                 alternateUrls = request.alternateUrls,
+                streamId = request.streamId,
             ),
         )
     }

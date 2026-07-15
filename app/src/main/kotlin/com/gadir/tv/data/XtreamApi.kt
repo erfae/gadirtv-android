@@ -328,15 +328,19 @@ class XtreamApi(
         val response = NativeHttpClient.request(url, activeUserAgent)
         if (response.status != 200 || response.body.isBlank()) return emptyList()
         return try {
-            val root = gson.fromJson(response.body, JsonObject::class.java) ?: return emptyList()
-            val listings = root.getAsJsonArray("epg_listings") ?: return emptyList()
+            val root = gson.fromJson(response.body, JsonElement::class.java) ?: return emptyList()
+            val listings = when {
+                root.isJsonArray -> root.asJsonArray
+                root.isJsonObject -> root.asJsonObject.getAsJsonArray("epg_listings")
+                else -> null
+            } ?: return emptyList()
             listings.mapNotNull { el ->
                 val row = el.asJsonObjectOrNull() ?: return@mapNotNull null
-                val rawTitle = row.get("title")?.asStringOrNull().orEmpty()
+                val title = decodeEpgTitle(row.get("title")?.asStringOrNull().orEmpty())
                 EpgEntry(
-                    title = decodeEpgTitle(rawTitle),
-                    start = row.get("start_timestamp")?.asStringOrNull()?.toLongOrNull() ?: 0L,
-                    end = row.get("stop_timestamp")?.asStringOrNull()?.toLongOrNull() ?: 0L,
+                    title = title,
+                    start = epgTimestamp(row, "start_timestamp", "start"),
+                    end = epgTimestamp(row, "stop_timestamp", "end_timestamp", "end"),
                 )
             }.filter { it.title.isNotBlank() }
         } catch (_: Exception) {
@@ -344,13 +348,49 @@ class XtreamApi(
         }
     }
 
+    private fun epgTimestamp(row: JsonObject, vararg keys: String): Long {
+        for (key in keys) {
+            val el = row.get(key) ?: continue
+            val value = when {
+                el.isJsonPrimitive && el.asJsonPrimitive.isNumber -> el.asLong
+                else -> {
+                    val text = el.asStringOrNull().orEmpty()
+                    text.toLongOrNull() ?: parseEpgDateTime(text)
+                }
+            }
+            if (value > 0L) return value
+        }
+        return 0L
+    }
+
+    private fun parseEpgDateTime(raw: String): Long {
+        if (raw.isBlank()) return 0L
+        val patterns = listOf(
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd'T'HH:mm:ss",
+            "dd-MM-yyyy HH:mm:ss",
+        )
+        for (pattern in patterns) {
+            try {
+                val sdf = java.text.SimpleDateFormat(pattern, java.util.Locale.US)
+                sdf.timeZone = java.util.TimeZone.getDefault()
+                val date = sdf.parse(raw.trim()) ?: continue
+                return date.time / 1000L
+            } catch (_: Exception) {
+            }
+        }
+        return 0L
+    }
+
     private fun decodeEpgTitle(raw: String): String {
         if (raw.isBlank()) return ""
+        val trimmed = raw.trim()
         return try {
-            val bytes = android.util.Base64.decode(raw, android.util.Base64.DEFAULT)
-            String(bytes, Charsets.UTF_8).trim()
+            val bytes = android.util.Base64.decode(trimmed, android.util.Base64.DEFAULT)
+            val decoded = String(bytes, Charsets.UTF_8).trim()
+            if (decoded.isNotBlank() && decoded.none { it == '\u0000' }) decoded else trimmed
         } catch (_: Exception) {
-            raw
+            trimmed
         }
     }
 
