@@ -183,6 +183,14 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                     scheduleHideOverlays()
                     return true
                 }
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (!overlaysVisible) {
+                        showOverlays()
+                        return true
+                    }
+                    scheduleHideOverlays()
+                    return true
+                }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     VolumeHelper.adjust(this, raise = false)
                     showOverlays()
