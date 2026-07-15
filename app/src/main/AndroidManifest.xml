@@ -88,6 +88,7 @@
             android:name=".ui.player.TrailerActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize"
             android:exported="false"
+            android:hardwareAccelerated="true"
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.GadirTV.Player" />
 
