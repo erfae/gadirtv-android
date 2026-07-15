@@ -116,6 +116,7 @@ class SettingsActivity : BaseLocaleActivity() {
             PlaylistRepository.clear()
             startActivity(
                 Intent(this, ProfilesActivity::class.java)
+                    .putExtra(ProfilesActivity.EXTRA_FORCE_PICKER, true)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK),
             )
             finishAffinity()

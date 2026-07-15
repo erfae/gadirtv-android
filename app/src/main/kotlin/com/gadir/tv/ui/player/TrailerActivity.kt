@@ -26,9 +26,14 @@ import com.gadir.tv.R
 import com.gadir.tv.player.PlayerFactory
 import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.util.MetaExtractor
+import androidx.lifecycle.lifecycleScope
+import com.gadir.tv.util.TrailerStreamResolver
 import com.gadir.tv.util.TrailerResolver
 import com.gadir.tv.util.TrailerSource
 import com.gadir.tv.util.YoutubeTrailerHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class TrailerActivity : BaseLocaleActivity() {
     private lateinit var webView: WebView
@@ -47,6 +52,7 @@ class TrailerActivity : BaseLocaleActivity() {
     private var sourceIndex = 0
     private var youtubeStep = 0
     private var currentYoutubeId: String? = null
+    private var youtubeStreamTried = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -170,6 +176,7 @@ class TrailerActivity : BaseLocaleActivity() {
     private fun retryPlayback() {
         sourceIndex = 0
         youtubeStep = 0
+        youtubeStreamTried = false
         currentYoutubeId = null
         releasePlayer()
         startCurrentSource()
@@ -219,6 +226,25 @@ class TrailerActivity : BaseLocaleActivity() {
 
     private fun playYoutube(videoId: String) {
         currentYoutubeId = videoId
+        if (!youtubeStreamTried) {
+            youtubeStreamTried = true
+            lifecycleScope.launch {
+                val direct = withContext(Dispatchers.IO) {
+                    TrailerStreamResolver.directPlayUrl(videoId)
+                }
+                if (isFinishing) return@launch
+                if (direct != null) {
+                    playDirectVideo(direct)
+                } else {
+                    playYoutubeEmbed(videoId)
+                }
+            }
+            return
+        }
+        playYoutubeEmbed(videoId)
+    }
+
+    private fun playYoutubeEmbed(videoId: String) {
         showWebView()
         val origin = "https://www.youtube.com"
         when (youtubeStep) {

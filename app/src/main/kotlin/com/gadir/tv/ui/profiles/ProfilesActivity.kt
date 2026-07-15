@@ -40,6 +40,7 @@ class ProfilesActivity : BaseLocaleActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         profileStore = ProfileStore(this)
+        forcePicker = intent.getBooleanExtra(EXTRA_FORCE_PICKER, false)
         ensureDefaultProfile()
         setContentView(R.layout.activity_profiles)
 
@@ -67,10 +68,12 @@ class ProfilesActivity : BaseLocaleActivity() {
     }
 
     private var autoConnected = false
+    private var forcePicker = false
 
     override fun onResume() {
         super.onResume()
         reload()
+        if (forcePicker) return
         if (!autoConnected && profiles.size == 1 && !manageMode) {
             autoConnected = true
             val profile = profiles.first()
@@ -183,5 +186,9 @@ class ProfilesActivity : BaseLocaleActivity() {
         }
 
         override fun getItemCount(): Int = items.size
+    }
+
+    companion object {
+        const val EXTRA_FORCE_PICKER = "force_picker"
     }
 }

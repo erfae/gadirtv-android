@@ -14,6 +14,9 @@ object TrailerResolver {
             TrailerCatalog.find(title)?.let { addRaw(sources, it) }
         }
         addRaw(sources, rawUrl)
+        if (sources.isEmpty() && title.isNotBlank()) {
+            TrailerSearch.findYoutubeId(title)?.let { sources.add(TrailerSource.Youtube(it)) }
+        }
         return sources.toList()
     }
 

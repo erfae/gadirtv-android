@@ -2,7 +2,7 @@ package com.gadir.tv.ui.main
 
 import android.content.Intent
 import android.view.KeyEvent
-import com.gadir.tv.util.TrailerCatalog
+import com.gadir.tv.util.TrailerAvailability
 import com.gadir.tv.util.TrailerLauncher
 import android.os.Bundle
 import android.os.Handler
@@ -1270,7 +1270,8 @@ class MainActivity : BaseLocaleActivity() {
         heroPlotRequestId += 1
         val requestId = heroPlotRequestId
         heroTrailerUrl = null
-        showHeroTrailer(resolveTrailerUrl(item.title))
+        heroTrailer.visibility = View.GONE
+        updateHeroTrailer(item.title)
 
         heroTitle.text = item.title
         heroSubtitle.text = ""
@@ -1335,26 +1336,16 @@ class MainActivity : BaseLocaleActivity() {
         ImageLoader.loadPoster(target, url)
     }
 
-    private fun showHeroTrailer(url: String?) {
-        val valid = url?.takeIf { MetaExtractor.isValidTrailerUrl(it) }
-        if (valid.isNullOrBlank()) {
-            heroTrailer.visibility = View.GONE
-            heroTrailerUrl = null
-        } else {
-            heroTrailerUrl = valid
+    private fun updateHeroTrailer(title: String, serverUrl: String = "") {
+        val requestTitle = title
+        lifecycleScope.launch {
+            val match = withContext(Dispatchers.IO) {
+                TrailerAvailability.resolve(requestTitle, serverUrl)
+            } ?: return@launch
+            if (heroTitle.text.toString() != requestTitle && serverUrl.isBlank()) return@launch
+            heroTrailerUrl = match.url
             heroTrailer.visibility = View.VISIBLE
         }
-    }
-
-    private fun resolveTrailerUrl(vararg candidates: String): String? {
-        for (candidate in candidates) {
-            if (candidate.isBlank()) continue
-            MetaExtractor.normalizeTrailerUrl(candidate)?.let { return it }
-            TrailerCatalog.find(candidate)?.let { catalog ->
-                MetaExtractor.normalizeTrailerUrl(catalog)?.let { return it }
-            }
-        }
-        return null
     }
 
     private fun openHeroTrailer() {
@@ -1376,7 +1367,7 @@ class MainActivity : BaseLocaleActivity() {
             val backdrop = info.backdrop.ifBlank { info.cover }
             if (backdrop.isNotEmpty()) loadHeroImage(heroImage, backdrop)
             if (info.cover.isNotEmpty()) loadHeroImage(heroPoster, info.cover)
-            showHeroTrailer(resolveTrailerUrl(info.trailerUrl, info.name, heroTitle.text.toString()))
+            showHeroTrailer(info.trailerUrl, info.name.ifBlank { heroTitle.text.toString() })
         }
     }
 
@@ -1396,8 +1387,14 @@ class MainActivity : BaseLocaleActivity() {
                 loadHeroImage(heroImage, backdrop)
                 loadHeroImage(heroPoster, detail.cover)
             }
-            showHeroTrailer(resolveTrailerUrl(detail.trailerUrl, detail.name, heroTitle.text.toString()))
+            showHeroTrailer(detail.trailerUrl, detail.name.ifBlank { heroTitle.text.toString() })
         }
+    }
+
+    private fun showHeroTrailer(serverUrl: String, title: String) {
+        heroTrailer.visibility = View.GONE
+        heroTrailerUrl = null
+        updateHeroTrailer(title, serverUrl)
     }
 
     private fun openHeroContent() {
@@ -1924,6 +1921,7 @@ class MainActivity : BaseLocaleActivity() {
         PlaylistRepository.clear()
         startActivity(
             Intent(this, ProfilesActivity::class.java)
+                .putExtra(ProfilesActivity.EXTRA_FORCE_PICKER, true)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK),
         )
         finish()
