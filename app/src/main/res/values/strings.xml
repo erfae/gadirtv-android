@@ -116,6 +116,7 @@
     <string name="hero_synopsis_label">SINOPSIS</string>
     <string name="hero_trailer">TRÁILER</string>
     <string name="trailer_unavailable">No se encontró una app para reproducir el tráiler</string>
+    <string name="trailer_playback_failed">No se pudo reproducir el tráiler. Prueba de nuevo o instala YouTube.</string>
     <string name="no_signal_title">SIN SEÑAL</string>
     <string name="no_signal_message">No se pudo reproducir este canal. Revisa tu conexión o los ajustes del reproductor.</string>
     <string name="no_signal_settings">Ir a Ajustes</string>

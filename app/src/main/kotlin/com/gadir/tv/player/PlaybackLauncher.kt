@@ -11,9 +11,12 @@ import com.gadir.tv.ui.player.VlcPlayerActivity
 object PlaybackLauncher {
     fun play(context: Context, request: PlaybackRequest) {
         val settings = AppSettings(context)
+        val isVod = request.kind == ResumeStore.KIND_MOVIE || request.kind == ResumeStore.KIND_SERIES
         when {
             // NetTV: live siempre con libVLC (audio fiable en TV boxes).
             request.kind == ResumeStore.KIND_LIVE -> launchVlc(context, request)
+            // Netflix-style: películas y series con ExoPlayer y controles VOD.
+            isVod -> launchExo(context, request)
             settings.playerMode == AppSettings.PLAYER_EXTERNAL ->
                 launchExternal(context, request, settings)
             settings.playerMode == AppSettings.PLAYER_VLC ->
@@ -62,6 +65,7 @@ object PlaybackLauncher {
                 url = request.url,
                 alternateUrls = request.alternateUrls,
                 streamId = request.streamId,
+                epgChannelId = request.epgChannelId,
             ),
         )
     }

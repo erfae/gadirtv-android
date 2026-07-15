@@ -14,9 +14,13 @@ import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
 import androidx.lifecycle.lifecycleScope
+import com.gadir.tv.data.LiveChannelStore
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.EpgEntry
+import com.gadir.tv.model.LiveChannel
+import com.gadir.tv.player.LiveChannelNavigator
+import com.gadir.tv.player.LiveStreamUrls
 import com.gadir.tv.util.VolumeHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -36,6 +40,9 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
     private lateinit var epgNowView: TextView
     private lateinit var epgNextView: TextView
+    private var currentStreamId = 0
+    private var currentEpgChannelId = ""
+    private var isLivePlayback = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,7 +64,9 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         epgNowView = findViewById(R.id.vlcEpgNow)
         epgNextView = findViewById(R.id.vlcEpgNext)
         findViewById<ImageButton>(R.id.btnFullscreen).visibility = View.GONE
-        loadLiveEpg(intent.getIntExtra(EXTRA_STREAM_ID, 0))
+        currentStreamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
+        isLivePlayback = currentStreamId > 0
+        loadLiveEpg(currentStreamId, intent.getStringExtra(EXTRA_EPG_CHANNEL_ID).orEmpty())
 
         val settings = AppSettings(this)
         val bufferMs = settings.networkBufferMs
@@ -92,19 +101,21 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         showOverlays()
     }
 
-    private fun loadLiveEpg(streamId: Int) {
+    private fun loadLiveEpg(streamId: Int, epgChannelId: String = "") {
         if (streamId <= 0) {
             epgNowView.visibility = View.GONE
             epgNextView.visibility = View.GONE
             return
         }
+        currentEpgChannelId = epgChannelId
         val profile = PlaylistRepository.profile ?: return
         epgNowView.text = getString(R.string.epg_loading)
         epgNowView.visibility = View.VISIBLE
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {
-                api.shortEpg(profile, streamId, limit = 4)
+                api.shortEpg(profile, streamId, epgChannelId = epgChannelId, limit = 4)
             }
+            if (streamId != currentStreamId) return@launch
             applyLiveEpg(epg)
         }
     }
@@ -149,6 +160,28 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         return true
     }
 
+    private fun zapChannel(delta: Int) {
+        if (!isLivePlayback || currentStreamId <= 0) return
+        val channel = LiveChannelNavigator.neighbor(this, currentStreamId, delta) ?: return
+        switchToChannel(channel)
+    }
+
+    private fun switchToChannel(channel: LiveChannel) {
+        val profile = PlaylistRepository.profile ?: return
+        currentStreamId = channel.streamId
+        currentEpgChannelId = channel.epgChannelId
+        LiveChannelStore(this).lastStreamId = channel.streamId
+
+        findViewById<TextView>(R.id.vlcTitle).text = channel.name
+        loadLiveEpg(channel.streamId, channel.epgChannelId)
+
+        val urls = LiveStreamUrls.candidates(api, profile, channel)
+        pendingUrls.clear()
+        pendingUrls.addAll(urls)
+        playUrl(urls.first())
+        showOverlays()
+    }
+
     override fun onResume() {
         super.onResume()
         mediaPlayer?.play()
@@ -176,6 +209,30 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         if (event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_MENU -> {
+                    if (!overlaysVisible) {
+                        showOverlays()
+                        return true
+                    }
+                    scheduleHideOverlays()
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    if (isLivePlayback) {
+                        zapChannel(-1)
+                        return true
+                    }
+                    if (!overlaysVisible) {
+                        showOverlays()
+                        return true
+                    }
+                    scheduleHideOverlays()
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (isLivePlayback) {
+                        zapChannel(1)
+                        return true
+                    }
                     if (!overlaysVisible) {
                         showOverlays()
                         return true
@@ -222,6 +279,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_URL = "url"
         private const val EXTRA_ALTERNATE_URLS = "alternate_urls"
         private const val EXTRA_STREAM_ID = "stream_id"
+        private const val EXTRA_EPG_CHANNEL_ID = "epg_channel_id"
         private const val VLC_VOLUME = 100
         private const val CONTROLS_HIDE_MS = 8_000L
 
@@ -231,10 +289,12 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             url: String,
             alternateUrls: List<String> = emptyList(),
             streamId: Int = 0,
+            epgChannelId: String = "",
         ): Intent = Intent(context, VlcPlayerActivity::class.java)
             .putExtra(EXTRA_TITLE, title)
             .putExtra(EXTRA_URL, url)
             .putExtra(EXTRA_STREAM_ID, streamId)
+            .putExtra(EXTRA_EPG_CHANNEL_ID, epgChannelId)
             .putStringArrayListExtra(EXTRA_ALTERNATE_URLS, ArrayList(alternateUrls))
     }
 }

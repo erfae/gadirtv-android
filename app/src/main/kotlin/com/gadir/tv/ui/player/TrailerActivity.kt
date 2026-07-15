@@ -1,47 +1,53 @@
 package com.gadir.tv.ui.player
 
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.TextView
-import com.gadir.tv.ui.BaseLocaleActivity
+import android.widget.Toast
 import com.gadir.tv.R
+import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.util.MetaExtractor
+import com.gadir.tv.util.YoutubeTrailerHelper
 
 class TrailerActivity : BaseLocaleActivity() {
-    private var guestMode = GuestMode.NOCOOKIE_EMBED
+    private var guestMode = GuestMode.IFRAME_API
     private var videoId: String? = null
     private lateinit var webView: WebView
     private lateinit var header: View
     private var customView: View? = null
     private var customCallback: WebChromeClient.CustomViewCallback? = null
+    private var headerVisible = false
+    private val hideHeaderHandler = Handler(Looper.getMainLooper())
+    private val hideHeaderRunnable = Runnable { hideHeader() }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_trailer)
-        window.decorView.systemUiVisibility = (
-            View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            )
+        enterImmersiveMode()
 
         val rawUrl = intent.getStringExtra(EXTRA_URL).orEmpty()
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         header = findViewById(R.id.trailerHeader)
         findViewById<TextView>(R.id.trailerTitle).text = title
 
-        videoId = extractYoutubeId(rawUrl)
+        videoId = YoutubeTrailerHelper.extractId(rawUrl)
         webView = findViewById(R.id.trailerWebView)
+        webView.setBackgroundColor(Color.BLACK)
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -49,6 +55,8 @@ class TrailerActivity : BaseLocaleActivity() {
             mediaPlaybackRequiresUserGesture = false
             javaScriptCanOpenWindowsAutomatically = false
             setSupportMultipleWindows(false)
+            loadWithOverviewMode = true
+            useWideViewPort = true
             userAgentString = EMBED_USER_AGENT
         }
         CookieManager.getInstance().apply {
@@ -57,6 +65,7 @@ class TrailerActivity : BaseLocaleActivity() {
                 setAcceptThirdPartyCookies(webView, true)
             }
         }
+        webView.addJavascriptInterface(TrailerBridge(), "TrailerBridge")
         webView.webChromeClient = object : WebChromeClient() {
             override fun onShowCustomView(view: View, callback: CustomViewCallback) {
                 if (customView != null) {
@@ -74,7 +83,8 @@ class TrailerActivity : BaseLocaleActivity() {
                     ),
                 )
                 webView.visibility = View.GONE
-                header.visibility = View.GONE
+                hideHeader(immediate = true)
+                enterImmersiveMode()
             }
 
             override fun onHideCustomView() {
@@ -83,7 +93,7 @@ class TrailerActivity : BaseLocaleActivity() {
                 customCallback?.onCustomViewHidden()
                 customCallback = null
                 webView.visibility = View.VISIBLE
-                header.visibility = View.VISIBLE
+                showHeaderBriefly()
             }
         }
         webView.webViewClient = object : WebViewClient() {
@@ -121,17 +131,38 @@ class TrailerActivity : BaseLocaleActivity() {
         }
 
         findViewById<TextView>(R.id.btnTrailerBack).setOnClickListener { finish() }
-        findViewById<TextView>(R.id.btnTrailerBack).requestFocus()
+        hideHeader(immediate = true)
+        webView.requestFocus()
     }
 
     override fun onBackPressed() {
         if (hideFullscreenCustomView()) return
+        if (!headerVisible) {
+            showHeaderBriefly()
+            findViewById<TextView>(R.id.btnTrailerBack).requestFocus()
+            return
+        }
         super.onBackPressed()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_BACK) {
-            if (hideFullscreenCustomView()) return true
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_BACK -> {
+                    if (hideFullscreenCustomView()) return true
+                    if (!headerVisible) {
+                        showHeaderBriefly()
+                        findViewById<TextView>(R.id.btnTrailerBack).requestFocus()
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_MENU -> {
+                    if (!headerVisible) {
+                        showHeaderBriefly()
+                        return true
+                    }
+                }
+            }
         }
         return super.dispatchKeyEvent(event)
     }
@@ -143,41 +174,26 @@ class TrailerActivity : BaseLocaleActivity() {
         customCallback?.onCustomViewHidden()
         customCallback = null
         webView.visibility = View.VISIBLE
-        header.visibility = View.VISIBLE
+        showHeaderBriefly()
         return true
     }
 
     private fun loadGuestYoutube(webView: WebView, id: String) {
+        val origin = "https://www.youtube.com"
         when (guestMode) {
-            GuestMode.NOCOOKIE_EMBED -> {
-                val embedUrl =
-                    "https://www.youtube-nocookie.com/embed/$id" +
-                        "?autoplay=1&rel=0&playsinline=1&modestbranding=1&fs=1&iv_load_policy=3&controls=1"
-                webView.loadUrl(embedUrl)
+            GuestMode.IFRAME_API -> {
+                webView.loadDataWithBaseURL(
+                    origin,
+                    YoutubeTrailerHelper.iframeApiHtml(id, origin),
+                    "text/html",
+                    "UTF-8",
+                    null,
+                )
             }
-            GuestMode.IFRAME_EMBED -> {
-                val html = """
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                      <meta name="viewport" content="width=device-width, initial-scale=1">
-                      <style>
-                        html, body { margin:0; padding:0; background:#000; height:100%; overflow:hidden; }
-                        iframe { position:absolute; top:0; left:0; width:100%; height:100%; border:0; }
-                      </style>
-                    </head>
-                    <body>
-                      <iframe
-                        src="https://www.youtube-nocookie.com/embed/$id?autoplay=1&rel=0&playsinline=1&modestbranding=1&fs=1&iv_load_policy=3&controls=1"
-                        allow="autoplay; encrypted-media; fullscreen"
-                        allowfullscreen>
-                      </iframe>
-                    </body>
-                    </html>
-                """.trimIndent()
+            GuestMode.NOCOOKIE_EMBED -> {
                 webView.loadDataWithBaseURL(
                     "https://www.youtube-nocookie.com",
-                    html,
+                    YoutubeTrailerHelper.nocookieIframeHtml(id, origin),
                     "text/html",
                     "UTF-8",
                     null,
@@ -192,11 +208,66 @@ class TrailerActivity : BaseLocaleActivity() {
     private fun retryGuestPlayback(webView: WebView) {
         val id = videoId ?: return
         guestMode = when (guestMode) {
-            GuestMode.NOCOOKIE_EMBED -> GuestMode.IFRAME_EMBED
-            GuestMode.IFRAME_EMBED -> GuestMode.MOBILE
-            GuestMode.MOBILE -> return
+            GuestMode.IFRAME_API -> GuestMode.NOCOOKIE_EMBED
+            GuestMode.NOCOOKIE_EMBED -> GuestMode.MOBILE
+            GuestMode.MOBILE -> {
+                tryYoutubeAppFallback(id)
+                return
+            }
         }
         loadGuestYoutube(webView, id)
+    }
+
+    private fun onYoutubePlayerError(code: Int) {
+        if (code == 150 || code == 151 || code == 153) {
+            runOnUiThread {
+                val id = videoId ?: return@runOnUiThread
+                if (guestMode != GuestMode.MOBILE) {
+                    guestMode = when (guestMode) {
+                        GuestMode.IFRAME_API -> GuestMode.NOCOOKIE_EMBED
+                        else -> GuestMode.MOBILE
+                    }
+                    loadGuestYoutube(webView, id)
+                } else {
+                    tryYoutubeAppFallback(id)
+                }
+            }
+        }
+    }
+
+    private fun tryYoutubeAppFallback(videoId: String) {
+        if (YoutubeTrailerHelper.openInYoutubeApp(this, videoId)) {
+            finish()
+            return
+        }
+        Toast.makeText(this, R.string.trailer_playback_failed, Toast.LENGTH_LONG).show()
+    }
+
+    private fun showHeaderBriefly() {
+        headerVisible = true
+        header.visibility = View.VISIBLE
+        hideHeaderHandler.removeCallbacks(hideHeaderRunnable)
+        hideHeaderHandler.postDelayed(hideHeaderRunnable, HEADER_HIDE_MS)
+    }
+
+    private fun hideHeader(immediate: Boolean = false) {
+        hideHeaderHandler.removeCallbacks(hideHeaderRunnable)
+        if (immediate) {
+            headerVisible = false
+            header.visibility = View.GONE
+        } else {
+            hideHeaderRunnable.run()
+        }
+    }
+
+    private fun enterImmersiveMode() {
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            )
     }
 
     private fun isBlockedGuestUrl(url: String): Boolean {
@@ -207,29 +278,40 @@ class TrailerActivity : BaseLocaleActivity() {
             lower.contains("addaccount")
     }
 
-    private fun extractYoutubeId(url: String): String? {
-        val patterns = listOf(
-            Regex("(?:youtube\\.com/watch\\?v=|youtu\\.be/|youtube\\.com/embed/)([\\w-]{6,})"),
-            Regex("^([\\w-]{11})$"),
-        )
-        for (pattern in patterns) {
-            val match = pattern.find(url)
-            if (match != null) return match.groupValues[1]
+    override fun onDestroy() {
+        hideHeaderHandler.removeCallbacks(hideHeaderRunnable)
+        webView.removeJavascriptInterface("TrailerBridge")
+        webView.destroy()
+        super.onDestroy()
+    }
+
+    private inner class TrailerBridge {
+        @JavascriptInterface
+        fun onReady() = Unit
+
+        @JavascriptInterface
+        fun onPlaying() {
+            runOnUiThread { hideHeader(immediate = true) }
         }
-        return null
+
+        @JavascriptInterface
+        fun onPlayerError(code: Int) {
+            onYoutubePlayerError(code)
+        }
     }
 
     private enum class GuestMode {
+        IFRAME_API,
         NOCOOKIE_EMBED,
-        IFRAME_EMBED,
         MOBILE,
     }
 
     companion object {
         private const val EXTRA_URL = "trailer_url"
         private const val EXTRA_TITLE = "trailer_title"
+        private const val HEADER_HIDE_MS = 4_000L
         private const val EMBED_USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "Mozilla/5.0 (Linux; Android 10; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
         fun intent(context: android.content.Context, url: String, title: String = "") =
             android.content.Intent(context, TrailerActivity::class.java)

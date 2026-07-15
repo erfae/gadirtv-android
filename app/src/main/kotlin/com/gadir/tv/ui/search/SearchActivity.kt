@@ -20,6 +20,7 @@ import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.ui.main.HomeRailAdapter
 import com.gadir.tv.ui.movie.MovieDetailActivity
+import com.gadir.tv.player.LiveChannelNavigator
 import com.gadir.tv.player.LiveStreamUrls
 import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
@@ -176,6 +177,7 @@ class SearchActivity : BaseLocaleActivity() {
 
     private fun playChannel(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
+        LiveChannelNavigator.setPlaybackContext(this, channel, channel.categoryId)
         val urls = LiveStreamUrls.candidates(api, profile, channel)
         PlaybackLauncher.play(
             context = this,
@@ -186,6 +188,7 @@ class SearchActivity : BaseLocaleActivity() {
                 contentId = channel.streamId.toString(),
                 imageUrl = channel.icon,
                 streamId = channel.streamId,
+                epgChannelId = channel.epgChannelId,
                 extension = channel.extension,
                 alternateUrls = urls.drop(1),
             ),

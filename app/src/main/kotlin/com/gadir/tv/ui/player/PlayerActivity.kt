@@ -404,7 +404,7 @@ class PlayerActivity : BaseLocaleActivity() {
                         return true
                     }
                 }
-                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_MENU -> {
                     if (!controlsVisible) {
                         showVodControls()
                         return true

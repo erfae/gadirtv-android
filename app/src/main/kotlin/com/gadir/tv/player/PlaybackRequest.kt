@@ -9,5 +9,6 @@ data class PlaybackRequest(
     val extension: String = "mp4",
     val positionMs: Long = 0L,
     val streamId: Int = 0,
+    val epgChannelId: String = "",
     val alternateUrls: List<String> = emptyList(),
 )

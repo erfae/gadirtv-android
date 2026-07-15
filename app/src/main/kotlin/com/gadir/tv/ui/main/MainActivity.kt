@@ -34,6 +34,7 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.Profile
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.ui.movie.MovieDetailActivity
+import com.gadir.tv.player.LiveChannelNavigator
 import com.gadir.tv.player.LiveStreamUrls
 import com.gadir.tv.player.LiveVlcPlayer
 import com.gadir.tv.player.PlaybackLauncher
@@ -1730,6 +1731,10 @@ class MainActivity : BaseLocaleActivity() {
             updatePreviewInfo(channel)
             return
         }
+        if (!channelChanged && previewUrlIndex > 0 && previewUrls.isNotEmpty()) {
+            updatePreviewInfo(channel)
+            return
+        }
         if (channelChanged) {
             previewToken++
             cancelMiniPreviewPlayback()
@@ -1789,16 +1794,24 @@ class MainActivity : BaseLocaleActivity() {
         if (token != previewToken) return
         val profile = PlaylistRepository.profile ?: return
         updatePreviewInfo(channel)
-        if (appSettings.autoplayPreview) {
+        if (!appSettings.autoplayPreview) {
+            cancelMiniPreviewPlayback()
+            setPreviewVideoVisible(false)
+            return
+        }
+        val channelChanged = previewingStreamId != channel.streamId
+        if (channelChanged || previewUrls.isEmpty()) {
             previewUrls = LiveStreamUrls.candidates(api, profile, channel)
             previewUrlIndex = 0
             previewWorkingUrl = null
             previewingStreamId = channel.streamId
-            playMiniPreviewUrl(previewUrls.firstOrNull().orEmpty(), token)
-        } else {
-            cancelMiniPreviewPlayback()
-            setPreviewVideoVisible(false)
         }
+        val url = previewUrls.getOrNull(previewUrlIndex).orEmpty()
+        if (url.isBlank()) {
+            panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.VISIBLE
+            return
+        }
+        playMiniPreviewUrl(url, token)
     }
 
     private fun playMiniPreviewUrl(url: String, token: Int) {
@@ -1850,6 +1863,7 @@ class MainActivity : BaseLocaleActivity() {
         }
         previewUrlIndex += 1
         panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
+        recreateMiniVlcPlayer()
         playMiniPreviewUrl(previewUrls[previewUrlIndex], token)
         return true
     }
@@ -1879,6 +1893,7 @@ class MainActivity : BaseLocaleActivity() {
 
     fun openFullscreen(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
+        LiveChannelNavigator.setPlaybackContext(this, channel, selectedLiveCategoryId)
         VolumeHelper.boostOnPlaybackStart(this)
         miniVlcPlayer?.stop()
         val candidates = LiveStreamUrls.candidates(api, profile, channel)
@@ -1897,6 +1912,7 @@ class MainActivity : BaseLocaleActivity() {
                 contentId = channel.streamId.toString(),
                 imageUrl = channel.icon,
                 streamId = channel.streamId,
+                epgChannelId = channel.epgChannelId,
                 extension = channel.extension,
                 alternateUrls = urls.drop(1),
             ),
@@ -2044,6 +2060,23 @@ class MainActivity : BaseLocaleActivity() {
                 else -> false
             }
         }
+        recreateMiniVlcPlayer()
+        panelLive.findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
+            VolumeHelper.adjust(this, raise = true)
+            scheduleHideMiniControls()
+        }
+        panelLive.findViewById<ImageButton>(R.id.btnVolDown).setOnClickListener {
+            VolumeHelper.adjust(this, raise = false)
+            scheduleHideMiniControls()
+        }
+        panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
+            currentPreviewChannel?.let { openFullscreen(it) }
+        }
+    }
+
+    private fun recreateMiniVlcPlayer() {
+        miniVlcPlayer?.release()
+        val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
         miniVlcPlayer = LiveVlcPlayer(
             context = this,
             videoLayout = miniVlcView,
@@ -2062,16 +2095,5 @@ class MainActivity : BaseLocaleActivity() {
                 noSignal.visibility = View.GONE
             },
         )
-        panelLive.findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
-            VolumeHelper.adjust(this, raise = true)
-            scheduleHideMiniControls()
-        }
-        panelLive.findViewById<ImageButton>(R.id.btnVolDown).setOnClickListener {
-            VolumeHelper.adjust(this, raise = false)
-            scheduleHideMiniControls()
-        }
-        panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
-            currentPreviewChannel?.let { openFullscreen(it) }
-        }
     }
 }
