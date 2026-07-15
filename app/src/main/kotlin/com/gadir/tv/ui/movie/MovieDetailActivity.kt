@@ -16,8 +16,6 @@ import com.gadir.tv.model.VodMovie
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.util.ImageLoader
-import com.gadir.tv.util.TrailerAvailability
-import com.gadir.tv.util.TrailerLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -28,7 +26,6 @@ class MovieDetailActivity : BaseLocaleActivity() {
     private var streamId = 0
     private var extension = "mp4"
     private var fallbackCover = ""
-    private var trailerUrl: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -94,24 +91,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
                 ImageLoader.loadPoster(findViewById(R.id.moviePoster), poster, 280, 420)
             }
 
-            val trailerBtn = findViewById<TextView>(R.id.btnMovieTrailer)
-            bindTrailerButton(trailerBtn, info.name.ifEmpty { movieName }, info.trailerUrl)
-
             findViewById<TextView>(R.id.btnMoviePlay).requestFocus()
-        }
-    }
-
-    private fun bindTrailerButton(button: TextView, title: String, serverUrl: String) {
-        button.visibility = View.GONE
-        lifecycleScope.launch {
-            val match = withContext(Dispatchers.IO) {
-                TrailerAvailability.resolve(title, serverUrl)
-            } ?: return@launch
-            trailerUrl = match.url
-            button.visibility = View.VISIBLE
-            button.setOnClickListener {
-                TrailerLauncher.open(this@MovieDetailActivity, match.url, title)
-            }
         }
     }
 

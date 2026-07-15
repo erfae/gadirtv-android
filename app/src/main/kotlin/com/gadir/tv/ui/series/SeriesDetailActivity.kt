@@ -21,8 +21,6 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.util.ImageLoader
-import com.gadir.tv.util.TrailerAvailability
-import com.gadir.tv.util.TrailerLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -111,9 +109,6 @@ class SeriesDetailActivity : BaseLocaleActivity() {
                 ImageLoader.loadPoster(findViewById(R.id.seriesPoster), poster, 280, 420)
             }
 
-            val trailerBtn = findViewById<TextView>(R.id.btnSeriesTrailer)
-            bindTrailerButton(trailerBtn, detail.name.ifEmpty { seriesName }, detail.trailerUrl)
-
             seasons = detail.seasons
             val keys = seasons.keys.sortedBy { it.toIntOrNull() ?: 0 }
             if (keys.isEmpty()) {
@@ -132,19 +127,6 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             }
             reloadEpisodes()
             btnSeriesPlay.requestFocus()
-        }
-    }
-
-    private fun bindTrailerButton(button: TextView, title: String, serverUrl: String) {
-        button.visibility = View.GONE
-        lifecycleScope.launch {
-            val match = withContext(Dispatchers.IO) {
-                TrailerAvailability.resolve(title, serverUrl)
-            } ?: return@launch
-            button.visibility = View.VISIBLE
-            button.setOnClickListener {
-                TrailerLauncher.open(this@SeriesDetailActivity, match.url, title)
-            }
         }
     }
 

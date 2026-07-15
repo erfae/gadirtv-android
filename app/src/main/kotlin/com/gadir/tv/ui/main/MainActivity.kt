@@ -2,8 +2,6 @@ package com.gadir.tv.ui.main
 
 import android.content.Intent
 import android.view.KeyEvent
-import com.gadir.tv.util.TrailerAvailability
-import com.gadir.tv.util.TrailerLauncher
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -113,7 +111,6 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var heroSubtitle: TextView
     private lateinit var heroPlot: TextView
     private lateinit var heroPlay: TextView
-    private lateinit var heroTrailer: TextView
     private lateinit var heroPoster: ImageView
     private lateinit var homeLoading: TextView
     private lateinit var homeEmpty: TextView
@@ -147,7 +144,6 @@ class MainActivity : BaseLocaleActivity() {
     private val recentSeries = mutableListOf<HomeRailAdapter.HomeRailItem>()
     private val heroItems = mutableListOf<HeroItem>()
     private var heroPlotRequestId = 0
-    private var heroTrailerUrl: String? = null
     private var heroIndex = 0
     private var railPreviewItem: HomeRailAdapter.HomeRailItem? = null
     private var homeLoaded = false
@@ -272,7 +268,6 @@ class MainActivity : BaseLocaleActivity() {
         heroSubtitle = panelHome.findViewById(R.id.heroSubtitle)
         heroPlot = panelHome.findViewById(R.id.heroPlot)
         heroPlay = panelHome.findViewById(R.id.heroPlay)
-        heroTrailer = panelHome.findViewById(R.id.heroTrailer)
         heroPoster = panelHome.findViewById(R.id.heroPoster)
         homeLoading = panelHome.findViewById(R.id.homeLoading)
         homeEmpty = panelHome.findViewById(R.id.homeEmpty)
@@ -303,20 +298,7 @@ class MainActivity : BaseLocaleActivity() {
                 startHeroRotation()
             }
         }
-        heroTrailer.setOnFocusChangeListener { view, hasFocus ->
-            FocusScaleHelper.applyConeFocus(view, hasFocus)
-        }
         heroPlay.setOnKeyListener { _, keyCode, event ->
-            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
-            when (keyCode) {
-                KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    focusFirstHomeRail()
-                    true
-                }
-                else -> false
-            }
-        }
-        heroTrailer.setOnKeyListener { _, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
@@ -330,7 +312,6 @@ class MainActivity : BaseLocaleActivity() {
         setupLiveTab()
         setupTabNavigation()
         heroPlay.setOnClickListener { openHeroContent() }
-        heroTrailer.setOnClickListener { openHeroTrailer() }
         tabHome.nextFocusUpId = R.id.btnSettings
         tabLive.nextFocusUpId = R.id.btnSettings
         tabMovies.nextFocusUpId = R.id.btnSettings
@@ -1275,9 +1256,6 @@ class MainActivity : BaseLocaleActivity() {
     private fun bindHero(item: HeroItem) {
         heroPlotRequestId += 1
         val requestId = heroPlotRequestId
-        heroTrailerUrl = null
-        heroTrailer.visibility = View.GONE
-        updateHeroTrailer(item.title)
 
         heroTitle.text = item.title
         heroSubtitle.text = ""
@@ -1342,23 +1320,6 @@ class MainActivity : BaseLocaleActivity() {
         ImageLoader.loadPoster(target, url)
     }
 
-    private fun updateHeroTrailer(title: String, serverUrl: String = "") {
-        val requestTitle = title
-        lifecycleScope.launch {
-            val match = withContext(Dispatchers.IO) {
-                TrailerAvailability.resolve(requestTitle, serverUrl)
-            } ?: return@launch
-            if (heroTitle.text.toString() != requestTitle && serverUrl.isBlank()) return@launch
-            heroTrailerUrl = match.url
-            heroTrailer.visibility = View.VISIBLE
-        }
-    }
-
-    private fun openHeroTrailer() {
-        val url = heroTrailerUrl ?: return
-        TrailerLauncher.open(this, url)
-    }
-
     private fun loadMoviePlot(streamId: Int, requestId: Int) {
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
@@ -1373,7 +1334,6 @@ class MainActivity : BaseLocaleActivity() {
             val backdrop = info.backdrop.ifBlank { info.cover }
             if (backdrop.isNotEmpty()) loadHeroImage(heroImage, backdrop)
             if (info.cover.isNotEmpty()) loadHeroImage(heroPoster, info.cover)
-            showHeroTrailer(info.trailerUrl, info.name.ifBlank { heroTitle.text.toString() })
         }
     }
 
@@ -1393,14 +1353,7 @@ class MainActivity : BaseLocaleActivity() {
                 loadHeroImage(heroImage, backdrop)
                 loadHeroImage(heroPoster, detail.cover)
             }
-            showHeroTrailer(detail.trailerUrl, detail.name.ifBlank { heroTitle.text.toString() })
         }
-    }
-
-    private fun showHeroTrailer(serverUrl: String, title: String) {
-        heroTrailer.visibility = View.GONE
-        heroTrailerUrl = null
-        updateHeroTrailer(title, serverUrl)
     }
 
     private fun openHeroContent() {

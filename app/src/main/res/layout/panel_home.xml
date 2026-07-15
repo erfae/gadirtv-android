@@ -91,41 +91,18 @@
 
                 <TextView
                     android:id="@+id/heroPlay"
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="40dp"
-                    android:layout_weight="1"
                     android:background="@drawable/btn_play_hero"
                     android:focusable="true"
                     android:focusableInTouchMode="true"
                     android:gravity="center"
-                    android:nextFocusRight="@+id/heroTrailer"
                     android:paddingHorizontal="12dp"
                     android:text="@string/hero_play"
                     android:textAllCaps="true"
                     android:textColor="@color/hero_play_text"
                     android:textSize="11sp"
                     android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/heroTrailer"
-                    android:layout_width="0dp"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/btn_trailer_hero"
-                    android:drawableStart="@drawable/ic_trailer"
-                    android:drawablePadding="6dp"
-                    android:focusable="true"
-                    android:focusableInTouchMode="true"
-                    android:gravity="center"
-                    android:nextFocusLeft="@+id/heroPlay"
-                    android:paddingHorizontal="10dp"
-                    android:text="@string/hero_trailer"
-                    android:textAllCaps="true"
-                    android:textColor="@color/hero_trailer_text"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
 

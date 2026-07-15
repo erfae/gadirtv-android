@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.TextView
 import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.core.content.ContextCompat
@@ -151,6 +152,16 @@ class ProfilesActivity : BaseLocaleActivity() {
         }
 
         private fun bindAdd(holder: Holder) {
+            val density = holder.itemView.resources.displayMetrics.density
+            val extraTop = (20 * density).toInt()
+            (holder.itemView.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
+                lp.topMargin = extraTop
+                holder.itemView.layoutParams = lp
+            }
+            (holder.label.layoutParams as? LinearLayout.LayoutParams)?.let { lp ->
+                lp.topMargin = (14 * density).toInt()
+                holder.label.layoutParams = lp
+            }
             val color = ContextCompat.getColor(holder.itemView.context, R.color.gtv_surface)
             (holder.circle.background as? GradientDrawable)?.setColor(color)
                 ?: holder.circle.setBackgroundColor(color)
@@ -161,6 +172,9 @@ class ProfilesActivity : BaseLocaleActivity() {
         }
 
         private fun bindProfile(holder: Holder, profile: Profile) {
+            (holder.itemView.layoutParams as? ViewGroup.MarginLayoutParams)?.topMargin = 0
+            (holder.label.layoutParams as? LinearLayout.LayoutParams)?.topMargin =
+                (12 * holder.itemView.resources.displayMetrics.density).toInt()
             val seed = if (profile.avatarSeed != 0) profile.avatarSeed else profile.id.hashCode()
             val color = colorFor(seed)
             (holder.circle.background as? GradientDrawable)?.setColor(color)
