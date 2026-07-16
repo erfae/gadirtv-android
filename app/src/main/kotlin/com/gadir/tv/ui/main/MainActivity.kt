@@ -49,9 +49,10 @@ import com.gadir.tv.ui.series.SeriesDetailActivity
 import com.gadir.tv.ui.settings.ParentalPinDialog
 import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.AccountFormat
-import com.gadir.tv.util.DeviceUi
-import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ChannelIconHelper
+import com.gadir.tv.util.DeviceUi
+import com.gadir.tv.util.CategorySort
+import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.MetaExtractor
 import com.gadir.tv.util.ProfileAvatarHelper
@@ -160,7 +161,6 @@ class MainActivity : BaseLocaleActivity() {
     private var catalogLoadToken = 0
     private var reloadingChannels = false
     private var channelsLoadToken = 0
-    private val unlockedCategories = mutableSetOf<String>()
     private var livePreviewPaused = false
     private lateinit var miniPreviewControls: View
     private lateinit var previewContainer: View
@@ -360,16 +360,23 @@ class MainActivity : BaseLocaleActivity() {
                 name = getString(R.string.category_favorites),
             ),
         )
+        liveCategories.add(
+            Category(
+                id = ParentalControlStore.LOCK_CATEGORY_ID,
+                name = getString(R.string.category_locked),
+            ),
+        )
         liveCategories.addAll(PlaylistRepository.categories)
 
         val applyLiveCategory: (Category) -> Unit = liveCat@{ cat ->
             val newId = when (cat.id) {
                 "" -> null
                 FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
+                ParentalControlStore.LOCK_CATEGORY_ID -> ParentalControlStore.LOCK_CATEGORY_ID
                 else -> cat.id
             }
             if (newId == selectedLiveCategoryId || reloadingChannels) return@liveCat
-            val apply = {
+            withLiveCategoryAccess(cat, newId) {
                 try {
                     teardownLivePreview()
                     liveChannelStore.lastStreamId = 0
@@ -379,12 +386,6 @@ class MainActivity : BaseLocaleActivity() {
                 } catch (_: Exception) {
                     reloadChannels(keepCategoryFocus = true)
                 }
-            }
-            val lockId = newId?.takeIf { it.isNotEmpty() && it != FavoritesStore.FAVORITES_CATEGORY_ID }
-            if (lockId != null && parentalStore.isLocked(ParentalControlStore.KIND_LIVE, lockId)) {
-                ensureCategoryUnlocked(ParentalControlStore.KIND_LIVE, cat, apply)
-            } else {
-                apply()
             }
         }
 
@@ -419,6 +420,17 @@ class MainActivity : BaseLocaleActivity() {
             onToggleFavorite = { channel ->
                 favoritesStore.toggle(FavoritesStore.KIND_LIVE, channel.streamId)
                 if (selectedLiveCategoryId == FavoritesStore.FAVORITES_CATEGORY_ID) {
+                    reloadChannels(keepCategoryFocus = true)
+                } else {
+                    channelAdapter?.notifyDataSetChanged()
+                }
+            },
+            isLocked = { parentalStore.isChannelLocked(it.streamId) },
+            canLock = { parentalStore.canLockChannel(it) },
+            onToggleLock = { channel ->
+                if (!parentalStore.canLockChannel(channel)) return@ChannelAdapter
+                parentalStore.toggleChannelLock(channel.streamId)
+                if (selectedLiveCategoryId == ParentalControlStore.LOCK_CATEGORY_ID) {
                     reloadChannels(keepCategoryFocus = true)
                 } else {
                     channelAdapter?.notifyDataSetChanged()
@@ -565,6 +577,7 @@ class MainActivity : BaseLocaleActivity() {
         return when (selectedLiveCategoryId) {
             null -> 0
             FavoritesStore.FAVORITES_CATEGORY_ID -> 1
+            ParentalControlStore.LOCK_CATEGORY_ID -> 2
             else -> liveCategories.indexOfFirst { it.id == selectedLiveCategoryId }
                 .takeIf { it >= 0 } ?: 0
         }
@@ -1170,6 +1183,23 @@ class MainActivity : BaseLocaleActivity() {
         title: String,
         cover: String,
         extension: String = "mp4",
+        categoryId: String = "",
+    ) {
+        val open = {
+            openMovieEntryInternal(streamId, title, cover, extension)
+        }
+        if (categoryId.isNotBlank() && parentalStore.isAdultVodCategory(categoryId)) {
+            open()
+        } else {
+            withMovieAccess(title, categoryId, open)
+        }
+    }
+
+    private fun openMovieEntryInternal(
+        streamId: Int,
+        title: String,
+        cover: String,
+        extension: String = "mp4",
     ) {
         val record = resumeStore.get(ResumeStore.KIND_MOVIE, streamId.toString())
         if (record != null) {
@@ -1208,21 +1238,45 @@ class MainActivity : BaseLocaleActivity() {
         )
     }
 
-    private fun openSeriesDetail(seriesId: Int, title: String, cover: String) {
-        startActivity(
-            SeriesDetailActivity.intent(
-                context = this,
-                series = SeriesItem(
-                    seriesId = seriesId,
-                    name = title,
-                    cover = cover,
-                    categoryId = "",
+    private fun openSeriesDetail(
+        seriesId: Int,
+        title: String,
+        cover: String,
+        categoryId: String = "",
+    ) {
+        val open = {
+            startActivity(
+                SeriesDetailActivity.intent(
+                    context = this,
+                    series = SeriesItem(
+                        seriesId = seriesId,
+                        name = title,
+                        cover = cover,
+                        categoryId = categoryId,
+                    ),
                 ),
-            ),
-        )
+            )
+        }
+        if (categoryId.isNotBlank() && parentalStore.isAdultSeriesCategory(categoryId)) {
+            open()
+        } else {
+            withSeriesAccess(title, categoryId, open)
+        }
     }
 
     private fun playMovie(
+        title: String,
+        streamId: Int,
+        extension: String,
+        imageUrl: String = "",
+        positionMs: Long = 0L,
+    ) {
+        withMovieAccess(title) {
+            playMovieInternal(title, streamId, extension, imageUrl, positionMs)
+        }
+    }
+
+    private fun playMovieInternal(
         title: String,
         streamId: Int,
         extension: String,
@@ -1247,6 +1301,18 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun playSeriesEpisode(
+        title: String,
+        episodeId: Int,
+        extension: String,
+        imageUrl: String = "",
+        positionMs: Long = 0L,
+    ) {
+        withSeriesAccess(title) {
+            playSeriesEpisodeInternal(title, episodeId, extension, imageUrl, positionMs)
+        }
+    }
+
+    private fun playSeriesEpisodeInternal(
         title: String,
         episodeId: Int,
         extension: String,
@@ -1403,11 +1469,13 @@ class MainActivity : BaseLocaleActivity() {
                 title = hero.title,
                 cover = hero.movie.icon,
                 extension = hero.movie.extension,
+                categoryId = hero.movie.categoryId,
             )
             is HeroItem.Series -> openSeriesDetail(
                 seriesId = hero.series.seriesId,
                 title = hero.series.name,
                 cover = hero.series.cover,
+                categoryId = hero.series.categoryId,
             )
             is HeroItem.Rail -> openHomeItem(hero.item)
             null -> Unit
@@ -1553,14 +1621,9 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun bindCatalogCategoryAdapter(tab: Tab) {
-        val kind = when (tab) {
-            Tab.MOVIES -> ParentalControlStore.KIND_VOD
-            Tab.SERIES -> ParentalControlStore.KIND_SERIES
-            else -> ""
-        }
         val applyCategory: (Category) -> Unit = cat@{ cat ->
             if (cat.id == selectedCatalogCategoryId) return@cat
-            val apply = {
+            withCatalogCategoryAccess(tab, cat) {
                 val oldIndex = catalogCategoryIndex()
                 selectedCatalogCategoryId = cat.id
                 when (tab) {
@@ -1573,11 +1636,6 @@ class MainActivity : BaseLocaleActivity() {
                     catalogCategoryIndex(),
                 )
                 loadCatalogItems(tab, cat.id)
-            }
-            if (kind.isNotEmpty() && parentalStore.isLocked(kind, cat.id)) {
-                ensureCategoryUnlocked(kind, cat, apply)
-            } else {
-                apply()
             }
         }
 
@@ -1691,47 +1749,92 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun onPosterClick(tab: Tab, item: PosterAdapter.PosterItem) {
+        val categoryId = selectedCatalogCategoryId.orEmpty()
         when (tab) {
             Tab.MOVIES -> openMovieEntry(
                 streamId = item.id,
                 title = item.title,
                 cover = item.imageUrl,
                 extension = item.extension,
+                categoryId = categoryId,
             )
             Tab.SERIES -> openSeriesDetail(
                 seriesId = item.id,
                 title = item.title,
                 cover = item.imageUrl,
+                categoryId = categoryId,
             )
             Tab.LIVE, Tab.HOME -> Unit
         }
     }
 
-    private fun categoryUnlockKey(kind: String, categoryId: String) = "$kind:$categoryId"
-
-    private fun isCategoryUnlocked(kind: String, categoryId: String): Boolean {
-        if (!parentalStore.isLocked(kind, categoryId)) return true
-        return unlockedCategories.contains(categoryUnlockKey(kind, categoryId))
+    private fun withLiveCategoryAccess(category: Category, categoryId: String?, action: () -> Unit) {
+        if (!parentalStore.requiresPinForLiveCategory(categoryId)) {
+            action()
+            return
+        }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_message, category.name),
+            onVerified = action,
+        )
     }
 
-    private fun ensureCategoryUnlocked(kind: String, category: Category, onGranted: () -> Unit) {
-        val id = category.id
-        if (id.isEmpty() || isCategoryUnlocked(kind, id)) {
-            onGranted()
+    private fun withChannelAccess(channel: LiveChannel, action: () -> Unit) {
+        if (!parentalStore.requiresPinForChannel(channel, selectedLiveCategoryId)) {
+            action()
             return
         }
-        if (!parentalStore.hasPin) {
-            Toast.makeText(this, R.string.parental_set_pin_first, Toast.LENGTH_SHORT).show()
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_channel, channel.name),
+            onVerified = action,
+        )
+    }
+
+    private fun withCatalogCategoryAccess(tab: Tab, category: Category, action: () -> Unit) {
+        val needsPin = when (tab) {
+            Tab.MOVIES -> parentalStore.isAdultVodCategory(category.id)
+            Tab.SERIES -> parentalStore.isAdultSeriesCategory(category.id)
+            else -> false
+        }
+        if (!needsPin) {
+            action()
             return
         }
-        ParentalPinDialog.show(this, category.name) { pin ->
-            if (parentalStore.verifyPin(pin)) {
-                unlockedCategories.add(categoryUnlockKey(kind, id))
-                onGranted()
-            } else {
-                Toast.makeText(this, R.string.parental_pin_wrong, Toast.LENGTH_SHORT).show()
-            }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_message, category.name),
+            onVerified = action,
+        )
+    }
+
+    private fun withMovieAccess(title: String, categoryId: String = "", action: () -> Unit) {
+        val adult = CategorySort.isAdultContent(title) ||
+            (categoryId.isNotBlank() && parentalStore.isAdultVodCategory(categoryId))
+        if (!adult) {
+            action()
+            return
         }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_content, title),
+            onVerified = action,
+        )
+    }
+
+    private fun withSeriesAccess(title: String, categoryId: String = "", action: () -> Unit) {
+        val adult = CategorySort.isAdultContent(title) ||
+            (categoryId.isNotBlank() && parentalStore.isAdultSeriesCategory(categoryId))
+        if (!adult) {
+            action()
+            return
+        }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_content, title),
+            onVerified = action,
+        )
     }
 
     private fun reloadChannels(keepCategoryFocus: Boolean = false) {
@@ -1747,6 +1850,10 @@ class MainActivity : BaseLocaleActivity() {
                         FavoritesStore.FAVORITES_CATEGORY_ID ->
                             PlaylistRepository.channelsFor(null, appSettings.liveSortMode).filter {
                                 favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId)
+                            }
+                        ParentalControlStore.LOCK_CATEGORY_ID ->
+                            PlaylistRepository.channelsFor(null, appSettings.liveSortMode).filter {
+                                parentalStore.isChannelLocked(it.streamId)
                             }
                         else -> PlaylistRepository.channelsFor(categoryId, appSettings.liveSortMode)
                     }
@@ -1812,6 +1919,13 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun schedulePreview(channel: LiveChannel) {
+        if (livePreviewPaused || reloadingChannels) return
+        withChannelAccess(channel) {
+            schedulePreviewInternal(channel)
+        }
+    }
+
+    private fun schedulePreviewInternal(channel: LiveChannel) {
         if (livePreviewPaused || reloadingChannels) return
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val channelChanged = previewingStreamId != channel.streamId
@@ -2000,6 +2114,12 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     fun openFullscreen(channel: LiveChannel) {
+        withChannelAccess(channel) {
+            openFullscreenInternal(channel)
+        }
+    }
+
+    private fun openFullscreenInternal(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         LiveChannelNavigator.setPlaybackContext(this, channel, selectedLiveCategoryId)
         VolumeHelper.boostOnPlaybackStart(this)

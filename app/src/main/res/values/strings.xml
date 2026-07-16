@@ -178,4 +178,15 @@
     <string name="parental_pin_unlock">Desbloquear</string>
     <string name="parental_pin_cancel">Cancelar</string>
     <string name="parental_pin_wrong">PIN incorrecto</string>
+    <string name="parental_pin_default_hint">PIN por defecto: 0000. Cámbialo aquí (actual + nuevo + confirmar).</string>
+    <string name="parental_pin_current">PIN actual</string>
+    <string name="parental_pin_confirm">Confirmar PIN</string>
+    <string name="parental_pin_mismatch">Los PIN nuevos no coinciden</string>
+    <string name="parental_info">Estilo NetTV: los grupos adultos se bloquean automáticamente. Puedes bloquear canales con el candado en TV en vivo. El PIN se pide cada vez.</string>
+    <string name="parental_channel_lock_section">BLOQUEO DE CANALES</string>
+    <string name="parental_channel_lock_hint">En TV en vivo, pulsa el candado 🔒 en un canal para bloquearlo. Aparecerán en el grupo «Bloqueados».</string>
+    <string name="parental_channel_lock_toggle">Bloquear o desbloquear canal</string>
+    <string name="parental_pin_channel">El canal «%1$s» está protegido. Introduce el PIN.</string>
+    <string name="parental_pin_content">«%1$s» está protegido. Introduce el PIN.</string>
+    <string name="category_locked">Bloqueados</string>
 </resources>

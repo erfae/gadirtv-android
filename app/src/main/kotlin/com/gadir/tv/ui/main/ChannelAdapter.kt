@@ -23,6 +23,9 @@ class ChannelAdapter(
     private val onMoveDown: (() -> Unit)? = null,
     private val isFavorite: (LiveChannel) -> Boolean = { false },
     private val onToggleFavorite: ((LiveChannel) -> Unit)? = null,
+    private val isLocked: (LiveChannel) -> Boolean = { false },
+    private val canLock: (LiveChannel) -> Boolean = { true },
+    private val onToggleLock: ((LiveChannel) -> Unit)? = null,
 ) : RecyclerView.Adapter<ChannelAdapter.Holder>() {
 
     constructor(
@@ -35,6 +38,9 @@ class ChannelAdapter(
         onMoveDown: (() -> Unit)? = null,
         isFavorite: (LiveChannel) -> Boolean = { false },
         onToggleFavorite: ((LiveChannel) -> Unit)? = null,
+        isLocked: (LiveChannel) -> Boolean = { false },
+        canLock: (LiveChannel) -> Boolean = { true },
+        onToggleLock: ((LiveChannel) -> Unit)? = null,
     ) : this(
         itemCount = { items.size },
         itemAt = { index -> items.getOrNull(index) },
@@ -46,12 +52,16 @@ class ChannelAdapter(
         onMoveDown = onMoveDown,
         isFavorite = isFavorite,
         onToggleFavorite = onToggleFavorite,
+        isLocked = isLocked,
+        canLock = canLock,
+        onToggleLock = onToggleLock,
     )
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
         val number: TextView = view.findViewById(R.id.channelNumber)
         val icon: ImageView = view.findViewById(R.id.channelIcon)
         val name: TextView = view.findViewById(R.id.channelName)
+        val lock: ImageView = view.findViewById(R.id.channelLock)
         val favorite: ImageView = view.findViewById(R.id.channelFavorite)
     }
 
@@ -70,6 +80,10 @@ class ChannelAdapter(
         holder.favorite.setImageResource(
             if (isFavorite(item)) R.drawable.ic_favorite_on else R.drawable.ic_favorite_off,
         )
+        val locked = isLocked(item)
+        holder.lock.setImageResource(if (locked) R.drawable.ic_lock_on else R.drawable.ic_lock_off)
+        holder.lock.visibility = if (canLock(item) || locked) View.VISIBLE else View.INVISIBLE
+        holder.lock.alpha = if (canLock(item)) 1f else 0.35f
 
         holder.itemView.isSelected = holder.itemView.hasFocus()
         holder.number.isSelected = holder.itemView.hasFocus()
@@ -87,6 +101,16 @@ class ChannelAdapter(
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
             itemAt(pos)?.let { openChannel(it) }
+        }
+
+        holder.lock.setOnClickListener {
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
+            val channel = itemAt(pos) ?: return@setOnClickListener
+            if (!canLock(channel) && !isLocked(channel)) return@setOnClickListener
+            onToggleLock?.invoke(channel)
+            val nowLocked = isLocked(channel)
+            holder.lock.setImageResource(if (nowLocked) R.drawable.ic_lock_on else R.drawable.ic_lock_off)
         }
 
         holder.itemView.setOnLongClickListener {

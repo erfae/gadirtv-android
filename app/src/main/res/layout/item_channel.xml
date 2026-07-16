@@ -41,6 +41,16 @@
         android:textSize="13sp" />
 
     <ImageView
+        android:id="@+id/channelLock"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_marginEnd="8dp"
+        android:contentDescription="@string/parental_channel_lock_toggle"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:src="@drawable/ic_lock_off" />
+
+    <ImageView
         android:id="@+id/channelFavorite"
         android:layout_width="18dp"
         android:layout_height="18dp"
