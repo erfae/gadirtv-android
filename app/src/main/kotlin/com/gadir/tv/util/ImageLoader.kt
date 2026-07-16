@@ -66,7 +66,13 @@ object ImageLoader {
             target.setImageResource(R.drawable.hero_placeholder_bg)
             return
         }
-        loadWithFallback(target, candidates, 0, heroBackdropOptions.centerCrop())
+        loadWithFallback(
+            target = target,
+            urls = candidates,
+            index = 0,
+            options = heroBackdropOptions.centerCrop(),
+            errorDrawable = R.drawable.hero_placeholder_bg,
+        )
     }
 
     private fun loadPoster(
@@ -93,9 +99,10 @@ object ImageLoader {
         urls: List<String>,
         index: Int,
         options: RequestOptions,
+        errorDrawable: Int = R.drawable.tv_banner,
     ) {
         if (index >= urls.size) {
-            target.setImageResource(R.drawable.tv_banner)
+            target.setImageResource(errorDrawable)
             return
         }
         Glide.with(target)
@@ -108,7 +115,7 @@ object ImageLoader {
                     targetView: Target<Drawable>,
                     isFirstResource: Boolean,
                 ): Boolean {
-                    loadWithFallback(target, urls, index + 1, options)
+                    loadWithFallback(target, urls, index + 1, options, errorDrawable)
                     return true
                 }
 

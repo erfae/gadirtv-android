@@ -163,6 +163,12 @@ class MainActivity : BaseLocaleActivity() {
     private var homeLoaded = false
     private var shouldFocusHomeRailsOnResume = true
     private var catalogLoadToken = 0
+    private var catalogCategoryFocusToken = 0
+    private val catalogCategoryHandler = Handler(Looper.getMainLooper())
+    private var pendingCatalogCategory: Runnable? = null
+    private var liveCategoryApplyToken = 0
+    private val liveCategoryHandler = Handler(Looper.getMainLooper())
+    private var pendingLiveCategory: Runnable? = null
     private var reloadingChannels = false
     private var channelsLoadToken = 0
     private var livePreviewPaused = false
@@ -209,12 +215,14 @@ class MainActivity : BaseLocaleActivity() {
     private val liveCategories = mutableListOf<Category>()
     private val heroRotateRunnable = object : Runnable {
         override fun run() {
-            if (railPreviewItem != null) return
-            if (heroItems.size > 1) {
+            if (currentTab != Tab.HOME) return
+            if (railPreviewItem == null && heroItems.size > 1) {
                 heroIndex = (heroIndex + 1) % heroItems.size
                 bindHero(heroItems[heroIndex])
             }
-            heroHandler.postDelayed(this, 8000L)
+            if (currentTab == Tab.HOME && heroItems.size > 1) {
+                heroHandler.postDelayed(this, 8000L)
+            }
         }
     }
 
@@ -392,7 +400,6 @@ class MainActivity : BaseLocaleActivity() {
         liveCategories.addAll(PlaylistRepository.categories)
 
         val applyLiveCategory: (Category) -> Unit = liveCat@{ cat ->
-            if (reloadingChannels) return@liveCat
             val newId = when (cat.id) {
                 "" -> null
                 FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
@@ -400,37 +407,14 @@ class MainActivity : BaseLocaleActivity() {
                 else -> cat.id
             }
             if (newId == selectedLiveCategoryId) return@liveCat
-            withLiveCategoryAccess(cat, newId) {
-                try {
-                    previewToken++
-                    pendingPreview?.let { previewHandler.removeCallbacks(it) }
-                    pendingPreview = null
-                    teardownLivePreviewPlayback()
-                    currentPreviewChannel = null
-                    previewingStreamId = null
-                    previewUrls = emptyList()
-                    previewUrlIndex = 0
-                    setPreviewVideoVisible(false)
-                    previewTitle.text = getString(R.string.select_channel)
-                    epgNow.text = getString(R.string.epg_unavailable)
-                    epgNext.visibility = View.GONE
-                    previewLogo.visibility = View.GONE
-                    panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.GONE
-                    liveChannelStore.lastStreamId = 0
-                    selectedLiveCategoryId = newId
-                    (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
-                    reloadChannels(keepCategoryFocus = true, autoPreviewFirst = true)
-                } catch (_: Exception) {
-                    reloadChannels(keepCategoryFocus = true, autoPreviewFirst = true)
-                }
-            }
+            scheduleLiveCategoryApply(cat, newId)
         }
 
         liveCategoryList.adapter = CategoryAdapter(
             items = liveCategories,
             selectedId = { liveSelectedCategoryKey() },
             onClick = applyLiveCategory,
-            onFocus = null,
+            onFocus = { cat -> scheduleLiveCategoryApply(cat, liveCategoryId(cat)) },
             onMoveRight = { focusFirstChannel() },
             onMoveUp = { focusBottomTab(Tab.LIVE) },
         )
@@ -470,6 +454,90 @@ class MainActivity : BaseLocaleActivity() {
         channelList.adapter = channelAdapter
         selectedLiveCategoryId = liveChannelStore.lastCategoryId?.takeIf { it.isNotEmpty() }
         reloadChannels(keepCategoryFocus = true)
+        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+    }
+
+    private fun liveCategoryId(cat: Category): String? = when (cat.id) {
+        "" -> null
+        FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
+        ParentalControlStore.LOCK_CATEGORY_ID -> ParentalControlStore.LOCK_CATEGORY_ID
+        else -> cat.id
+    }
+
+    private fun scheduleLiveCategoryApply(cat: Category, newId: String?) {
+        if (newId == selectedLiveCategoryId) return
+        liveCategoryApplyToken++
+        val token = liveCategoryApplyToken
+        pendingLiveCategory?.let { liveCategoryHandler.removeCallbacks(it) }
+        val task = Runnable {
+            if (token != liveCategoryApplyToken || currentTab != Tab.LIVE) return@Runnable
+            applyLiveCategoryNow(cat, newId)
+        }
+        pendingLiveCategory = task
+        liveCategoryHandler.postDelayed(task, 200L)
+    }
+
+    private fun applyLiveCategoryNow(cat: Category, newId: String?) {
+        if (newId == selectedLiveCategoryId) return
+        withLiveCategoryAccess(cat, newId) {
+            try {
+                resetLivePreviewUi()
+                selectedLiveCategoryId = newId
+                (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+                reloadChannels(keepCategoryFocus = true, autoPreviewFirst = true)
+            } catch (_: Exception) {
+                selectedLiveCategoryId = newId
+                reloadChannels(keepCategoryFocus = true, autoPreviewFirst = true)
+            }
+        }
+    }
+
+    private fun resetLivePreviewUi() {
+        if (!liveTabReady) return
+        previewToken++
+        pendingPreview?.let { previewHandler.removeCallbacks(it) }
+        pendingPreview = null
+        teardownLivePreviewPlayback()
+        currentPreviewChannel = null
+        previewingStreamId = null
+        previewUrls = emptyList()
+        previewUrlIndex = 0
+        setPreviewVideoVisible(false)
+        previewTitle.text = getString(R.string.select_channel)
+        epgNow.text = getString(R.string.epg_unavailable)
+        epgNext.visibility = View.GONE
+        previewLogo.visibility = View.GONE
+        livePanel().findViewById<View>(R.id.miniNoSignal)?.visibility = View.GONE
+        liveChannelStore.lastStreamId = 0
+    }
+
+    private fun refreshLiveCategoryList() {
+        if (!liveTabReady) return
+        val currentId = selectedLiveCategoryId
+        liveCategories.clear()
+        liveCategories.add(Category(id = "", name = getString(R.string.category_all)))
+        liveCategories.add(
+            Category(
+                id = FavoritesStore.FAVORITES_CATEGORY_ID,
+                name = getString(R.string.category_favorites),
+            ),
+        )
+        liveCategories.add(
+            Category(
+                id = ParentalControlStore.LOCK_CATEGORY_ID,
+                name = getString(R.string.category_locked),
+            ),
+        )
+        liveCategories.addAll(PlaylistRepository.categories)
+        selectedLiveCategoryId = currentId
+        liveCategoryList.adapter = CategoryAdapter(
+            items = liveCategories,
+            selectedId = { liveSelectedCategoryKey() },
+            onClick = { cat -> scheduleLiveCategoryApply(cat, liveCategoryId(cat)) },
+            onFocus = { cat -> scheduleLiveCategoryApply(cat, liveCategoryId(cat)) },
+            onMoveRight = { focusFirstChannel() },
+            onMoveUp = { focusBottomTab(Tab.LIVE) },
+        )
         (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
     }
 
@@ -971,11 +1039,12 @@ class MainActivity : BaseLocaleActivity() {
             homeEmpty.visibility = View.VISIBLE
         } else {
             homeEmpty.visibility = View.GONE
+            bindHero(heroItems[heroIndex])
+            startHeroRotation()
             panelHome.post {
-                if (isDestroyed || currentTab != Tab.HOME) return@post
-                bindHero(heroItems[heroIndex])
-                startHeroRotation()
-                focusHeroOnStart()
+                if (!isDestroyed && currentTab == Tab.HOME) {
+                    focusHeroOnStart()
+                }
             }
         }
     }
@@ -999,7 +1068,12 @@ class MainActivity : BaseLocaleActivity() {
                 runCatching { BootstrapLoader.load(this@MainActivity, api, profile) }
             }
             result.onSuccess {
-                setupLiveTab()
+                if (liveTabReady) {
+                    refreshLiveCategoryList()
+                    reloadChannels(keepCategoryFocus = true)
+                } else {
+                    ensureLiveTabReady()
+                }
                 loadHome()
                 when (currentTab) {
                     Tab.MOVIES, Tab.SERIES -> {
@@ -1756,32 +1830,55 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun bindCatalogCategoryAdapter(tab: Tab) {
-        val applyCategory: (Category) -> Unit = cat@{ cat ->
-            if (cat.id == selectedCatalogCategoryId) return@cat
-            withCatalogCategoryAccess(tab, cat) {
-                val oldIndex = catalogCategoryIndex()
-                selectedCatalogCategoryId = cat.id
-                when (tab) {
-                    Tab.MOVIES -> movieCategoryId = cat.id
-                    Tab.SERIES -> seriesCategoryId = cat.id
-                    else -> Unit
-                }
-                (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelectionAt(
-                    oldIndex,
-                    catalogCategoryIndex(),
-                )
-                loadCatalogItems(tab, cat.id)
-            }
+        val applyCategory: (Category) -> Unit = { cat ->
+            catalogCategoryHandler.removeCallbacksAndMessages(null)
+            catalogCategoryFocusToken++
+            applyCatalogCategory(tab, cat)
         }
 
         catalogCategoryList.adapter = CategoryAdapter(
             items = catalogCategories,
             selectedId = { selectedCatalogCategoryId },
             onClick = applyCategory,
-            onFocus = if (DeviceUi.isCompact(this)) null else applyCategory,
+            onFocus = if (DeviceUi.isCompact(this)) {
+                null
+            } else {
+                { cat -> scheduleCatalogCategoryApply(tab, cat) }
+            },
             onMoveRight = { focusFirstCatalogItem() },
             onMoveUp = { focusBottomTab(tab) },
         )
+    }
+
+    private fun scheduleCatalogCategoryApply(tab: Tab, cat: Category) {
+        if (cat.id == selectedCatalogCategoryId) return
+        catalogCategoryFocusToken++
+        val token = catalogCategoryFocusToken
+        pendingCatalogCategory?.let { catalogCategoryHandler.removeCallbacks(it) }
+        val task = Runnable {
+            if (token != catalogCategoryFocusToken || currentTab != tab) return@Runnable
+            applyCatalogCategory(tab, cat)
+        }
+        pendingCatalogCategory = task
+        catalogCategoryHandler.postDelayed(task, 250L)
+    }
+
+    private fun applyCatalogCategory(tab: Tab, cat: Category) {
+        if (cat.id == selectedCatalogCategoryId) return
+        withCatalogCategoryAccess(tab, cat) {
+            val oldIndex = catalogCategoryIndex()
+            selectedCatalogCategoryId = cat.id
+            when (tab) {
+                Tab.MOVIES -> movieCategoryId = cat.id
+                Tab.SERIES -> seriesCategoryId = cat.id
+                else -> Unit
+            }
+            (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelectionAt(
+                oldIndex,
+                catalogCategoryIndex(),
+            )
+            loadCatalogItems(tab, cat.id)
+        }
     }
 
     private fun configureCatalogGrid() {
@@ -2463,6 +2560,8 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onDestroy() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
+        pendingLiveCategory?.let { liveCategoryHandler.removeCallbacks(it) }
+        pendingCatalogCategory?.let { catalogCategoryHandler.removeCallbacks(it) }
         clockHandler.removeCallbacks(clockRunnable)
         miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
         stopHeroRotation()
