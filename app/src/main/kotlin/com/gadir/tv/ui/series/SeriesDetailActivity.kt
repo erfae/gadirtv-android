@@ -22,6 +22,7 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.util.ImageLoader
+import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.RecyclerViewUtil
 import com.gadir.tv.util.TvFocusHelper
 import kotlinx.coroutines.Dispatchers
@@ -157,9 +158,12 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             reloadEpisodes()
         }.also { adapter ->
             seasonList.adapter = adapter
+            RecyclerViewUtil.expandHorizontalList(seasonList)
         }
         reloadEpisodes()
-        btnSeriesPlay.requestFocus()
+        if (!DeviceUi.isCompact(this)) {
+            btnSeriesPlay.requestFocus()
+        }
     }
 
     private fun playFirstEpisode() {
