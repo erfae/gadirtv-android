@@ -2085,7 +2085,7 @@ class MainActivity : BaseLocaleActivity() {
         if (channelChanged) {
             previewToken++
             teardownLivePreviewPlayback()
-            if (!usesExoPreview()) {
+            if (!usesExoPreview() && miniVlcPlayer == null) {
                 try {
                     recreateMiniVlcPlayer()
                 } catch (_: Exception) {
@@ -2233,7 +2233,7 @@ class MainActivity : BaseLocaleActivity() {
         }
         previewUrlIndex += 1
         panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
-        if (!usesExoPreview()) {
+        if (!usesExoPreview() && miniVlcPlayer == null) {
             recreateMiniVlcPlayer()
         }
         playMiniPreviewUrl(previewUrls[previewUrlIndex], token)
@@ -2466,7 +2466,10 @@ class MainActivity : BaseLocaleActivity() {
         }
         miniExoView = panelLive.findViewById(R.id.miniExoPlayer)
         miniVlcView = panelLive.findViewById(R.id.miniVlcPlayer)
-        previewUsesExo = miniExoView != null && (DeviceUi.isCompact(this) || miniVlcView == null)
+        previewUsesExo = when {
+            DeviceUi.isTelevision(this) -> miniVlcView == null && miniExoView != null
+            else -> miniExoView != null && (DeviceUi.isCompact(this) || miniVlcView == null)
+        }
         miniExoView?.alpha = 0f
         miniVlcView?.alpha = 0f
         if (previewUsesExo) {

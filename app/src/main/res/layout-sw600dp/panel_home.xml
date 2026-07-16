@@ -119,7 +119,7 @@
                 android:background="@color/gtv_surface"
                 android:contentDescription="@null"
                 android:scaleType="centerCrop"
-                android:src="@drawable/tv_banner" />
+                android:src="@drawable/hero_placeholder_bg" />
         </LinearLayout>
     </FrameLayout>
 
