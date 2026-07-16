@@ -399,31 +399,26 @@ class MainActivity : BaseLocaleActivity() {
         )
         liveCategories.addAll(PlaylistRepository.categories)
 
-        val applyLiveCategory: (Category) -> Unit = liveCat@{ cat ->
-            val newId = when (cat.id) {
-                "" -> null
-                FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
-                ParentalControlStore.LOCK_CATEGORY_ID -> ParentalControlStore.LOCK_CATEGORY_ID
-                else -> cat.id
+        val applyLiveCategory: (Category) -> Unit = { cat ->
+            val newId = liveCategoryId(cat)
+            if (DeviceUi.isCompact(this)) {
+                applyLiveCategoryNow(cat, newId)
+            } else {
+                scheduleLiveCategoryApply(cat, newId)
             }
-            if (newId == selectedLiveCategoryId) return@liveCat
-            scheduleLiveCategoryApply(cat, newId)
         }
 
-        liveCategoryList.adapter = CategoryAdapter(
-            items = liveCategories,
-            selectedId = { liveSelectedCategoryKey() },
-            onClick = applyLiveCategory,
-            onFocus = { cat -> scheduleLiveCategoryApply(cat, liveCategoryId(cat)) },
-            onMoveRight = { focusFirstChannel() },
-            onMoveUp = { focusBottomTab(Tab.LIVE) },
-        )
+        bindLiveCategoryAdapter(applyLiveCategory)
         channelList.setItemViewCacheSize(24)
         channelAdapter = ChannelAdapter(
             items = channels,
-            onFocus = { channel ->
-                if (!reloadingChannels) {
-                    schedulePreview(channel)
+            onFocus = if (DeviceUi.isCompact(this)) {
+                { }
+            } else {
+                { channel ->
+                    if (!reloadingChannels) {
+                        schedulePreview(channel)
+                    }
                 }
             },
             onOpen = { channel ->
@@ -484,10 +479,16 @@ class MainActivity : BaseLocaleActivity() {
                 resetLivePreviewUi()
                 selectedLiveCategoryId = newId
                 (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
-                reloadChannels(keepCategoryFocus = true, autoPreviewFirst = true)
+                reloadChannels(
+                    keepCategoryFocus = true,
+                    autoPreviewFirst = !DeviceUi.isCompact(this),
+                )
             } catch (_: Exception) {
                 selectedLiveCategoryId = newId
-                reloadChannels(keepCategoryFocus = true, autoPreviewFirst = true)
+                reloadChannels(
+                    keepCategoryFocus = true,
+                    autoPreviewFirst = !DeviceUi.isCompact(this),
+                )
             }
         }
     }
@@ -530,15 +531,31 @@ class MainActivity : BaseLocaleActivity() {
         )
         liveCategories.addAll(PlaylistRepository.categories)
         selectedLiveCategoryId = currentId
+        val applyLiveCategory: (Category) -> Unit = { cat ->
+            val newId = liveCategoryId(cat)
+            if (DeviceUi.isCompact(this)) {
+                applyLiveCategoryNow(cat, newId)
+            } else {
+                scheduleLiveCategoryApply(cat, newId)
+            }
+        }
+        bindLiveCategoryAdapter(applyLiveCategory)
+        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+    }
+
+    private fun bindLiveCategoryAdapter(applyLiveCategory: (Category) -> Unit) {
         liveCategoryList.adapter = CategoryAdapter(
             items = liveCategories,
             selectedId = { liveSelectedCategoryKey() },
-            onClick = { cat -> scheduleLiveCategoryApply(cat, liveCategoryId(cat)) },
-            onFocus = { cat -> scheduleLiveCategoryApply(cat, liveCategoryId(cat)) },
+            onClick = applyLiveCategory,
+            onFocus = if (DeviceUi.isCompact(this)) {
+                null
+            } else {
+                applyLiveCategory
+            },
             onMoveRight = { focusFirstChannel() },
             onMoveUp = { focusBottomTab(Tab.LIVE) },
         )
-        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
     }
 
     private fun focusFirstChannel() {
@@ -757,7 +774,9 @@ class MainActivity : BaseLocaleActivity() {
                 } else {
                     restoreCatalogTab(tab)
                 }
-                focusCatalogCategoryList()
+                if (!DeviceUi.isCompact(this)) {
+                    focusCatalogCategoryList()
+                }
             }
         }
     }
