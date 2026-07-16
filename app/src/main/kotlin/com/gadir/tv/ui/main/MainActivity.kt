@@ -861,12 +861,9 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun focusHeroOnStart() {
-        if (currentTab != Tab.HOME) return
+        if (currentTab != Tab.HOME || DeviceUi.isCompact(this)) return
         homeScrollView.post { homeScrollView.smoothScrollTo(0, 0) }
-        if (heroItems.isEmpty()) {
-            shouldFocusHomeRailsOnResume = false
-            return
-        }
+        if (heroItems.isEmpty()) return
         heroPlay.post {
             if (heroPlay.requestFocus()) {
                 shouldFocusHomeRailsOnResume = false
@@ -1058,10 +1055,11 @@ class MainActivity : BaseLocaleActivity() {
             homeEmpty.visibility = View.VISIBLE
         } else {
             homeEmpty.visibility = View.GONE
-            bindHero(heroItems[heroIndex])
-            startHeroRotation()
             panelHome.post {
-                if (!isDestroyed && currentTab == Tab.HOME) {
+                if (isDestroyed || currentTab != Tab.HOME) return@post
+                bindHero(heroItems[heroIndex])
+                startHeroRotation()
+                if (!DeviceUi.isCompact(this)) {
                     focusHeroOnStart()
                 }
             }
@@ -1087,11 +1085,16 @@ class MainActivity : BaseLocaleActivity() {
                 runCatching { BootstrapLoader.load(this@MainActivity, api, profile) }
             }
             result.onSuccess {
-                if (liveTabReady) {
-                    refreshLiveCategoryList()
-                    reloadChannels(keepCategoryFocus = true)
-                } else {
-                    ensureLiveTabReady()
+                when (currentTab) {
+                    Tab.LIVE -> {
+                        ensureLiveTabReady()
+                        refreshLiveCategoryList()
+                        reloadChannels(keepCategoryFocus = true)
+                    }
+                    else -> if (liveTabReady) {
+                        refreshLiveCategoryList()
+                        reloadChannels(keepCategoryFocus = true)
+                    }
                 }
                 loadHome()
                 when (currentTab) {
@@ -1258,7 +1261,11 @@ class MainActivity : BaseLocaleActivity() {
         list.adapter = HomeRailAdapter(
             items = items,
             onClick = { item -> onHomeRailClick(item) },
-            onFocus = { item -> previewHomeRailItem(item) },
+            onFocus = if (DeviceUi.isCompact(this)) {
+                null
+            } else {
+                { item -> previewHomeRailItem(item) }
+            },
             onToggleFavorite = { item -> toggleHomeFavorite(item) },
             isFavorite = { item -> isHomeFavorite(item) },
             onMoveUp = onMoveUp,
@@ -2558,7 +2565,7 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (currentTab == Tab.HOME && shouldFocusHomeRailsOnResume) {
+        if (currentTab == Tab.HOME && shouldFocusHomeRailsOnResume && !DeviceUi.isCompact(this)) {
             focusHeroOnStart()
         } else if (currentTab == Tab.LIVE) {
             ensureLiveTabReady()
