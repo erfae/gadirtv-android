@@ -165,7 +165,7 @@ class MainActivity : BaseLocaleActivity() {
     private var reloadingChannels = false
     private var channelsLoadToken = 0
     private var livePreviewPaused = false
-    private lateinit var miniPreviewControls: View
+    private var miniPreviewControls: View? = null
     private lateinit var previewContainer: View
     private val miniControlsHandler = Handler(Looper.getMainLooper())
     private val hideMiniControlsRunnable = Runnable { hideMiniPreviewControls() }
@@ -633,8 +633,7 @@ class MainActivity : BaseLocaleActivity() {
                 panelHome.visibility = View.VISIBLE
                 panelLive.visibility = View.GONE
                 panelCatalog.visibility = View.GONE
-                teardownLivePreview()
-                hideMiniPreviewControls()
+                suspendLivePreview()
                 if (!homeLoaded) {
                     loadHome()
                 } else {
@@ -655,7 +654,7 @@ class MainActivity : BaseLocaleActivity() {
                 panelLive.visibility = View.GONE
                 panelCatalog.visibility = View.VISIBLE
                 stopHeroRotation()
-                teardownLivePreview()
+                suspendLivePreview()
                 val ready = if (tab == Tab.MOVIES) moviesCatalogReady else seriesCatalogReady
                 if (!ready) {
                     setupCatalogTab(tab)
@@ -2060,7 +2059,17 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun stopLivePreview() {
-        teardownLivePreview()
+        suspendLivePreview()
+    }
+
+    /** Pausa el preview sin destruir libVLC/Exo (evita crash al volver en Android TV). */
+    private fun suspendLivePreview() {
+        livePreviewPaused = true
+        pendingPreview?.let { previewHandler.removeCallbacks(it) }
+        pendingPreview = null
+        teardownLivePreviewPlayback()
+        setPreviewVideoVisible(false)
+        hideMiniPreviewControls()
     }
 
     private fun schedulePreview(channel: LiveChannel) {
@@ -2085,13 +2094,7 @@ class MainActivity : BaseLocaleActivity() {
         if (channelChanged) {
             previewToken++
             teardownLivePreviewPlayback()
-            if (!usesExoPreview() && miniVlcPlayer == null) {
-                try {
-                    recreateMiniVlcPlayer()
-                } catch (_: Exception) {
-                    miniVlcPlayer = null
-                }
-            }
+            ensurePreviewPlayer()
             setPreviewVideoVisible(false)
             panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
         }
@@ -2145,9 +2148,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun previewChannel(channel: LiveChannel, token: Int) {
         if (token != previewToken || livePreviewPaused) return
         val profile = PlaylistRepository.profile ?: return
-        if (usesExoPreview() && miniExoPlayer == null) {
-            createMiniExoPlayer()
-        }
+        if (!ensurePreviewPlayer()) return
         updatePreviewInfo(channel)
         if (!appSettings.autoplayPreview) {
             cancelMiniPreviewPlayback()
@@ -2210,13 +2211,13 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun showMiniPreviewControls() {
-        miniPreviewControls.visibility = View.VISIBLE
+        miniPreviewControls?.visibility = View.VISIBLE
         miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
         miniControlsHandler.postDelayed(hideMiniControlsRunnable, 5_000L)
     }
 
     private fun hideMiniPreviewControls() {
-        miniPreviewControls.visibility = View.GONE
+        miniPreviewControls?.visibility = View.GONE
         miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
     }
 
@@ -2233,9 +2234,7 @@ class MainActivity : BaseLocaleActivity() {
         }
         previewUrlIndex += 1
         panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
-        if (!usesExoPreview() && miniVlcPlayer == null) {
-            recreateMiniVlcPlayer()
-        }
+        if (!ensurePreviewPlayer()) return false
         playMiniPreviewUrl(previewUrls[previewUrlIndex], token)
         return true
     }
@@ -2376,8 +2375,7 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onStop() {
         super.onStop()
-        livePreviewPaused = true
-        teardownLivePreview()
+        suspendLivePreview()
         stopHeroRotation()
     }
 
@@ -2414,11 +2412,11 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun setupMiniPlayer() {
         miniPreviewControls = panelLive.findViewById(R.id.miniPreviewControls)
-        miniPreviewControls.visibility = View.GONE
+        miniPreviewControls?.visibility = View.GONE
 
         val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
-        noSignal.visibility = View.GONE
-        panelLive.findViewById<View>(R.id.btnNoSignalSettings).setOnClickListener {
+        noSignal?.visibility = View.GONE
+        panelLive.findViewById<View>(R.id.btnNoSignalSettings)?.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
         previewContainer.setOnClickListener {
@@ -2450,18 +2448,18 @@ class MainActivity : BaseLocaleActivity() {
                 else -> false
             }
         }
-        panelLive.findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
+        panelLive.findViewById<ImageButton>(R.id.btnVolUp)?.setOnClickListener {
             VolumeHelper.adjust(this, raise = true)
             scheduleHideMiniControls()
         }
-        panelLive.findViewById<ImageButton>(R.id.btnVolDown).setOnClickListener {
+        panelLive.findViewById<ImageButton>(R.id.btnVolDown)?.setOnClickListener {
             VolumeHelper.adjust(this, raise = false)
             scheduleHideMiniControls()
         }
-        panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
+        panelLive.findViewById<ImageButton>(R.id.btnFullscreen)?.setOnClickListener {
             currentPreviewChannel?.let { openFullscreen(it) }
         }
-        panelLive.findViewById<ImageButton>(R.id.btnChannelLock).setOnClickListener {
+        panelLive.findViewById<ImageButton>(R.id.btnChannelLock)?.setOnClickListener {
             currentPreviewChannel?.let { toggleChannelLock(it) }
         }
         miniExoView = panelLive.findViewById(R.id.miniExoPlayer)
@@ -2472,11 +2470,37 @@ class MainActivity : BaseLocaleActivity() {
         }
         miniExoView?.alpha = 0f
         miniVlcView?.alpha = 0f
-        if (previewUsesExo) {
-            createMiniExoPlayer()
-        } else if (miniVlcView != null) {
-            recreateMiniVlcPlayer()
+    }
+
+    /** Crea el reproductor de preview bajo demanda cuando el panel Live está visible. */
+    private fun ensurePreviewPlayer(): Boolean {
+        if (usesExoPreview()) {
+            if (miniExoPlayer == null) {
+                createMiniExoPlayer()
+            }
+            return miniExoPlayer != null
         }
+        if (miniVlcPlayer != null) return true
+        val videoLayout = miniVlcView ?: return false
+        val init: () -> Unit = {
+            if (miniVlcPlayer == null) {
+                try {
+                    recreateMiniVlcPlayer()
+                } catch (_: Exception) {
+                    miniVlcPlayer = null
+                }
+            }
+        }
+        if (
+            panelLive.visibility == View.VISIBLE &&
+            videoLayout.isAttachedToWindow &&
+            videoLayout.width > 0
+        ) {
+            init()
+            return miniVlcPlayer != null
+        }
+        videoLayout.post { init() }
+        return panelLive.visibility == View.VISIBLE
     }
 
     private fun createMiniExoPlayer() {
@@ -2507,6 +2531,7 @@ class MainActivity : BaseLocaleActivity() {
         if (usesExoPreview()) return
         val videoLayout = miniVlcView ?: return
         miniVlcPlayer?.release()
+        miniVlcPlayer = null
         val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
         miniVlcPlayer = LiveVlcPlayer(
             context = this,
