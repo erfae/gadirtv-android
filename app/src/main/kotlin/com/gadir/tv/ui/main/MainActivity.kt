@@ -155,6 +155,7 @@ class MainActivity : BaseLocaleActivity() {
     private var shouldFocusHomeRailsOnResume = true
     private var catalogLoadToken = 0
     private var reloadingChannels = false
+    private var livePreviewPaused = false
     private lateinit var miniPreviewControls: View
     private lateinit var previewContainer: View
     private val miniControlsHandler = Handler(Looper.getMainLooper())
@@ -362,10 +363,15 @@ class MainActivity : BaseLocaleActivity() {
             }
             if (newId == selectedLiveCategoryId || reloadingChannels) return@liveCat
             try {
-                stopLivePreview()
+                teardownLivePreview()
+                if (usesExoPreview()) {
+                    liveChannelStore.lastStreamId = 0
+                }
                 selectedLiveCategoryId = newId
                 (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
-                reloadChannels(keepCategoryFocus = true)
+                liveCategoryList.postDelayed({
+                    reloadChannels(keepCategoryFocus = true)
+                }, if (usesExoPreview()) 200L else 0L)
             } catch (_: Exception) {
                 reloadChannels(keepCategoryFocus = true)
             }
@@ -383,10 +389,16 @@ class MainActivity : BaseLocaleActivity() {
         channelAdapter = ChannelAdapter(
             items = channels,
             onFocus = focus@{ channel ->
-                if (reloadingChannels) return@focus
+                if (reloadingChannels || usesExoPreview()) return@focus
                 schedulePreview(channel)
             },
-            onOpen = { channel -> openFullscreen(channel) },
+            onOpen = { channel ->
+                if (usesExoPreview()) {
+                    selectChannelPreview(channel)
+                } else {
+                    openFullscreen(channel)
+                }
+            },
             onMoveLeft = { focusCategoryList() },
             onMoveRight = { focusPreviewPanel() },
             onMoveUp = { focusCategoryList() },
@@ -585,8 +597,7 @@ class MainActivity : BaseLocaleActivity() {
                 panelHome.visibility = View.VISIBLE
                 panelLive.visibility = View.GONE
                 panelCatalog.visibility = View.GONE
-                miniVlcPlayer?.pause()
-                miniExoPlayer?.pause()
+                teardownLivePreview()
                 hideMiniPreviewControls()
                 if (!homeLoaded) {
                     loadHome()
@@ -599,10 +610,8 @@ class MainActivity : BaseLocaleActivity() {
                 panelLive.visibility = View.VISIBLE
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
+                livePreviewPaused = false
                 VolumeHelper.boostOnPlaybackStart(this)
-                if (appSettings.autoplayPreview) {
-                    currentPreviewChannel?.let { schedulePreview(it) }
-                }
                 restoreLiveTabSession()
             }
             Tab.MOVIES, Tab.SERIES -> {
@@ -610,8 +619,7 @@ class MainActivity : BaseLocaleActivity() {
                 panelLive.visibility = View.GONE
                 panelCatalog.visibility = View.VISIBLE
                 stopHeroRotation()
-                miniVlcPlayer?.pause()
-                miniExoPlayer?.pause()
+                teardownLivePreview()
                 val ready = if (tab == Tab.MOVIES) moviesCatalogReady else seriesCatalogReady
                 if (!ready) {
                     setupCatalogTab(tab)
@@ -1692,14 +1700,8 @@ class MainActivity : BaseLocaleActivity() {
             channelList.post {
                 try {
                     channelAdapter?.notifyDataSetChanged()
-                    if (!keepCategoryFocus && channels.isNotEmpty() && !DeviceUi.isCompact(this)) {
+                    if (!keepCategoryFocus && channels.isNotEmpty() && !usesExoPreview()) {
                         focusFirstChannel()
-                    } else if (
-                        keepCategoryFocus &&
-                        channels.isNotEmpty() &&
-                        appSettings.autoplayPreview
-                    ) {
-                        schedulePreview(channels.first())
                     }
                 } finally {
                     reloadingChannels = false
@@ -1714,16 +1716,38 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun stopLivePreview() {
+    private fun selectChannelPreview(channel: LiveChannel) {
+        if (reloadingChannels || livePreviewPaused) return
+        livePreviewPaused = false
+        teardownLivePreviewPlayback()
+        schedulePreview(channel)
+    }
+
+    private fun teardownLivePreviewPlayback() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
         previewToken++
-        cancelMiniPreviewPlayback()
-        currentPreviewChannel = null
+        miniVlcPlayer?.stop()
+        releaseExoPreview()
         previewingStreamId = null
+        previewWorkingUrl = null
+    }
+
+    private fun releaseExoPreview() {
+        val view = miniExoView
+        miniExoPlayer?.let { player ->
+            if (view != null) player.detach(view) else player.teardown()
+            player.release()
+        }
+        miniExoPlayer = null
+    }
+
+    /** NetTV-style: destruye el preview por completo (categoría, pestaña, salir). */
+    private fun teardownLivePreview() {
+        teardownLivePreviewPlayback()
+        currentPreviewChannel = null
         previewUrls = emptyList()
         previewUrlIndex = 0
-        previewWorkingUrl = null
         setPreviewVideoVisible(false)
         miniVlcView?.alpha = 0f
         miniExoView?.alpha = 0f
@@ -1734,7 +1758,12 @@ class MainActivity : BaseLocaleActivity() {
         epgNext.visibility = View.GONE
     }
 
+    private fun stopLivePreview() {
+        teardownLivePreview()
+    }
+
     private fun schedulePreview(channel: LiveChannel) {
+        if (livePreviewPaused || reloadingChannels) return
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val channelChanged = previewingStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) {
@@ -1747,7 +1776,7 @@ class MainActivity : BaseLocaleActivity() {
         }
         if (channelChanged) {
             previewToken++
-            cancelMiniPreviewPlayback()
+            teardownLivePreviewPlayback()
             if (!usesExoPreview()) {
                 recreateMiniVlcPlayer()
             }
@@ -1756,11 +1785,14 @@ class MainActivity : BaseLocaleActivity() {
         }
         updatePreviewInfo(channel)
         val token = previewToken
+        val delayMs = if (usesExoPreview()) 500L else 400L
         val task = Runnable {
-            if (token == previewToken) previewChannel(channel, token)
+            if (token == previewToken && !reloadingChannels && !livePreviewPaused) {
+                previewChannel(channel, token)
+            }
         }
         pendingPreview = task
-        previewHandler.postDelayed(task, 400L)
+        previewHandler.postDelayed(task, delayMs)
     }
 
     private fun updatePreviewInfo(channel: LiveChannel) {
@@ -1794,15 +1826,15 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun cancelMiniPreviewPlayback() {
-        miniVlcPlayer?.stop()
-        miniExoPlayer?.stop()
-        previewingStreamId = null
-        previewWorkingUrl = null
+        teardownLivePreviewPlayback()
     }
 
     private fun previewChannel(channel: LiveChannel, token: Int) {
-        if (token != previewToken) return
+        if (token != previewToken || livePreviewPaused) return
         val profile = PlaylistRepository.profile ?: return
+        if (usesExoPreview() && miniExoPlayer == null) {
+            createMiniExoPlayer()
+        }
         updatePreviewInfo(channel)
         if (!appSettings.autoplayPreview) {
             cancelMiniPreviewPlayback()
@@ -1922,8 +1954,8 @@ class MainActivity : BaseLocaleActivity() {
         val profile = PlaylistRepository.profile ?: return
         LiveChannelNavigator.setPlaybackContext(this, channel, selectedLiveCategoryId)
         VolumeHelper.boostOnPlaybackStart(this)
-        miniVlcPlayer?.stop()
-        miniExoPlayer?.stop()
+        livePreviewPaused = true
+        teardownLivePreviewPlayback()
         val candidates = LiveStreamUrls.candidates(api, profile, channel)
         val urls = buildList {
             if (previewingStreamId == channel.streamId) {
@@ -2024,8 +2056,8 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onStop() {
         super.onStop()
-        miniVlcPlayer?.pause()
-        miniExoPlayer?.pause()
+        livePreviewPaused = true
+        teardownLivePreview()
         stopHeroRotation()
     }
 
@@ -2034,9 +2066,14 @@ class MainActivity : BaseLocaleActivity() {
         if (currentTab == Tab.HOME && shouldFocusHomeRailsOnResume) {
             focusHeroOnStart()
         } else if (currentTab == Tab.LIVE) {
+            livePreviewPaused = false
             focusChannelAt(currentPreviewChannel)
             liveCategoryList.adapter?.let { (it as? CategoryAdapter)?.refreshSelection() }
-            if (appSettings.autoplayPreview) {
+            if (
+                !usesExoPreview() &&
+                appSettings.autoplayPreview &&
+                currentPreviewChannel != null
+            ) {
                 currentPreviewChannel?.let { schedulePreview(it) }
             }
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
@@ -2049,10 +2086,9 @@ class MainActivity : BaseLocaleActivity() {
         clockHandler.removeCallbacks(clockRunnable)
         miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
         stopHeroRotation()
+        releaseExoPreview()
         miniVlcPlayer?.release()
         miniVlcPlayer = null
-        miniExoPlayer?.release()
-        miniExoPlayer = null
         super.onDestroy()
     }
 

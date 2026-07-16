@@ -47,15 +47,26 @@ class LiveExoPreviewPlayer(
         player.playWhenReady = true
     }
 
-    fun stop() {
+    fun teardown() {
         player.playWhenReady = false
         player.stop()
         player.clearMediaItems()
+        player.volume = 0f
+    }
+
+    fun detach(playerView: PlayerView) {
+        teardown()
+        playerView.player = null
+    }
+
+    fun stop() {
+        teardown()
     }
 
     fun pause() {
         player.playWhenReady = false
         player.pause()
+        player.volume = 0f
     }
 
     fun isPlaying(): Boolean = player.isPlaying
