@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
 import com.gadir.tv.R
 import com.gadir.tv.data.ParentalControlStore
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -17,6 +18,8 @@ object ParentalPinDialog {
         message: String,
         onVerified: () -> Unit,
     ) {
+        val activity = context as? AppCompatActivity
+        if (activity != null && (activity.isFinishing || activity.isDestroyed)) return
         val store = ParentalControlStore(context)
         val view = LayoutInflater.from(context).inflate(R.layout.dialog_parental_pin, null)
         view.findViewById<TextView>(R.id.parentalPinMessage).text = message
@@ -43,7 +46,9 @@ object ParentalPinDialog {
                     return@setOnClickListener
                 }
                 dialog.dismiss()
-                onVerified()
+                if (activity == null || (!activity.isFinishing && !activity.isDestroyed)) {
+                    onVerified()
+                }
             }
             input.requestFocus()
         }

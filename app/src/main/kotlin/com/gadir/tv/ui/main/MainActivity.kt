@@ -375,7 +375,7 @@ class MainActivity : BaseLocaleActivity() {
                 ParentalControlStore.LOCK_CATEGORY_ID -> ParentalControlStore.LOCK_CATEGORY_ID
                 else -> cat.id
             }
-            if (newId == selectedLiveCategoryId || reloadingChannels) return@liveCat
+            if (newId == selectedLiveCategoryId) return@liveCat
             withLiveCategoryAccess(cat, newId) {
                 try {
                     teardownLivePreview()
@@ -393,7 +393,7 @@ class MainActivity : BaseLocaleActivity() {
             items = liveCategories,
             selectedId = { liveSelectedCategoryKey() },
             onClick = applyLiveCategory,
-            onFocus = if (DeviceUi.isCompact(this)) null else applyLiveCategory,
+            onFocus = null,
             onMoveRight = { focusFirstChannel() },
             onMoveUp = { focusBottomTab(Tab.LIVE) },
         )
@@ -1818,7 +1818,11 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun updatePreviewLockButton(channel: LiveChannel?) {
         val btn = panelLive.findViewById<ImageButton?>(R.id.btnChannelLock) ?: return
-        val target = channel ?: currentPreviewChannel ?: return
+        val target = channel ?: currentPreviewChannel ?: run {
+            btn.visibility = View.GONE
+            return
+        }
+        btn.visibility = View.VISIBLE
         val locked = parentalStore.isChannelLocked(target.streamId)
         val canLock = parentalStore.canLockChannel(target)
         btn.setImageResource(if (locked) R.drawable.ic_lock_on else R.drawable.ic_lock_off)
@@ -1872,37 +1876,53 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun reloadChannels(keepCategoryFocus: Boolean = false) {
-        if (reloadingChannels) return
-        reloadingChannels = true
+        previewToken++
+        pendingPreview?.let { previewHandler.removeCallbacks(it) }
+        pendingPreview = null
         teardownLivePreviewPlayback()
         val loadToken = ++channelsLoadToken
         val categoryId = selectedLiveCategoryId
+        reloadingChannels = true
         lifecycleScope.launch {
-            val loaded = withContext(Dispatchers.Default) {
-                try {
+            val loaded = try {
+                withContext(Dispatchers.Default) {
                     when (categoryId) {
                         FavoritesStore.FAVORITES_CATEGORY_ID ->
                             PlaylistRepository.channelsFor(null, appSettings.liveSortMode).filter {
                                 favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId)
                             }
-                        ParentalControlStore.LOCK_CATEGORY_ID ->
-                            PlaylistRepository.channelsFor(null, appSettings.liveSortMode).filter {
-                                parentalStore.isChannelLocked(it.streamId)
+                        ParentalControlStore.LOCK_CATEGORY_ID -> {
+                            val lockedIds = parentalStore.lockedChannelIds()
+                            if (lockedIds.isEmpty()) {
+                                emptyList()
+                            } else {
+                                PlaylistRepository.channelsFor(null, appSettings.liveSortMode).filter {
+                                    it.streamId in lockedIds
+                                }
                             }
+                        }
                         else -> PlaylistRepository.channelsFor(categoryId, appSettings.liveSortMode)
                     }
-                } catch (_: Exception) {
-                    emptyList()
+                }
+            } catch (_: Exception) {
+                emptyList()
+            }
+            withContext(Dispatchers.Main) {
+                if (loadToken != channelsLoadToken) return@withContext
+                try {
+                    channels.clear()
+                    channels.addAll(loaded)
+                    channelList.stopScroll()
+                    channelAdapter?.notifyDataSetChanged()
+                    if (!keepCategoryFocus && channels.isNotEmpty() && !usesExoPreview()) {
+                        channelList.post { focusFirstChannel() }
+                    }
+                } finally {
+                    if (loadToken == channelsLoadToken) {
+                        reloadingChannels = false
+                    }
                 }
             }
-            if (loadToken != channelsLoadToken) return@launch
-            channels.clear()
-            channels.addAll(loaded)
-            channelAdapter?.notifyDataSetChanged()
-            if (!keepCategoryFocus && channels.isNotEmpty() && !usesExoPreview()) {
-                focusFirstChannel()
-            }
-            reloadingChannels = false
         }
     }
 
@@ -1975,7 +1995,11 @@ class MainActivity : BaseLocaleActivity() {
             previewToken++
             teardownLivePreviewPlayback()
             if (!usesExoPreview()) {
-                recreateMiniVlcPlayer()
+                try {
+                    recreateMiniVlcPlayer()
+                } catch (_: Exception) {
+                    miniVlcPlayer = null
+                }
             }
             setPreviewVideoVisible(false)
             panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE

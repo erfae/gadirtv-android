@@ -182,7 +182,7 @@
     <string name="parental_pin_current">PIN actual</string>
     <string name="parental_pin_confirm">Confirmar PIN</string>
     <string name="parental_pin_mismatch">Los PIN nuevos no coinciden</string>
-    <string name="parental_info">Estilo NetTV: los grupos adultos se bloquean automáticamente. Puedes bloquear canales con el candado en TV en vivo. El PIN se pide cada vez.</string>
+    <string name="parental_info">Los grupos adultos se bloquean automáticamente. Puedes bloquear canales con el candado en TV en vivo. El PIN se pide cada vez que accedes a contenido protegido.</string>
     <string name="parental_channel_lock_section">BLOQUEO DE CANALES</string>
     <string name="parental_channel_lock_hint">En TV en vivo, pulsa el candado en el canal, el botón del preview o la tecla Menú del mando para bloquearlo. Aparecerán en «Bloqueados».</string>
     <string name="parental_channel_lock_toggle">Bloquear o desbloquear canal</string>
