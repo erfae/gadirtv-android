@@ -9,6 +9,7 @@ import android.view.View
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.core.widget.NestedScrollView
 import androidx.lifecycle.lifecycleScope
@@ -22,6 +23,7 @@ import com.gadir.tv.data.BootstrapLoader
 import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.LiveChannelStore
 import com.gadir.tv.data.PlaylistRepository
+import com.gadir.tv.data.ParentalControlStore
 import com.gadir.tv.data.ProfileStore
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
@@ -44,6 +46,7 @@ import org.videolan.libvlc.util.VLCVideoLayout
 import androidx.media3.ui.PlayerView
 import com.gadir.tv.ui.search.SearchActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
+import com.gadir.tv.ui.settings.ParentalPinDialog
 import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.AccountFormat
 import com.gadir.tv.util.DeviceUi
@@ -68,6 +71,7 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var favoritesStore: FavoritesStore
     private lateinit var liveChannelStore: LiveChannelStore
     private lateinit var appSettings: AppSettings
+    private lateinit var parentalStore: ParentalControlStore
     private var miniVlcPlayer: LiveVlcPlayer? = null
     private var miniVlcView: VLCVideoLayout? = null
     private var miniExoPlayer: LiveExoPreviewPlayer? = null
@@ -155,6 +159,8 @@ class MainActivity : BaseLocaleActivity() {
     private var shouldFocusHomeRailsOnResume = true
     private var catalogLoadToken = 0
     private var reloadingChannels = false
+    private var channelsLoadToken = 0
+    private val unlockedCategories = mutableSetOf<String>()
     private var livePreviewPaused = false
     private lateinit var miniPreviewControls: View
     private lateinit var previewContainer: View
@@ -224,6 +230,7 @@ class MainActivity : BaseLocaleActivity() {
         liveChannelStore = LiveChannelStore(this)
         resumeStore = ResumeStore(this)
         appSettings = AppSettings(this)
+        parentalStore = ParentalControlStore(this)
 
         headerClock = findViewById(R.id.headerClock)
         headerDate = findViewById(R.id.headerDate)
@@ -362,18 +369,22 @@ class MainActivity : BaseLocaleActivity() {
                 else -> cat.id
             }
             if (newId == selectedLiveCategoryId || reloadingChannels) return@liveCat
-            try {
-                teardownLivePreview()
-                if (usesExoPreview()) {
+            val apply = {
+                try {
+                    teardownLivePreview()
                     liveChannelStore.lastStreamId = 0
-                }
-                selectedLiveCategoryId = newId
-                (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
-                liveCategoryList.postDelayed({
+                    selectedLiveCategoryId = newId
+                    (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
                     reloadChannels(keepCategoryFocus = true)
-                }, if (usesExoPreview()) 200L else 0L)
-            } catch (_: Exception) {
-                reloadChannels(keepCategoryFocus = true)
+                } catch (_: Exception) {
+                    reloadChannels(keepCategoryFocus = true)
+                }
+            }
+            val lockId = newId?.takeIf { it.isNotEmpty() && it != FavoritesStore.FAVORITES_CATEGORY_ID }
+            if (lockId != null && parentalStore.isLocked(ParentalControlStore.KIND_LIVE, lockId)) {
+                ensureCategoryUnlocked(ParentalControlStore.KIND_LIVE, cat, apply)
+            } else {
+                apply()
             }
         }
 
@@ -389,14 +400,16 @@ class MainActivity : BaseLocaleActivity() {
         channelAdapter = ChannelAdapter(
             items = channels,
             onFocus = focus@{ channel ->
-                if (reloadingChannels || usesExoPreview()) return@focus
+                if (reloadingChannels) return@focus
                 schedulePreview(channel)
             },
             onOpen = { channel ->
-                if (usesExoPreview()) {
-                    selectChannelPreview(channel)
-                } else {
+                if (currentPreviewChannel?.streamId == channel.streamId &&
+                    (previewIsSettled() || previewingStreamId == channel.streamId)
+                ) {
                     openFullscreen(channel)
+                } else {
+                    selectChannelPreview(channel)
                 }
             },
             onMoveLeft = { focusCategoryList() },
@@ -1540,8 +1553,14 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun bindCatalogCategoryAdapter(tab: Tab) {
-        val applyCategory: (Category) -> Unit = { cat ->
-            if (cat.id != selectedCatalogCategoryId) {
+        val kind = when (tab) {
+            Tab.MOVIES -> ParentalControlStore.KIND_VOD
+            Tab.SERIES -> ParentalControlStore.KIND_SERIES
+            else -> ""
+        }
+        val applyCategory: (Category) -> Unit = cat@{ cat ->
+            if (cat.id == selectedCatalogCategoryId) return@cat
+            val apply = {
                 val oldIndex = catalogCategoryIndex()
                 selectedCatalogCategoryId = cat.id
                 when (tab) {
@@ -1554,6 +1573,11 @@ class MainActivity : BaseLocaleActivity() {
                     catalogCategoryIndex(),
                 )
                 loadCatalogItems(tab, cat.id)
+            }
+            if (kind.isNotEmpty() && parentalStore.isLocked(kind, cat.id)) {
+                ensureCategoryUnlocked(kind, cat, apply)
+            } else {
+                apply()
             }
         }
 
@@ -1683,36 +1707,61 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun categoryUnlockKey(kind: String, categoryId: String) = "$kind:$categoryId"
+
+    private fun isCategoryUnlocked(kind: String, categoryId: String): Boolean {
+        if (!parentalStore.isLocked(kind, categoryId)) return true
+        return unlockedCategories.contains(categoryUnlockKey(kind, categoryId))
+    }
+
+    private fun ensureCategoryUnlocked(kind: String, category: Category, onGranted: () -> Unit) {
+        val id = category.id
+        if (id.isEmpty() || isCategoryUnlocked(kind, id)) {
+            onGranted()
+            return
+        }
+        if (!parentalStore.hasPin) {
+            Toast.makeText(this, R.string.parental_set_pin_first, Toast.LENGTH_SHORT).show()
+            return
+        }
+        ParentalPinDialog.show(this, category.name) { pin ->
+            if (parentalStore.verifyPin(pin)) {
+                unlockedCategories.add(categoryUnlockKey(kind, id))
+                onGranted()
+            } else {
+                Toast.makeText(this, R.string.parental_pin_wrong, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private fun reloadChannels(keepCategoryFocus: Boolean = false) {
         if (reloadingChannels) return
         reloadingChannels = true
-        try {
-            channels.clear()
-            channels.addAll(
-                when (selectedLiveCategoryId) {
-                    FavoritesStore.FAVORITES_CATEGORY_ID ->
-                        PlaylistRepository.channelsFor(null, appSettings.liveSortMode).filter {
-                            favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId)
-                        }
-                    else -> PlaylistRepository.channelsFor(selectedLiveCategoryId, appSettings.liveSortMode)
-                },
-            )
-            channelList.post {
+        teardownLivePreviewPlayback()
+        val loadToken = ++channelsLoadToken
+        val categoryId = selectedLiveCategoryId
+        lifecycleScope.launch {
+            val loaded = withContext(Dispatchers.Default) {
                 try {
-                    channelAdapter?.notifyDataSetChanged()
-                    if (!keepCategoryFocus && channels.isNotEmpty() && !usesExoPreview()) {
-                        focusFirstChannel()
+                    when (categoryId) {
+                        FavoritesStore.FAVORITES_CATEGORY_ID ->
+                            PlaylistRepository.channelsFor(null, appSettings.liveSortMode).filter {
+                                favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId)
+                            }
+                        else -> PlaylistRepository.channelsFor(categoryId, appSettings.liveSortMode)
                     }
-                } finally {
-                    reloadingChannels = false
+                } catch (_: Exception) {
+                    emptyList()
                 }
             }
-        } catch (_: Exception) {
+            if (loadToken != channelsLoadToken) return@launch
             channels.clear()
-            channelList.post {
-                channelAdapter?.notifyDataSetChanged()
-                reloadingChannels = false
+            channels.addAll(loaded)
+            channelAdapter?.notifyDataSetChanged()
+            if (!keepCategoryFocus && channels.isNotEmpty() && !usesExoPreview()) {
+                focusFirstChannel()
             }
+            reloadingChannels = false
         }
     }
 

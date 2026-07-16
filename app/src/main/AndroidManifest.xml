@@ -89,6 +89,11 @@
             android:screenOrientation="sensorLandscape" />
 
         <activity
+            android:name=".ui.settings.ParentalControlActivity"
+            android:exported="false"
+            android:screenOrientation="sensorLandscape" />
+
+        <activity
             android:name=".ui.settings.PlayerSelectActivity"
             android:exported="false"
             android:screenOrientation="sensorLandscape" />

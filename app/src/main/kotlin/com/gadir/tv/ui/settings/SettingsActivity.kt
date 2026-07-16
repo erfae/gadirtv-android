@@ -57,6 +57,7 @@ class SettingsActivity : BaseLocaleActivity() {
         val btnPreviewSound = findViewById<TextView>(R.id.btnPreviewSound)
         val btnNetworkBuffer = findViewById<TextView>(R.id.btnNetworkBuffer)
         val btnLiveSort = findViewById<TextView>(R.id.btnLiveSort)
+        val btnParentalControl = findViewById<TextView>(R.id.btnParentalControl)
         val btnReloadPlaylist = findViewById<TextView>(R.id.btnReloadPlaylist)
         val btnClearCache = findViewById<TextView>(R.id.btnClearCache)
         val btnChangeProfile = findViewById<TextView>(R.id.btnChangeProfile)
@@ -101,6 +102,10 @@ class SettingsActivity : BaseLocaleActivity() {
                 AppSettings.LIVE_SORT_ALPHA
             }
             updateLiveSortLabel(btnLiveSort)
+        }
+
+        TvFocusHelper.bindButton(btnParentalControl) {
+            startActivity(Intent(this, ParentalControlActivity::class.java))
         }
 
         TvFocusHelper.bindButton(btnReloadPlaylist) { reloadPlaylist() }
