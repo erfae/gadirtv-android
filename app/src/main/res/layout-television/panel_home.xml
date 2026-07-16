@@ -17,7 +17,7 @@
             android:layout_height="match_parent"
             android:contentDescription="@null"
             android:scaleType="centerCrop"
-            android:src="@drawable/tv_banner" />
+            android:src="@drawable/hero_placeholder_bg" />
 
         <View
             android:layout_width="match_parent"

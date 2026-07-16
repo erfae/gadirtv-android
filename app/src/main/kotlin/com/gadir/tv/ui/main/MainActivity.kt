@@ -60,6 +60,7 @@ import com.gadir.tv.util.TvFocusHelper
 import com.gadir.tv.util.TvNavHelper
 import com.gadir.tv.util.VolumeHelper
 import com.gadir.tv.util.HeaderClockHelper
+import com.gadir.tv.util.HostUtils
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -155,6 +156,7 @@ class MainActivity : BaseLocaleActivity() {
     private val recentSeries = mutableListOf<HomeRailAdapter.HomeRailItem>()
     private val heroItems = mutableListOf<HeroItem>()
     private var heroPlotRequestId = 0
+    private var heroBackdropRequestId = 0
     private var heroIndex = 0
     private var railPreviewItem: HomeRailAdapter.HomeRailItem? = null
     private var homeLoaded = false
@@ -910,8 +912,12 @@ class MainActivity : BaseLocaleActivity() {
         seriesRail.visibility = if (recentSeries.isEmpty()) View.GONE else View.VISIBLE
 
         heroItems.clear()
-        recentMovies.take(6).forEach { heroItems.add(HeroItem.Rail(it)) }
-        recentSeries.take(6).forEach { heroItems.add(HeroItem.Rail(it)) }
+        val heroMovies = recentMovies.filter { it.imageUrl.isNotBlank() }.take(6)
+            .ifEmpty { recentMovies.take(6) }
+        val heroSeries = recentSeries.filter { it.imageUrl.isNotBlank() }.take(6)
+            .ifEmpty { recentSeries.take(6) }
+        heroMovies.forEach { heroItems.add(HeroItem.Rail(it)) }
+        heroSeries.forEach { heroItems.add(HeroItem.Rail(it)) }
         heroIndex = 0
         railPreviewItem = null
 
@@ -1364,6 +1370,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun bindHero(item: HeroItem) {
         heroPlotRequestId += 1
         val requestId = heroPlotRequestId
+        val backdropRequestId = ++heroBackdropRequestId
 
         heroTitle.text = item.title
         heroSubtitle.text = ""
@@ -1376,8 +1383,11 @@ class MainActivity : BaseLocaleActivity() {
                     playLabel = getString(R.string.hero_view_detail),
                     backdrop = item.imageUrl,
                     poster = item.posterUrl,
+                    contentId = item.movie.streamId,
+                    kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
+                    backdropRequestId = backdropRequestId,
                 )
-                loadMoviePlot(item.movie.streamId, requestId)
+                loadMoviePlot(item.movie.streamId, requestId, backdropRequestId)
             }
             is HeroItem.Series -> {
                 applyHeroMeta(
@@ -1385,8 +1395,11 @@ class MainActivity : BaseLocaleActivity() {
                     playLabel = getString(R.string.hero_view_detail),
                     backdrop = item.imageUrl,
                     poster = item.posterUrl,
+                    contentId = item.series.seriesId,
+                    kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
+                    backdropRequestId = backdropRequestId,
                 )
-                loadSeriesPlot(item.series.seriesId, requestId)
+                loadSeriesPlot(item.series.seriesId, requestId, backdropRequestId)
             }
             is HeroItem.Rail -> {
                 applyHeroMeta(
@@ -1401,11 +1414,16 @@ class MainActivity : BaseLocaleActivity() {
                     },
                     backdrop = item.imageUrl,
                     poster = item.posterUrl,
+                    contentId = item.item.id,
+                    kind = item.item.kind,
+                    backdropRequestId = backdropRequestId,
                 )
                 heroSubtitle.text = item.item.subtitle
                 when (item.item.kind) {
-                    HomeRailAdapter.HomeRailItem.KIND_MOVIE -> loadMoviePlot(item.item.id, requestId)
-                    HomeRailAdapter.HomeRailItem.KIND_SERIES -> loadSeriesPlot(item.item.id, requestId)
+                    HomeRailAdapter.HomeRailItem.KIND_MOVIE ->
+                        loadMoviePlot(item.item.id, requestId, backdropRequestId)
+                    HomeRailAdapter.HomeRailItem.KIND_SERIES ->
+                        loadSeriesPlot(item.item.id, requestId, backdropRequestId)
                     HomeRailAdapter.HomeRailItem.KIND_LIVE -> Unit
                 }
             }
@@ -1417,22 +1435,61 @@ class MainActivity : BaseLocaleActivity() {
         playLabel: String,
         backdrop: String,
         poster: String,
+        contentId: Int = 0,
+        kind: String = "",
+        backdropRequestId: Int = heroBackdropRequestId,
     ) {
         heroType.text = badge.uppercase()
         heroPlay.text = playLabel
         val heroBackdrop = backdrop.ifBlank { poster }
-        loadHeroImage(heroImage, heroBackdrop)
+        loadHeroImage(heroImage, heroBackdrop, contentId, kind)
         if (poster.isNotBlank()) {
-            loadHeroImage(heroPoster, poster)
+            loadHeroImage(heroPoster, poster, contentId, kind)
         }
     }
 
-    private fun loadHeroImage(target: ImageView, url: String) {
-        if (url.isBlank()) return
-        ImageLoader.loadHeroBackdrop(target, url)
+    private fun loadHeroImage(
+        target: ImageView,
+        url: String,
+        contentId: Int = 0,
+        kind: String = "",
+    ) {
+        val fallbacks = heroImageFallbacks(url, contentId, kind)
+        if (fallbacks.isEmpty()) return
+        ImageLoader.loadHeroBackdrop(target, fallbacks.first(), fallbacks.drop(1))
     }
 
-    private fun loadMoviePlot(streamId: Int, requestId: Int) {
+    private fun heroImageFallbacks(primary: String, contentId: Int, kind: String): List<String> {
+        val profile = PlaylistRepository.profile ?: return listOf(primary).filter { it.isNotBlank() }
+        val base = HostUtils.baseUrl(profile.host).trimEnd('/')
+        return buildList {
+            if (primary.isNotBlank()) add(primary)
+            if (contentId <= 0) return@buildList
+            when (kind) {
+                HomeRailAdapter.HomeRailItem.KIND_MOVIE -> {
+                    add("$base/images/${contentId}.jpg")
+                    add("$base/images/${contentId}.png")
+                }
+                HomeRailAdapter.HomeRailItem.KIND_SERIES -> {
+                    add("$base/images/${contentId}.jpg")
+                    add("$base/images/${contentId}.png")
+                }
+            }
+        }.distinct().filter { it.isNotBlank() }
+    }
+
+    private fun applyHeroBackdrop(backdrop: String, poster: String, backdropRequestId: Int, contentId: Int, kind: String) {
+        if (backdropRequestId != heroBackdropRequestId) return
+        val image = backdrop.ifBlank { poster }
+        if (image.isNotBlank()) {
+            loadHeroImage(heroImage, image, contentId, kind)
+        }
+        if (poster.isNotBlank()) {
+            loadHeroImage(heroPoster, poster, contentId, kind)
+        }
+    }
+
+    private fun loadMoviePlot(streamId: Int, requestId: Int, backdropRequestId: Int) {
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
             val info = withContext(Dispatchers.IO) { api.vodInfo(profile, streamId) }
@@ -1444,12 +1501,17 @@ class MainActivity : BaseLocaleActivity() {
                 .filter { it.isNotBlank() }
                 .joinToString(" · ")
             val backdrop = info.backdrop.ifBlank { info.cover }
-            if (backdrop.isNotEmpty()) loadHeroImage(heroImage, backdrop)
-            if (info.cover.isNotEmpty()) loadHeroImage(heroPoster, info.cover)
+            applyHeroBackdrop(
+                backdrop = backdrop,
+                poster = info.cover,
+                backdropRequestId = backdropRequestId,
+                contentId = streamId,
+                kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
+            )
         }
     }
 
-    private fun loadSeriesPlot(seriesId: Int, requestId: Int) {
+    private fun loadSeriesPlot(seriesId: Int, requestId: Int, backdropRequestId: Int) {
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
             val detail = withContext(Dispatchers.IO) { api.seriesInfo(profile, seriesId) }
@@ -1460,11 +1522,14 @@ class MainActivity : BaseLocaleActivity() {
             heroSubtitle.text = listOf(detail.genre, detail.releaseDate, detail.rating)
                 .filter { it.isNotBlank() }
                 .joinToString(" · ")
-            if (detail.cover.isNotEmpty()) {
-                val backdrop = detail.backdrop.ifBlank { detail.cover }
-                loadHeroImage(heroImage, backdrop)
-                loadHeroImage(heroPoster, detail.cover)
-            }
+            val backdrop = detail.backdrop.ifBlank { detail.cover }
+            applyHeroBackdrop(
+                backdrop = backdrop,
+                poster = detail.cover,
+                backdropRequestId = backdropRequestId,
+                contentId = seriesId,
+                kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
+            )
         }
     }
 

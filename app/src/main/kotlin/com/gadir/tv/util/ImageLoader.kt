@@ -48,17 +48,25 @@ object ImageLoader {
         loadPoster(target, url, width, height, posterOptions)
     }
 
-    fun loadHeroBackdrop(target: ImageView, url: String) {
-        val resolved = ImageUrlResolver.resolve(url)
-        if (resolved.isEmpty()) {
-            target.setImageResource(R.drawable.tv_banner)
+    private val heroBackdropOptions = RequestOptions()
+        .diskCacheStrategy(DiskCacheStrategy.ALL)
+        .placeholder(R.drawable.hero_placeholder_bg)
+        .error(R.drawable.hero_placeholder_bg)
+
+    fun loadHeroBackdrop(target: ImageView, url: String, fallbacks: List<String> = emptyList()) {
+        val candidates = buildList {
+            val primary = ImageUrlResolver.resolve(url)
+            if (primary.isNotEmpty()) add(primary)
+            fallbacks.forEach { candidate ->
+                val resolved = ImageUrlResolver.resolve(candidate)
+                if (resolved.isNotEmpty() && resolved !in this) add(resolved)
+            }
+        }
+        if (candidates.isEmpty()) {
+            target.setImageResource(R.drawable.hero_placeholder_bg)
             return
         }
-        Glide.with(target)
-            .load(glideUrl(resolved))
-            .apply(posterOptions)
-            .centerCrop()
-            .into(target)
+        loadWithFallback(target, candidates, 0, heroBackdropOptions.centerCrop())
     }
 
     private fun loadPoster(

@@ -184,7 +184,7 @@ class XtreamApi(
             VodMovie(
                 streamId = row.get("stream_id")?.asIntOrZero() ?: row.get("num")?.asIntOrZero() ?: 0,
                 name = row.get("name")?.asStringOrNull() ?: "",
-                icon = imageUrl(row, "stream_icon", "cover"),
+                icon = imageUrl(row, "stream_icon", "cover", "cover_big", "movie_image"),
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
                 extension = row.get("container_extension")?.asStringOrNull() ?: "mp4",
                 added = row.addedTimestamp(),
