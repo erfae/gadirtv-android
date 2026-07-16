@@ -30,10 +30,24 @@
         android:contentDescription="@string/volume_up"
         android:focusable="true"
         android:nextFocusLeft="@+id/btnVolDown"
-        android:nextFocusRight="@+id/btnFullscreen"
+        android:nextFocusRight="@+id/btnChannelLock"
         android:padding="8dp"
         android:scaleType="centerInside"
         android:src="@drawable/ic_volume_up" />
+
+    <ImageButton
+        android:id="@+id/btnChannelLock"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/player_control_bg"
+        android:contentDescription="@string/parental_channel_lock_toggle"
+        android:focusable="true"
+        android:nextFocusLeft="@+id/btnVolUp"
+        android:nextFocusRight="@+id/btnFullscreen"
+        android:padding="8dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_lock_off" />
 
     <ImageButton
         android:id="@+id/btnFullscreen"
@@ -43,7 +57,7 @@
         android:background="@drawable/player_control_bg"
         android:contentDescription="@string/fullscreen"
         android:focusable="true"
-        android:nextFocusLeft="@+id/btnVolUp"
+        android:nextFocusLeft="@+id/btnChannelLock"
         android:padding="8dp"
         android:scaleType="centerInside"
         android:src="@drawable/ic_fullscreen" />

@@ -109,8 +109,6 @@ class ChannelAdapter(
             val channel = itemAt(pos) ?: return@setOnClickListener
             if (!canLock(channel) && !isLocked(channel)) return@setOnClickListener
             onToggleLock?.invoke(channel)
-            val nowLocked = isLocked(channel)
-            holder.lock.setImageResource(if (nowLocked) R.drawable.ic_lock_on else R.drawable.ic_lock_off)
         }
 
         holder.itemView.setOnLongClickListener {
@@ -156,6 +154,10 @@ class ChannelAdapter(
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     openChannel(channel)
+                    true
+                }
+                KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_INFO -> {
+                    onToggleLock?.invoke(channel)
                     true
                 }
                 else -> false

@@ -427,15 +427,7 @@ class MainActivity : BaseLocaleActivity() {
             },
             isLocked = { parentalStore.isChannelLocked(it.streamId) },
             canLock = { parentalStore.canLockChannel(it) },
-            onToggleLock = { channel ->
-                if (!parentalStore.canLockChannel(channel)) return@ChannelAdapter
-                parentalStore.toggleChannelLock(channel.streamId)
-                if (selectedLiveCategoryId == ParentalControlStore.LOCK_CATEGORY_ID) {
-                    reloadChannels(keepCategoryFocus = true)
-                } else {
-                    channelAdapter?.notifyDataSetChanged()
-                }
-            },
+            onToggleLock = { channel -> toggleChannelLock(channel) },
         )
         channelList.adapter = channelAdapter
         selectedLiveCategoryId = liveChannelStore.lastCategoryId?.takeIf { it.isNotEmpty() }
@@ -1792,6 +1784,48 @@ class MainActivity : BaseLocaleActivity() {
         )
     }
 
+    private fun toggleChannelLock(channel: LiveChannel) {
+        if (!parentalStore.canLockChannel(channel)) {
+            Toast.makeText(this, R.string.parental_channel_lock_adult, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val unlock = {
+            parentalStore.toggleChannelLock(channel.streamId)
+            refreshAfterChannelLockToggle(channel)
+            Toast.makeText(this, R.string.parental_channel_unlocked, Toast.LENGTH_SHORT).show()
+        }
+        if (parentalStore.isChannelLocked(channel.streamId)) {
+            ParentalPinDialog.show(
+                this,
+                getString(R.string.parental_pin_channel, channel.name),
+                onVerified = unlock,
+            )
+            return
+        }
+        parentalStore.toggleChannelLock(channel.streamId)
+        refreshAfterChannelLockToggle(channel)
+        Toast.makeText(this, R.string.parental_channel_locked, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun refreshAfterChannelLockToggle(channel: LiveChannel) {
+        updatePreviewLockButton(channel)
+        if (selectedLiveCategoryId == ParentalControlStore.LOCK_CATEGORY_ID) {
+            reloadChannels(keepCategoryFocus = true)
+        } else {
+            channelAdapter?.notifyDataSetChanged()
+        }
+    }
+
+    private fun updatePreviewLockButton(channel: LiveChannel?) {
+        val btn = panelLive.findViewById<ImageButton?>(R.id.btnChannelLock) ?: return
+        val target = channel ?: currentPreviewChannel ?: return
+        val locked = parentalStore.isChannelLocked(target.streamId)
+        val canLock = parentalStore.canLockChannel(target)
+        btn.setImageResource(if (locked) R.drawable.ic_lock_on else R.drawable.ic_lock_off)
+        btn.alpha = if (canLock || locked) 1f else 0.35f
+        btn.isEnabled = canLock || locked
+    }
+
     private fun withCatalogCategoryAccess(tab: Tab, category: Category, action: () -> Unit) {
         val needsPin = when (tab) {
             Tab.MOVIES -> parentalStore.isAdultVodCategory(category.id)
@@ -1965,6 +1999,7 @@ class MainActivity : BaseLocaleActivity() {
         previewTitle.text = channel.name
         previewLogo.visibility = View.VISIBLE
         ChannelIconHelper.load(previewLogo, channel)
+        updatePreviewLockButton(channel)
         epgCache[channel.streamId]?.takeIf { it.isNotEmpty() }?.let { applyEpg(channel, it) } ?: run {
             epgNow.text = getString(R.string.epg_loading)
             epgNext.visibility = View.GONE
@@ -2167,6 +2202,7 @@ class MainActivity : BaseLocaleActivity() {
         val focused = currentFocus ?: return false
         return focused.id == R.id.btnVolUp ||
             focused.id == R.id.btnVolDown ||
+            focused.id == R.id.btnChannelLock ||
             focused.id == R.id.btnFullscreen
     }
 
@@ -2292,6 +2328,10 @@ class MainActivity : BaseLocaleActivity() {
                     zapChannel(1, keepPreviewFocus = true)
                     true
                 }
+                KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_INFO -> {
+                    currentPreviewChannel?.let { toggleChannelLock(it) }
+                    true
+                }
                 else -> false
             }
         }
@@ -2305,6 +2345,9 @@ class MainActivity : BaseLocaleActivity() {
         }
         panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
             currentPreviewChannel?.let { openFullscreen(it) }
+        }
+        panelLive.findViewById<ImageButton>(R.id.btnChannelLock).setOnClickListener {
+            currentPreviewChannel?.let { toggleChannelLock(it) }
         }
         if (usesExoPreview()) {
             miniExoView = panelLive.findViewById(R.id.miniExoPlayer)

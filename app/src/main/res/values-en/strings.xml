@@ -152,8 +152,11 @@
     <string name="parental_pin_mismatch">New PINs do not match</string>
     <string name="parental_info">NetTV style: adult groups are locked automatically. Lock channels with the lock icon in Live TV. PIN is required every time.</string>
     <string name="parental_channel_lock_section">CHANNEL LOCK</string>
-    <string name="parental_channel_lock_hint">In Live TV, tap the lock icon on a channel to block it. Blocked channels appear in the \"Locked\" group.</string>
+    <string name="parental_channel_lock_hint">In Live TV, tap the channel lock icon, the preview lock button, or press Menu on the remote. Blocked channels appear in \"Locked\".</string>
     <string name="parental_channel_lock_toggle">Lock or unlock channel</string>
+    <string name="parental_channel_locked">Channel locked</string>
+    <string name="parental_channel_unlocked">Channel unlocked</string>
+    <string name="parental_channel_lock_adult">Adult channels are already protected automatically</string>
     <string name="parental_pin_channel">Channel \"%1$s\" is protected. Enter PIN.</string>
     <string name="parental_pin_content">\"%1$s\" is protected. Enter PIN.</string>
     <string name="category_locked">Locked</string>
