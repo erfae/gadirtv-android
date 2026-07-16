@@ -157,6 +157,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             reloadEpisodes()
         }.also { adapter ->
             seasonList.adapter = adapter
+            RecyclerViewUtil.expandHorizontalList(seasonList)
         }
         reloadEpisodes()
         btnSeriesPlay.requestFocus()
