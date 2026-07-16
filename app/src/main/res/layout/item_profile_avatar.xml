@@ -64,6 +64,21 @@
             android:textColor="@android:color/white"
             android:textSize="14sp"
             android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/avatarEdit"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="bottom|start"
+            android:background="@color/gtv_surface"
+            android:contentDescription="@string/edit_connection"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:gravity="center"
+            android:text="⚙"
+            android:textColor="@android:color/white"
+            android:textSize="13sp"
+            android:visibility="gone" />
     </FrameLayout>
 
     <TextView

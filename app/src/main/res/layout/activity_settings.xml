@@ -205,9 +205,34 @@
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:nextFocusUp="@+id/btnNetworkBuffer"
+                android:nextFocusDown="@+id/btnParentalControl"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="14dp"
+                android:textColor="@android:color/white"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/settings_section_parental"
+                android:textColor="@color/gtv_red_hi"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnParentalControl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/tab_bg"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusUp="@+id/btnLiveSort"
                 android:nextFocusDown="@+id/btnReloadPlaylist"
                 android:paddingHorizontal="16dp"
                 android:paddingVertical="14dp"
+                android:text="@string/settings_parental_control"
                 android:textColor="@android:color/white"
                 android:textSize="14sp" />
 
@@ -219,7 +244,7 @@
                 android:background="@drawable/tab_bg"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
-                android:nextFocusUp="@+id/btnLiveSort"
+                android:nextFocusUp="@+id/btnParentalControl"
                 android:nextFocusDown="@+id/btnClearCache"
                 android:paddingHorizontal="16dp"
                 android:paddingVertical="14dp"

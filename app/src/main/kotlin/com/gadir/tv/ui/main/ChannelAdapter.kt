@@ -13,7 +13,8 @@ import com.gadir.tv.util.ChannelIconHelper
 import com.gadir.tv.model.LiveChannel
 
 class ChannelAdapter(
-    private val items: List<LiveChannel>,
+    private val itemCount: () -> Int,
+    private val itemAt: (Int) -> LiveChannel?,
     private val onFocus: (LiveChannel) -> Unit,
     private val onOpen: ((LiveChannel) -> Unit)? = null,
     private val onMoveLeft: (() -> Unit)? = null,
@@ -22,12 +23,45 @@ class ChannelAdapter(
     private val onMoveDown: (() -> Unit)? = null,
     private val isFavorite: (LiveChannel) -> Boolean = { false },
     private val onToggleFavorite: ((LiveChannel) -> Unit)? = null,
+    private val isLocked: (LiveChannel) -> Boolean = { false },
+    private val canLock: (LiveChannel) -> Boolean = { true },
+    private val onToggleLock: ((LiveChannel) -> Unit)? = null,
 ) : RecyclerView.Adapter<ChannelAdapter.Holder>() {
+
+    constructor(
+        items: List<LiveChannel>,
+        onFocus: (LiveChannel) -> Unit,
+        onOpen: ((LiveChannel) -> Unit)? = null,
+        onMoveLeft: (() -> Unit)? = null,
+        onMoveRight: (() -> Unit)? = null,
+        onMoveUp: (() -> Unit)? = null,
+        onMoveDown: (() -> Unit)? = null,
+        isFavorite: (LiveChannel) -> Boolean = { false },
+        onToggleFavorite: ((LiveChannel) -> Unit)? = null,
+        isLocked: (LiveChannel) -> Boolean = { false },
+        canLock: (LiveChannel) -> Boolean = { true },
+        onToggleLock: ((LiveChannel) -> Unit)? = null,
+    ) : this(
+        itemCount = { items.size },
+        itemAt = { index -> items.getOrNull(index) },
+        onFocus = onFocus,
+        onOpen = onOpen,
+        onMoveLeft = onMoveLeft,
+        onMoveRight = onMoveRight,
+        onMoveUp = onMoveUp,
+        onMoveDown = onMoveDown,
+        isFavorite = isFavorite,
+        onToggleFavorite = onToggleFavorite,
+        isLocked = isLocked,
+        canLock = canLock,
+        onToggleLock = onToggleLock,
+    )
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
         val number: TextView = view.findViewById(R.id.channelNumber)
         val icon: ImageView = view.findViewById(R.id.channelIcon)
         val name: TextView = view.findViewById(R.id.channelName)
+        val lock: ImageView = view.findViewById(R.id.channelLock)
         val favorite: ImageView = view.findViewById(R.id.channelFavorite)
     }
 
@@ -38,7 +72,7 @@ class ChannelAdapter(
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
-        val item = items[position]
+        val item = itemAt(position) ?: return
         holder.number.text = (position + 1).toString()
         holder.name.text = item.name
         Glide.with(holder.icon).clear(holder.icon)
@@ -46,6 +80,10 @@ class ChannelAdapter(
         holder.favorite.setImageResource(
             if (isFavorite(item)) R.drawable.ic_favorite_on else R.drawable.ic_favorite_off,
         )
+        val locked = isLocked(item)
+        holder.lock.setImageResource(if (locked) R.drawable.ic_lock_on else R.drawable.ic_lock_off)
+        holder.lock.visibility = if (canLock(item) || locked) View.VISIBLE else View.INVISIBLE
+        holder.lock.alpha = if (canLock(item)) 1f else 0.35f
 
         holder.itemView.isSelected = holder.itemView.hasFocus()
         holder.number.isSelected = holder.itemView.hasFocus()
@@ -53,15 +91,35 @@ class ChannelAdapter(
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             view.isSelected = hasFocus
             holder.number.isSelected = hasFocus
-            if (hasFocus) onFocus(item)
+            if (!hasFocus) return@setOnFocusChangeListener
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
+            itemAt(pos)?.let(onFocus)
         }
 
-        holder.itemView.setOnClickListener { openChannel(item) }
+        holder.itemView.setOnClickListener {
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
+            itemAt(pos)?.let { openChannel(it) }
+        }
+
+        holder.lock.setOnClickListener {
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
+            val channel = itemAt(pos) ?: return@setOnClickListener
+            if (!canLock(channel) && !isLocked(channel)) return@setOnClickListener
+            onToggleLock?.invoke(channel)
+            val nowLocked = isLocked(channel)
+            holder.lock.setImageResource(if (nowLocked) R.drawable.ic_lock_on else R.drawable.ic_lock_off)
+        }
 
         holder.itemView.setOnLongClickListener {
-            onToggleFavorite?.invoke(item)
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION) return@setOnLongClickListener false
+            val channel = itemAt(pos) ?: return@setOnLongClickListener false
+            onToggleFavorite?.invoke(channel)
             holder.favorite.setImageResource(
-                if (isFavorite(item)) R.drawable.ic_favorite_on else R.drawable.ic_favorite_off,
+                if (isFavorite(channel)) R.drawable.ic_favorite_on else R.drawable.ic_favorite_off,
             )
             true
         }
@@ -70,6 +128,7 @@ class ChannelAdapter(
             if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
+            val channel = itemAt(pos) ?: return@setOnKeyListener false
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     onMoveLeft?.invoke()
@@ -88,7 +147,7 @@ class ChannelAdapter(
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    if (pos == items.lastIndex) {
+                    if (pos == itemCount() - 1) {
                         onMoveDown?.invoke()
                         onMoveDown != null
                     } else {
@@ -96,7 +155,7 @@ class ChannelAdapter(
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                    openChannel(item)
+                    openChannel(channel)
                     true
                 }
                 else -> false
@@ -108,5 +167,5 @@ class ChannelAdapter(
         onOpen?.invoke(item) ?: onFocus(item)
     }
 
-    override fun getItemCount(): Int = items.size
+    override fun getItemCount(): Int = itemCount()
 }

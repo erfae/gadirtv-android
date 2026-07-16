@@ -9,6 +9,7 @@ import android.view.View
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.core.widget.NestedScrollView
 import androidx.lifecycle.lifecycleScope
@@ -22,6 +23,7 @@ import com.gadir.tv.data.BootstrapLoader
 import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.LiveChannelStore
 import com.gadir.tv.data.PlaylistRepository
+import com.gadir.tv.data.ParentalControlStore
 import com.gadir.tv.data.ProfileStore
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
@@ -33,6 +35,7 @@ import com.gadir.tv.model.Profile
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.ui.movie.MovieDetailActivity
 import com.gadir.tv.player.LiveChannelNavigator
+import com.gadir.tv.player.LiveExoPreviewPlayer
 import com.gadir.tv.player.LiveStreamUrls
 import com.gadir.tv.player.LiveVlcPlayer
 import com.gadir.tv.player.PlaybackLauncher
@@ -40,13 +43,16 @@ import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.ui.profiles.ProfilesActivity
 import org.videolan.libvlc.util.VLCVideoLayout
+import androidx.media3.ui.PlayerView
 import com.gadir.tv.ui.search.SearchActivity
 import com.gadir.tv.ui.series.SeriesDetailActivity
+import com.gadir.tv.ui.settings.ParentalPinDialog
 import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.AccountFormat
-import com.gadir.tv.util.DeviceUi
-import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ChannelIconHelper
+import com.gadir.tv.util.DeviceUi
+import com.gadir.tv.util.CategorySort
+import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.MetaExtractor
 import com.gadir.tv.util.ProfileAvatarHelper
@@ -66,8 +72,11 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var favoritesStore: FavoritesStore
     private lateinit var liveChannelStore: LiveChannelStore
     private lateinit var appSettings: AppSettings
+    private lateinit var parentalStore: ParentalControlStore
     private var miniVlcPlayer: LiveVlcPlayer? = null
-    private lateinit var miniVlcView: VLCVideoLayout
+    private var miniVlcView: VLCVideoLayout? = null
+    private var miniExoPlayer: LiveExoPreviewPlayer? = null
+    private var miniExoView: PlayerView? = null
     private var channelAdapter: ChannelAdapter? = null
     private var currentPreviewChannel: LiveChannel? = null
     private var previewingStreamId: Int? = null
@@ -150,6 +159,9 @@ class MainActivity : BaseLocaleActivity() {
     private var homeLoaded = false
     private var shouldFocusHomeRailsOnResume = true
     private var catalogLoadToken = 0
+    private var reloadingChannels = false
+    private var channelsLoadToken = 0
+    private var livePreviewPaused = false
     private lateinit var miniPreviewControls: View
     private lateinit var previewContainer: View
     private val miniControlsHandler = Handler(Looper.getMainLooper())
@@ -163,6 +175,8 @@ class MainActivity : BaseLocaleActivity() {
             clockHandler.postDelayed(this, 1_000L)
         }
     }
+
+    private fun usesExoPreview(): Boolean = DeviceUi.isCompact(this)
 
     private val liveCategories = mutableListOf<Category>()
     private val heroRotateRunnable = object : Runnable {
@@ -216,6 +230,7 @@ class MainActivity : BaseLocaleActivity() {
         liveChannelStore = LiveChannelStore(this)
         resumeStore = ResumeStore(this)
         appSettings = AppSettings(this)
+        parentalStore = ParentalControlStore(this)
 
         headerClock = findViewById(R.id.headerClock)
         headerDate = findViewById(R.id.headerDate)
@@ -345,27 +360,32 @@ class MainActivity : BaseLocaleActivity() {
                 name = getString(R.string.category_favorites),
             ),
         )
+        liveCategories.add(
+            Category(
+                id = ParentalControlStore.LOCK_CATEGORY_ID,
+                name = getString(R.string.category_locked),
+            ),
+        )
         liveCategories.addAll(PlaylistRepository.categories)
 
-        val applyLiveCategory: (Category) -> Unit = { cat ->
-            try {
-                val newId = when (cat.id) {
-                    "" -> null
-                    FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
-                    else -> cat.id
-                }
-                if (newId != selectedLiveCategoryId) {
-                    stopLivePreview()
-                    val oldIndex = liveCategoryIndex()
+        val applyLiveCategory: (Category) -> Unit = liveCat@{ cat ->
+            val newId = when (cat.id) {
+                "" -> null
+                FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
+                ParentalControlStore.LOCK_CATEGORY_ID -> ParentalControlStore.LOCK_CATEGORY_ID
+                else -> cat.id
+            }
+            if (newId == selectedLiveCategoryId || reloadingChannels) return@liveCat
+            withLiveCategoryAccess(cat, newId) {
+                try {
+                    teardownLivePreview()
+                    liveChannelStore.lastStreamId = 0
                     selectedLiveCategoryId = newId
-                    (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelectionAt(
-                        oldIndex,
-                        liveCategoryIndex(),
-                    )
+                    (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+                    reloadChannels(keepCategoryFocus = true)
+                } catch (_: Exception) {
                     reloadChannels(keepCategoryFocus = true)
                 }
-            } catch (_: Exception) {
-                reloadChannels(keepCategoryFocus = true)
             }
         }
 
@@ -380,14 +400,19 @@ class MainActivity : BaseLocaleActivity() {
         channelList.setItemViewCacheSize(24)
         channelAdapter = ChannelAdapter(
             items = channels,
-            onFocus = { channel ->
-                if (DeviceUi.isCompact(this)) {
-                    updatePreviewInfo(channel)
+            onFocus = focus@{ channel ->
+                if (reloadingChannels) return@focus
+                schedulePreview(channel)
+            },
+            onOpen = { channel ->
+                if (currentPreviewChannel?.streamId == channel.streamId &&
+                    (previewIsSettled() || previewingStreamId == channel.streamId)
+                ) {
+                    openFullscreen(channel)
                 } else {
-                    schedulePreview(channel)
+                    selectChannelPreview(channel)
                 }
             },
-            onOpen = { channel -> openFullscreen(channel) },
             onMoveLeft = { focusCategoryList() },
             onMoveRight = { focusPreviewPanel() },
             onMoveUp = { focusCategoryList() },
@@ -395,6 +420,17 @@ class MainActivity : BaseLocaleActivity() {
             onToggleFavorite = { channel ->
                 favoritesStore.toggle(FavoritesStore.KIND_LIVE, channel.streamId)
                 if (selectedLiveCategoryId == FavoritesStore.FAVORITES_CATEGORY_ID) {
+                    reloadChannels(keepCategoryFocus = true)
+                } else {
+                    channelAdapter?.notifyDataSetChanged()
+                }
+            },
+            isLocked = { parentalStore.isChannelLocked(it.streamId) },
+            canLock = { parentalStore.canLockChannel(it) },
+            onToggleLock = { channel ->
+                if (!parentalStore.canLockChannel(channel)) return@ChannelAdapter
+                parentalStore.toggleChannelLock(channel.streamId)
+                if (selectedLiveCategoryId == ParentalControlStore.LOCK_CATEGORY_ID) {
                     reloadChannels(keepCategoryFocus = true)
                 } else {
                     channelAdapter?.notifyDataSetChanged()
@@ -541,6 +577,7 @@ class MainActivity : BaseLocaleActivity() {
         return when (selectedLiveCategoryId) {
             null -> 0
             FavoritesStore.FAVORITES_CATEGORY_ID -> 1
+            ParentalControlStore.LOCK_CATEGORY_ID -> 2
             else -> liveCategories.indexOfFirst { it.id == selectedLiveCategoryId }
                 .takeIf { it >= 0 } ?: 0
         }
@@ -586,7 +623,7 @@ class MainActivity : BaseLocaleActivity() {
                 panelHome.visibility = View.VISIBLE
                 panelLive.visibility = View.GONE
                 panelCatalog.visibility = View.GONE
-                miniVlcPlayer?.pause()
+                teardownLivePreview()
                 hideMiniPreviewControls()
                 if (!homeLoaded) {
                     loadHome()
@@ -599,10 +636,8 @@ class MainActivity : BaseLocaleActivity() {
                 panelLive.visibility = View.VISIBLE
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
+                livePreviewPaused = false
                 VolumeHelper.boostOnPlaybackStart(this)
-                if (appSettings.autoplayPreview) {
-                    currentPreviewChannel?.let { schedulePreview(it) }
-                }
                 restoreLiveTabSession()
             }
             Tab.MOVIES, Tab.SERIES -> {
@@ -610,7 +645,7 @@ class MainActivity : BaseLocaleActivity() {
                 panelLive.visibility = View.GONE
                 panelCatalog.visibility = View.VISIBLE
                 stopHeroRotation()
-                miniVlcPlayer?.pause()
+                teardownLivePreview()
                 val ready = if (tab == Tab.MOVIES) moviesCatalogReady else seriesCatalogReady
                 if (!ready) {
                     setupCatalogTab(tab)
@@ -1148,6 +1183,23 @@ class MainActivity : BaseLocaleActivity() {
         title: String,
         cover: String,
         extension: String = "mp4",
+        categoryId: String = "",
+    ) {
+        val open = {
+            openMovieEntryInternal(streamId, title, cover, extension)
+        }
+        if (categoryId.isNotBlank() && parentalStore.isAdultVodCategory(categoryId)) {
+            open()
+        } else {
+            withMovieAccess(title, categoryId, open)
+        }
+    }
+
+    private fun openMovieEntryInternal(
+        streamId: Int,
+        title: String,
+        cover: String,
+        extension: String = "mp4",
     ) {
         val record = resumeStore.get(ResumeStore.KIND_MOVIE, streamId.toString())
         if (record != null) {
@@ -1186,21 +1238,45 @@ class MainActivity : BaseLocaleActivity() {
         )
     }
 
-    private fun openSeriesDetail(seriesId: Int, title: String, cover: String) {
-        startActivity(
-            SeriesDetailActivity.intent(
-                context = this,
-                series = SeriesItem(
-                    seriesId = seriesId,
-                    name = title,
-                    cover = cover,
-                    categoryId = "",
+    private fun openSeriesDetail(
+        seriesId: Int,
+        title: String,
+        cover: String,
+        categoryId: String = "",
+    ) {
+        val open = {
+            startActivity(
+                SeriesDetailActivity.intent(
+                    context = this,
+                    series = SeriesItem(
+                        seriesId = seriesId,
+                        name = title,
+                        cover = cover,
+                        categoryId = categoryId,
+                    ),
                 ),
-            ),
-        )
+            )
+        }
+        if (categoryId.isNotBlank() && parentalStore.isAdultSeriesCategory(categoryId)) {
+            open()
+        } else {
+            withSeriesAccess(title, categoryId, open)
+        }
     }
 
     private fun playMovie(
+        title: String,
+        streamId: Int,
+        extension: String,
+        imageUrl: String = "",
+        positionMs: Long = 0L,
+    ) {
+        withMovieAccess(title) {
+            playMovieInternal(title, streamId, extension, imageUrl, positionMs)
+        }
+    }
+
+    private fun playMovieInternal(
         title: String,
         streamId: Int,
         extension: String,
@@ -1225,6 +1301,18 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun playSeriesEpisode(
+        title: String,
+        episodeId: Int,
+        extension: String,
+        imageUrl: String = "",
+        positionMs: Long = 0L,
+    ) {
+        withSeriesAccess(title) {
+            playSeriesEpisodeInternal(title, episodeId, extension, imageUrl, positionMs)
+        }
+    }
+
+    private fun playSeriesEpisodeInternal(
         title: String,
         episodeId: Int,
         extension: String,
@@ -1381,11 +1469,13 @@ class MainActivity : BaseLocaleActivity() {
                 title = hero.title,
                 cover = hero.movie.icon,
                 extension = hero.movie.extension,
+                categoryId = hero.movie.categoryId,
             )
             is HeroItem.Series -> openSeriesDetail(
                 seriesId = hero.series.seriesId,
                 title = hero.series.name,
                 cover = hero.series.cover,
+                categoryId = hero.series.categoryId,
             )
             is HeroItem.Rail -> openHomeItem(hero.item)
             null -> Unit
@@ -1531,8 +1621,9 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun bindCatalogCategoryAdapter(tab: Tab) {
-        val applyCategory: (Category) -> Unit = { cat ->
-            if (cat.id != selectedCatalogCategoryId) {
+        val applyCategory: (Category) -> Unit = cat@{ cat ->
+            if (cat.id == selectedCatalogCategoryId) return@cat
+            withCatalogCategoryAccess(tab, cat) {
                 val oldIndex = catalogCategoryIndex()
                 selectedCatalogCategoryId = cat.id
                 when (tab) {
@@ -1658,58 +1749,164 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun onPosterClick(tab: Tab, item: PosterAdapter.PosterItem) {
+        val categoryId = selectedCatalogCategoryId.orEmpty()
         when (tab) {
             Tab.MOVIES -> openMovieEntry(
                 streamId = item.id,
                 title = item.title,
                 cover = item.imageUrl,
                 extension = item.extension,
+                categoryId = categoryId,
             )
             Tab.SERIES -> openSeriesDetail(
                 seriesId = item.id,
                 title = item.title,
                 cover = item.imageUrl,
+                categoryId = categoryId,
             )
             Tab.LIVE, Tab.HOME -> Unit
         }
     }
 
+    private fun withLiveCategoryAccess(category: Category, categoryId: String?, action: () -> Unit) {
+        if (!parentalStore.requiresPinForLiveCategory(categoryId)) {
+            action()
+            return
+        }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_message, category.name),
+            onVerified = action,
+        )
+    }
+
+    private fun withChannelAccess(channel: LiveChannel, action: () -> Unit) {
+        if (!parentalStore.requiresPinForChannel(channel, selectedLiveCategoryId)) {
+            action()
+            return
+        }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_channel, channel.name),
+            onVerified = action,
+        )
+    }
+
+    private fun withCatalogCategoryAccess(tab: Tab, category: Category, action: () -> Unit) {
+        val needsPin = when (tab) {
+            Tab.MOVIES -> parentalStore.isAdultVodCategory(category.id)
+            Tab.SERIES -> parentalStore.isAdultSeriesCategory(category.id)
+            else -> false
+        }
+        if (!needsPin) {
+            action()
+            return
+        }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_message, category.name),
+            onVerified = action,
+        )
+    }
+
+    private fun withMovieAccess(title: String, categoryId: String = "", action: () -> Unit) {
+        val adult = CategorySort.isAdultContent(title) ||
+            (categoryId.isNotBlank() && parentalStore.isAdultVodCategory(categoryId))
+        if (!adult) {
+            action()
+            return
+        }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_content, title),
+            onVerified = action,
+        )
+    }
+
+    private fun withSeriesAccess(title: String, categoryId: String = "", action: () -> Unit) {
+        val adult = CategorySort.isAdultContent(title) ||
+            (categoryId.isNotBlank() && parentalStore.isAdultSeriesCategory(categoryId))
+        if (!adult) {
+            action()
+            return
+        }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_content, title),
+            onVerified = action,
+        )
+    }
+
     private fun reloadChannels(keepCategoryFocus: Boolean = false) {
-        try {
-            channels.clear()
-            channels.addAll(
-                when (selectedLiveCategoryId) {
-                    FavoritesStore.FAVORITES_CATEGORY_ID ->
-                        PlaylistRepository.channelsFor(null, appSettings.liveSortMode).filter {
-                            favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId)
-                        }
-                    else -> PlaylistRepository.channelsFor(selectedLiveCategoryId, appSettings.liveSortMode)
-                },
-            )
-            channelList.post {
-                channelAdapter?.notifyDataSetChanged()
-                if (!keepCategoryFocus && channels.isNotEmpty() && !DeviceUi.isCompact(this)) {
-                    focusFirstChannel()
+        if (reloadingChannels) return
+        reloadingChannels = true
+        teardownLivePreviewPlayback()
+        val loadToken = ++channelsLoadToken
+        val categoryId = selectedLiveCategoryId
+        lifecycleScope.launch {
+            val loaded = withContext(Dispatchers.Default) {
+                try {
+                    when (categoryId) {
+                        FavoritesStore.FAVORITES_CATEGORY_ID ->
+                            PlaylistRepository.channelsFor(null, appSettings.liveSortMode).filter {
+                                favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId)
+                            }
+                        ParentalControlStore.LOCK_CATEGORY_ID ->
+                            PlaylistRepository.channelsFor(null, appSettings.liveSortMode).filter {
+                                parentalStore.isChannelLocked(it.streamId)
+                            }
+                        else -> PlaylistRepository.channelsFor(categoryId, appSettings.liveSortMode)
+                    }
+                } catch (_: Exception) {
+                    emptyList()
                 }
             }
-        } catch (_: Exception) {
+            if (loadToken != channelsLoadToken) return@launch
             channels.clear()
-            channelList.post { channelAdapter?.notifyDataSetChanged() }
+            channels.addAll(loaded)
+            channelAdapter?.notifyDataSetChanged()
+            if (!keepCategoryFocus && channels.isNotEmpty() && !usesExoPreview()) {
+                focusFirstChannel()
+            }
+            reloadingChannels = false
         }
     }
 
-    private fun stopLivePreview() {
+    private fun selectChannelPreview(channel: LiveChannel) {
+        if (reloadingChannels || livePreviewPaused) return
+        livePreviewPaused = false
+        teardownLivePreviewPlayback()
+        schedulePreview(channel)
+    }
+
+    private fun teardownLivePreviewPlayback() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
         previewToken++
-        cancelMiniPreviewPlayback()
-        currentPreviewChannel = null
+        miniVlcPlayer?.stop()
+        releaseExoPreview()
         previewingStreamId = null
+        previewWorkingUrl = null
+    }
+
+    private fun releaseExoPreview() {
+        val view = miniExoView
+        miniExoPlayer?.let { player ->
+            if (view != null) player.detach(view) else player.teardown()
+            player.release()
+        }
+        miniExoPlayer = null
+    }
+
+    /** NetTV-style: destruye el preview por completo (categoría, pestaña, salir). */
+    private fun teardownLivePreview() {
+        teardownLivePreviewPlayback()
+        currentPreviewChannel = null
         previewUrls = emptyList()
         previewUrlIndex = 0
-        previewWorkingUrl = null
         setPreviewVideoVisible(false)
-        miniVlcView.alpha = 0f
+        miniVlcView?.alpha = 0f
+        miniExoView?.alpha = 0f
         previewLogo.visibility = View.GONE
         panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
         previewTitle.text = getString(R.string.select_channel)
@@ -1717,11 +1914,19 @@ class MainActivity : BaseLocaleActivity() {
         epgNext.visibility = View.GONE
     }
 
+    private fun stopLivePreview() {
+        teardownLivePreview()
+    }
+
     private fun schedulePreview(channel: LiveChannel) {
-        if (DeviceUi.isCompact(this)) {
-            updatePreviewInfo(channel)
-            return
+        if (livePreviewPaused || reloadingChannels) return
+        withChannelAccess(channel) {
+            schedulePreviewInternal(channel)
         }
+    }
+
+    private fun schedulePreviewInternal(channel: LiveChannel) {
+        if (livePreviewPaused || reloadingChannels) return
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val channelChanged = previewingStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) {
@@ -1734,18 +1939,23 @@ class MainActivity : BaseLocaleActivity() {
         }
         if (channelChanged) {
             previewToken++
-            cancelMiniPreviewPlayback()
-            recreateMiniVlcPlayer()
+            teardownLivePreviewPlayback()
+            if (!usesExoPreview()) {
+                recreateMiniVlcPlayer()
+            }
             setPreviewVideoVisible(false)
             panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
         }
         updatePreviewInfo(channel)
         val token = previewToken
+        val delayMs = if (usesExoPreview()) 500L else 400L
         val task = Runnable {
-            if (token == previewToken) previewChannel(channel, token)
+            if (token == previewToken && !reloadingChannels && !livePreviewPaused) {
+                previewChannel(channel, token)
+            }
         }
         pendingPreview = task
-        previewHandler.postDelayed(task, 400L)
+        previewHandler.postDelayed(task, delayMs)
     }
 
     private fun updatePreviewInfo(channel: LiveChannel) {
@@ -1779,15 +1989,15 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun cancelMiniPreviewPlayback() {
-        miniVlcPlayer?.stop()
-        previewingStreamId = null
-        previewWorkingUrl = null
+        teardownLivePreviewPlayback()
     }
 
     private fun previewChannel(channel: LiveChannel, token: Int) {
-        if (DeviceUi.isCompact(this)) return
-        if (token != previewToken) return
+        if (token != previewToken || livePreviewPaused) return
         val profile = PlaylistRepository.profile ?: return
+        if (usesExoPreview() && miniExoPlayer == null) {
+            createMiniExoPlayer()
+        }
         updatePreviewInfo(channel)
         if (!appSettings.autoplayPreview) {
             cancelMiniPreviewPlayback()
@@ -1820,16 +2030,28 @@ class MainActivity : BaseLocaleActivity() {
         } else {
             0
         }
-        miniVlcPlayer?.play(url, volume)
+        if (usesExoPreview()) {
+            miniExoPlayer?.play(url, volume)
+        } else {
+            miniVlcPlayer?.play(url, volume)
+        }
     }
 
     private fun previewIsSettled(): Boolean {
         if (previewWorkingUrl.isNullOrBlank()) return false
-        return miniVlcPlayer?.isPlaying() == true
+        return if (usesExoPreview()) {
+            miniExoPlayer?.isPlaying() == true
+        } else {
+            miniVlcPlayer?.isPlaying() == true
+        }
     }
 
     private fun setPreviewVideoVisible(visible: Boolean) {
-        miniVlcView.alpha = if (visible) 1f else 0f
+        if (usesExoPreview()) {
+            miniExoView?.alpha = if (visible) 1f else 0f
+        } else {
+            miniVlcView?.alpha = if (visible) 1f else 0f
+        }
         if (!visible && currentPreviewChannel?.icon?.isNotEmpty() == true) {
             previewLogo.visibility = View.VISIBLE
         } else if (visible) {
@@ -1861,7 +2083,9 @@ class MainActivity : BaseLocaleActivity() {
         }
         previewUrlIndex += 1
         panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
-        recreateMiniVlcPlayer()
+        if (!usesExoPreview()) {
+            recreateMiniVlcPlayer()
+        }
         playMiniPreviewUrl(previewUrls[previewUrlIndex], token)
         return true
     }
@@ -1890,10 +2114,17 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     fun openFullscreen(channel: LiveChannel) {
+        withChannelAccess(channel) {
+            openFullscreenInternal(channel)
+        }
+    }
+
+    private fun openFullscreenInternal(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         LiveChannelNavigator.setPlaybackContext(this, channel, selectedLiveCategoryId)
         VolumeHelper.boostOnPlaybackStart(this)
-        miniVlcPlayer?.stop()
+        livePreviewPaused = true
+        teardownLivePreviewPlayback()
         val candidates = LiveStreamUrls.candidates(api, profile, channel)
         val urls = buildList {
             if (previewingStreamId == channel.streamId) {
@@ -1994,7 +2225,8 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onStop() {
         super.onStop()
-        miniVlcPlayer?.pause()
+        livePreviewPaused = true
+        teardownLivePreview()
         stopHeroRotation()
     }
 
@@ -2003,9 +2235,14 @@ class MainActivity : BaseLocaleActivity() {
         if (currentTab == Tab.HOME && shouldFocusHomeRailsOnResume) {
             focusHeroOnStart()
         } else if (currentTab == Tab.LIVE) {
+            livePreviewPaused = false
             focusChannelAt(currentPreviewChannel)
             liveCategoryList.adapter?.let { (it as? CategoryAdapter)?.refreshSelection() }
-            if (appSettings.autoplayPreview) {
+            if (
+                !usesExoPreview() &&
+                appSettings.autoplayPreview &&
+                currentPreviewChannel != null
+            ) {
                 currentPreviewChannel?.let { schedulePreview(it) }
             }
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
@@ -2018,6 +2255,7 @@ class MainActivity : BaseLocaleActivity() {
         clockHandler.removeCallbacks(clockRunnable)
         miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
         stopHeroRotation()
+        releaseExoPreview()
         miniVlcPlayer?.release()
         miniVlcPlayer = null
         super.onDestroy()
@@ -2027,8 +2265,6 @@ class MainActivity : BaseLocaleActivity() {
         miniPreviewControls = panelLive.findViewById(R.id.miniPreviewControls)
         miniPreviewControls.visibility = View.GONE
 
-        miniVlcView = panelLive.findViewById(R.id.miniVlcPlayer)
-        miniVlcView.alpha = 0f
         val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
         noSignal.visibility = View.GONE
         panelLive.findViewById<View>(R.id.btnNoSignalSettings).setOnClickListener {
@@ -2059,7 +2295,6 @@ class MainActivity : BaseLocaleActivity() {
                 else -> false
             }
         }
-        recreateMiniVlcPlayer()
         panelLive.findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
             VolumeHelper.adjust(this, raise = true)
             scheduleHideMiniControls()
@@ -2071,15 +2306,49 @@ class MainActivity : BaseLocaleActivity() {
         panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
             currentPreviewChannel?.let { openFullscreen(it) }
         }
+        if (usesExoPreview()) {
+            miniExoView = panelLive.findViewById(R.id.miniExoPlayer)
+            miniExoView?.alpha = 0f
+            createMiniExoPlayer()
+        } else {
+            miniVlcView = panelLive.findViewById(R.id.miniVlcPlayer)
+            miniVlcView?.alpha = 0f
+            recreateMiniVlcPlayer()
+        }
+    }
+
+    private fun createMiniExoPlayer() {
+        if (miniExoPlayer != null) return
+        val playerView = miniExoView ?: return
+        val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
+        miniExoPlayer = LiveExoPreviewPlayer(
+            context = this,
+            playerView = playerView,
+            onError = {
+                setPreviewVideoVisible(false)
+                if (!tryNextPreviewUrl()) {
+                    noSignal.visibility = View.VISIBLE
+                }
+            },
+            onPlaying = {
+                if (previewPlaybackToken != previewToken) return@LiveExoPreviewPlayer
+                if (previewUrlIndex in previewUrls.indices) {
+                    previewWorkingUrl = previewUrls[previewUrlIndex]
+                }
+                setPreviewVideoVisible(true)
+                noSignal.visibility = View.GONE
+            },
+        )
     }
 
     private fun recreateMiniVlcPlayer() {
-        if (DeviceUi.isCompact(this)) return
+        if (usesExoPreview()) return
+        val videoLayout = miniVlcView ?: return
         miniVlcPlayer?.release()
         val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
         miniVlcPlayer = LiveVlcPlayer(
             context = this,
-            videoLayout = miniVlcView,
+            videoLayout = videoLayout,
             networkBufferMs = appSettings.networkBufferMs,
             onError = {
                 setPreviewVideoVisible(false)

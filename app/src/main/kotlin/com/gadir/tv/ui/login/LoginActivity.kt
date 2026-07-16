@@ -44,6 +44,7 @@ class LoginActivity : BaseLocaleActivity() {
     private lateinit var btnConnect: MaterialButton
     private lateinit var btnBack: MaterialButton
     private lateinit var btnDeleteProfile: MaterialButton
+    private lateinit var btnManageProfiles: MaterialButton
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +58,22 @@ class LoginActivity : BaseLocaleActivity() {
         btnConnect.setOnClickListener { connect() }
         btnBack.setOnClickListener { finish() }
         btnDeleteProfile.setOnClickListener { confirmDeleteProfile() }
+        btnManageProfiles.setOnClickListener {
+            startActivity(
+                Intent(this, ProfilesActivity::class.java)
+                    .putExtra(ProfilesActivity.EXTRA_FORCE_PICKER, true)
+                    .putExtra(ProfilesActivity.EXTRA_MANAGE_MODE, true),
+            )
+        }
+
+        setupCreateModeActions()
+
+        findViewById<android.widget.ScrollView>(R.id.loginScroll)?.post {
+            findViewById<View>(R.id.loginTitle)?.let { title ->
+                findViewById<android.widget.ScrollView>(R.id.loginScroll)
+                    ?.smoothScrollTo(0, title.top)
+            }
+        }
 
         btnConnect.setOnKeyListener { _, keyCode, event ->
             if (event.action == KeyEvent.ACTION_DOWN &&
@@ -89,6 +106,14 @@ class LoginActivity : BaseLocaleActivity() {
         inputPass.setText(existing.password)
         inputName.setText(existing.name)
         btnDeleteProfile.visibility = View.VISIBLE
+        btnManageProfiles.visibility = View.GONE
+    }
+
+    private fun setupCreateModeActions() {
+        if (editingProfileId != null) return
+        val hasProfiles = profileStore.loadAll().isNotEmpty()
+        btnManageProfiles.visibility = if (hasProfiles) View.VISIBLE else View.GONE
+        btnDeleteProfile.visibility = View.GONE
     }
 
     private fun confirmDeleteProfile() {
@@ -116,6 +141,7 @@ class LoginActivity : BaseLocaleActivity() {
         btnConnect = findViewById(R.id.btnConnect)
         btnBack = findViewById(R.id.btnBack)
         btnDeleteProfile = findViewById(R.id.btnDeleteProfile)
+        btnManageProfiles = findViewById(R.id.btnManageProfiles)
     }
 
     private fun loadDraft() {

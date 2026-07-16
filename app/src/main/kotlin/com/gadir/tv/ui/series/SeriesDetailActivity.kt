@@ -21,6 +21,7 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.util.ImageLoader
+import com.gadir.tv.util.RecyclerViewUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -125,6 +126,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
                 selectedSeason = season
                 reloadEpisodes()
             }
+            RecyclerViewUtil.expandInScrollView(seasonList)
             reloadEpisodes()
             btnSeriesPlay.requestFocus()
         }
@@ -144,6 +146,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         episodeList.adapter = EpisodeAdapter(eps, fallbackCover) { ep ->
             playEpisode(ep)
         }
+        RecyclerViewUtil.expandInScrollView(episodeList)
     }
 
     private fun playEpisode(ep: SeriesEpisode) {
@@ -186,11 +189,16 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             holder.label.text = holder.itemView.context.getString(R.string.season_label, season)
             holder.itemView.isSelected = position == selected
             holder.itemView.setOnClickListener {
+                val pos = holder.bindingAdapterPosition
+                if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
                 val old = selected
-                selected = holder.bindingAdapterPosition
+                selected = pos
                 notifyItemChanged(old)
                 notifyItemChanged(selected)
-                onClick(season)
+                onClick(seasons[pos])
+                RecyclerViewUtil.expandInScrollView(
+                    (holder.itemView.parent as? RecyclerView) ?: return@setOnClickListener,
+                )
             }
         }
 

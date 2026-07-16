@@ -13,11 +13,13 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
+import com.gadir.tv.data.ParentalControlStore
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.SearchRepository
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.SeriesItem
+import com.gadir.tv.model.VodMovie
 import com.gadir.tv.ui.main.HomeRailAdapter
 import com.gadir.tv.ui.movie.MovieDetailActivity
 import com.gadir.tv.player.LiveChannelNavigator
@@ -25,12 +27,15 @@ import com.gadir.tv.player.LiveStreamUrls
 import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.ui.series.SeriesDetailActivity
+import com.gadir.tv.ui.settings.ParentalPinDialog
+import com.gadir.tv.util.CategorySort
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class SearchActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
+    private lateinit var parentalStore: ParentalControlStore
     private val debounceHandler = Handler(Looper.getMainLooper())
     private var debounceRunnable: Runnable? = null
 
@@ -47,6 +52,7 @@ class SearchActivity : BaseLocaleActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_search)
+        parentalStore = ParentalControlStore(this)
 
         val profile = PlaylistRepository.profile
         if (profile == null) {
@@ -118,7 +124,7 @@ class SearchActivity : BaseLocaleActivity() {
             },
             onClick = { item ->
                 val channel = results.channels.firstOrNull { it.streamId == item.id } ?: return@bindSection
-                playChannel(channel)
+                withChannelAccess(channel) { playChannel(channel) }
             },
         )
 
@@ -138,7 +144,9 @@ class SearchActivity : BaseLocaleActivity() {
             },
             onClick = { item ->
                 val movie = results.movies.firstOrNull { it.streamId == item.id } ?: return@bindSection
-                startActivity(MovieDetailActivity.intent(this, movie))
+                withMovieAccess(movie) {
+                    startActivity(MovieDetailActivity.intent(this, movie))
+                }
             },
         )
 
@@ -157,7 +165,7 @@ class SearchActivity : BaseLocaleActivity() {
             },
             onClick = { item ->
                 val series = results.series.firstOrNull { it.seriesId == item.id } ?: return@bindSection
-                openSeries(series)
+                withSeriesAccess(series) { openSeries(series) }
             },
         )
     }
@@ -173,6 +181,46 @@ class SearchActivity : BaseLocaleActivity() {
         list.visibility = if (visible) View.VISIBLE else View.GONE
         if (!visible) return
         list.adapter = HomeRailAdapter(items = items, onClick = onClick)
+    }
+
+    private fun withChannelAccess(channel: LiveChannel, action: () -> Unit) {
+        if (!parentalStore.isAdultLiveChannel(channel) && !parentalStore.isChannelLocked(channel.streamId)) {
+            action()
+            return
+        }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_channel, channel.name),
+            onVerified = action,
+        )
+    }
+
+    private fun withMovieAccess(movie: VodMovie, action: () -> Unit) {
+        val adult = CategorySort.isAdultContent(movie.name) ||
+            parentalStore.isAdultVodCategory(movie.categoryId)
+        if (!adult) {
+            action()
+            return
+        }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_content, movie.name),
+            onVerified = action,
+        )
+    }
+
+    private fun withSeriesAccess(series: SeriesItem, action: () -> Unit) {
+        val adult = CategorySort.isAdultContent(series.name) ||
+            parentalStore.isAdultSeriesCategory(series.categoryId)
+        if (!adult) {
+            action()
+            return
+        }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_content, series.name),
+            onVerified = action,
+        )
     }
 
     private fun playChannel(channel: LiveChannel) {
