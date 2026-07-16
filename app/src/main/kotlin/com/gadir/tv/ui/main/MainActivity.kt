@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.view.ViewStub
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
@@ -102,7 +103,7 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var tabMovies: View
     private lateinit var tabSeries: View
     private lateinit var panelHome: View
-    private lateinit var panelLive: View
+    private var panelLive: View? = null
     private lateinit var panelCatalog: View
 
     private lateinit var liveCategoryList: RecyclerView
@@ -167,7 +168,7 @@ class MainActivity : BaseLocaleActivity() {
     private var livePreviewPaused = false
     private var liveTabReady = false
     private var miniPreviewControls: View? = null
-    private lateinit var previewContainer: View
+    private var previewContainer: View? = null
     private val miniControlsHandler = Handler(Looper.getMainLooper())
     private val hideMiniControlsRunnable = Runnable { hideMiniPreviewControls() }
     private val heroHandler = Handler(Looper.getMainLooper())
@@ -181,6 +182,29 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun usesExoPreview(): Boolean = previewUsesExo
+
+    private fun livePanel(): View = checkNotNull(panelLive) { "Live panel not ready" }
+
+    private fun inflateLivePanelIfNeeded(): View {
+        panelLive?.let { return it }
+        val stub = findViewById<ViewStub>(R.id.panelLiveStub)
+        val inflated = stub.inflate()
+        panelLive = inflated
+        bindLivePanelViews(inflated)
+        return inflated
+    }
+
+    private fun bindLivePanelViews(panel: View) {
+        liveCategoryList = panel.findViewById(R.id.categoryList)
+        channelList = panel.findViewById(R.id.channelList)
+        previewTitle = panel.findViewById(R.id.previewTitle)
+        previewLogo = panel.findViewById(R.id.previewLogo)
+        epgNow = panel.findViewById(R.id.epgNow)
+        epgNext = panel.findViewById(R.id.epgNext)
+        previewContainer = panel.findViewById(R.id.previewContainer)
+        liveCategoryList.layoutManager = LinearLayoutManager(this)
+        channelList.layoutManager = LinearLayoutManager(this)
+    }
 
     private val liveCategories = mutableListOf<Category>()
     private val heroRotateRunnable = object : Runnable {
@@ -267,16 +291,7 @@ class MainActivity : BaseLocaleActivity() {
         tabMovies = findViewById(R.id.tabMovies)
         tabSeries = findViewById(R.id.tabSeries)
         panelHome = findViewById(R.id.panelHome)
-        panelLive = findViewById(R.id.panelLive)
         panelCatalog = findViewById(R.id.panelMovies)
-
-        liveCategoryList = panelLive.findViewById(R.id.categoryList)
-        channelList = panelLive.findViewById(R.id.channelList)
-        previewTitle = panelLive.findViewById(R.id.previewTitle)
-        previewLogo = panelLive.findViewById(R.id.previewLogo)
-        epgNow = panelLive.findViewById(R.id.epgNow)
-        epgNext = panelLive.findViewById(R.id.epgNext)
-        previewContainer = panelLive.findViewById(R.id.previewContainer)
 
         catalogCategoryList = panelCatalog.findViewById(R.id.catalogCategoryList)
         catalogGrid = panelCatalog.findViewById(R.id.catalogGrid)
@@ -302,8 +317,6 @@ class MainActivity : BaseLocaleActivity() {
         seriesRailTitle = panelHome.findViewById(R.id.seriesRailTitle)
         homeScrollView = panelHome.findViewById(R.id.homeScrollView)
 
-        liveCategoryList.layoutManager = LinearLayoutManager(this)
-        channelList.layoutManager = LinearLayoutManager(this)
         catalogCategoryList.layoutManager = LinearLayoutManager(this)
         configureCatalogGrid()
         favoritesRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
@@ -355,6 +368,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun ensureLiveTabReady() {
         if (liveTabReady) return
         liveTabReady = true
+        inflateLivePanelIfNeeded()
         setupMiniPlayer()
         setupLiveTab()
     }
@@ -401,7 +415,7 @@ class MainActivity : BaseLocaleActivity() {
                     epgNow.text = getString(R.string.epg_unavailable)
                     epgNext.visibility = View.GONE
                     previewLogo.visibility = View.GONE
-                    panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
+                    panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.GONE
                     liveChannelStore.lastStreamId = 0
                     selectedLiveCategoryId = newId
                     (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
@@ -509,7 +523,7 @@ class MainActivity : BaseLocaleActivity() {
         channelList.scrollToPosition(next)
         if (keepPreviewFocus) {
             schedulePreview(channel)
-            previewContainer.post { previewContainer.requestFocus() }
+            previewContainer?.post { previewContainer?.requestFocus() }
         } else {
             TvNavHelper.focusItem(channelList, next)
         }
@@ -517,7 +531,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun focusPreviewPanel() {
         if (currentPreviewChannel == null) return
-        previewContainer.requestFocus()
+        previewContainer?.requestFocus()
     }
 
     private fun isFocusInPreviewPanel(): Boolean {
@@ -637,7 +651,7 @@ class MainActivity : BaseLocaleActivity() {
         when (tab) {
             Tab.HOME -> {
                 panelHome.visibility = View.VISIBLE
-                panelLive.visibility = View.GONE
+                panelLive?.visibility = View.GONE
                 panelCatalog.visibility = View.GONE
                 suspendLivePreview()
                 if (!homeLoaded) {
@@ -648,7 +662,8 @@ class MainActivity : BaseLocaleActivity() {
             }
             Tab.LIVE -> {
                 panelHome.visibility = View.GONE
-                panelLive.visibility = View.VISIBLE
+                ensureLiveTabReady()
+                livePanel().visibility = View.VISIBLE
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
                 ensureLiveTabReady()
@@ -658,7 +673,7 @@ class MainActivity : BaseLocaleActivity() {
             }
             Tab.MOVIES, Tab.SERIES -> {
                 panelHome.visibility = View.GONE
-                panelLive.visibility = View.GONE
+                panelLive?.visibility = View.GONE
                 panelCatalog.visibility = View.VISIBLE
                 stopHeroRotation()
                 suspendLivePreview()
@@ -873,6 +888,15 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun applyHomeData(movies: List<VodMovie>, series: List<SeriesItem>) {
+        try {
+            applyHomeDataInternal(movies, series)
+        } catch (_: Exception) {
+            homeLoading.visibility = View.GONE
+            homeEmpty.visibility = View.VISIBLE
+        }
+    }
+
+    private fun applyHomeDataInternal(movies: List<VodMovie>, series: List<SeriesItem>) {
         recentMovies.clear()
         movies.forEach { movie ->
             recentMovies.add(
@@ -1010,19 +1034,22 @@ class MainActivity : BaseLocaleActivity() {
     private fun buildFavoriteItems() {
         favoriteItems.clear()
         val liveIds = favoritesStore.load(FavoritesStore.KIND_LIVE)
-        PlaylistRepository.channelsFor(null)
-            .filter { liveIds.contains(it.streamId) }
-            .forEach { channel ->
-                favoriteItems.add(
-                    HomeRailAdapter.HomeRailItem(
-                        id = channel.streamId,
-                        title = channel.name,
-                        imageUrl = channel.icon,
-                        badge = getString(R.string.tab_live),
-                        kind = HomeRailAdapter.HomeRailItem.KIND_LIVE,
-                    ),
-                )
+        if (liveIds.isNotEmpty()) {
+            val channelById = PlaylistRepository.allChannels.associateBy { it.streamId }
+            liveIds.forEach { id ->
+                channelById[id]?.let { channel ->
+                    favoriteItems.add(
+                        HomeRailAdapter.HomeRailItem(
+                            id = channel.streamId,
+                            title = channel.name,
+                            imageUrl = channel.icon,
+                            badge = getString(R.string.tab_live),
+                            kind = HomeRailAdapter.HomeRailItem.KIND_LIVE,
+                        ),
+                    )
+                }
             }
+        }
 
         val movieIds = favoritesStore.load(FavoritesStore.KIND_MOVIE)
         findFavoriteMovies(movieIds).forEach { movie ->
@@ -1498,44 +1525,50 @@ class MainActivity : BaseLocaleActivity() {
     private fun loadMoviePlot(streamId: Int, requestId: Int, backdropRequestId: Int) {
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
-            val info = withContext(Dispatchers.IO) { api.vodInfo(profile, streamId) }
-            if (requestId != heroPlotRequestId) return@launch
-            if (info == null) return@launch
-            if (info.name.isNotBlank()) heroTitle.text = info.name
-            heroPlot.text = info.plot.ifBlank { getString(R.string.hero_plot_empty) }
-            heroSubtitle.text = listOf(info.genre, info.releaseDate, info.rating)
-                .filter { it.isNotBlank() }
-                .joinToString(" · ")
-            val backdrop = info.backdrop.ifBlank { info.cover }
-            applyHeroBackdrop(
-                backdrop = backdrop,
-                poster = info.cover,
-                backdropRequestId = backdropRequestId,
-                contentId = streamId,
-                kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
-            )
+            try {
+                val info = withContext(Dispatchers.IO) { api.vodInfo(profile, streamId) }
+                if (requestId != heroPlotRequestId || isDestroyed) return@launch
+                if (info == null) return@launch
+                if (info.name.isNotBlank()) heroTitle.text = info.name
+                heroPlot.text = info.plot.ifBlank { getString(R.string.hero_plot_empty) }
+                heroSubtitle.text = listOf(info.genre, info.releaseDate, info.rating)
+                    .filter { it.isNotBlank() }
+                    .joinToString(" · ")
+                val backdrop = info.backdrop.ifBlank { info.cover }
+                applyHeroBackdrop(
+                    backdrop = backdrop,
+                    poster = info.cover,
+                    backdropRequestId = backdropRequestId,
+                    contentId = streamId,
+                    kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
+                )
+            } catch (_: Exception) {
+            }
         }
     }
 
     private fun loadSeriesPlot(seriesId: Int, requestId: Int, backdropRequestId: Int) {
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
-            val detail = withContext(Dispatchers.IO) { api.seriesInfo(profile, seriesId) }
-            if (requestId != heroPlotRequestId) return@launch
-            if (detail == null) return@launch
-            if (detail.name.isNotBlank()) heroTitle.text = detail.name
-            heroPlot.text = detail.plot.ifBlank { getString(R.string.hero_plot_empty) }
-            heroSubtitle.text = listOf(detail.genre, detail.releaseDate, detail.rating)
-                .filter { it.isNotBlank() }
-                .joinToString(" · ")
-            val backdrop = detail.backdrop.ifBlank { detail.cover }
-            applyHeroBackdrop(
-                backdrop = backdrop,
-                poster = detail.cover,
-                backdropRequestId = backdropRequestId,
-                contentId = seriesId,
-                kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
-            )
+            try {
+                val detail = withContext(Dispatchers.IO) { api.seriesInfo(profile, seriesId) }
+                if (requestId != heroPlotRequestId || isDestroyed) return@launch
+                if (detail == null) return@launch
+                if (detail.name.isNotBlank()) heroTitle.text = detail.name
+                heroPlot.text = detail.plot.ifBlank { getString(R.string.hero_plot_empty) }
+                heroSubtitle.text = listOf(detail.genre, detail.releaseDate, detail.rating)
+                    .filter { it.isNotBlank() }
+                    .joinToString(" · ")
+                val backdrop = detail.backdrop.ifBlank { detail.cover }
+                applyHeroBackdrop(
+                    backdrop = backdrop,
+                    poster = detail.cover,
+                    backdropRequestId = backdropRequestId,
+                    contentId = seriesId,
+                    kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
+                )
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -1908,7 +1941,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun updatePreviewLockButton(channel: LiveChannel?) {
-        val btn = panelLive.findViewById<ImageButton?>(R.id.btnChannelLock) ?: return
+        val btn = panelLive?.findViewById<ImageButton?>(R.id.btnChannelLock) ?: return
         val target = channel ?: currentPreviewChannel ?: run {
             btn.visibility = View.GONE
             return
@@ -2048,6 +2081,7 @@ class MainActivity : BaseLocaleActivity() {
 
     /** NetTV-style: destruye el preview por completo (categoría, pestaña, salir). */
     private fun teardownLivePreview() {
+        if (!liveTabReady) return
         teardownLivePreviewPlayback()
         releaseExoPreview()
         miniVlcPlayer?.release()
@@ -2059,7 +2093,7 @@ class MainActivity : BaseLocaleActivity() {
         miniVlcView?.alpha = 0f
         miniExoView?.alpha = 0f
         previewLogo.visibility = View.GONE
-        panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
+        panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.GONE
         previewTitle.text = getString(R.string.select_channel)
         epgNow.text = getString(R.string.epg_unavailable)
         epgNext.visibility = View.GONE
@@ -2071,6 +2105,7 @@ class MainActivity : BaseLocaleActivity() {
 
     /** Pausa el preview sin destruir libVLC/Exo (evita crash al volver en Android TV). */
     private fun suspendLivePreview() {
+        if (!liveTabReady) return
         livePreviewPaused = true
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
@@ -2103,7 +2138,7 @@ class MainActivity : BaseLocaleActivity() {
             teardownLivePreviewPlayback()
             ensurePreviewPlayer()
             setPreviewVideoVisible(false)
-            panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
+            panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.GONE
         }
         updatePreviewInfo(channel)
         val token = previewToken
@@ -2171,7 +2206,7 @@ class MainActivity : BaseLocaleActivity() {
         }
         val url = previewUrls.getOrNull(previewUrlIndex).orEmpty()
         if (url.isBlank()) {
-            panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.VISIBLE
+            panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.VISIBLE
             return
         }
         playMiniPreviewUrl(url, token)
@@ -2236,11 +2271,11 @@ class MainActivity : BaseLocaleActivity() {
     private fun tryNextPreviewUrl(token: Int = previewToken): Boolean {
         if (token != previewToken) return false
         if (previewUrlIndex >= previewUrls.lastIndex) {
-            panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.VISIBLE
+            panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.VISIBLE
             return false
         }
         previewUrlIndex += 1
-        panelLive.findViewById<View>(R.id.miniNoSignal).visibility = View.GONE
+        panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.GONE
         if (!ensurePreviewPlayer()) return false
         playMiniPreviewUrl(previewUrls[previewUrlIndex], token)
         return true
@@ -2391,6 +2426,7 @@ class MainActivity : BaseLocaleActivity() {
         if (currentTab == Tab.HOME && shouldFocusHomeRailsOnResume) {
             focusHeroOnStart()
         } else if (currentTab == Tab.LIVE) {
+            ensureLiveTabReady()
             livePreviewPaused = false
             focusChannelAt(currentPreviewChannel)
             liveCategoryList.adapter?.let { (it as? CategoryAdapter)?.refreshSelection() }
@@ -2418,18 +2454,20 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun setupMiniPlayer() {
-        miniPreviewControls = panelLive.findViewById(R.id.miniPreviewControls)
+        val panel = livePanel()
+        miniPreviewControls = panel.findViewById(R.id.miniPreviewControls)
         miniPreviewControls?.visibility = View.GONE
 
-        val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
+        val noSignal = panel.findViewById<View>(R.id.miniNoSignal)
         noSignal?.visibility = View.GONE
-        panelLive.findViewById<View>(R.id.btnNoSignalSettings)?.setOnClickListener {
+        panel.findViewById<View>(R.id.btnNoSignalSettings)?.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
-        previewContainer.setOnClickListener {
+        val preview = previewContainer ?: return
+        preview.setOnClickListener {
             currentPreviewChannel?.let { openFullscreen(it) }
         }
-        previewContainer.setOnKeyListener { _, keyCode, event ->
+        preview.setOnKeyListener { _, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -2455,32 +2493,31 @@ class MainActivity : BaseLocaleActivity() {
                 else -> false
             }
         }
-        panelLive.findViewById<ImageButton>(R.id.btnVolUp)?.setOnClickListener {
+        panel.findViewById<ImageButton>(R.id.btnVolUp)?.setOnClickListener {
             VolumeHelper.adjust(this, raise = true)
             scheduleHideMiniControls()
         }
-        panelLive.findViewById<ImageButton>(R.id.btnVolDown)?.setOnClickListener {
+        panel.findViewById<ImageButton>(R.id.btnVolDown)?.setOnClickListener {
             VolumeHelper.adjust(this, raise = false)
             scheduleHideMiniControls()
         }
-        panelLive.findViewById<ImageButton>(R.id.btnFullscreen)?.setOnClickListener {
+        panel.findViewById<ImageButton>(R.id.btnFullscreen)?.setOnClickListener {
             currentPreviewChannel?.let { openFullscreen(it) }
         }
-        panelLive.findViewById<ImageButton>(R.id.btnChannelLock)?.setOnClickListener {
+        panel.findViewById<ImageButton>(R.id.btnChannelLock)?.setOnClickListener {
             currentPreviewChannel?.let { toggleChannelLock(it) }
         }
-        miniExoView = panelLive.findViewById(R.id.miniExoPlayer)
-        miniVlcView = panelLive.findViewById(R.id.miniVlcPlayer)
-        // Exo para preview en TV (estable al arrancar); VLC solo en pantalla completa.
-        previewUsesExo = miniExoView != null &&
-            (miniVlcView == null || DeviceUi.isTelevision(this) || DeviceUi.isCompact(this))
+        miniExoView = panel.findViewById(R.id.miniExoPlayer)
+        miniVlcView = null
+        // Exo para preview en TV y móvil; VLC solo en pantalla completa.
+        previewUsesExo = miniExoView != null
         miniExoView?.alpha = 0f
         miniVlcView?.alpha = 0f
     }
 
     /** Crea el reproductor de preview bajo demanda cuando el panel Live está visible. */
     private fun ensurePreviewPlayer(): Boolean {
-        if (currentTab != Tab.LIVE || panelLive.visibility != View.VISIBLE) return false
+        if (currentTab != Tab.LIVE || livePanel().visibility != View.VISIBLE) return false
         if (usesExoPreview()) {
             if (miniExoPlayer == null) {
                 createMiniExoPlayer()
@@ -2501,7 +2538,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun createMiniExoPlayer() {
         if (miniExoPlayer != null) return
         val playerView = miniExoView ?: return
-        val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
+        val noSignal = livePanel().findViewById<View>(R.id.miniNoSignal)
         miniExoPlayer = LiveExoPreviewPlayer(
             context = this,
             playerView = playerView,
@@ -2527,7 +2564,7 @@ class MainActivity : BaseLocaleActivity() {
         val videoLayout = miniVlcView ?: return
         miniVlcPlayer?.release()
         miniVlcPlayer = null
-        val noSignal = panelLive.findViewById<View>(R.id.miniNoSignal)
+        val noSignal = livePanel().findViewById<View>(R.id.miniNoSignal)
         miniVlcPlayer = LiveVlcPlayer(
             context = this,
             videoLayout = videoLayout,
