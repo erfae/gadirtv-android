@@ -573,7 +573,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun updateHeaderDownFocus() {
         val target = when (currentTab) {
             Tab.HOME -> heroPlay.id
-            Tab.LIVE -> liveCategoryList.id
+            Tab.LIVE -> if (liveTabReady) liveCategoryList.id else heroPlay.id
             Tab.MOVIES, Tab.SERIES -> catalogCategoryList.id
         }
         listOf(btnSearch, btnReload, btnSettings, btnLogout, btnExit).forEach {
@@ -646,6 +646,9 @@ class MainActivity : BaseLocaleActivity() {
         tabLive.isSelected = tab == Tab.LIVE
         tabMovies.isSelected = tab == Tab.MOVIES
         tabSeries.isSelected = tab == Tab.SERIES
+        if (tab == Tab.LIVE) {
+            ensureLiveTabReady()
+        }
         updateHeaderDownFocus()
 
         when (tab) {
@@ -655,18 +658,20 @@ class MainActivity : BaseLocaleActivity() {
                 panelCatalog.visibility = View.GONE
                 suspendLivePreview()
                 if (!homeLoaded) {
-                    loadHome()
+                    panelHome.post {
+                        if (!isDestroyed && currentTab == Tab.HOME) {
+                            loadHome()
+                        }
+                    }
                 } else {
                     startHeroRotation()
                 }
             }
             Tab.LIVE -> {
                 panelHome.visibility = View.GONE
-                ensureLiveTabReady()
                 livePanel().visibility = View.VISIBLE
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
-                ensureLiveTabReady()
                 livePreviewPaused = false
                 VolumeHelper.boostOnPlaybackStart(this)
                 restoreLiveTabSession()
@@ -691,14 +696,19 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun loadHome() {
         val profile = PlaylistRepository.profile ?: return
-        val cachedMovies = HomeLoader.recentMoviesFromCache()
-        val cachedSeries = HomeLoader.recentSeriesFromCache()
-        if (cachedMovies.isNotEmpty() || cachedSeries.isNotEmpty()) {
-            applyHomeData(cachedMovies, cachedSeries)
+        try {
+            val cachedMovies = HomeLoader.recentMoviesFromCache()
+            val cachedSeries = HomeLoader.recentSeriesFromCache()
+            if (cachedMovies.isNotEmpty() || cachedSeries.isNotEmpty()) {
+                applyHomeData(cachedMovies, cachedSeries)
+                homeLoading.visibility = View.GONE
+                homeLoaded = true
+                refreshHomeIfNeeded(profile, cachedMovies.size)
+                return
+            }
+        } catch (_: Exception) {
             homeLoading.visibility = View.GONE
-            homeLoaded = true
-            focusHeroOnStart()
-            refreshHomeIfNeeded(profile, cachedMovies.size)
+            homeEmpty.visibility = View.VISIBLE
             return
         }
 
@@ -706,19 +716,25 @@ class MainActivity : BaseLocaleActivity() {
         homeEmpty.visibility = View.GONE
 
         lifecycleScope.launch {
-            val moviesDeferred = async(Dispatchers.IO) {
-                HomeLoader.loadRecentMovies(api, profile)
+            try {
+                val moviesDeferred = async(Dispatchers.IO) {
+                    HomeLoader.loadRecentMovies(api, profile)
+                }
+                val seriesDeferred = async(Dispatchers.IO) {
+                    HomeLoader.loadRecentSeries(api, profile)
+                }
+                val movies = moviesDeferred.await()
+                val series = seriesDeferred.await()
+                PlaylistRepository.setHomeRecent(movies, series)
+                if (isDestroyed || currentTab != Tab.HOME) return@launch
+                applyHomeData(movies, series)
+                homeLoading.visibility = View.GONE
+                homeLoaded = true
+            } catch (_: Exception) {
+                if (isDestroyed) return@launch
+                homeLoading.visibility = View.GONE
+                homeEmpty.visibility = View.VISIBLE
             }
-            val seriesDeferred = async(Dispatchers.IO) {
-                HomeLoader.loadRecentSeries(api, profile)
-            }
-            val movies = moviesDeferred.await()
-            val series = seriesDeferred.await()
-            PlaylistRepository.setHomeRecent(movies, series)
-            applyHomeData(movies, series)
-            homeLoading.visibility = View.GONE
-            homeLoaded = true
-            focusHeroOnStart()
         }
     }
 
@@ -955,9 +971,12 @@ class MainActivity : BaseLocaleActivity() {
             homeEmpty.visibility = View.VISIBLE
         } else {
             homeEmpty.visibility = View.GONE
-            bindHero(heroItems[heroIndex])
-            startHeroRotation()
-            focusHeroOnStart()
+            panelHome.post {
+                if (isDestroyed || currentTab != Tab.HOME) return@post
+                bindHero(heroItems[heroIndex])
+                startHeroRotation()
+                focusHeroOnStart()
+            }
         }
     }
 

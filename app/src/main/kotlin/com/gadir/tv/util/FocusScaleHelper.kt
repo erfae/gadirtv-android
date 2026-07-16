@@ -9,6 +9,7 @@ object FocusScaleHelper {
     private const val DURATION_MS = 180L
 
     fun applyConeFocus(view: View, hasFocus: Boolean) {
+        val television = DeviceUi.isTelevision(view.context)
         val camera = view.resources.displayMetrics.density * 8000f
         view.cameraDistance = camera
         view.pivotX = view.width / 2f
@@ -16,23 +17,25 @@ object FocusScaleHelper {
 
         view.animate().cancel()
         if (hasFocus) {
-            view.animate()
+            val anim = view.animate()
                 .scaleX(SCALE)
                 .scaleY(SCALE)
-                .rotationX(ROTATION_X)
-                .translationZ(16f)
                 .setDuration(DURATION_MS)
                 .setInterpolator(DecelerateInterpolator())
-                .start()
+            if (!television) {
+                anim.rotationX(ROTATION_X).translationZ(16f)
+            }
+            anim.start()
         } else {
-            view.animate()
+            val anim = view.animate()
                 .scaleX(1f)
                 .scaleY(1f)
-                .rotationX(0f)
-                .translationZ(0f)
                 .setDuration(DURATION_MS)
                 .setInterpolator(DecelerateInterpolator())
-                .start()
+            if (!television) {
+                anim.rotationX(0f).translationZ(0f)
+            }
+            anim.start()
         }
     }
 }
