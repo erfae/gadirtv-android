@@ -150,6 +150,7 @@ class MainActivity : BaseLocaleActivity() {
     private var homeLoaded = false
     private var shouldFocusHomeRailsOnResume = true
     private var catalogLoadToken = 0
+    private var reloadingChannels = false
     private lateinit var miniPreviewControls: View
     private lateinit var previewContainer: View
     private val miniControlsHandler = Handler(Looper.getMainLooper())
@@ -353,24 +354,15 @@ class MainActivity : BaseLocaleActivity() {
                 FavoritesStore.FAVORITES_CATEGORY_ID -> FavoritesStore.FAVORITES_CATEGORY_ID
                 else -> cat.id
             }
-            if (newId == selectedLiveCategoryId) return@liveCat
+            if (newId == selectedLiveCategoryId || reloadingChannels) return@liveCat
             val compact = DeviceUi.isCompact(this)
-            val oldIndex = liveCategoryIndex()
-            liveCategoryList.post {
-                try {
-                    if (!compact) stopLivePreview()
-                    selectedLiveCategoryId = newId
-                    (liveCategoryList.adapter as? CategoryAdapter)?.let { adapter ->
-                        if (compact) {
-                            adapter.refreshSelection()
-                        } else {
-                            adapter.refreshSelectionAt(oldIndex, liveCategoryIndex())
-                        }
-                    }
-                    reloadChannels(keepCategoryFocus = true)
-                } catch (_: Exception) {
-                    reloadChannels(keepCategoryFocus = true)
-                }
+            try {
+                if (!compact) stopLivePreview()
+                selectedLiveCategoryId = newId
+                (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+                reloadChannels(keepCategoryFocus = true)
+            } catch (_: Exception) {
+                reloadChannels(keepCategoryFocus = true)
             }
         }
 
@@ -385,17 +377,20 @@ class MainActivity : BaseLocaleActivity() {
         channelList.setItemViewCacheSize(24)
         channelAdapter = ChannelAdapter(
             items = channels,
-            onFocus = { channel ->
-                if (DeviceUi.isCompact(this)) {
-                    updatePreviewInfo(channel)
-                } else {
-                    schedulePreview(channel)
-                }
+            onFocus = focus@{ channel ->
+                if (DeviceUi.isCompact(this) || reloadingChannels) return@focus
+                schedulePreview(channel)
             },
             onOpen = { channel -> openFullscreen(channel) },
-            onMoveLeft = { focusCategoryList() },
-            onMoveRight = { focusPreviewPanel() },
-            onMoveUp = { focusCategoryList() },
+            onMoveLeft = { if (!DeviceUi.isCompact(this)) focusCategoryList() },
+            onMoveRight = {
+                if (DeviceUi.isCompact(this)) {
+                    if (channels.isNotEmpty()) TvNavHelper.focusItem(channelList, 0)
+                } else {
+                    focusPreviewPanel()
+                }
+            },
+            onMoveUp = { if (!DeviceUi.isCompact(this)) focusCategoryList() },
             isFavorite = { favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId) },
             onToggleFavorite = { channel ->
                 favoritesStore.toggle(FavoritesStore.KIND_LIVE, channel.streamId)
@@ -1680,6 +1675,8 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun reloadChannels(keepCategoryFocus: Boolean = false) {
+        if (reloadingChannels) return
+        reloadingChannels = true
         try {
             channels.clear()
             channels.addAll(
@@ -1692,14 +1689,21 @@ class MainActivity : BaseLocaleActivity() {
                 },
             )
             channelList.post {
-                channelAdapter?.notifyDataSetChanged()
-                if (!keepCategoryFocus && channels.isNotEmpty() && !DeviceUi.isCompact(this)) {
-                    focusFirstChannel()
+                try {
+                    channelAdapter?.notifyDataSetChanged()
+                    if (!keepCategoryFocus && channels.isNotEmpty() && !DeviceUi.isCompact(this)) {
+                        focusFirstChannel()
+                    }
+                } finally {
+                    reloadingChannels = false
                 }
             }
         } catch (_: Exception) {
             channels.clear()
-            channelList.post { channelAdapter?.notifyDataSetChanged() }
+            channelList.post {
+                channelAdapter?.notifyDataSetChanged()
+                reloadingChannels = false
+            }
         }
     }
 
@@ -2029,6 +2033,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun setupMiniPlayer() {
+        if (DeviceUi.isCompact(this)) return
         miniPreviewControls = panelLive.findViewById(R.id.miniPreviewControls)
         miniPreviewControls.visibility = View.GONE
 
@@ -2077,9 +2082,6 @@ class MainActivity : BaseLocaleActivity() {
             panelLive.findViewById<ImageButton>(R.id.btnFullscreen).setOnClickListener {
                 currentPreviewChannel?.let { openFullscreen(it) }
             }
-        } else {
-            panelLive.findViewById<View>(R.id.miniVlcPlayer)?.visibility = View.GONE
-            miniPreviewControls.visibility = View.GONE
         }
     }
 

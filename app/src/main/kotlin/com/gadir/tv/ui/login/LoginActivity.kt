@@ -68,6 +68,13 @@ class LoginActivity : BaseLocaleActivity() {
 
         setupCreateModeActions()
 
+        findViewById<android.widget.ScrollView>(R.id.loginScroll)?.post {
+            findViewById<View>(R.id.loginTitle)?.let { title ->
+                findViewById<android.widget.ScrollView>(R.id.loginScroll)
+                    ?.smoothScrollTo(0, title.top)
+            }
+        }
+
         btnConnect.setOnKeyListener { _, keyCode, event ->
             if (event.action == KeyEvent.ACTION_DOWN &&
                 (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
