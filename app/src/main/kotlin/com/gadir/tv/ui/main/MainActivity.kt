@@ -165,6 +165,7 @@ class MainActivity : BaseLocaleActivity() {
     private var reloadingChannels = false
     private var channelsLoadToken = 0
     private var livePreviewPaused = false
+    private var liveTabReady = false
     private var miniPreviewControls: View? = null
     private lateinit var previewContainer: View
     private val miniControlsHandler = Handler(Looper.getMainLooper())
@@ -329,7 +330,6 @@ class MainActivity : BaseLocaleActivity() {
             }
         }
 
-        setupLiveTab()
         setupTabNavigation()
         heroPlay.setOnClickListener { openHeroContent() }
         tabHome.nextFocusUpId = R.id.btnSettings
@@ -347,10 +347,16 @@ class MainActivity : BaseLocaleActivity() {
             false
         }
 
-        setupMiniPlayer()
         setupHeaderFocusChain()
 
         showTab(Tab.HOME)
+    }
+
+    private fun ensureLiveTabReady() {
+        if (liveTabReady) return
+        liveTabReady = true
+        setupMiniPlayer()
+        setupLiveTab()
     }
 
     private fun setupLiveTab() {
@@ -645,6 +651,7 @@ class MainActivity : BaseLocaleActivity() {
                 panelLive.visibility = View.VISIBLE
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
+                ensureLiveTabReady()
                 livePreviewPaused = false
                 VolumeHelper.boostOnPlaybackStart(this)
                 restoreLiveTabSession()
@@ -2073,14 +2080,14 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun schedulePreview(channel: LiveChannel) {
-        if (livePreviewPaused || reloadingChannels) return
+        if (currentTab != Tab.LIVE || livePreviewPaused || reloadingChannels) return
         withChannelAccess(channel) {
             schedulePreviewInternal(channel)
         }
     }
 
     private fun schedulePreviewInternal(channel: LiveChannel) {
-        if (livePreviewPaused || reloadingChannels) return
+        if (currentTab != Tab.LIVE || livePreviewPaused || reloadingChannels) return
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val channelChanged = previewingStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) {
@@ -2464,16 +2471,16 @@ class MainActivity : BaseLocaleActivity() {
         }
         miniExoView = panelLive.findViewById(R.id.miniExoPlayer)
         miniVlcView = panelLive.findViewById(R.id.miniVlcPlayer)
-        previewUsesExo = when {
-            DeviceUi.isTelevision(this) -> miniVlcView == null && miniExoView != null
-            else -> miniExoView != null && (DeviceUi.isCompact(this) || miniVlcView == null)
-        }
+        // Exo para preview en TV (estable al arrancar); VLC solo en pantalla completa.
+        previewUsesExo = miniExoView != null &&
+            (miniVlcView == null || DeviceUi.isTelevision(this) || DeviceUi.isCompact(this))
         miniExoView?.alpha = 0f
         miniVlcView?.alpha = 0f
     }
 
     /** Crea el reproductor de preview bajo demanda cuando el panel Live está visible. */
     private fun ensurePreviewPlayer(): Boolean {
+        if (currentTab != Tab.LIVE || panelLive.visibility != View.VISIBLE) return false
         if (usesExoPreview()) {
             if (miniExoPlayer == null) {
                 createMiniExoPlayer()
@@ -2482,25 +2489,13 @@ class MainActivity : BaseLocaleActivity() {
         }
         if (miniVlcPlayer != null) return true
         val videoLayout = miniVlcView ?: return false
-        val init: () -> Unit = {
-            if (miniVlcPlayer == null) {
-                try {
-                    recreateMiniVlcPlayer()
-                } catch (_: Exception) {
-                    miniVlcPlayer = null
-                }
-            }
+        if (!videoLayout.isAttachedToWindow || videoLayout.width <= 0) return false
+        try {
+            recreateMiniVlcPlayer()
+        } catch (_: Exception) {
+            miniVlcPlayer = null
         }
-        if (
-            panelLive.visibility == View.VISIBLE &&
-            videoLayout.isAttachedToWindow &&
-            videoLayout.width > 0
-        ) {
-            init()
-            return miniVlcPlayer != null
-        }
-        videoLayout.post { init() }
-        return panelLive.visibility == View.VISIBLE
+        return miniVlcPlayer != null
     }
 
     private fun createMiniExoPlayer() {
