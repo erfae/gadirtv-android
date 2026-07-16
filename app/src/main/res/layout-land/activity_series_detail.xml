@@ -177,6 +177,7 @@
         android:background="@drawable/tab_bg"
         android:contentDescription="@string/series_reload"
         android:drawableStart="@drawable/ic_reload"
+        android:elevation="12dp"
         android:focusable="true"
         android:focusableInTouchMode="true"
         android:gravity="center"

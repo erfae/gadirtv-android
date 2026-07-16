@@ -16,6 +16,7 @@ import com.gadir.tv.model.VodMovie
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.util.ImageLoader
+import com.gadir.tv.util.TvFocusHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -26,6 +27,12 @@ class MovieDetailActivity : BaseLocaleActivity() {
     private var streamId = 0
     private var extension = "mp4"
     private var fallbackCover = ""
+    private var movieName = ""
+    private var loadToken = 0
+
+    private lateinit var loadingView: TextView
+    private lateinit var moviePlot: TextView
+    private lateinit var btnMoviePlay: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,16 +41,21 @@ class MovieDetailActivity : BaseLocaleActivity() {
         streamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
         extension = intent.getStringExtra(EXTRA_EXTENSION).orEmpty().ifBlank { "mp4" }
         resumeStore = ResumeStore(this)
-        val movieName = intent.getStringExtra(EXTRA_MOVIE_NAME).orEmpty()
+        movieName = intent.getStringExtra(EXTRA_MOVIE_NAME).orEmpty()
         fallbackCover = intent.getStringExtra(EXTRA_MOVIE_COVER).orEmpty()
 
         findViewById<TextView>(R.id.movieTitle).text = movieName
+        moviePlot = findViewById(R.id.moviePlot)
+        loadingView = findViewById(R.id.movieLoading)
+        btnMoviePlay = findViewById(R.id.btnMoviePlay)
+        btnMoviePlay.setOnClickListener { playMovie() }
         if (fallbackCover.isNotEmpty()) {
             ImageLoader.loadPoster(findViewById(R.id.moviePoster), fallbackCover, 280, 420)
             ImageLoader.loadPoster(findViewById(R.id.movieBackdrop), fallbackCover)
         }
 
-        findViewById<TextView>(R.id.btnMoviePlay).setOnClickListener { playMovie() }
+        val btnReload = findViewById<TextView>(R.id.btnMovieReload)
+        TvFocusHelper.bindButton(btnReload) { loadMovieDetail() }
 
         val profile = PlaylistRepository.profile
         if (profile == null || streamId <= 0) {
@@ -51,12 +63,23 @@ class MovieDetailActivity : BaseLocaleActivity() {
             return
         }
 
+        loadMovieDetail()
+    }
+
+    private fun loadMovieDetail() {
+        val profile = PlaylistRepository.profile ?: return
+        val token = ++loadToken
+        loadingView.visibility = View.VISIBLE
+        btnMoviePlay.visibility = View.GONE
+
         lifecycleScope.launch {
             val info = withContext(Dispatchers.IO) { api.vodInfo(profile, streamId) }
-            findViewById<TextView>(R.id.movieLoading).visibility = View.GONE
+            if (token != loadToken) return@launch
+            loadingView.visibility = View.GONE
             if (info == null) {
-                findViewById<TextView>(R.id.moviePlot).text = getString(R.string.hero_plot_empty)
-                findViewById<TextView>(R.id.btnMoviePlay).requestFocus()
+                moviePlot.text = getString(R.string.movie_load_failed)
+                btnMoviePlay.visibility = View.VISIBLE
+                btnMoviePlay.requestFocus()
                 return@launch
             }
 
@@ -67,19 +90,22 @@ class MovieDetailActivity : BaseLocaleActivity() {
                 if (info.rating.isNotEmpty()) add("★ ${info.rating}")
             }.joinToString(" · ")
             findViewById<TextView>(R.id.movieMeta).text = meta
-            findViewById<TextView>(R.id.moviePlot).text =
-                info.plot.ifBlank { getString(R.string.hero_plot_empty) }
+            moviePlot.text = info.plot.ifBlank { getString(R.string.hero_plot_empty) }
 
             val directorView = findViewById<TextView>(R.id.movieDirector)
             if (info.director.isNotBlank()) {
                 directorView.visibility = View.VISIBLE
                 directorView.text = getString(R.string.movie_director, info.director)
+            } else {
+                directorView.visibility = View.GONE
             }
 
             val castView = findViewById<TextView>(R.id.movieCast)
             if (info.cast.isNotBlank()) {
                 castView.visibility = View.VISIBLE
                 castView.text = getString(R.string.movie_cast, info.cast)
+            } else {
+                castView.visibility = View.GONE
             }
 
             val backdrop = info.backdrop.ifBlank { info.cover.ifBlank { fallbackCover } }
@@ -88,10 +114,12 @@ class MovieDetailActivity : BaseLocaleActivity() {
             }
             val poster = info.cover.ifBlank { fallbackCover }
             if (poster.isNotEmpty()) {
+                fallbackCover = poster
                 ImageLoader.loadPoster(findViewById(R.id.moviePoster), poster, 280, 420)
             }
 
-            findViewById<TextView>(R.id.btnMoviePlay).requestFocus()
+            btnMoviePlay.visibility = View.VISIBLE
+            btnMoviePlay.requestFocus()
         }
     }
 

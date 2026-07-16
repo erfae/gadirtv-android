@@ -48,6 +48,19 @@ object ImageLoader {
         loadPoster(target, url, width, height, posterOptions)
     }
 
+    fun loadHeroBackdrop(target: ImageView, url: String) {
+        val resolved = ImageUrlResolver.resolve(url)
+        if (resolved.isEmpty()) {
+            target.setImageResource(R.drawable.tv_banner)
+            return
+        }
+        Glide.with(target)
+            .load(glideUrl(resolved))
+            .apply(posterOptions)
+            .centerCrop()
+            .into(target)
+    }
+
     private fun loadPoster(
         target: ImageView,
         url: String,

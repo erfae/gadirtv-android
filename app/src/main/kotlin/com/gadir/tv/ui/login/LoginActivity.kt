@@ -23,7 +23,7 @@ import com.gadir.tv.util.DefaultCredentials
 import com.gadir.tv.util.HostUtils
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.textfield.TextInputEditText
+import android.widget.EditText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,10 +35,10 @@ class LoginActivity : BaseLocaleActivity() {
     private var draftRunnable: Runnable? = null
     private var editingProfileId: String? = null
 
-    private lateinit var inputHost: TextInputEditText
-    private lateinit var inputUser: TextInputEditText
-    private lateinit var inputPass: TextInputEditText
-    private lateinit var inputName: TextInputEditText
+    private lateinit var inputHost: EditText
+    private lateinit var inputUser: EditText
+    private lateinit var inputPass: EditText
+    private lateinit var inputName: EditText
     private lateinit var loginError: TextView
     private lateinit var loginProgress: TextView
     private lateinit var btnConnect: MaterialButton

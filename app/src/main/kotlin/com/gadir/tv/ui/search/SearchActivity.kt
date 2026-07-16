@@ -6,6 +6,8 @@ import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.TextView
 import com.gadir.tv.ui.BaseLocaleActivity
@@ -83,6 +85,20 @@ class SearchActivity : BaseLocaleActivity() {
                 scheduleSearch(s?.toString().orEmpty())
             }
         })
+        searchInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                debounceRunnable?.let { debounceHandler.removeCallbacks(it) }
+                runSearch(searchInput.text?.toString().orEmpty())
+                hideKeyboard()
+                true
+            } else {
+                false
+            }
+        }
+        searchInput.setOnClickListener {
+            searchInput.requestFocus()
+            showKeyboard(searchInput)
+        }
 
         searchLoading.visibility = View.VISIBLE
         lifecycleScope.launch {
@@ -245,6 +261,16 @@ class SearchActivity : BaseLocaleActivity() {
 
     private fun openSeries(series: SeriesItem) {
         startActivity(SeriesDetailActivity.intent(this, series))
+    }
+
+    private fun showKeyboard(target: View) {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.showSoftInput(target, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(searchInput.windowToken, 0)
     }
 
     override fun onDestroy() {

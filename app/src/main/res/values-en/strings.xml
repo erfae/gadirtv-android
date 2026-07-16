@@ -111,6 +111,8 @@
     <string name="bootstrap_loading_group">Loading: %1$s…</string>
     <string name="series_load_failed">Could not load series</string>
     <string name="series_reload">Reload series</string>
+    <string name="movie_reload">Reload movie</string>
+    <string name="movie_load_failed">Could not load movie</string>
     <string name="episode_label">Episode %1$d</string>
     <string name="movie_director">Director: %1$s</string>
     <string name="movie_cast">Cast: %1$s</string>

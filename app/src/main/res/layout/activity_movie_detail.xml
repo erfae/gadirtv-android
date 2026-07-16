@@ -136,6 +136,25 @@
     </LinearLayout>
 
     <TextView
+        android:id="@+id/btnMovieReload"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/tab_bg"
+        android:contentDescription="@string/movie_reload"
+        android:drawableStart="@drawable/ic_reload"
+        android:elevation="12dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:gravity="center"
+        android:minWidth="36dp"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="6dp"
+        android:text="" />
+
+    <TextView
         android:id="@+id/movieLoading"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
