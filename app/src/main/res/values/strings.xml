@@ -142,6 +142,7 @@
     <string name="bootstrap_catalog">Descargando catálogo completo…</string>
     <string name="bootstrap_loading_group">Cargando: %1$s…</string>
     <string name="series_load_failed">No se pudo cargar la serie</string>
+    <string name="series_reload">Recargar serie</string>
     <string name="episode_label">Episodio %1$d</string>
     <string name="movie_director">Director: %1$s</string>
     <string name="movie_cast">Reparto: %1$s</string>

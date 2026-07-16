@@ -222,25 +222,24 @@ class XtreamApi(
         return try {
             val root = gson.fromJson(response.body, JsonObject::class.java) ?: return null
             val info = root.getAsJsonObject("info")
-            val episodesObj = root.getAsJsonObject("episodes") ?: JsonObject()
-            val seasons = linkedMapOf<String, List<SeriesEpisode>>()
-            for ((seasonKey, seasonValue) in episodesObj.entrySet()) {
-                if (!seasonValue.isJsonArray) continue
-                val eps = seasonValue.asJsonArray.mapNotNull { el ->
-                    val ep = el.asJsonObjectOrNull() ?: return@mapNotNull null
-                    val epInfo = ep.getAsJsonObject("info")
-                    SeriesEpisode(
-                        id = ep.get("id")?.asIntOrZero() ?: 0,
-                        title = ep.get("title")?.asStringOrNull() ?: "",
-                        episodeNum = ep.get("episode_num")?.asIntOrZero() ?: 0,
-                        season = seasonKey,
-                        extension = ep.get("container_extension")?.asStringOrNull() ?: "mp4",
-                        plot = epInfo?.get("plot")?.asStringOrNull() ?: "",
-                        image = imageUrl(epInfo, "movie_image", "cover_big", "cover")
-                            .ifBlank { imageUrl(ep, "movie_image", "cover_big", "cover") },
-                    )
-                }.filter { it.id > 0 }
-                if (eps.isNotEmpty()) seasons[seasonKey] = eps
+            val seasons = linkedMapOf<String, MutableList<SeriesEpisode>>()
+            val episodesEl = root.get("episodes")
+            when {
+                episodesEl?.isJsonObject == true -> {
+                    for ((seasonKey, seasonValue) in episodesEl.asJsonObject.entrySet()) {
+                        mergeSeasonEpisodes(seasons, seasonKey, seasonValue)
+                    }
+                }
+                episodesEl?.isJsonArray == true -> {
+                    for (element in episodesEl.asJsonArray) {
+                        val episode = parseSeriesEpisode(element, "") ?: continue
+                        val key = normalizeSeasonKey(episode.season)
+                        seasons.getOrPut(key) { mutableListOf() }.add(episode)
+                    }
+                }
+            }
+            val normalized = seasons.mapValues { (_, eps) ->
+                eps.sortedBy { it.episodeNum }
             }
             val name = info?.get("name")?.asStringOrNull() ?: ""
             SeriesDetail(
@@ -255,11 +254,60 @@ class XtreamApi(
                     ?: "",
                 trailerUrl = MetaExtractor.trailerFrom(name, info, root).orEmpty(),
                 cast = MetaExtractor.castFrom(info),
-                seasons = seasons,
+                seasons = normalized,
             )
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun mergeSeasonEpisodes(
+        seasons: LinkedHashMap<String, MutableList<SeriesEpisode>>,
+        seasonKey: String,
+        seasonValue: JsonElement,
+    ) {
+        val key = normalizeSeasonKey(seasonKey)
+        val elements = when {
+            seasonValue.isJsonArray -> seasonValue.asJsonArray.toList()
+            seasonValue.isJsonObject -> seasonValue.asJsonObject.entrySet().map { it.value }
+            else -> emptyList()
+        }
+        val eps = elements.mapNotNull { parseSeriesEpisode(it, key) }
+        if (eps.isEmpty()) return
+        val bucket = seasons.getOrPut(key) { mutableListOf() }
+        bucket.addAll(eps)
+    }
+
+    private fun parseSeriesEpisode(element: JsonElement, seasonKey: String): SeriesEpisode? {
+        val ep = element.asJsonObjectOrNull() ?: return null
+        val epInfo = ep.getAsJsonObject("info")
+        val id = ep.get("id")?.asIntOrZero() ?: 0
+        if (id <= 0) return null
+        val season = normalizeSeasonKey(
+            ep.get("season")?.asStringOrNull()?.takeIf { it.isNotBlank() }
+                ?: ep.get("season_number")?.asStringOrNull()?.takeIf { it.isNotBlank() }
+                ?: seasonKey,
+        )
+        return SeriesEpisode(
+            id = id,
+            title = ep.get("title")?.asStringOrNull()?.trim().orEmpty(),
+            episodeNum = ep.get("episode_num")?.asIntOrZero() ?: 0,
+            season = season,
+            extension = ep.get("container_extension")?.asStringOrNull()?.ifBlank { "mp4" } ?: "mp4",
+            plot = epInfo?.get("plot")?.asStringOrNull()?.trim().orEmpty(),
+            image = imageUrl(epInfo, "movie_image", "cover_big", "cover")
+                .ifBlank { imageUrl(ep, "movie_image", "cover_big", "cover") },
+        )
+    }
+
+    private fun normalizeSeasonKey(raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return "1"
+        val numeric = trimmed.filter { it.isDigit() }
+        if (numeric.isNotEmpty()) {
+            return numeric.trimStart('0').ifEmpty { "0" }
+        }
+        return trimmed
     }
 
     fun vodInfo(profile: Profile, vodId: Int): VodInfo? {

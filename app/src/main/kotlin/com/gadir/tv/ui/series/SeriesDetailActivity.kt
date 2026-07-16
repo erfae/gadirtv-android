@@ -16,12 +16,14 @@ import com.gadir.tv.R
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
+import com.gadir.tv.model.SeriesDetail
 import com.gadir.tv.model.SeriesEpisode
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.RecyclerViewUtil
+import com.gadir.tv.util.TvFocusHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,22 +35,27 @@ class SeriesDetailActivity : BaseLocaleActivity() {
     private var selectedSeason: String? = null
     private var fallbackCover = ""
     private var seriesName = ""
+    private var seriesId = 0
+    private var loadToken = 0
+    private var seasonAdapter: SeasonAdapter? = null
 
     private lateinit var seasonList: RecyclerView
     private lateinit var episodeList: RecyclerView
     private lateinit var loadingView: TextView
     private lateinit var btnSeriesPlay: TextView
+    private lateinit var seriesPlot: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_series_detail)
 
         resumeStore = ResumeStore(this)
-        val seriesId = intent.getIntExtra(EXTRA_SERIES_ID, 0)
+        seriesId = intent.getIntExtra(EXTRA_SERIES_ID, 0)
         seriesName = intent.getStringExtra(EXTRA_SERIES_NAME).orEmpty()
         fallbackCover = intent.getStringExtra(EXTRA_SERIES_COVER).orEmpty()
 
         findViewById<TextView>(R.id.seriesTitle).text = seriesName
+        seriesPlot = findViewById(R.id.seriesPlot)
         btnSeriesPlay = findViewById(R.id.btnSeriesPlay)
         btnSeriesPlay.setOnClickListener { playFirstEpisode() }
         if (fallbackCover.isNotEmpty()) {
@@ -61,80 +68,103 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         loadingView = findViewById(R.id.seriesLoading)
 
         seasonList.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        seasonList.isNestedScrollingEnabled = true
         episodeList.layoutManager = LinearLayoutManager(this)
 
-        loadingView.visibility = View.VISIBLE
-        episodeList.visibility = View.GONE
-        seasonList.visibility = View.GONE
+        val btnReload = findViewById<TextView>(R.id.btnSeriesReload)
+        TvFocusHelper.bindButton(btnReload) { loadSeriesDetail() }
 
-        val profile = PlaylistRepository.profile
-        if (profile == null || seriesId <= 0) {
+        if (PlaylistRepository.profile == null || seriesId <= 0) {
             finish()
             return
         }
 
+        loadSeriesDetail()
+    }
+
+    private fun loadSeriesDetail() {
+        val token = ++loadToken
+        loadingView.visibility = View.VISIBLE
+        episodeList.visibility = View.GONE
+        seasonList.visibility = View.GONE
+        btnSeriesPlay.visibility = View.GONE
+
         lifecycleScope.launch {
             val detail = withContext(Dispatchers.IO) {
-                api.seriesInfo(profile, seriesId)
+                api.seriesInfo(PlaylistRepository.profile!!, seriesId)
             }
+            if (token != loadToken) return@launch
             loadingView.visibility = View.GONE
             if (detail == null) {
-                findViewById<TextView>(R.id.seriesPlot).text = getString(R.string.series_load_failed)
+                seriesPlot.text = getString(R.string.series_load_failed)
+                seasonList.visibility = View.GONE
+                episodeList.visibility = View.GONE
+                btnSeriesPlay.visibility = View.GONE
                 return@launch
             }
-
-            findViewById<TextView>(R.id.seriesTitle).text =
-                detail.name.ifEmpty { seriesName }
-            val meta = buildList {
-                if (detail.releaseDate.isNotEmpty()) add(detail.releaseDate.take(4))
-                if (detail.genre.isNotEmpty()) add(detail.genre)
-                if (detail.rating.isNotEmpty()) add("★ ${detail.rating}")
-            }.joinToString(" · ")
-            findViewById<TextView>(R.id.seriesMeta).text = meta
-            findViewById<TextView>(R.id.seriesPlot).text =
-                detail.plot.ifBlank { getString(R.string.hero_plot_empty) }
-
-            val castView = findViewById<TextView>(R.id.seriesCast)
-            if (detail.cast.isNotBlank()) {
-                castView.visibility = View.VISIBLE
-                castView.text = getString(R.string.movie_cast, detail.cast)
-            }
-
-            val backdrop = detail.backdrop.ifBlank { detail.cover.ifBlank { fallbackCover } }
-            if (backdrop.isNotEmpty()) {
-                ImageLoader.loadPoster(findViewById(R.id.seriesBackdrop), backdrop)
-            }
-            val poster = detail.cover.ifBlank { fallbackCover }
-            if (poster.isNotEmpty()) {
-                fallbackCover = poster
-                ImageLoader.loadPoster(findViewById(R.id.seriesPoster), poster, 280, 420)
-            }
-
-            seasons = detail.seasons
-            val keys = seasons.keys.sortedBy { it.toIntOrNull() ?: 0 }
-            if (keys.isEmpty()) {
-                findViewById<TextView>(R.id.seriesPlot).text = getString(R.string.hero_plot_empty)
-                return@launch
-            }
-
-            btnSeriesPlay.visibility = View.VISIBLE
-            selectedSeason = keys.first()
-
-            seasonList.visibility = View.VISIBLE
-            episodeList.visibility = View.VISIBLE
-            seasonList.adapter = SeasonAdapter(keys) { season ->
-                selectedSeason = season
-                reloadEpisodes()
-            }
-            RecyclerViewUtil.expandInScrollView(seasonList)
-            reloadEpisodes()
-            btnSeriesPlay.requestFocus()
+            bindDetail(detail)
         }
     }
 
+    private fun bindDetail(detail: SeriesDetail) {
+        findViewById<TextView>(R.id.seriesTitle).text = detail.name.ifEmpty { seriesName }
+        val meta = buildList {
+            if (detail.releaseDate.isNotEmpty()) add(detail.releaseDate.take(4))
+            if (detail.genre.isNotEmpty()) add(detail.genre)
+            if (detail.rating.isNotEmpty()) add("★ ${detail.rating}")
+        }.joinToString(" · ")
+        findViewById<TextView>(R.id.seriesMeta).text = meta
+        seriesPlot.text = detail.plot.ifBlank { getString(R.string.hero_plot_empty) }
+
+        val castView = findViewById<TextView>(R.id.seriesCast)
+        if (detail.cast.isNotBlank()) {
+            castView.visibility = View.VISIBLE
+            castView.text = getString(R.string.movie_cast, detail.cast)
+        } else {
+            castView.visibility = View.GONE
+        }
+
+        val backdrop = detail.backdrop.ifBlank { detail.cover.ifBlank { fallbackCover } }
+        if (backdrop.isNotEmpty()) {
+            ImageLoader.loadPoster(findViewById(R.id.seriesBackdrop), backdrop)
+        }
+        val poster = detail.cover.ifBlank { fallbackCover }
+        if (poster.isNotEmpty()) {
+            fallbackCover = poster
+            ImageLoader.loadPoster(findViewById(R.id.seriesPoster), poster, 280, 420)
+        }
+
+        seasons = detail.seasons
+        val keys = seasons.keys.sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
+        if (keys.isEmpty()) {
+            seriesPlot.text = getString(R.string.hero_plot_empty)
+            seasonList.visibility = View.GONE
+            episodeList.visibility = View.GONE
+            btnSeriesPlay.visibility = View.GONE
+            return
+        }
+
+        btnSeriesPlay.visibility = View.VISIBLE
+        if (selectedSeason == null || selectedSeason !in keys) {
+            selectedSeason = keys.first()
+        }
+
+        seasonList.visibility = View.VISIBLE
+        episodeList.visibility = View.VISIBLE
+        seasonAdapter = SeasonAdapter(keys, selectedSeason) { season ->
+            selectedSeason = season
+            seasonAdapter?.setSelectedSeason(season)
+            reloadEpisodes()
+        }.also { adapter ->
+            seasonList.adapter = adapter
+        }
+        reloadEpisodes()
+        btnSeriesPlay.requestFocus()
+    }
+
     private fun playFirstEpisode() {
-        val season = selectedSeason ?: seasons.keys.sortedBy { it.toIntOrNull() ?: 0 }.firstOrNull()
-        val episode = season?.let { seasons[it]?.firstOrNull() }
+        val season = selectedSeason ?: seasons.keys.sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }.firstOrNull()
+        val episode = season?.let { seasons[it]?.minByOrNull { ep -> ep.episodeNum } }
         if (episode != null) {
             playEpisode(episode)
         }
@@ -146,7 +176,9 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         episodeList.adapter = EpisodeAdapter(eps, fallbackCover) { ep ->
             playEpisode(ep)
         }
-        RecyclerViewUtil.expandInScrollView(episodeList)
+        if (findViewById<View?>(R.id.seriesScroll) != null) {
+            RecyclerViewUtil.expandInScrollView(episodeList)
+        }
     }
 
     private fun playEpisode(ep: SeriesEpisode) {
@@ -170,17 +202,27 @@ class SeriesDetailActivity : BaseLocaleActivity() {
 
     private class SeasonAdapter(
         private val seasons: List<String>,
+        selectedSeason: String?,
         private val onClick: (String) -> Unit,
     ) : RecyclerView.Adapter<SeasonAdapter.Holder>() {
-        private var selected = 0
+        private var selected = seasons.indexOf(selectedSeason).coerceAtLeast(0)
 
         inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
-            val label: TextView = view.findViewById(R.id.categoryName)
+            val label: TextView = view.findViewById(R.id.seasonLabel)
+        }
+
+        fun setSelectedSeason(season: String) {
+            val index = seasons.indexOf(season)
+            if (index < 0) return
+            val old = selected
+            selected = index
+            notifyItemChanged(old)
+            notifyItemChanged(selected)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
             val view = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_category, parent, false)
+                .inflate(R.layout.item_season_chip, parent, false)
             return Holder(view)
         }
 
@@ -196,9 +238,6 @@ class SeriesDetailActivity : BaseLocaleActivity() {
                 notifyItemChanged(old)
                 notifyItemChanged(selected)
                 onClick(seasons[pos])
-                RecyclerViewUtil.expandInScrollView(
-                    (holder.itemView.parent as? RecyclerView) ?: return@setOnClickListener,
-                )
             }
         }
 
