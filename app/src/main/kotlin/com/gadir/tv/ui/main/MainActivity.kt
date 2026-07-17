@@ -108,6 +108,8 @@ class MainActivity : BaseLocaleActivity() {
     private var previewToken = 0
     private var selectedLiveCategoryId: String? = null
     private var liveChannelsLoaded = false
+    private var liveEnterContentOnLoad = false
+    private var catalogEnterContentOnLoad = false
     private var selectedCatalogCategoryId: String? = null
     private var movieCategoryId: String? = null
     private var seriesCategoryId: String? = null
@@ -534,7 +536,6 @@ class MainActivity : BaseLocaleActivity() {
         if (DeviceUi.useDpadFocus(this)) {
             liveChannelsLoaded = false
             selectedLiveCategoryId = null
-            showLiveSelectPrompt()
         } else {
             selectedLiveCategoryId = liveChannelStore.lastCategoryId?.takeIf { it.isNotEmpty() }
             liveChannelsLoaded = true
@@ -549,11 +550,15 @@ class MainActivity : BaseLocaleActivity() {
         else -> cat.id
     }
 
-    private fun applyLiveCategoryClick(cat: Category) {
+    private fun applyLiveCategoryClick(cat: Category, enterContent: Boolean = false) {
         val newId = liveCategoryId(cat)
-        if (liveChannelsLoaded && newId == selectedLiveCategoryId) return
+        if (liveChannelsLoaded && newId == selectedLiveCategoryId) {
+            if (enterContent) focusFirstChannel()
+            return
+        }
         highlightLiveCategory(newId)
         liveChannelsLoaded = true
+        liveEnterContentOnLoad = enterContent
         reloadChannels(keepCategoryFocus = true, autoPreviewFirst = false)
     }
 
@@ -584,12 +589,13 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun openLiveTabAtFirstGroup() {
         liveCategoryHandler.removeCallbacksAndMessages(null)
-        liveChannelsLoaded = false
-        selectedLiveCategoryId = null
-        channels.clear()
-        channelAdapter?.notifyDataSetChanged()
-        showLiveSelectPrompt()
-        bindLiveCategoryAdapter()
+        if (liveCategories.isEmpty()) return
+        val firstId = liveCategoryId(liveCategories.first())
+        selectedLiveCategoryId = firstId
+        liveChannelsLoaded = true
+        liveEnterContentOnLoad = false
+        highlightLiveCategory(firstId)
+        reloadChannels(keepCategoryFocus = true, autoPreviewFirst = false)
     }
 
     private fun enterLiveTabFocus() {
@@ -646,12 +652,11 @@ class MainActivity : BaseLocaleActivity() {
         liveCategoryList.adapter = CategoryAdapter(
             items = liveCategories,
             selectedId = { liveCategoryAdapterSelectedId() },
-            onClick = { cat -> applyLiveCategoryClick(cat) },
+            onClick = { cat -> applyLiveCategoryClick(cat, enterContent = true) },
             onFocus = null,
             onMoveRight = {
-                if (liveChannelsLoaded && channels.isNotEmpty()) {
-                    focusFirstChannel()
-                }
+                val index = if (liveChannelsLoaded) liveCategoryIndex() else 0
+                liveCategories.getOrNull(index)?.let { applyLiveCategoryClick(it, enterContent = true) }
             },
             onMoveUp = { focusHeaderReload() },
             upFocusViewId = R.id.btnReload,
@@ -866,16 +871,34 @@ class MainActivity : BaseLocaleActivity() {
         val cats = catalogCategoriesFor(tab)
         catalogCategories.clear()
         catalogCategories.addAll(cats)
-        selectedCatalogCategoryId = null
+        val firstId = cats.firstOrNull()?.id ?: return
+        selectedCatalogCategoryId = firstId
         when (tab) {
-            Tab.MOVIES -> movieCategoryId = null
-            Tab.SERIES -> seriesCategoryId = null
+            Tab.MOVIES -> movieCategoryId = firstId
+            Tab.SERIES -> seriesCategoryId = firstId
             else -> Unit
         }
-        posterItems.clear()
-        updateCatalogGrid()
-        showCatalogSelectPrompt()
+        catalogEnterContentOnLoad = false
         bindCatalogCategoryAdapter(tab)
+        loadCatalogItems(tab, firstId)
+    }
+
+    private fun selectCatalogGroup(tab: Tab, cat: Category, enterContent: Boolean) {
+        val catId = cat.id
+        if (catId == selectedCatalogCategoryId && posterItems.isNotEmpty()) {
+            if (enterContent) focusFirstCatalogItem()
+            return
+        }
+        catalogEnterContentOnLoad = enterContent
+        catalogCategoryHandler.removeCallbacksAndMessages(null)
+        highlightCatalogCategory(tab, catId)
+        loadCatalogItems(tab, catId)
+    }
+
+    private fun maybeEnterCatalogContent() {
+        if (!catalogEnterContentOnLoad || posterItems.isEmpty()) return
+        catalogEnterContentOnLoad = false
+        catalogGrid.post { TvNavHelper.focusItem(catalogGrid, 0) }
     }
 
     private fun highlightCatalogCategory(tab: Tab, catId: String) {
@@ -2371,7 +2394,7 @@ class MainActivity : BaseLocaleActivity() {
             else -> Unit
         }
         if (DeviceUi.useDpadFocus(this)) {
-            showCatalogSelectPrompt()
+            // Content loads when entering the tab via openCatalogTabAtFirstGroup.
         } else {
             selectedCatalogCategoryId?.let { loadCatalogItems(tab, it) }
         }
@@ -2417,21 +2440,21 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun bindCatalogCategoryAdapter(tab: Tab) {
-        val applyCategory: (Category) -> Unit = { cat ->
-            catalogCategoryHandler.removeCallbacksAndMessages(null)
-            highlightCatalogCategory(tab, cat.id)
-            loadCatalogItems(tab, cat.id)
-        }
-
         catalogCategoryAdapter = CategoryAdapter(
             items = catalogCategories,
             selectedId = { selectedCatalogCategoryId },
-            onClick = applyCategory,
+            onClick = { cat ->
+                withCatalogCategoryAccess(tab, cat) {
+                    selectCatalogGroup(tab, cat, enterContent = true)
+                }
+            },
             onFocus = null,
             onMoveRight = {
-                val index = catalogCategories.indexOfFirst { it.id == selectedCatalogCategoryId }
-                if (index >= 0 && posterItems.isNotEmpty()) {
-                    focusFirstCatalogItem()
+                val index = catalogCategoryIndex()
+                catalogCategories.getOrNull(index)?.let { cat ->
+                    withCatalogCategoryAccess(tab, cat) {
+                        selectCatalogGroup(tab, cat, enterContent = true)
+                    }
                 }
             },
             onMoveUp = { focusHeaderReload() },
@@ -2542,6 +2565,7 @@ class MainActivity : BaseLocaleActivity() {
         }
         bindCatalogHero(Tab.MOVIES, getString(R.string.rail_continue), records.firstOrNull()?.imageUrl.orEmpty())
         updateCatalogGrid()
+        if (DeviceUi.useDpadFocus(this)) maybeEnterCatalogContent()
     }
 
     private fun bindResumeSeries() {
@@ -2561,6 +2585,7 @@ class MainActivity : BaseLocaleActivity() {
         }
         bindCatalogHero(Tab.SERIES, getString(R.string.rail_continue), records.firstOrNull()?.imageUrl.orEmpty())
         updateCatalogGrid()
+        if (DeviceUi.useDpadFocus(this)) maybeEnterCatalogContent()
     }
 
     private fun catalogCategoriesFor(tab: Tab): List<Category> {
@@ -2626,6 +2651,7 @@ class MainActivity : BaseLocaleActivity() {
             )
         }
         updateCatalogGrid()
+        if (DeviceUi.useDpadFocus(this)) maybeEnterCatalogContent()
     }
 
     private fun bindSeries(series: List<SeriesItem>) {
@@ -2645,6 +2671,7 @@ class MainActivity : BaseLocaleActivity() {
             )
         }
         updateCatalogGrid()
+        if (DeviceUi.useDpadFocus(this)) maybeEnterCatalogContent()
     }
 
     private fun updateCatalogGrid() {
@@ -2895,10 +2922,20 @@ class MainActivity : BaseLocaleActivity() {
                     if (channels.isEmpty()) return@post
                     val previewIndex = 0
                     channelList.scrollToPosition(previewIndex)
-                    if (autoPreviewFirst && DeviceUi.useDpadFocus(this@MainActivity)) {
-                        TvNavHelper.focusItem(channelList, previewIndex)
+                    when {
+                        liveEnterContentOnLoad -> {
+                            liveEnterContentOnLoad = false
+                            TvNavHelper.focusItem(channelList, previewIndex)
+                            schedulePreviewAfterChannelFocus(previewIndex)
+                        }
+                        autoPreviewFirst && DeviceUi.useDpadFocus(this@MainActivity) -> {
+                            TvNavHelper.focusItem(channelList, previewIndex)
+                            schedulePreviewAfterChannelFocus(previewIndex)
+                        }
+                        else -> {
+                            channels.getOrNull(previewIndex)?.let { schedulePreview(it) }
+                        }
                     }
-                    schedulePreviewAfterChannelFocus(previewIndex)
                 }
             }
         }
@@ -3267,10 +3304,10 @@ class MainActivity : BaseLocaleActivity() {
             Tab.MOVIES, Tab.SERIES -> {
                 when {
                     isFocusInHeader() -> focusBottomTab(currentTab)
-                    isFocusInBottomNav() -> focusFirstCatalogCategory()
-                    isFocusInList(catalogGrid) -> focusFirstCatalogCategory()
+                    isFocusInBottomNav() -> focusCatalogCategoryList()
+                    isFocusInList(catalogGrid) -> focusCatalogCategoryList()
                     isFocusInList(catalogCategoryList) -> focusBottomTab(currentTab)
-                    else -> focusFirstCatalogCategory()
+                    else -> focusCatalogCategoryList()
                 }
             }
         }

@@ -81,10 +81,7 @@ class CategoryAdapter(
                         false
                     }
                 }
-                KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    val pos = holder.bindingAdapterPosition
-                    pos == items.lastIndex
-                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> false
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     val pos = holder.bindingAdapterPosition
                     if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
