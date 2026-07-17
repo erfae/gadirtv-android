@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.data.ParentalControlStore
+import com.gadir.tv.data.ParentalSession
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.SearchRepository
 import com.gadir.tv.data.XtreamApi
@@ -199,23 +200,55 @@ class SearchActivity : BaseLocaleActivity() {
     }
 
     private fun withChannelAccess(channel: LiveChannel, action: () -> Unit) {
-        if (!parentalStore.requiresPinForChannel(channel, null)) {
+        if (!parentalStore.requiresPinForChannel(channel, channel.categoryId)) {
             action()
             return
         }
         ParentalPinDialog.show(
             this,
             getString(R.string.parental_pin_channel, channel.name),
-            onVerified = action,
+            onVerified = {
+                ParentalSession.unlock(ParentalSession.liveChannelKey(channel.streamId))
+                if (channel.categoryId.isNotBlank()) {
+                    ParentalSession.unlock(ParentalSession.liveCategoryKey(channel.categoryId))
+                }
+                action()
+            },
         )
     }
 
     private fun withMovieAccess(movie: VodMovie, action: () -> Unit) {
-        action()
+        if (!parentalStore.requiresPinForMovie(movie)) {
+            action()
+            return
+        }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_content, movie.name),
+            onVerified = {
+                if (movie.categoryId.isNotBlank()) {
+                    ParentalSession.unlock(ParentalSession.vodCategoryKey(movie.categoryId))
+                }
+                action()
+            },
+        )
     }
 
     private fun withSeriesAccess(series: SeriesItem, action: () -> Unit) {
-        action()
+        if (!parentalStore.requiresPinForSeriesItem(series)) {
+            action()
+            return
+        }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_content, series.name),
+            onVerified = {
+                if (series.categoryId.isNotBlank()) {
+                    ParentalSession.unlock(ParentalSession.seriesCategoryKey(series.categoryId))
+                }
+                action()
+            },
+        )
     }
 
     private fun playChannel(channel: LiveChannel) {
