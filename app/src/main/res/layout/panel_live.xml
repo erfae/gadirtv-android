@@ -48,7 +48,7 @@
     <FrameLayout
         android:id="@+id/previewContainer"
         android:layout_width="match_parent"
-        android:layout_height="200dp"
+        android:layout_height="168dp"
         android:background="@drawable/preview_focus_bg"
         android:clickable="true"
         android:descendantFocusability="blocksDescendants"

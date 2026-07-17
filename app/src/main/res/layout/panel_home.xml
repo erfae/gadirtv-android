@@ -10,19 +10,19 @@
         android:layout_height="wrap_content"
         android:background="@color/gtv_bg"
         android:descendantFocusability="afterDescendants"
-        android:minHeight="168dp">
+        android:minHeight="132dp">
 
         <ImageView
             android:id="@+id/heroImage"
             android:layout_width="match_parent"
-            android:layout_height="168dp"
+            android:layout_height="132dp"
             android:contentDescription="@null"
             android:scaleType="centerCrop"
             android:src="@drawable/hero_placeholder_bg" />
 
         <View
             android:layout_width="match_parent"
-            android:layout_height="168dp"
+            android:layout_height="132dp"
             android:background="@drawable/hero_scrim_left" />
 
         <LinearLayout
@@ -31,7 +31,7 @@
             android:layout_gravity="bottom"
             android:orientation="vertical"
             android:paddingHorizontal="12dp"
-            android:paddingTop="72dp"
+            android:paddingTop="48dp"
             android:paddingBottom="12dp">
 
             <TextView
@@ -175,7 +175,7 @@
                 android:layout_height="wrap_content"
                 android:clipChildren="false"
                 android:clipToPadding="false"
-                android:minHeight="148dp"
+                android:minHeight="112dp"
                 android:nestedScrollingEnabled="false"
                 android:paddingHorizontal="12dp"
                 android:paddingTop="6dp"
@@ -201,7 +201,7 @@
                 android:layout_height="wrap_content"
                 android:clipChildren="false"
                 android:clipToPadding="false"
-                android:minHeight="148dp"
+                android:minHeight="112dp"
                 android:nestedScrollingEnabled="false"
                 android:paddingHorizontal="12dp"
                 android:paddingTop="6dp"
@@ -227,7 +227,7 @@
                 android:layout_height="wrap_content"
                 android:clipChildren="false"
                 android:clipToPadding="false"
-                android:minHeight="148dp"
+                android:minHeight="112dp"
                 android:nestedScrollingEnabled="false"
                 android:paddingHorizontal="12dp"
                 android:paddingTop="6dp"
@@ -252,7 +252,7 @@
                 android:layout_height="wrap_content"
                 android:clipChildren="false"
                 android:clipToPadding="false"
-                android:minHeight="148dp"
+                android:minHeight="112dp"
                 android:nestedScrollingEnabled="false"
                 android:paddingHorizontal="12dp"
                 android:paddingTop="6dp"
