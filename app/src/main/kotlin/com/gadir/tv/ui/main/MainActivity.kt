@@ -333,11 +333,13 @@ class MainActivity : BaseLocaleActivity() {
         seriesRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
 
         heroPlay.setOnFocusChangeListener { view, hasFocus ->
-            FocusScaleHelper.applyConeFocus(view, hasFocus)
-            if (hasFocus) {
-                railPreviewItem = null
-                bindHero(heroItems.getOrNull(heroIndex) ?: return@setOnFocusChangeListener)
-                startHeroRotation()
+            if (DeviceUi.useDpadFocus(this)) {
+                FocusScaleHelper.applyConeFocus(view, hasFocus)
+                if (hasFocus) {
+                    railPreviewItem = null
+                    bindHero(heroItems.getOrNull(heroIndex) ?: return@setOnFocusChangeListener)
+                    startHeroRotation()
+                }
             }
         }
         heroPlay.setOnKeyListener { _, keyCode, event ->
@@ -861,7 +863,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun focusHeroOnStart() {
-        if (currentTab != Tab.HOME || DeviceUi.isCompact(this)) return
+        if (currentTab != Tab.HOME || !DeviceUi.useDpadFocus(this)) return
         homeScrollView.post { homeScrollView.smoothScrollTo(0, 0) }
         if (heroItems.isEmpty()) return
         heroPlay.post {
@@ -1027,20 +1029,6 @@ class MainActivity : BaseLocaleActivity() {
         buildFavoriteItems()
         buildResumeItems()
 
-        wireHomeRails()
-        resumeRailTitle.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
-        resumeRail.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
-
-        favoritesRailTitle.visibility =
-            if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
-        favoritesRail.visibility =
-            if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
-
-        moviesRailTitle.visibility = if (recentMovies.isEmpty()) View.GONE else View.VISIBLE
-        moviesRail.visibility = if (recentMovies.isEmpty()) View.GONE else View.VISIBLE
-        seriesRailTitle.visibility = if (recentSeries.isEmpty()) View.GONE else View.VISIBLE
-        seriesRail.visibility = if (recentSeries.isEmpty()) View.GONE else View.VISIBLE
-
         heroItems.clear()
         val heroMovies = recentMovies.filter { it.imageUrl.isNotBlank() }.take(6)
             .ifEmpty { recentMovies.take(6) }
@@ -1051,15 +1039,29 @@ class MainActivity : BaseLocaleActivity() {
         heroIndex = 0
         railPreviewItem = null
 
-        if (heroItems.isEmpty()) {
-            homeEmpty.visibility = View.VISIBLE
-        } else {
-            homeEmpty.visibility = View.GONE
-            panelHome.post {
-                if (isDestroyed || currentTab != Tab.HOME) return@post
+        panelHome.post {
+            if (isDestroyed || currentTab != Tab.HOME) return@post
+            wireHomeRails()
+            resumeRailTitle.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
+            resumeRail.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
+
+            favoritesRailTitle.visibility =
+                if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
+            favoritesRail.visibility =
+                if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
+
+            moviesRailTitle.visibility = if (recentMovies.isEmpty()) View.GONE else View.VISIBLE
+            moviesRail.visibility = if (recentMovies.isEmpty()) View.GONE else View.VISIBLE
+            seriesRailTitle.visibility = if (recentSeries.isEmpty()) View.GONE else View.VISIBLE
+            seriesRail.visibility = if (recentSeries.isEmpty()) View.GONE else View.VISIBLE
+
+            if (heroItems.isEmpty()) {
+                homeEmpty.visibility = View.VISIBLE
+            } else {
+                homeEmpty.visibility = View.GONE
                 bindHero(heroItems[heroIndex])
                 startHeroRotation()
-                if (!DeviceUi.isCompact(this)) {
+                if (DeviceUi.useDpadFocus(this)) {
                     focusHeroOnStart()
                 }
             }
@@ -2565,7 +2567,7 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (currentTab == Tab.HOME && shouldFocusHomeRailsOnResume && !DeviceUi.isCompact(this)) {
+        if (currentTab == Tab.HOME && shouldFocusHomeRailsOnResume && DeviceUi.useDpadFocus(this)) {
             focusHeroOnStart()
         } else if (currentTab == Tab.LIVE) {
             ensureLiveTabReady()
