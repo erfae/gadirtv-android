@@ -37,8 +37,10 @@ jobs:
       - name: Prepare APK
         run: |
           APK=$(find app/build/outputs/apk -name '*.apk' | head -1)
+          VERSION=$(grep 'versionName' app/build.gradle.kts | head -1 | sed 's/.*"\(.*\)".*/\1/')
           cp "$APK" GadirTV-AndroidTV.apk
-          ls -la GadirTV-AndroidTV.apk
+          cp "$APK" "GadirTV-${VERSION}.apk"
+          ls -la GadirTV-*.apk
 
       - uses: actions/upload-artifact@v4
         with:
@@ -74,9 +76,15 @@ jobs:
 
             100% Kotlin + ExoPlayer. Sin Flutter.
 
-            ```
-            https://github.com/${{ github.repository }}/releases/download/${{ steps.ver.outputs.tag }}/GadirTV-AndroidTV.apk
-            ```
+            ### Descargar (móvil y TV)
+
+            1. Abre esta página en el navegador (Chrome/Firefox).
+            2. Pulsa **Assets** (abajo) para desplegar los archivos.
+            3. Descarga **`GadirTV-${{ steps.ver.outputs.version }}.apk`**.
+
+            Enlace directo: [Descargar GadirTV-${{ steps.ver.outputs.version }}.apk](https://github.com/${{ github.repository }}/releases/download/${{ steps.ver.outputs.tag }}/GadirTV-${{ steps.ver.outputs.version }}.apk)
+
+            Si el navegador avisa del archivo, elige **Descargar de todos modos** (es normal con APK fuera de Play Store).
 
             **Package:** `com.gadir.tv`
 
