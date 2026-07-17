@@ -52,7 +52,6 @@ import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.AccountFormat
 import com.gadir.tv.util.ChannelIconHelper
 import com.gadir.tv.util.DeviceUi
-import com.gadir.tv.util.CategorySort
 import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.MetaExtractor
@@ -376,8 +375,26 @@ class MainActivity : BaseLocaleActivity() {
         }
 
         setupHeaderFocusChain()
+        configureCompactUi()
 
         showTab(Tab.HOME)
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    private fun configureCompactUi() {
+        if (!DeviceUi.isCompact(this)) return
+        headerDate.visibility = View.GONE
+        val heroHeight = dp(120)
+        heroImage.layoutParams = heroImage.layoutParams.apply { height = heroHeight }
+        panelHome.findViewById<View>(R.id.heroContainer)?.minimumHeight = heroHeight
+        heroTitle.textSize = 15f
+        heroPlot.maxLines = 1
+        heroPlay.layoutParams = heroPlay.layoutParams.apply { height = dp(36) }
+        listOf(favoritesRail, moviesRail, seriesRail).forEach { rail ->
+            rail.minimumHeight = dp(108)
+        }
     }
 
     private fun ensureLiveTabReady() {
@@ -429,7 +446,13 @@ class MainActivity : BaseLocaleActivity() {
                 }
             },
             onOpen = { channel ->
-                if (currentPreviewChannel?.streamId == channel.streamId &&
+                if (DeviceUi.isCompact(this)) {
+                    if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
+                        openFullscreen(channel)
+                    } else {
+                        selectChannelPreview(channel)
+                    }
+                } else if (currentPreviewChannel?.streamId == channel.streamId &&
                     (previewIsSettled() || previewingStreamId == channel.streamId)
                 ) {
                     openFullscreen(channel)
@@ -1348,11 +1371,7 @@ class MainActivity : BaseLocaleActivity() {
         val open = {
             openMovieEntryInternal(streamId, title, cover, extension)
         }
-        if (categoryId.isNotBlank() && parentalStore.isAdultVodCategory(categoryId)) {
-            open()
-        } else {
-            withMovieAccess(title, categoryId, open)
-        }
+        withMovieAccess(title, categoryId, open)
     }
 
     private fun openMovieEntryInternal(
@@ -1417,11 +1436,7 @@ class MainActivity : BaseLocaleActivity() {
                 ),
             )
         }
-        if (categoryId.isNotBlank() && parentalStore.isAdultSeriesCategory(categoryId)) {
-            open()
-        } else {
-            withSeriesAccess(title, categoryId, open)
-        }
+        withSeriesAccess(title, categoryId, open)
     }
 
     private fun playMovie(
@@ -1611,7 +1626,7 @@ class MainActivity : BaseLocaleActivity() {
         if (DeviceUi.isCompact(this)) {
             val dm = resources.displayMetrics
             val width = dm.widthPixels.coerceAtMost(720)
-            val height = (168f * dm.density).toInt().coerceAtMost(400)
+            val height = (120f * dm.density).toInt().coerceAtMost(320)
             ImageLoader.loadHeroBackdrop(target, fallbacks.first(), fallbacks.drop(1), width, height)
         } else {
             ImageLoader.loadHeroBackdrop(target, fallbacks.first(), fallbacks.drop(1))
@@ -2195,48 +2210,15 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun withCatalogCategoryAccess(tab: Tab, category: Category, action: () -> Unit) {
-        val needsPin = when (tab) {
-            Tab.MOVIES -> parentalStore.isAdultVodCategory(category.id)
-            Tab.SERIES -> parentalStore.isAdultSeriesCategory(category.id)
-            else -> false
-        }
-        if (!needsPin) {
-            action()
-            return
-        }
-        ParentalPinDialog.show(
-            this,
-            getString(R.string.parental_pin_message, category.name),
-            onVerified = action,
-        )
+        action()
     }
 
     private fun withMovieAccess(title: String, categoryId: String = "", action: () -> Unit) {
-        val adult = CategorySort.isAdultContent(title) ||
-            (categoryId.isNotBlank() && parentalStore.isAdultVodCategory(categoryId))
-        if (!adult) {
-            action()
-            return
-        }
-        ParentalPinDialog.show(
-            this,
-            getString(R.string.parental_pin_content, title),
-            onVerified = action,
-        )
+        action()
     }
 
     private fun withSeriesAccess(title: String, categoryId: String = "", action: () -> Unit) {
-        val adult = CategorySort.isAdultContent(title) ||
-            (categoryId.isNotBlank() && parentalStore.isAdultSeriesCategory(categoryId))
-        if (!adult) {
-            action()
-            return
-        }
-        ParentalPinDialog.show(
-            this,
-            getString(R.string.parental_pin_content, title),
-            onVerified = action,
-        )
+        action()
     }
 
     private fun reloadChannels(keepCategoryFocus: Boolean = false, autoPreviewFirst: Boolean = false) {

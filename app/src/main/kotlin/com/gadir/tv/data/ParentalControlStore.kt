@@ -66,19 +66,11 @@ class ParentalControlStore(context: Context) {
         isAdultLiveCategory(channel.categoryId) ||
             CategorySort.isAdultContent(channel.name)
 
-    fun requiresPinForLiveCategory(categoryId: String?): Boolean = when (categoryId) {
-        null, "" -> false
-        LOCK_CATEGORY_ID -> hasLockedChannels()
-        else -> isAdultLiveCategory(categoryId)
-    }
+    fun requiresPinForLiveCategory(categoryId: String?): Boolean =
+        categoryId == LOCK_CATEGORY_ID && hasLockedChannels()
 
-    fun requiresPinForChannel(channel: LiveChannel, selectedCategoryId: String?): Boolean {
-        if (isChannelLocked(channel.streamId)) return true
-        if (selectedCategoryId == null) {
-            return isAdultLiveChannel(channel)
-        }
-        return false
-    }
+    fun requiresPinForChannel(channel: LiveChannel, selectedCategoryId: String?): Boolean =
+        isChannelLocked(channel.streamId)
 
     fun canLockChannel(channel: LiveChannel): Boolean =
         !isAdultLiveChannel(channel)

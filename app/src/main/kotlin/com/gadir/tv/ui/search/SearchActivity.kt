@@ -30,7 +30,6 @@ import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.ui.series.SeriesDetailActivity
 import com.gadir.tv.ui.settings.ParentalPinDialog
-import com.gadir.tv.util.CategorySort
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -200,7 +199,7 @@ class SearchActivity : BaseLocaleActivity() {
     }
 
     private fun withChannelAccess(channel: LiveChannel, action: () -> Unit) {
-        if (!parentalStore.isAdultLiveChannel(channel) && !parentalStore.isChannelLocked(channel.streamId)) {
+        if (!parentalStore.requiresPinForChannel(channel, null)) {
             action()
             return
         }
@@ -212,31 +211,11 @@ class SearchActivity : BaseLocaleActivity() {
     }
 
     private fun withMovieAccess(movie: VodMovie, action: () -> Unit) {
-        val adult = CategorySort.isAdultContent(movie.name) ||
-            parentalStore.isAdultVodCategory(movie.categoryId)
-        if (!adult) {
-            action()
-            return
-        }
-        ParentalPinDialog.show(
-            this,
-            getString(R.string.parental_pin_content, movie.name),
-            onVerified = action,
-        )
+        action()
     }
 
     private fun withSeriesAccess(series: SeriesItem, action: () -> Unit) {
-        val adult = CategorySort.isAdultContent(series.name) ||
-            parentalStore.isAdultSeriesCategory(series.categoryId)
-        if (!adult) {
-            action()
-            return
-        }
-        ParentalPinDialog.show(
-            this,
-            getString(R.string.parental_pin_content, series.name),
-            onVerified = action,
-        )
+        action()
     }
 
     private fun playChannel(channel: LiveChannel) {
