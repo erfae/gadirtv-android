@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewStub
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
@@ -100,6 +101,8 @@ class MainActivity : BaseLocaleActivity() {
     private var pendingPreview: Runnable? = null
     private var previewToken = 0
     private var selectedLiveCategoryId: String? = null
+    /** Resalta el grupo enfocado al instante; la lista de canales usa [selectedLiveCategoryId]. */
+    private var highlightedLiveCategoryId: String? = null
     private var selectedCatalogCategoryId: String? = null
     private var movieCategoryId: String? = null
     private var seriesCategoryId: String? = null
@@ -399,7 +402,7 @@ class MainActivity : BaseLocaleActivity() {
         val heroHeight = when {
             DeviceUi.isCompact(this) ->
                 (metrics.heightPixels * 0.40f).toInt().coerceIn(dp(220), dp(320))
-            DeviceUi.isTelevision(this) ->
+            DeviceUi.useDpadFocus(this) ->
                 (metrics.heightPixels * 0.45f).toInt().coerceIn(dp(280), dp(400))
             else -> dp(220)
         }
@@ -417,15 +420,28 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun configureHeroPosterLayout() {
-        val posterWidth = dp(100)
-        val posterHeight = dp(145)
-        val params = (heroPoster.layoutParams as? FrameLayout.LayoutParams)
-            ?: FrameLayout.LayoutParams(posterWidth, posterHeight)
-        params.width = posterWidth
-        params.height = posterHeight
-        params.gravity = Gravity.END or Gravity.CENTER_VERTICAL
-        params.marginEnd = dp(24)
-        heroPoster.layoutParams = params
+        val posterWidth = if (DeviceUi.isTelevision(this)) dp(120) else dp(100)
+        val posterHeight = if (DeviceUi.isTelevision(this)) dp(170) else dp(145)
+        heroPoster.visibility = View.VISIBLE
+        when (heroPoster.parent) {
+            is FrameLayout -> {
+                val params = (heroPoster.layoutParams as? FrameLayout.LayoutParams)
+                    ?: FrameLayout.LayoutParams(posterWidth, posterHeight)
+                params.width = posterWidth
+                params.height = posterHeight
+                params.gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                params.marginEnd = dp(24)
+                heroPoster.layoutParams = params
+            }
+            is LinearLayout -> {
+                val params = (heroPoster.layoutParams as? LinearLayout.LayoutParams)
+                    ?: LinearLayout.LayoutParams(posterWidth, posterHeight)
+                params.width = posterWidth
+                params.height = posterHeight
+                if (params.marginStart < dp(12)) params.marginStart = dp(16)
+                heroPoster.layoutParams = params
+            }
+        }
     }
 
     private fun ensureLiveTabReady() {
@@ -509,6 +525,7 @@ class MainActivity : BaseLocaleActivity() {
         )
         channelList.adapter = channelAdapter
         selectedLiveCategoryId = liveChannelStore.lastCategoryId?.takeIf { it.isNotEmpty() }
+        highlightedLiveCategoryId = selectedLiveCategoryId
         reloadChannels(keepCategoryFocus = true)
         (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
     }
@@ -538,6 +555,7 @@ class MainActivity : BaseLocaleActivity() {
         withLiveCategoryAccess(cat, newId) {
             try {
                 selectedLiveCategoryId = newId
+                highlightedLiveCategoryId = newId
                 (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
                 scrollLiveCategoryToSelection()
                 reloadChannels(
@@ -546,6 +564,7 @@ class MainActivity : BaseLocaleActivity() {
                 )
             } catch (_: Exception) {
                 selectedLiveCategoryId = newId
+                highlightedLiveCategoryId = newId
                 (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
                 scrollLiveCategoryToSelection()
                 reloadChannels(
@@ -554,6 +573,24 @@ class MainActivity : BaseLocaleActivity() {
                 )
             }
         }
+    }
+
+    private fun highlightLiveCategory(categoryId: String?) {
+        val newKey = categoryId ?: ""
+        val oldKey = highlightedLiveCategoryId ?: selectedLiveCategoryId ?: ""
+        if (newKey == oldKey) return
+        val adapter = liveCategoryList.adapter as? CategoryAdapter ?: return
+        val oldIndex = liveCategoryIndexFor(oldKey)
+        highlightedLiveCategoryId = categoryId
+        val newIndex = liveCategoryIndexFor(newKey)
+        adapter.refreshSelectionAt(oldIndex, newIndex)
+    }
+
+    private fun liveCategoryIndexFor(key: String): Int = when (key) {
+        "" -> 0
+        FavoritesStore.FAVORITES_CATEGORY_ID -> 1
+        ParentalControlStore.LOCK_CATEGORY_ID -> 2
+        else -> liveCategories.indexOfFirst { it.id == key }.takeIf { it >= 0 } ?: 0
     }
 
     private fun resetLivePreviewUi() {
@@ -594,6 +631,7 @@ class MainActivity : BaseLocaleActivity() {
         )
         liveCategories.addAll(PlaylistRepository.categories)
         selectedLiveCategoryId = currentId
+        highlightedLiveCategoryId = currentId
         val applyLiveCategory: (Category) -> Unit = { cat ->
             val newId = liveCategoryId(cat)
             if (DeviceUi.isCompact(this)) {
@@ -614,7 +652,11 @@ class MainActivity : BaseLocaleActivity() {
             onFocus = if (DeviceUi.isCompact(this)) {
                 null
             } else {
-                applyLiveCategory
+                { cat ->
+                    val newId = liveCategoryId(cat)
+                    highlightLiveCategory(newId)
+                    scheduleLiveCategoryApply(cat, newId)
+                }
             },
             onMoveRight = { focusFirstChannel() },
             onMoveUp = { focusBottomTab(Tab.LIVE) },
@@ -635,6 +677,7 @@ class MainActivity : BaseLocaleActivity() {
         val savedCategory = liveChannelStore.lastCategoryId?.takeIf { it.isNotEmpty() }
         if (savedCategory != selectedLiveCategoryId) {
             selectedLiveCategoryId = savedCategory
+            highlightedLiveCategoryId = savedCategory
             reloadChannels(keepCategoryFocus = true)
         }
         (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
@@ -654,6 +697,16 @@ class MainActivity : BaseLocaleActivity() {
         }
         channelList.scrollToPosition(index)
         TvNavHelper.focusItem(channelList, index)
+        if (!DeviceUi.isCompact(this)) {
+            schedulePreviewAfterChannelFocus(index)
+        }
+    }
+
+    private fun schedulePreviewAfterChannelFocus(index: Int) {
+        channelList.postDelayed({
+            if (currentTab != Tab.LIVE || reloadingChannels) return@postDelayed
+            channels.getOrNull(index)?.let { schedulePreview(it) }
+        }, 200L)
     }
 
     private fun zapChannel(delta: Int, keepPreviewFocus: Boolean = false) {
@@ -695,7 +748,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun liveSelectedCategoryKey(): String =
-        selectedLiveCategoryId ?: ""
+        highlightedLiveCategoryId ?: selectedLiveCategoryId ?: ""
 
     private fun focusHeader() {
         btnSettings.requestFocus()
@@ -754,15 +807,8 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun liveCategoryIndex(): Int {
-        return when (selectedLiveCategoryId) {
-            null -> 0
-            FavoritesStore.FAVORITES_CATEGORY_ID -> 1
-            ParentalControlStore.LOCK_CATEGORY_ID -> 2
-            else -> liveCategories.indexOfFirst { it.id == selectedLiveCategoryId }
-                .takeIf { it >= 0 } ?: 0
-        }
-    }
+    private fun liveCategoryIndex(): Int =
+        liveCategoryIndexFor(liveSelectedCategoryKey())
 
     private fun scrollLiveCategoryToSelection() {
         if (!liveTabReady) return
@@ -834,7 +880,15 @@ class MainActivity : BaseLocaleActivity() {
                 stopHeroRotation()
                 livePreviewPaused = false
                 VolumeHelper.boostOnPlaybackStart(this)
-                restoreLiveTabSession()
+                livePanel().post {
+                    if (currentTab != Tab.LIVE) return@post
+                    ensurePreviewPlayer()
+                    restoreLiveTabSession()
+                    if (!DeviceUi.isCompact(this)) {
+                        val channel = currentPreviewChannel ?: channels.firstOrNull()
+                        channel?.let { schedulePreview(it) }
+                    }
+                }
             }
             Tab.MOVIES, Tab.SERIES -> {
                 panelHome.visibility = View.GONE
@@ -2392,6 +2446,9 @@ class MainActivity : BaseLocaleActivity() {
                         channelList.post {
                             if (loadToken != channelsLoadToken || reloadingChannels) return@post
                             focusFirstChannel()
+                            if (!DeviceUi.isCompact(this@MainActivity)) {
+                                schedulePreviewAfterChannelFocus(0)
+                            }
                         }
                     }
                 }
@@ -2463,9 +2520,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun schedulePreview(channel: LiveChannel) {
         if (currentTab != Tab.LIVE || reloadingChannels) return
         livePreviewPaused = false
-        withChannelAccess(channel) {
-            schedulePreviewInternal(channel)
-        }
+        schedulePreviewInternal(channel)
     }
 
     private fun schedulePreviewInternal(channel: LiveChannel) {
@@ -2777,8 +2832,14 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (currentTab == Tab.HOME && shouldFocusHomeRailsOnResume && DeviceUi.useDpadFocus(this)) {
-            focusHeroOnStart()
+        if (currentTab == Tab.HOME) {
+            if (shouldFocusHomeRailsOnResume && DeviceUi.useDpadFocus(this)) {
+                focusHeroOnStart()
+            }
+            if (homeLoaded) {
+                railPreviewItem = null
+                startHeroRotation()
+            }
         } else if (currentTab == Tab.LIVE) {
             ensureLiveTabReady()
             livePreviewPaused = false
