@@ -9,19 +9,21 @@ import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.widget.ImageButton
+import android.widget.SeekBar
 import android.widget.TextView
-import com.gadir.tv.ui.BaseLocaleActivity
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
-import androidx.lifecycle.lifecycleScope
 import com.gadir.tv.data.LiveChannelStore
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.XtreamApi
-import com.gadir.tv.model.EpgEntry
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.player.LiveChannelNavigator
 import com.gadir.tv.player.LiveStreamUrls
-import com.gadir.tv.util.EpgFormatter
+import com.gadir.tv.ui.BaseLocaleActivity
+import com.gadir.tv.util.TimeFormat
 import com.gadir.tv.util.VolumeHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -34,19 +36,34 @@ import org.videolan.libvlc.util.VLCVideoLayout
 class VlcPlayerActivity : BaseLocaleActivity() {
     private var libVlc: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
-    private var overlaysVisible = false
-    private var playbackOverlayShown = false
+    private var controlsVisible = false
     private val pendingUrls = ArrayDeque<String>()
     private val hideHandler = Handler(Looper.getMainLooper())
-    private val hideOverlaysRunnable = Runnable { hideOverlays() }
+    private val hideControlsRunnable = Runnable { hideControls() }
+    private val progressRunnable = object : Runnable {
+        override fun run() {
+            updateVodProgress()
+            hideHandler.postDelayed(this, 1_000L)
+        }
+    }
     private val api = XtreamApi()
-    private lateinit var epgNowView: TextView
-    private lateinit var epgNextView: TextView
+
+    private lateinit var vodControls: View
+    private lateinit var epgPanel: View
+    private lateinit var volumeControls: View
+    private lateinit var btnBack: ImageButton
+    private lateinit var vodTitle: TextView
+    private lateinit var vodPosition: TextView
+    private lateinit var vodDuration: TextView
+    private lateinit var vodSeekBar: SeekBar
+    private lateinit var btnVodPlayPause: ImageButton
+
     private var currentStreamId = 0
-    private var currentEpgChannelId = ""
     private var isLivePlayback = false
     private var resumePositionMs = 0L
     private var resumeSeekPending = false
+    private var userSeeking = false
+    private var epgLoaded = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,26 +81,30 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             if (alt.isNotBlank() && alt !in pendingUrls) pendingUrls.add(alt)
         }
 
-        findViewById<TextView>(R.id.vlcTitle).text = title
-        epgNowView = findViewById(R.id.vlcEpgNow)
-        epgNextView = findViewById(R.id.vlcEpgNext)
-        findViewById<ImageButton>(R.id.btnFullscreen).visibility = View.GONE
-        findViewById<ImageButton>(R.id.btnVlcBack).setOnClickListener { finish() }
-        findViewById<org.videolan.libvlc.util.VLCVideoLayout>(R.id.vlcVideo).setOnClickListener {
-            showOverlays()
-        }
+        volumeControls = findViewById(R.id.vlcVolumeControls)
+        btnBack = findViewById(R.id.btnVlcBack)
+        vodControls = findViewById(R.id.vlcVodControls)
+        epgPanel = findViewById(R.id.vlcEpgPanel)
+
+        btnBack.setOnClickListener { finish() }
+        findViewById<VLCVideoLayout>(R.id.vlcVideo).setOnClickListener { showControls() }
+
         currentStreamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
         isLivePlayback = currentStreamId > 0
         resumePositionMs = intent.getLongExtra(EXTRA_POSITION_MS, 0L).coerceAtLeast(0L)
         resumeSeekPending = resumePositionMs > 0L && !isLivePlayback
-        loadLiveEpg(currentStreamId, intent.getStringExtra(EXTRA_EPG_CHANNEL_ID).orEmpty())
+
+        if (isLivePlayback) {
+            setupLiveUi(title)
+        } else {
+            setupVodControls(title)
+        }
 
         val settings = AppSettings(this)
-        val bufferMs = settings.networkBufferMs
-        val options = com.gadir.tv.player.VlcAudioOptions.baseOptions(bufferMs)
+        val options = com.gadir.tv.player.VlcAudioOptions.baseOptions(settings.networkBufferMs)
         libVlc = LibVLC(this, options)
         mediaPlayer = MediaPlayer(libVlc).apply {
-            attachViews(findViewById<VLCVideoLayout>(R.id.vlcVideo), null, false, false)
+            attachViews(findViewById(R.id.vlcVideo), null, false, false)
             volume = VLC_VOLUME
             setEventListener { event ->
                 when (event.type) {
@@ -93,64 +114,110 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                             mediaPlayer?.time = resumePositionMs
                             resumeSeekPending = false
                         }
-                        showOverlaysOnPlaybackStart()
+                        showControls()
+                        updatePlayPauseIcon()
                     }
+                    MediaPlayer.Event.Paused -> updatePlayPauseIcon()
                 }
             }
         }
         playUrl(url)
         VolumeHelper.boostOnPlaybackStart(this)
 
-        showOverlaysOnPlaybackStart()
-
         findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
             VolumeHelper.adjust(this, raise = true)
-            showOverlays()
+            showControls()
         }
         findViewById<ImageButton>(R.id.btnVolDown).setOnClickListener {
             VolumeHelper.adjust(this, raise = false)
-            showOverlays()
+            showControls()
         }
+
+        showControls()
     }
 
-    private fun loadLiveEpg(streamId: Int, epgChannelId: String = "") {
-        if (streamId <= 0) {
-            epgNowView.visibility = View.GONE
-            epgNextView.visibility = View.GONE
-            return
+    private fun setupLiveUi(channelTitle: String) {
+        vodControls.visibility = View.GONE
+        epgPanel.visibility = View.GONE
+        findViewById<TextView>(R.id.playerChannelTitle).text = channelTitle
+        loadFullscreenEpg(currentStreamId, intent.getStringExtra(EXTRA_EPG_CHANNEL_ID).orEmpty())
+    }
+
+    private fun setupVodControls(title: String) {
+        epgPanel.visibility = View.GONE
+        vodControls.visibility = View.GONE
+        vodTitle = vodControls.findViewById(R.id.vodTitle)
+        vodPosition = vodControls.findViewById(R.id.vodPosition)
+        vodDuration = vodControls.findViewById(R.id.vodDuration)
+        vodSeekBar = vodControls.findViewById(R.id.vodSeekBar)
+        btnVodPlayPause = vodControls.findViewById(R.id.btnVodPlayPause)
+        vodTitle.text = title
+
+        btnVodPlayPause.setOnClickListener { togglePlayPause() }
+        vodControls.findViewById<ImageButton>(R.id.btnVodRewind).setOnClickListener {
+            seekBy(-SEEK_STEP_MS)
+            showControls()
         }
-        currentEpgChannelId = epgChannelId
+        vodControls.findViewById<ImageButton>(R.id.btnVodForward).setOnClickListener {
+            seekBy(SEEK_STEP_MS)
+            showControls()
+        }
+        vodControls.findViewById<ImageButton>(R.id.btnVodVolUp).setOnClickListener {
+            VolumeHelper.adjust(this, raise = true)
+            showControls()
+        }
+        vodControls.findViewById<ImageButton>(R.id.btnVodVolDown).setOnClickListener {
+            VolumeHelper.adjust(this, raise = false)
+            showControls()
+        }
+        vodSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                val duration = mediaPlayer?.length ?: 0L
+                if (duration > 0L) {
+                    val position = (duration * progress) / seekBar!!.max
+                    vodPosition.text = TimeFormat.formatMs(position)
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                userSeeking = true
+                hideHandler.removeCallbacks(hideControlsRunnable)
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                userSeeking = false
+                val duration = mediaPlayer?.length ?: 0L
+                if (duration > 0L && seekBar != null) {
+                    val position = (duration * seekBar.progress) / seekBar.max
+                    mediaPlayer?.time = position
+                }
+                scheduleHideControls()
+            }
+        })
+    }
+
+    private fun loadFullscreenEpg(streamId: Int, epgChannelId: String) {
+        if (streamId <= 0) return
         val profile = PlaylistRepository.profile ?: return
-        epgNowView.text = getString(R.string.epg_loading)
-        epgNowView.visibility = View.VISIBLE
+        val loading = findViewById<TextView>(R.id.epgLoadingLabel)
+        val list = findViewById<RecyclerView>(R.id.epgList)
+        list.layoutManager = LinearLayoutManager(this)
+        loading.visibility = View.VISIBLE
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {
-                api.shortEpg(profile, streamId, epgChannelId = epgChannelId, limit = 8)
+                api.shortEpg(profile, streamId, epgChannelId = epgChannelId, limit = 10)
             }
             if (streamId != currentStreamId) return@launch
-            applyLiveEpg(epg)
-        }
-    }
-
-    private fun applyLiveEpg(epg: List<EpgEntry>) {
-        if (epg.isEmpty()) {
-            epgNowView.text = getString(R.string.epg_unavailable)
-            epgNextView.visibility = View.GONE
-            return
-        }
-        val currentIndex = EpgFormatter.currentIndex(epg)
-        val current = epg[currentIndex]
-        epgNowView.text = EpgFormatter.formatNowLine(this, current)
-        epgNowView.visibility = View.VISIBLE
-        val next = epg.getOrNull(currentIndex + 1)
-        if (next != null) {
-            epgNextView.text = EpgFormatter.formatNextLine(this, next)
-            epgNextView.visibility = View.VISIBLE
-        } else {
-            epgNextView.visibility = View.GONE
-        }
-        if (overlaysVisible) {
-            findViewById<View>(R.id.vlcOverlay).visibility = View.VISIBLE
+            loading.visibility = View.GONE
+            if (epg.isEmpty()) {
+                loading.visibility = View.VISIBLE
+                loading.text = getString(R.string.epg_unavailable)
+                return@launch
+            }
+            val now = System.currentTimeMillis() / 1000L
+            list.adapter = EpgAdapter(epg, now)
+            epgLoaded = true
         }
     }
 
@@ -172,6 +239,43 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         return true
     }
 
+    private fun togglePlayPause() {
+        val player = mediaPlayer ?: return
+        if (player.isPlaying) player.pause() else player.play()
+        updatePlayPauseIcon()
+        showControls()
+    }
+
+    private fun seekBy(deltaMs: Long) {
+        val player = mediaPlayer ?: return
+        val duration = player.length
+        if (duration <= 0L) return
+        val target = (player.time + deltaMs).coerceIn(0L, duration)
+        player.time = target
+        updateVodProgress()
+    }
+
+    private fun updatePlayPauseIcon() {
+        if (isLivePlayback || !::btnVodPlayPause.isInitialized) return
+        val playing = mediaPlayer?.isPlaying == true
+        btnVodPlayPause.setImageResource(
+            if (playing) R.drawable.ic_pause else R.drawable.ic_play,
+        )
+    }
+
+    private fun updateVodProgress() {
+        if (isLivePlayback || !::vodSeekBar.isInitialized) return
+        val player = mediaPlayer ?: return
+        val duration = player.length
+        if (duration <= 0L) return
+        val position = player.time
+        vodDuration.text = TimeFormat.formatMs(duration)
+        vodPosition.text = TimeFormat.formatMs(position)
+        if (!userSeeking) {
+            vodSeekBar.progress = ((position * vodSeekBar.max) / duration).toInt()
+        }
+    }
+
     private fun zapChannel(delta: Int) {
         if (!isLivePlayback || currentStreamId <= 0) return
         val channel = LiveChannelNavigator.neighbor(this, currentStreamId, delta) ?: return
@@ -181,17 +285,49 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun switchToChannel(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         currentStreamId = channel.streamId
-        currentEpgChannelId = channel.epgChannelId
         LiveChannelStore(this).lastStreamId = channel.streamId
-
-        findViewById<TextView>(R.id.vlcTitle).text = channel.name
-        loadLiveEpg(channel.streamId, channel.epgChannelId)
-
+        findViewById<TextView>(R.id.playerChannelTitle).text = channel.name
+        epgLoaded = false
+        loadFullscreenEpg(channel.streamId, channel.epgChannelId)
         val urls = LiveStreamUrls.candidates(api, profile, channel)
         pendingUrls.clear()
         pendingUrls.addAll(urls)
         playUrl(urls.first())
-        showOverlays()
+        showControls()
+    }
+
+    private fun showControls() {
+        controlsVisible = true
+        btnBack.visibility = View.VISIBLE
+        volumeControls.visibility = View.VISIBLE
+        if (isLivePlayback) {
+            epgPanel.visibility = View.VISIBLE
+            vodControls.visibility = View.GONE
+        } else {
+            vodControls.visibility = View.VISIBLE
+            epgPanel.visibility = View.GONE
+            updateVodProgress()
+            updatePlayPauseIcon()
+            hideHandler.removeCallbacks(progressRunnable)
+            hideHandler.post(progressRunnable)
+            btnVodPlayPause.requestFocus()
+        }
+        scheduleHideControls()
+    }
+
+    private fun hideControls() {
+        controlsVisible = false
+        btnBack.visibility = View.GONE
+        volumeControls.visibility = View.GONE
+        vodControls.visibility = View.GONE
+        epgPanel.visibility = View.GONE
+        hideHandler.removeCallbacks(hideControlsRunnable)
+        hideHandler.removeCallbacks(progressRunnable)
+    }
+
+    private fun scheduleHideControls() {
+        hideHandler.removeCallbacks(hideControlsRunnable)
+        hideHandler.postDelayed(hideControlsRunnable, CONTROLS_HIDE_MS)
     }
 
     override fun onResume() {
@@ -218,87 +354,74 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN) {
+        if (event.action != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event)
+
+        if (isLivePlayback) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_MENU -> {
-                    if (!overlaysVisible) {
-                        showOverlays()
+                    if (!controlsVisible) {
+                        showControls()
                         return true
                     }
-                    scheduleHideOverlays()
+                    scheduleHideControls()
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
-                    if (isLivePlayback) {
-                        zapChannel(-1)
-                        return true
-                    }
-                    if (!overlaysVisible) {
-                        showOverlays()
-                        return true
-                    }
-                    scheduleHideOverlays()
+                    zapChannel(-1)
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    if (isLivePlayback) {
-                        zapChannel(1)
-                        return true
-                    }
-                    if (!overlaysVisible) {
-                        showOverlays()
-                        return true
-                    }
-                    scheduleHideOverlays()
+                    zapChannel(1)
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     VolumeHelper.adjust(this, raise = false)
-                    showOverlays()
+                    showControls()
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     VolumeHelper.adjust(this, raise = true)
-                    showOverlays()
+                    showControls()
+                    return true
+                }
+            }
+        } else {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_MENU -> {
+                    if (!controlsVisible) {
+                        showControls()
+                        return true
+                    }
+                    togglePlayPause()
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (!controlsVisible) {
+                        showControls()
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (!controlsVisible) {
+                        seekBy(-SEEK_STEP_MS)
+                        showControls()
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (!controlsVisible) {
+                        seekBy(SEEK_STEP_MS)
+                        showControls()
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                    togglePlayPause()
                     return true
                 }
             }
         }
         return super.dispatchKeyEvent(event)
-    }
-
-    private fun showOverlaysOnPlaybackStart() {
-        if (!playbackOverlayShown) {
-            playbackOverlayShown = true
-            showOverlays(CONTROLS_HIDE_ON_START_MS)
-            return
-        }
-        showOverlays()
-    }
-
-    private fun showOverlays(hideAfterMs: Long = CONTROLS_HIDE_MS) {
-        overlaysVisible = true
-        findViewById<View>(R.id.vlcOverlay).visibility = View.VISIBLE
-        findViewById<View>(R.id.vlcVolumeControls).visibility = View.VISIBLE
-        if (!isLivePlayback) {
-            findViewById<View>(R.id.btnVlcBack).visibility = View.VISIBLE
-            epgNowView.visibility = View.GONE
-            epgNextView.visibility = View.GONE
-        }
-        scheduleHideOverlays(hideAfterMs)
-    }
-
-    private fun hideOverlays() {
-        overlaysVisible = false
-        findViewById<View>(R.id.vlcOverlay).visibility = View.GONE
-        findViewById<View>(R.id.vlcVolumeControls).visibility = View.GONE
-        findViewById<View>(R.id.btnVlcBack).visibility = View.GONE
-        hideHandler.removeCallbacks(hideOverlaysRunnable)
-    }
-
-    private fun scheduleHideOverlays(hideAfterMs: Long = CONTROLS_HIDE_MS) {
-        hideHandler.removeCallbacks(hideOverlaysRunnable)
-        hideHandler.postDelayed(hideOverlaysRunnable, hideAfterMs)
     }
 
     companion object {
@@ -309,8 +432,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_EPG_CHANNEL_ID = "epg_channel_id"
         private const val EXTRA_POSITION_MS = "position_ms"
         private const val VLC_VOLUME = com.gadir.tv.player.VlcAudioOptions.VOLUME_FULLSCREEN
-        private const val CONTROLS_HIDE_MS = 10_000L
-        private const val CONTROLS_HIDE_ON_START_MS = 20_000L
+        private const val SEEK_STEP_MS = 10_000L
+        private const val CONTROLS_HIDE_MS = 12_000L
 
         fun intent(
             context: Context,
