@@ -125,6 +125,7 @@ class ResumeStore(context: Context) {
         const val KIND_MOVIE = "movie"
         const val KIND_SERIES = "series"
         const val KIND_LIVE = "live"
+        const val RESUME_CATEGORY_ID = "__resume__"
         private const val PREFS = "gadirtv_prefs"
         private const val KEY = "gr"
         private const val MAX_ENTRIES = 50

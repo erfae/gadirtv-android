@@ -158,7 +158,6 @@ class MainActivity : BaseLocaleActivity() {
     private val catalogCategories = mutableListOf<Category>()
     private val posterItems = mutableListOf<PosterAdapter.PosterItem>()
     private val favoriteItems = mutableListOf<HomeRailAdapter.HomeRailItem>()
-    private val resumeItems = mutableListOf<HomeRailAdapter.HomeRailItem>()
     private val recentMovies = mutableListOf<HomeRailAdapter.HomeRailItem>()
     private val recentSeries = mutableListOf<HomeRailAdapter.HomeRailItem>()
     private val heroItems = mutableListOf<HeroItem>()
@@ -885,8 +884,6 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun focusFirstHomeRail() {
         when {
-            resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
-                focusHomeRailItem(resumeRail, resumeRailTitle)
             favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
                 focusHomeRailItem(favoritesRail, favoritesRailTitle)
             recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail, moviesRailTitle)
@@ -908,19 +905,7 @@ class MainActivity : BaseLocaleActivity() {
             recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail, moviesRailTitle)
             favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
                 focusHomeRailItem(favoritesRail, favoritesRailTitle)
-            resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
-                focusHomeRailItem(resumeRail, resumeRailTitle)
             else -> heroPlay.requestFocus()
-        }
-    }
-
-    private fun focusHomeRailBelowResume() {
-        when {
-            favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
-                focusHomeRailItem(favoritesRail, favoritesRailTitle)
-            recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail, moviesRailTitle)
-            recentSeries.isNotEmpty() -> focusHomeRailItem(seriesRail, seriesRailTitle)
-            else -> tabHome.requestFocus()
         }
     }
 
@@ -933,19 +918,13 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun focusHomeRailAboveFavorites() {
-        when {
-            resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
-                focusHomeRailItem(resumeRail, resumeRailTitle)
-            else -> heroPlay.requestFocus()
-        }
+        heroPlay.requestFocus()
     }
 
     private fun focusHomeRailAboveMovies() {
         when {
             favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
                 focusHomeRailItem(favoritesRail, favoritesRailTitle)
-            resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
-                focusHomeRailItem(resumeRail, resumeRailTitle)
             else -> heroPlay.requestFocus()
         }
     }
@@ -962,23 +941,15 @@ class MainActivity : BaseLocaleActivity() {
             recentMovies.isNotEmpty() -> focusHomeRailItem(moviesRail, moviesRailTitle)
             favoritesRail.visibility == View.VISIBLE && favoriteItems.isNotEmpty() ->
                 focusHomeRailItem(favoritesRail, favoritesRailTitle)
-            resumeRail.visibility == View.VISIBLE && resumeItems.isNotEmpty() ->
-                focusHomeRailItem(resumeRail, resumeRailTitle)
             else -> heroPlay.requestFocus()
         }
     }
 
     private fun wireHomeRails() {
         bindHomeRail(
-            resumeRail,
-            resumeItems,
-            onMoveUp = { heroPlay.requestFocus() },
-            onMoveDown = { focusHomeRailBelowResume() },
-        )
-        bindHomeRail(
             favoritesRail,
             favoriteItems,
-            onMoveUp = { focusHomeRailAboveFavorites() },
+            onMoveUp = { heroPlay.requestFocus() },
             onMoveDown = { focusHomeRailBelowFavorites() },
         )
         bindHomeRail(
@@ -1040,10 +1011,8 @@ class MainActivity : BaseLocaleActivity() {
         }
 
         buildFavoriteItems()
-        buildResumeItems()
         if (DeviceUi.isCompact(this)) {
             while (favoriteItems.size > railLimit) favoriteItems.removeAt(favoriteItems.lastIndex)
-            while (resumeItems.size > railLimit) resumeItems.removeAt(resumeItems.lastIndex)
         }
 
         heroItems.clear()
@@ -1060,8 +1029,8 @@ class MainActivity : BaseLocaleActivity() {
         panelHome.post {
             if (isDestroyed || currentTab != Tab.HOME) return@post
             wireHomeRails()
-            resumeRailTitle.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
-            resumeRail.visibility = if (resumeItems.isEmpty()) View.GONE else View.VISIBLE
+            resumeRailTitle.visibility = View.GONE
+            resumeRail.visibility = View.GONE
 
             favoritesRailTitle.visibility =
                 if (favoriteItems.isEmpty()) View.GONE else View.VISIBLE
@@ -1143,26 +1112,31 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun buildResumeItems() {
-        resumeItems.clear()
-        resumeStore.loadAll().forEach { record ->
-            val kind = when (record.kind) {
-                ResumeStore.KIND_MOVIE -> HomeRailAdapter.HomeRailItem.KIND_MOVIE
-                ResumeStore.KIND_SERIES -> HomeRailAdapter.HomeRailItem.KIND_SERIES
-                else -> return@forEach
+    private fun refreshCatalogResumeCategory(tab: Tab) {
+        if (tab != Tab.MOVIES && tab != Tab.SERIES) return
+        val previous = selectedCatalogCategoryId
+        val cats = catalogCategoriesFor(tab)
+        val catsChanged = cats.size != catalogCategories.size ||
+            cats.zip(catalogCategories).any { (a, b) -> a.id != b.id }
+        if (catsChanged) {
+            catalogCategories.clear()
+            catalogCategories.addAll(cats)
+            if (previous != null && cats.none { it.id == previous }) {
+                selectedCatalogCategoryId = cats.firstOrNull()?.id
+                when (tab) {
+                    Tab.MOVIES -> movieCategoryId = selectedCatalogCategoryId
+                    Tab.SERIES -> seriesCategoryId = selectedCatalogCategoryId
+                    else -> Unit
+                }
             }
-            resumeItems.add(
-                HomeRailAdapter.HomeRailItem(
-                    id = record.id.toIntOrNull() ?: return@forEach,
-                    title = record.title,
-                    imageUrl = record.imageUrl,
-                    badge = getString(R.string.rail_continue),
-                    kind = kind,
-                    extension = record.extension,
-                    subtitle = getString(R.string.resume_progress, record.progressPercent),
-                    resumePositionMs = record.positionMs,
-                ),
-            )
+            bindCatalogCategoryAdapter(tab)
+        }
+        if (selectedCatalogCategoryId == ResumeStore.RESUME_CATEGORY_ID) {
+            when (tab) {
+                Tab.MOVIES -> bindResumeMovies()
+                Tab.SERIES -> bindResumeSeries()
+                else -> Unit
+            }
         }
     }
 
@@ -1808,11 +1782,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun setupCatalogTab(tab: Tab) {
-        val cats = when (tab) {
-            Tab.MOVIES -> PlaylistRepository.vodCategories
-            Tab.SERIES -> PlaylistRepository.seriesCategories
-            Tab.LIVE, Tab.HOME -> emptyList()
-        }
+        val cats = catalogCategoriesFor(tab)
 
         catalogCategories.clear()
         catalogCategories.addAll(cats)
@@ -1871,11 +1841,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun restoreCatalogTab(tab: Tab) {
-        val cats = when (tab) {
-            Tab.MOVIES -> PlaylistRepository.vodCategories
-            Tab.SERIES -> PlaylistRepository.seriesCategories
-            else -> emptyList()
-        }
+        val cats = catalogCategoriesFor(tab)
         catalogCategories.clear()
         catalogCategories.addAll(cats)
         selectedCatalogCategoryId = when (tab) {
@@ -1951,13 +1917,25 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun loadCatalogItems(tab: Tab, categoryId: String) {
         when (tab) {
-            Tab.MOVIES -> PlaylistRepository.cachedVod(categoryId)?.let {
-                bindMovies(it)
-                return
+            Tab.MOVIES -> when (categoryId) {
+                ResumeStore.RESUME_CATEGORY_ID -> {
+                    bindResumeMovies()
+                    return
+                }
+                else -> PlaylistRepository.cachedVod(categoryId)?.let {
+                    bindMovies(it)
+                    return
+                }
             }
-            Tab.SERIES -> PlaylistRepository.cachedSeries(categoryId)?.let {
-                bindSeries(it)
-                return
+            Tab.SERIES -> when (categoryId) {
+                ResumeStore.RESUME_CATEGORY_ID -> {
+                    bindResumeSeries()
+                    return
+                }
+                else -> PlaylistRepository.cachedSeries(categoryId)?.let {
+                    bindSeries(it)
+                    return
+                }
             }
             Tab.LIVE, Tab.HOME -> Unit
         }
@@ -2006,6 +1984,68 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun bindResumeMovies() {
+        posterItems.clear()
+        resumeStore.loadAll()
+            .filter { it.kind == ResumeStore.KIND_MOVIE }
+            .forEach { record ->
+                val id = record.id.toIntOrNull() ?: return@forEach
+                posterItems.add(
+                    PosterAdapter.PosterItem(
+                        id = id,
+                        title = record.title,
+                        imageUrl = record.imageUrl,
+                        extension = record.extension,
+                        resumePositionMs = record.positionMs,
+                    ),
+                )
+            }
+        updateCatalogGrid()
+    }
+
+    private fun bindResumeSeries() {
+        posterItems.clear()
+        resumeStore.loadAll()
+            .filter { it.kind == ResumeStore.KIND_SERIES }
+            .forEach { record ->
+                val id = record.id.toIntOrNull() ?: return@forEach
+                posterItems.add(
+                    PosterAdapter.PosterItem(
+                        id = id,
+                        title = record.title,
+                        imageUrl = record.imageUrl,
+                        extension = record.extension,
+                        resumePositionMs = record.positionMs,
+                    ),
+                )
+            }
+        updateCatalogGrid()
+    }
+
+    private fun catalogCategoriesFor(tab: Tab): List<Category> {
+        val base = when (tab) {
+            Tab.MOVIES -> PlaylistRepository.vodCategories
+            Tab.SERIES -> PlaylistRepository.seriesCategories
+            Tab.LIVE, Tab.HOME -> emptyList()
+        }
+        val resumeKind = when (tab) {
+            Tab.MOVIES -> ResumeStore.KIND_MOVIE
+            Tab.SERIES -> ResumeStore.KIND_SERIES
+            else -> return base
+        }
+        val hasResume = resumeStore.loadAll().any { it.kind == resumeKind }
+        return if (hasResume) {
+            listOf(
+                Category(
+                    id = ResumeStore.RESUME_CATEGORY_ID,
+                    name = getString(R.string.rail_continue),
+                ),
+            ) + base
+        } else {
+            base
+        }
+    }
+
     private fun bindMovies(movies: List<VodMovie>) {
         posterItems.clear()
         movies.forEach { movie ->
@@ -2043,19 +2083,43 @@ class MainActivity : BaseLocaleActivity() {
     private fun onPosterClick(tab: Tab, item: PosterAdapter.PosterItem) {
         val categoryId = selectedCatalogCategoryId.orEmpty()
         when (tab) {
-            Tab.MOVIES -> openMovieEntry(
-                streamId = item.id,
-                title = item.title,
-                cover = item.imageUrl,
-                extension = item.extension,
-                categoryId = categoryId,
-            )
-            Tab.SERIES -> openSeriesDetail(
-                seriesId = item.id,
-                title = item.title,
-                cover = item.imageUrl,
-                categoryId = categoryId,
-            )
+            Tab.MOVIES -> {
+                if (item.resumePositionMs > 0L) {
+                    playMovie(
+                        title = item.title,
+                        streamId = item.id,
+                        extension = item.extension,
+                        imageUrl = item.imageUrl,
+                        positionMs = item.resumePositionMs,
+                    )
+                } else {
+                    openMovieEntry(
+                        streamId = item.id,
+                        title = item.title,
+                        cover = item.imageUrl,
+                        extension = item.extension,
+                        categoryId = categoryId,
+                    )
+                }
+            }
+            Tab.SERIES -> {
+                if (item.resumePositionMs > 0L) {
+                    playSeriesEpisode(
+                        title = item.title,
+                        episodeId = item.id,
+                        extension = item.extension,
+                        imageUrl = item.imageUrl,
+                        positionMs = item.resumePositionMs,
+                    )
+                } else {
+                    openSeriesDetail(
+                        seriesId = item.id,
+                        title = item.title,
+                        cover = item.imageUrl,
+                        categoryId = categoryId,
+                    )
+                }
+            }
             Tab.LIVE, Tab.HOME -> Unit
         }
     }
@@ -2606,14 +2670,11 @@ class MainActivity : BaseLocaleActivity() {
             livePreviewPaused = false
             focusChannelAt(currentPreviewChannel)
             liveCategoryList.adapter?.let { (it as? CategoryAdapter)?.refreshSelection() }
-            if (
-                !usesExoPreview() &&
-                appSettings.autoplayPreview &&
-                currentPreviewChannel != null
-            ) {
+            if (appSettings.autoplayPreview && currentPreviewChannel != null) {
                 currentPreviewChannel?.let { schedulePreview(it) }
             }
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
+            refreshCatalogResumeCategory(currentTab)
             (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
         }
     }
