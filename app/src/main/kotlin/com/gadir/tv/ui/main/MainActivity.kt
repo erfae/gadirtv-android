@@ -1218,6 +1218,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun reloadPlaylist() {
         val profile = PlaylistRepository.profile ?: return
+        ParentalSession.clear()
         android.widget.Toast.makeText(
             this,
             getString(R.string.loading_playlist),
@@ -2885,6 +2886,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun logoutUser() {
+        ParentalSession.clear()
         ProfileStore(this).clearActive()
         PlaylistRepository.clear()
         startActivity(
@@ -2896,6 +2898,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun exitApp() {
+        ParentalSession.clear()
         finishAffinity()
     }
 
