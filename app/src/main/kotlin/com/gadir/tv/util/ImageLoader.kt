@@ -18,7 +18,6 @@ import com.gadir.tv.data.PlaylistRepository
 
 object ImageLoader {
     private fun canLoadInto(target: ImageView): Boolean {
-        if (!target.isAttachedToWindow) return false
         val ctx = target.context
         if (ctx is Activity && (ctx.isFinishing || ctx.isDestroyed)) return false
         return true
