@@ -158,6 +158,9 @@ class XtreamApi(
                 "icon",
                 "channel_icon",
                 "epg_icon",
+                "thumbnail",
+                "logo_url",
+                "tv_archive_icon",
             ).ifBlank { fallbackLiveIcon(profile, streamId) }
             val sanitizedIcon = if (icon.isNotBlank() && !looksLikeImageUrl(icon)) "" else icon
             LiveChannel(

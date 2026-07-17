@@ -65,7 +65,6 @@ class CategoryAdapter(
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     val pos = holder.bindingAdapterPosition
                     if (pos == 0) {
-                        onMoveUp?.invoke()
                         onMoveUp != null
                     } else {
                         false
@@ -73,12 +72,7 @@ class CategoryAdapter(
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
                     val pos = holder.bindingAdapterPosition
-                    if (pos == items.lastIndex) {
-                        onMoveDown?.invoke()
-                        onMoveDown != null
-                    } else {
-                        false
-                    }
+                    pos == items.lastIndex
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     val pos = holder.bindingAdapterPosition

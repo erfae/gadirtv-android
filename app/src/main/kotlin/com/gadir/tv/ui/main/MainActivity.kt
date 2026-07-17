@@ -42,7 +42,9 @@ import com.gadir.tv.model.VodMovie
 import com.gadir.tv.ui.movie.MovieDetailActivity
 import com.gadir.tv.player.LiveChannelNavigator
 import com.gadir.tv.player.LiveExoPreviewPlayer
+import com.gadir.tv.player.LivePreviewStreamUrls
 import com.gadir.tv.player.LiveStreamUrls
+import com.gadir.tv.player.VodStreamUrls
 import com.gadir.tv.player.LiveVlcPlayer
 import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
@@ -69,6 +71,9 @@ import com.gadir.tv.util.HostUtils
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -194,6 +199,7 @@ class MainActivity : BaseLocaleActivity() {
     private val miniControlsHandler = Handler(Looper.getMainLooper())
     private val hideMiniControlsRunnable = Runnable { hideMiniPreviewControls() }
     private val heroHandler = Handler(Looper.getMainLooper())
+    private var heroRotationJob: Job? = null
     private val clockRunnable = object : Runnable {
         override fun run() {
             val now = Date()
@@ -234,21 +240,20 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private val liveCategories = mutableListOf<Category>()
-    private val heroRotateRunnable = object : Runnable {
-        override fun run() {
-            if (currentTab != Tab.HOME) return
-            if (heroCarouselPaused || isAnyHomeRailFocused()) {
-                heroHandler.postDelayed(this, HERO_ROTATE_MS)
-                return
-            }
-            if (heroItems.size > 1) {
-                railPreviewItem = null
-                heroIndex = (heroIndex + 1) % heroItems.size
-                bindHero(heroItems[heroIndex], quickRotate = true)
-                heroRotateFirstTick = false
-            }
-            if (currentTab == Tab.HOME && heroItems.size > 1 && !heroCarouselPaused) {
-                heroHandler.postDelayed(this, HERO_ROTATE_MS)
+    private fun startHeroRotationLoop() {
+        heroRotationJob?.cancel()
+        if (!DeviceUi.useDpadFocus(this) || currentTab != Tab.HOME || heroItems.size <= 1) return
+        heroRotationJob = lifecycleScope.launch {
+            val firstDelay = if (heroRotateFirstTick) HERO_ROTATE_FIRST_MS else HERO_ROTATE_MS
+            delay(firstDelay)
+            while (isActive && currentTab == Tab.HOME && heroItems.size > 1) {
+                if (!heroCarouselPaused && !isAnyHomeRailFocused()) {
+                    railPreviewItem = null
+                    heroIndex = (heroIndex + 1) % heroItems.size
+                    bindHero(heroItems[heroIndex], quickRotate = true)
+                    heroRotateFirstTick = false
+                }
+                delay(HERO_ROTATE_MS)
             }
         }
     }
@@ -620,7 +625,6 @@ class MainActivity : BaseLocaleActivity() {
                 applyLiveCategory
             },
             onMoveRight = { focusFirstChannel() },
-            onMoveUp = { focusBottomTab(Tab.LIVE) },
         )
     }
 
@@ -1075,6 +1079,70 @@ class MainActivity : BaseLocaleActivity() {
     private fun homeRailItemLimit(): Int =
         if (DeviceUi.isCompact(this)) HOME_RAIL_LIMIT_COMPACT else Int.MAX_VALUE
 
+    private fun populateHeroItems() {
+        val heroLimit = heroItemLimit()
+        val seen = mutableSetOf<Pair<String, Int>>()
+        val pool = mutableListOf<HomeRailAdapter.HomeRailItem>()
+
+        fun addItem(item: HomeRailAdapter.HomeRailItem) {
+            val key = item.kind to item.id
+            if (seen.add(key)) pool.add(item)
+        }
+
+        recentMovies.forEach(::addItem)
+        recentSeries.forEach(::addItem)
+        favoriteItems.filter {
+            it.kind == HomeRailAdapter.HomeRailItem.KIND_MOVIE ||
+                it.kind == HomeRailAdapter.HomeRailItem.KIND_SERIES
+        }.forEach(::addItem)
+
+        if (pool.size < 2) {
+            PlaylistRepository.allCachedVod()
+                .sortedByDescending { it.added }
+                .take(16)
+                .forEach { movie ->
+                    addItem(
+                        HomeRailAdapter.HomeRailItem(
+                            id = movie.streamId,
+                            title = movie.name,
+                            imageUrl = movie.icon,
+                            badge = getString(R.string.hero_type_movie),
+                            kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
+                            extension = movie.extension,
+                        ),
+                    )
+                }
+            PlaylistRepository.allCachedSeries()
+                .sortedByDescending { it.added }
+                .take(16)
+                .forEach { series ->
+                    addItem(
+                        HomeRailAdapter.HomeRailItem(
+                            id = series.seriesId,
+                            title = series.name,
+                            imageUrl = series.cover,
+                            badge = getString(R.string.hero_type_series),
+                            kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
+                        ),
+                    )
+                }
+        }
+
+        val movies = pool.filter { it.kind == HomeRailAdapter.HomeRailItem.KIND_MOVIE }
+        val series = pool.filter { it.kind == HomeRailAdapter.HomeRailItem.KIND_SERIES }
+        var movieIdx = 0
+        var seriesIdx = 0
+        val maxItems = (heroLimit * 2).coerceAtMost(pool.size)
+        while (heroItems.size < maxItems && (movieIdx < movies.size || seriesIdx < series.size)) {
+            if (movieIdx < movies.size) {
+                heroItems.add(HeroItem.Rail(movies[movieIdx++]))
+            }
+            if (seriesIdx < series.size && heroItems.size < maxItems) {
+                heroItems.add(HeroItem.Rail(series[seriesIdx++]))
+            }
+        }
+    }
+
     private fun heroItemLimit(): Int =
         if (DeviceUi.isCompact(this)) HERO_LIMIT_COMPACT else HERO_LIMIT_TV
 
@@ -1113,42 +1181,7 @@ class MainActivity : BaseLocaleActivity() {
         }
 
         heroItems.clear()
-        val heroLimit = heroItemLimit()
-        val heroMovies = recentMovies.filter { it.imageUrl.isNotBlank() }.take(heroLimit)
-            .ifEmpty { recentMovies.take(heroLimit) }
-        val heroSeries = recentSeries.filter { it.imageUrl.isNotBlank() }.take(heroLimit)
-            .ifEmpty { recentSeries.take(heroLimit) }
-        var movieIdx = 0
-        var seriesIdx = 0
-        var favIdx = 0
-        val heroFavorites = favoriteItems.filter {
-            it.kind == HomeRailAdapter.HomeRailItem.KIND_MOVIE ||
-                it.kind == HomeRailAdapter.HomeRailItem.KIND_SERIES
-        }
-        while (heroItems.size < heroLimit * 2) {
-            if (movieIdx < heroMovies.size) {
-                heroItems.add(HeroItem.Rail(heroMovies[movieIdx++]))
-            }
-            if (seriesIdx < heroSeries.size) {
-                heroItems.add(HeroItem.Rail(heroSeries[seriesIdx++]))
-            }
-            if (favIdx < heroFavorites.size && heroItems.size < heroLimit * 2) {
-                heroItems.add(HeroItem.Rail(heroFavorites[favIdx++]))
-            }
-            if (movieIdx >= heroMovies.size &&
-                seriesIdx >= heroSeries.size &&
-                favIdx >= heroFavorites.size
-            ) {
-                break
-            }
-        }
-        if (heroItems.size == 1) {
-            val extra = (heroMovies.drop(1) + heroSeries.drop(1) + heroFavorites.drop(1))
-                .firstOrNull { rail -> heroItems.none { it is HeroItem.Rail && it.item.id == rail.id } }
-            if (extra != null) {
-                heroItems.add(HeroItem.Rail(extra))
-            }
-        }
+        populateHeroItems()
         heroIndex = 0
         heroRotateFirstTick = true
         heroCarouselPaused = false
@@ -1588,7 +1621,13 @@ class MainActivity : BaseLocaleActivity() {
         positionMs: Long = 0L,
     ) {
         val profile = PlaylistRepository.profile ?: return
-        val url = api.movieStreamUrl(profile, streamId, extension)
+        val urls = VodStreamUrls.movieCandidates(api, profile, streamId, extension)
+        val url = urls.firstOrNull().orEmpty()
+        if (url.isBlank()) {
+            Toast.makeText(this, R.string.series_playback_failed, Toast.LENGTH_SHORT).show()
+            openMovieDetail(streamId, title, imageUrl, extension)
+            return
+        }
         ResumePlaybackHelper.play(
             context = this,
             resumeStore = resumeStore,
@@ -1600,6 +1639,7 @@ class MainActivity : BaseLocaleActivity() {
                 imageUrl = imageUrl,
                 extension = extension,
                 positionMs = positionMs,
+                alternateUrls = urls.drop(1),
             ),
         )
     }
@@ -1624,7 +1664,9 @@ class MainActivity : BaseLocaleActivity() {
         positionMs: Long = 0L,
     ) {
         val profile = PlaylistRepository.profile ?: return
-        val url = api.seriesStreamUrl(profile, episodeId, extension)
+        val urls = VodStreamUrls.seriesCandidates(api, profile, episodeId, extension)
+        val url = urls.firstOrNull().orEmpty()
+        if (url.isBlank()) return
         ResumePlaybackHelper.play(
             context = this,
             resumeStore = resumeStore,
@@ -1636,6 +1678,7 @@ class MainActivity : BaseLocaleActivity() {
                 imageUrl = imageUrl,
                 extension = extension,
                 positionMs = positionMs,
+                alternateUrls = urls.drop(1),
             ),
         )
     }
@@ -1945,16 +1988,16 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun startHeroRotation() {
-        heroHandler.removeCallbacks(heroRotateRunnable)
+        heroRotationJob?.cancel()
         if (!DeviceUi.useDpadFocus(this)) return
-        if (heroItems.size > 1 && currentTab == Tab.HOME && !heroCarouselPaused) {
-            val delay = if (heroRotateFirstTick) HERO_ROTATE_FIRST_MS else HERO_ROTATE_MS
-            heroHandler.postDelayed(heroRotateRunnable, delay)
+        if (heroItems.size > 1 && currentTab == Tab.HOME) {
+            startHeroRotationLoop()
         }
     }
 
     private fun stopHeroRotation() {
-        heroHandler.removeCallbacks(heroRotateRunnable)
+        heroRotationJob?.cancel()
+        heroRotationJob = null
     }
 
     private fun setupCatalogTab(tab: Tab) {
@@ -2047,7 +2090,6 @@ class MainActivity : BaseLocaleActivity() {
                 { cat -> scheduleCatalogCategoryApply(tab, cat) }
             },
             onMoveRight = { focusFirstCatalogItem() },
-            onMoveUp = { focusBottomTab(tab) },
         )
     }
 
@@ -2286,11 +2328,11 @@ class MainActivity : BaseLocaleActivity() {
                         positionMs = item.resumePositionMs,
                     )
                 } else if (DeviceUi.useDpadFocus(this)) {
-                    playMovie(
-                        title = item.title,
+                    openMovieEntry(
                         streamId = item.id,
+                        title = item.title,
+                        cover = item.imageUrl,
                         extension = item.extension,
-                        imageUrl = item.imageUrl,
                         categoryId = categoryId,
                     )
                 } else {
@@ -2695,7 +2737,7 @@ class MainActivity : BaseLocaleActivity() {
         }
         val channelChanged = previewingStreamId != channel.streamId
         if (channelChanged || previewUrls.isEmpty()) {
-            previewUrls = LiveStreamUrls.candidates(api, profile, channel)
+            previewUrls = LivePreviewStreamUrls.candidates(api, profile, channel)
             previewUrlIndex = 0
             previewWorkingUrl = null
             previewingStreamId = channel.streamId
