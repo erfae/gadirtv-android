@@ -72,6 +72,7 @@ import com.gadir.tv.util.HostUtils
 import java.util.Date
 import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -182,6 +183,7 @@ class MainActivity : BaseLocaleActivity() {
     private var heroCarouselPaused = false
     private var heroRotateFirstTick = true
     private var catalogCategoryAdapter: CategoryAdapter? = null
+    private var heroPlotJob: Job? = null
     private var homeLoaded = false
     private var shouldFocusHomeRailsOnResume = true
     private var catalogLoadToken = 0
@@ -202,8 +204,7 @@ class MainActivity : BaseLocaleActivity() {
     private val heroHandler = Handler(Looper.getMainLooper())
     private val heroRotateRunnable = object : Runnable {
         override fun run() {
-            if (currentTab != Tab.HOME || heroItems.size <= 1) return
-            if (!heroCarouselPaused && !isAnyHomeRailFocused() && railPreviewItem == null) {
+            if (currentTab == Tab.HOME && heroItems.size > 1 && railPreviewItem == null) {
                 advanceHeroCarousel(quickRotate = true)
                 heroRotateFirstTick = false
             }
@@ -373,7 +374,10 @@ class MainActivity : BaseLocaleActivity() {
                 FocusScaleHelper.applyConeFocus(view, hasFocus)
                 if (hasFocus) {
                     railPreviewItem = null
+                    heroCarouselPaused = false
+                    heroPlotJob?.cancel()
                     bindHero(heroItems.getOrNull(heroIndex) ?: return@setOnFocusChangeListener)
+                    startHeroRotation()
                 }
             }
         }
@@ -817,18 +821,23 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun focusCatalogAtIndex(index: Int) {
+        if (catalogCategories.isEmpty() || index < 0) return
+        catalogCategoryList.post {
+            (catalogCategoryList.layoutManager as? LinearLayoutManager)
+                ?.scrollToPositionWithOffset(index, 0)
+            TvNavHelper.focusItem(catalogCategoryList, index)
+        }
+    }
+
     private fun focusFirstCatalogCategory() {
         if (catalogCategories.isEmpty()) return
         val tab = currentTab
         if (tab != Tab.MOVIES && tab != Tab.SERIES) return
         val first = catalogCategories.first()
-        selectCatalogCategory(tab, first)
-        catalogCategoryList.post {
-            (catalogCategoryList.layoutManager as? LinearLayoutManager)
-                ?.scrollToPositionWithOffset(0, 0)
-            catalogCategoryList.clearFocus()
-            TvNavHelper.focusItem(catalogCategoryList, 0)
-        }
+        highlightCatalogCategory(tab, first.id)
+        loadCatalogItems(tab, first.id)
+        focusCatalogAtIndex(0)
     }
 
     private fun openCatalogTabAtFirstGroup(tab: Tab) {
@@ -847,21 +856,24 @@ class MainActivity : BaseLocaleActivity() {
         }
         bindCatalogCategoryAdapter(tab)
         firstId?.let { loadCatalogItems(tab, it) }
-        if (DeviceUi.useDpadFocus(this)) {
-            panelCatalog.post { focusFirstCatalogCategory() }
-        }
     }
 
-    private fun selectCatalogCategory(tab: Tab, cat: Category) {
-        if (cat.id == selectedCatalogCategoryId) return
-        selectedCatalogCategoryId = cat.id
+    private fun highlightCatalogCategory(tab: Tab, catId: String) {
+        if (catId == selectedCatalogCategoryId) return
+        val oldIndex = catalogCategories.indexOfFirst { it.id == selectedCatalogCategoryId }
+        selectedCatalogCategoryId = catId
         when (tab) {
-            Tab.MOVIES -> movieCategoryId = cat.id
-            Tab.SERIES -> seriesCategoryId = cat.id
+            Tab.MOVIES -> movieCategoryId = catId
+            Tab.SERIES -> seriesCategoryId = catId
             else -> Unit
         }
-        catalogCategoryAdapter?.refreshSelection()
-        loadCatalogItems(tab, cat.id)
+        if (oldIndex >= 0) catalogCategoryAdapter?.notifyItemChanged(oldIndex)
+        val newIndex = catalogCategories.indexOfFirst { it.id == catId }
+        if (newIndex >= 0) catalogCategoryAdapter?.notifyItemChanged(newIndex)
+    }
+
+    private fun enterCatalogTabFocus() {
+        panelCatalog.postDelayed({ focusCatalogAtIndex(0) }, 120L)
     }
 
     private fun focusCatalogCategoryList() {
@@ -888,14 +900,10 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun bindNavTab(view: View, tab: Tab) {
-        view.setOnClickListener { showTab(tab) }
-        if (DeviceUi.useDpadFocus(this)) {
-            view.setOnFocusChangeListener { _, hasFocus ->
-                if (!hasFocus) return@setOnFocusChangeListener
-                if (currentTab != tab) showTab(tab)
-                if (tab == Tab.MOVIES || tab == Tab.SERIES) {
-                    panelCatalog.post { focusFirstCatalogCategory() }
-                }
+        view.setOnClickListener {
+            showTab(tab)
+            if (!DeviceUi.isCompact(this) && (tab == Tab.MOVIES || tab == Tab.SERIES)) {
+                enterCatalogTabFocus()
             }
         }
     }
@@ -963,6 +971,7 @@ class MainActivity : BaseLocaleActivity() {
                 }
                 if (!DeviceUi.isCompact(this)) {
                     openCatalogTabAtFirstGroup(tab)
+                    enterCatalogTabFocus()
                 } else if (ready) {
                     restoreCatalogTab(tab)
                 }
@@ -1222,6 +1231,15 @@ class MainActivity : BaseLocaleActivity() {
                 heroItems.add(HeroItem.Rail(series[seriesIdx++]))
             }
         }
+        if (heroItems.size < 2 && pool.isNotEmpty()) {
+            pool.shuffled().forEach { item ->
+                if (heroItems.size >= 2) return@forEach
+                if (heroItems.none { (it as? HeroItem.Rail)?.item?.id == item.id &&
+                        (it as? HeroItem.Rail)?.item?.kind == item.kind }) {
+                    heroItems.add(HeroItem.Rail(item))
+                }
+            }
+        }
     }
 
     private fun advanceHeroCarousel(quickRotate: Boolean = false) {
@@ -1234,18 +1252,17 @@ class MainActivity : BaseLocaleActivity() {
         heroIndex = next
         bindHero(heroItems[heroIndex], quickRotate = quickRotate)
         if (quickRotate) {
-            scheduleHeroPlotRefresh()
+            scheduleHeroPlotLoad()
         }
     }
 
-    private fun scheduleHeroPlotRefresh() {
+    private fun scheduleHeroPlotLoad() {
+        heroPlotJob?.cancel()
         val index = heroIndex
         val item = heroItems.getOrNull(index) ?: return
-        lifecycleScope.launch {
-            delay(900L)
-            if (heroIndex == index && currentTab == Tab.HOME &&
-                !heroCarouselPaused && railPreviewItem == null
-            ) {
+        heroPlotJob = lifecycleScope.launch {
+            delay(1200L)
+            if (heroIndex == index && currentTab == Tab.HOME && railPreviewItem == null) {
                 bindHero(item, quickRotate = false)
             }
         }
@@ -2216,7 +2233,8 @@ class MainActivity : BaseLocaleActivity() {
         val applyCategory: (Category) -> Unit = { cat ->
             catalogCategoryHandler.removeCallbacksAndMessages(null)
             catalogCategoryFocusToken++
-            selectCatalogCategory(tab, cat)
+            highlightCatalogCategory(tab, cat.id)
+            loadCatalogItems(tab, cat.id)
         }
 
         catalogCategoryAdapter = CategoryAdapter(
@@ -2226,7 +2244,7 @@ class MainActivity : BaseLocaleActivity() {
             onFocus = if (DeviceUi.isCompact(this)) {
                 null
             } else {
-                applyCategory
+                { cat -> scheduleCatalogCategoryApply(tab, cat) }
             },
             onMoveRight = { focusFirstCatalogItem() },
             onMoveUp = { focusHeaderReload() },
@@ -2234,6 +2252,20 @@ class MainActivity : BaseLocaleActivity() {
         )
         catalogCategoryList.adapter = catalogCategoryAdapter
         catalogCategoryList.nextFocusUpId = R.id.btnReload
+    }
+
+    private fun scheduleCatalogCategoryApply(tab: Tab, cat: Category) {
+        highlightCatalogCategory(tab, cat.id)
+        catalogCategoryFocusToken++
+        val token = catalogCategoryFocusToken
+        pendingCatalogCategory?.let { catalogCategoryHandler.removeCallbacks(it) }
+        val task = Runnable {
+            if (token != catalogCategoryFocusToken || currentTab != tab) return@Runnable
+            if (selectedCatalogCategoryId != cat.id) return@Runnable
+            loadCatalogItems(tab, cat.id)
+        }
+        pendingCatalogCategory = task
+        catalogCategoryHandler.postDelayed(task, 200L)
     }
 
     private fun configureCatalogGrid() {
