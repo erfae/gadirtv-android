@@ -59,6 +59,7 @@ import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.AccountFormat
 import com.gadir.tv.util.ChannelIconHelper
 import com.gadir.tv.util.DeviceUi
+import com.gadir.tv.util.EpgFormatter
 import com.gadir.tv.util.FocusScaleHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.MetaExtractor
@@ -198,16 +199,15 @@ class MainActivity : BaseLocaleActivity() {
     private val heroHandler = Handler(Looper.getMainLooper())
     private val heroCarouselTick = object : Runnable {
         override fun run() {
-            if (currentTab != Tab.HOME || heroItems.size <= 1) return
-            val shouldRotate =
-                (!heroCarouselPaused || heroPlay.hasFocus()) && !isRailBrowsingFocused()
-            if (shouldRotate) {
+            if (currentTab == Tab.HOME && heroItems.size > 1 && !heroCarouselPaused && !isRailBrowsingFocused()) {
                 railPreviewItem = null
                 heroIndex = (heroIndex + 1) % heroItems.size
                 bindHero(heroItems[heroIndex], quickRotate = true)
                 heroRotateFirstTick = false
             }
-            heroHandler.postDelayed(this, HERO_ROTATE_MS)
+            if (currentTab == Tab.HOME && heroItems.size > 1) {
+                heroHandler.postDelayed(this, HERO_ROTATE_MS)
+            }
         }
     }
     private val clockRunnable = object : Runnable {
@@ -355,6 +355,7 @@ class MainActivity : BaseLocaleActivity() {
         homeScrollView = panelHome.findViewById(R.id.homeScrollView)
 
         catalogCategoryList.layoutManager = LinearLayoutManager(this)
+        catalogCategoryList.nextFocusUpId = R.id.btnReload
         configureCatalogGrid()
         favoritesRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         resumeRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
@@ -619,7 +620,9 @@ class MainActivity : BaseLocaleActivity() {
             },
             onMoveRight = { focusFirstChannel() },
             onMoveUp = { focusHeaderReload() },
+            upFocusViewId = R.id.btnReload,
         )
+        liveCategoryList.nextFocusUpId = R.id.btnReload
     }
 
     private fun focusFirstChannel() {
@@ -754,8 +757,8 @@ class MainActivity : BaseLocaleActivity() {
     private fun focusContentFromHeader() {
         when (currentTab) {
             Tab.HOME -> heroPlay.requestFocus()
-            Tab.LIVE -> focusCategoryList()
-            Tab.MOVIES, Tab.SERIES -> focusCatalogCategoryList()
+            Tab.LIVE -> focusFirstLiveCategory()
+            Tab.MOVIES, Tab.SERIES -> focusFirstCatalogCategory()
         }
     }
 
@@ -803,7 +806,10 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun focusHeaderReload() {
-        btnReload.requestFocus()
+        btnReload.post {
+            homeScrollView.smoothScrollTo(0, 0)
+            btnReload.requestFocus()
+        }
     }
 
     private fun focusFirstCatalogCategory() {
@@ -1098,63 +1104,16 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun populateHeroItems() {
         val heroLimit = heroItemLimit()
-        val seen = mutableSetOf<Pair<String, Int>>()
-        val pool = mutableListOf<HomeRailAdapter.HomeRailItem>()
-
-        fun addItem(item: HomeRailAdapter.HomeRailItem) {
-            val key = item.kind to item.id
-            if (seen.add(key)) pool.add(item)
-        }
-
-        recentMovies.forEach(::addItem)
-        recentSeries.forEach(::addItem)
-        favoriteItems.filter {
-            it.kind == HomeRailAdapter.HomeRailItem.KIND_MOVIE ||
-                it.kind == HomeRailAdapter.HomeRailItem.KIND_SERIES
-        }.forEach(::addItem)
-
-        if (pool.size < heroLimit) {
-            PlaylistRepository.allCachedVod()
-                .sortedByDescending { it.added }
-                .take(16)
-                .forEach { movie ->
-                    addItem(
-                        HomeRailAdapter.HomeRailItem(
-                            id = movie.streamId,
-                            title = movie.name,
-                            imageUrl = movie.icon,
-                            badge = getString(R.string.hero_type_movie),
-                            kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
-                            extension = movie.extension,
-                        ),
-                    )
-                }
-            PlaylistRepository.allCachedSeries()
-                .sortedByDescending { it.added }
-                .take(16)
-                .forEach { series ->
-                    addItem(
-                        HomeRailAdapter.HomeRailItem(
-                            id = series.seriesId,
-                            title = series.name,
-                            imageUrl = series.cover,
-                            badge = getString(R.string.hero_type_series),
-                            kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
-                        ),
-                    )
-                }
-        }
-
-        val movies = pool.filter { it.kind == HomeRailAdapter.HomeRailItem.KIND_MOVIE }.shuffled()
-        val series = pool.filter { it.kind == HomeRailAdapter.HomeRailItem.KIND_SERIES }.shuffled()
+        val movies = recentMovies.toList()
+        val series = recentSeries.toList()
         var movieIdx = 0
         var seriesIdx = 0
-        val maxItems = (heroLimit * 2).coerceAtMost(pool.size)
-        while (heroItems.size < maxItems && (movieIdx < movies.size || seriesIdx < series.size)) {
+        val target = (heroLimit * 2).coerceAtMost(movies.size + series.size)
+        while (heroItems.size < target && (movieIdx < movies.size || seriesIdx < series.size)) {
             if (movieIdx < movies.size) {
                 heroItems.add(HeroItem.Rail(movies[movieIdx++]))
             }
-            if (seriesIdx < series.size && heroItems.size < maxItems) {
+            if (seriesIdx < series.size && heroItems.size < target) {
                 heroItems.add(HeroItem.Rail(series[seriesIdx++]))
             }
         }
@@ -1764,8 +1723,10 @@ class MainActivity : BaseLocaleActivity() {
         val backdropRequestId = ++heroBackdropRequestId
 
         heroTitle.text = item.title
-        heroSubtitle.text = ""
-        heroPlot.text = getString(R.string.hero_plot_empty)
+        if (!quickRotate) {
+            heroSubtitle.text = ""
+            heroPlot.text = getString(R.string.hero_plot_empty)
+        }
 
         when (item) {
             is HeroItem.Movie -> {
@@ -1778,7 +1739,7 @@ class MainActivity : BaseLocaleActivity() {
                     kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
                     backdropRequestId = backdropRequestId,
                 )
-                if (DeviceUi.useDpadFocus(this) && !quickRotate) {
+                if (DeviceUi.useDpadFocus(this)) {
                     loadMoviePlot(item.movie.streamId, requestId, backdropRequestId)
                 }
             }
@@ -1792,7 +1753,7 @@ class MainActivity : BaseLocaleActivity() {
                     kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
                     backdropRequestId = backdropRequestId,
                 )
-                if (DeviceUi.useDpadFocus(this) && !quickRotate) {
+                if (DeviceUi.useDpadFocus(this)) {
                     loadSeriesPlot(item.series.seriesId, requestId, backdropRequestId)
                 }
             }
@@ -1814,7 +1775,7 @@ class MainActivity : BaseLocaleActivity() {
                     backdropRequestId = backdropRequestId,
                 )
                 heroSubtitle.text = item.item.subtitle
-                if (DeviceUi.useDpadFocus(this) && !quickRotate) {
+                if (DeviceUi.useDpadFocus(this)) {
                     when (item.item.kind) {
                         HomeRailAdapter.HomeRailItem.KIND_MOVIE ->
                             loadMoviePlot(item.item.id, requestId, backdropRequestId)
@@ -2122,7 +2083,9 @@ class MainActivity : BaseLocaleActivity() {
             },
             onMoveRight = { focusFirstCatalogItem() },
             onMoveUp = { focusHeaderReload() },
+            upFocusViewId = R.id.btnReload,
         )
+        catalogCategoryList.nextFocusUpId = R.id.btnReload
     }
 
     private fun scheduleCatalogCategoryApply(tab: Tab, cat: Category) {
@@ -2733,7 +2696,7 @@ class MainActivity : BaseLocaleActivity() {
                     profile,
                     streamId = channel.streamId,
                     epgChannelId = channel.epgChannelId,
-                    limit = 4,
+                    limit = 8,
                 )
             }
             if (currentPreviewChannel?.streamId != channel.streamId) return@launch
@@ -2861,16 +2824,13 @@ class MainActivity : BaseLocaleActivity() {
             epgNext.visibility = View.GONE
             return
         }
-        val now = System.currentTimeMillis() / 1000L
-        val currentIndex = epg.indexOfFirst { entry ->
-            entry.start > 0L && entry.end > 0L && now >= entry.start && now < entry.end
-        }.takeIf { it >= 0 } ?: 0
+        val currentIndex = EpgFormatter.currentIndex(epg)
         val current = epg[currentIndex]
-        epgNow.text = current.title
+        epgNow.text = EpgFormatter.formatNowLine(this, current)
         epgNow.visibility = View.VISIBLE
         val next = epg.getOrNull(currentIndex + 1)
         if (next != null) {
-            epgNext.text = getString(R.string.epg_next) + ": " + next.title
+            epgNext.text = EpgFormatter.formatNextLine(this, next)
             epgNext.visibility = View.VISIBLE
         } else {
             epgNext.visibility = View.GONE
@@ -3030,6 +2990,9 @@ class MainActivity : BaseLocaleActivity() {
             }
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
             refreshCatalogResumeCategory(currentTab)
+            if (!DeviceUi.isCompact(this)) {
+                panelCatalog.post { focusFirstCatalogCategory() }
+            }
         }
     }
 

@@ -18,6 +18,7 @@ class CategoryAdapter(
     private val onMoveLeft: (() -> Unit)? = null,
     private val onMoveUp: (() -> Unit)? = null,
     private val onMoveDown: (() -> Unit)? = null,
+    private val upFocusViewId: Int = View.NO_ID,
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
@@ -34,7 +35,10 @@ class CategoryAdapter(
         val item = items[position]
 
         holder.name.text = item.name
-        holder.itemView.isSelected = false
+        holder.itemView.isSelected = item.id == selectedId()
+        if (position == 0 && upFocusViewId != View.NO_ID) {
+            holder.itemView.nextFocusUpId = upFocusViewId
+        }
 
         holder.itemView.setOnFocusChangeListener { _, hasFocus ->
             val pos = holder.bindingAdapterPosition
@@ -66,7 +70,7 @@ class CategoryAdapter(
                     val pos = holder.bindingAdapterPosition
                     if (pos == 0) {
                         onMoveUp?.invoke()
-                        onMoveUp != null
+                        true
                     } else {
                         false
                     }
