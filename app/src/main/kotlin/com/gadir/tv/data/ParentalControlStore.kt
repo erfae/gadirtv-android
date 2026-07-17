@@ -33,9 +33,6 @@ class ParentalControlStore(context: Context) {
     fun ensureAdultDefaultsBlocked() {
         hydrate()
         if (prefs.getBoolean(KEY_ADULT_DEFAULTS_APPLIED, false)) return
-        PlaylistRepository.categories
-            .filter { isAdultLiveCategory(it.id) }
-            .forEach { blockedLiveGroups.add(it.id) }
         PlaylistRepository.vodCategories
             .filter { isAdultVodCategory(it.id) }
             .forEach { blockedVodGroups.add(it.id) }
@@ -148,23 +145,12 @@ class ParentalControlStore(context: Context) {
 
     fun requiresPinForLiveCategory(categoryId: String?): Boolean {
         if (categoryId == null || categoryId.isEmpty()) return false
-        if (categoryId == LOCK_CATEGORY_ID) return hasLockedChannels()
-        if (!isLiveGroupBlocked(categoryId)) return false
-        return !ParentalSession.isUnlocked(ParentalSession.liveCategoryKey(categoryId))
+        return categoryId == LOCK_CATEGORY_ID && hasLockedChannels()
     }
 
     fun requiresPinForChannel(channel: LiveChannel, selectedCategoryId: String?): Boolean {
-        if (isChannelLocked(channel.streamId) &&
-            !ParentalSession.isUnlocked(ParentalSession.liveChannelKey(channel.streamId))
-        ) {
-            return true
-        }
-        if (channel.categoryId.isNotBlank() && isLiveGroupBlocked(channel.categoryId) &&
-            !ParentalSession.isUnlocked(ParentalSession.liveCategoryKey(channel.categoryId))
-        ) {
-            return true
-        }
-        return false
+        if (!isChannelLocked(channel.streamId)) return false
+        return !ParentalSession.isUnlocked(ParentalSession.liveChannelKey(channel.streamId))
     }
 
     fun requiresPinForVodCategory(categoryId: String): Boolean {
