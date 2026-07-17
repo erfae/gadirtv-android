@@ -20,6 +20,7 @@
             android:src="@drawable/hero_placeholder_bg" />
 
         <View
+            android:id="@+id/heroScrim"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@drawable/hero_scrim_left" />
