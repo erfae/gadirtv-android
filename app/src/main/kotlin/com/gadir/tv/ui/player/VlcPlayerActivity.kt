@@ -34,6 +34,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private var libVlc: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
     private var overlaysVisible = false
+    private var playbackOverlayShown = false
     private val pendingUrls = ArrayDeque<String>()
     private val hideHandler = Handler(Looper.getMainLooper())
     private val hideOverlaysRunnable = Runnable { hideOverlays() }
@@ -91,6 +92,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                             mediaPlayer?.time = resumePositionMs
                             resumeSeekPending = false
                         }
+                        showOverlaysOnPlaybackStart()
                     }
                 }
             }
@@ -107,7 +109,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             showOverlays()
         }
 
-        showOverlays()
+        hideOverlays()
     }
 
     private fun loadLiveEpg(streamId: Int, epgChannelId: String = "") {
@@ -264,14 +266,25 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         return super.dispatchKeyEvent(event)
     }
 
-    private fun showOverlays() {
+    private fun showOverlaysOnPlaybackStart() {
+        if (!playbackOverlayShown) {
+            playbackOverlayShown = true
+            showOverlays(CONTROLS_HIDE_ON_START_MS)
+            return
+        }
+        showOverlays()
+    }
+
+    private fun showOverlays(hideAfterMs: Long = CONTROLS_HIDE_MS) {
         overlaysVisible = true
         findViewById<View>(R.id.vlcOverlay).visibility = View.VISIBLE
         findViewById<View>(R.id.vlcVolumeControls).visibility = View.VISIBLE
         if (!isLivePlayback) {
             findViewById<View>(R.id.btnVlcBack).visibility = View.VISIBLE
+            epgNowView.visibility = View.GONE
+            epgNextView.visibility = View.GONE
         }
-        scheduleHideOverlays()
+        scheduleHideOverlays(hideAfterMs)
     }
 
     private fun hideOverlays() {
@@ -282,9 +295,9 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         hideHandler.removeCallbacks(hideOverlaysRunnable)
     }
 
-    private fun scheduleHideOverlays() {
+    private fun scheduleHideOverlays(hideAfterMs: Long = CONTROLS_HIDE_MS) {
         hideHandler.removeCallbacks(hideOverlaysRunnable)
-        hideHandler.postDelayed(hideOverlaysRunnable, CONTROLS_HIDE_MS)
+        hideHandler.postDelayed(hideOverlaysRunnable, hideAfterMs)
     }
 
     companion object {
@@ -296,6 +309,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_POSITION_MS = "position_ms"
         private const val VLC_VOLUME = com.gadir.tv.player.VlcAudioOptions.VOLUME_FULLSCREEN
         private const val CONTROLS_HIDE_MS = 8_000L
+        private const val CONTROLS_HIDE_ON_START_MS = 15_000L
 
         fun intent(
             context: Context,
