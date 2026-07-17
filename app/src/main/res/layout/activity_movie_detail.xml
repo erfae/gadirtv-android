@@ -154,12 +154,32 @@
         android:paddingVertical="6dp"
         android:text="" />
 
-    <TextView
+    <FrameLayout
         android:id="@+id/movieLoading"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="center"
-        android:text="@string/loading"
-        android:textColor="@color/gtv_text_dim"
-        android:textSize="16sp" />
+        android:background="#CC000000"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ProgressBar
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:indeterminateTint="@color/gtv_red_hi" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="@string/loading"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </FrameLayout>
 </FrameLayout>

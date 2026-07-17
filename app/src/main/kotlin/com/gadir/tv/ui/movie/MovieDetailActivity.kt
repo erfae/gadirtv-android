@@ -31,7 +31,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
     private var movieName = ""
     private var loadToken = 0
 
-    private lateinit var loadingView: TextView
+    private lateinit var loadingView: View
     private lateinit var moviePlot: TextView
     private lateinit var btnMoviePlay: TextView
 

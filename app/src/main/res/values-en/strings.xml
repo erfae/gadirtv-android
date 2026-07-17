@@ -39,6 +39,7 @@
     <string name="hero_type_movie">Movie</string>
     <string name="hero_type_series">Series</string>
     <string name="hero_plot_empty">Synopsis not available.</string>
+    <string name="hero_plot_loading">Loading synopsis…</string>
     <string name="rail_recent_movies">Recent movies</string>
     <string name="rail_recent_series">Recent series</string>
     <string name="home_empty">Could not load recent content.</string>

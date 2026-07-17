@@ -43,7 +43,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
 
     private lateinit var seasonList: RecyclerView
     private lateinit var episodeList: RecyclerView
-    private lateinit var loadingView: TextView
+    private lateinit var loadingView: View
     private lateinit var btnSeriesPlay: TextView
     private lateinit var seriesPlot: TextView
 
