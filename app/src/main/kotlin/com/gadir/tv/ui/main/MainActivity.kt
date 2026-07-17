@@ -81,8 +81,7 @@ class MainActivity : BaseLocaleActivity() {
         private const val HOME_RAIL_LIMIT_COMPACT = 12
         private const val HERO_LIMIT_COMPACT = 1
         private const val HERO_LIMIT_TV = 8
-        private const val HERO_ROTATE_MS = 5000L
-        private const val HERO_ROTATE_FIRST_MS = 2500L
+        private const val HERO_ROTATE_MS = 8000L
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -176,8 +175,6 @@ class MainActivity : BaseLocaleActivity() {
     private var heroPlotRequestId = 0
     private var heroBackdropRequestId = 0
     private var heroIndex = 0
-    private var heroCarouselPaused = false
-    private var heroRotateFirstTick = true
     private var railPreviewItem: HomeRailAdapter.HomeRailItem? = null
     private var homeLoaded = false
     private var shouldFocusHomeRailsOnResume = true
@@ -197,13 +194,12 @@ class MainActivity : BaseLocaleActivity() {
     private val miniControlsHandler = Handler(Looper.getMainLooper())
     private val hideMiniControlsRunnable = Runnable { hideMiniPreviewControls() }
     private val heroHandler = Handler(Looper.getMainLooper())
-    private val heroCarouselTick = object : Runnable {
+    private val heroRotateRunnable = object : Runnable {
         override fun run() {
-            if (currentTab == Tab.HOME && heroItems.size > 1 && !heroCarouselPaused && !isRailBrowsingFocused()) {
-                railPreviewItem = null
+            if (currentTab != Tab.HOME) return
+            if (railPreviewItem == null && heroItems.size > 1) {
                 heroIndex = (heroIndex + 1) % heroItems.size
-                bindHero(heroItems[heroIndex], quickRotate = true)
-                heroRotateFirstTick = false
+                bindHero(heroItems[heroIndex])
             }
             if (currentTab == Tab.HOME && heroItems.size > 1) {
                 heroHandler.postDelayed(this, HERO_ROTATE_MS)
@@ -356,6 +352,9 @@ class MainActivity : BaseLocaleActivity() {
 
         catalogCategoryList.layoutManager = LinearLayoutManager(this)
         catalogCategoryList.nextFocusUpId = R.id.btnReload
+        if (DeviceUi.useDpadFocus(this)) {
+            panelCatalog.findViewById<View>(R.id.catalogHeroContainer)?.visibility = View.GONE
+        }
         configureCatalogGrid()
         favoritesRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         resumeRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
@@ -367,7 +366,6 @@ class MainActivity : BaseLocaleActivity() {
                 FocusScaleHelper.applyConeFocus(view, hasFocus)
                 if (hasFocus) {
                     railPreviewItem = null
-                    heroCarouselPaused = false
                     bindHero(heroItems.getOrNull(heroIndex) ?: return@setOnFocusChangeListener)
                 }
             }
@@ -1103,20 +1101,8 @@ class MainActivity : BaseLocaleActivity() {
         if (DeviceUi.isCompact(this)) HOME_RAIL_LIMIT_COMPACT else Int.MAX_VALUE
 
     private fun populateHeroItems() {
-        val heroLimit = heroItemLimit()
-        val movies = recentMovies.toList()
-        val series = recentSeries.toList()
-        var movieIdx = 0
-        var seriesIdx = 0
-        val target = (heroLimit * 2).coerceAtMost(movies.size + series.size)
-        while (heroItems.size < target && (movieIdx < movies.size || seriesIdx < series.size)) {
-            if (movieIdx < movies.size) {
-                heroItems.add(HeroItem.Rail(movies[movieIdx++]))
-            }
-            if (seriesIdx < series.size && heroItems.size < target) {
-                heroItems.add(HeroItem.Rail(series[seriesIdx++]))
-            }
-        }
+        recentMovies.forEach { movie -> heroItems.add(HeroItem.Rail(movie)) }
+        recentSeries.forEach { series -> heroItems.add(HeroItem.Rail(series)) }
     }
 
     private fun heroItemLimit(): Int =
@@ -1159,8 +1145,6 @@ class MainActivity : BaseLocaleActivity() {
         heroItems.clear()
         populateHeroItems()
         heroIndex = 0
-        heroRotateFirstTick = true
-        heroCarouselPaused = false
         railPreviewItem = null
 
         panelHome.post {
@@ -1403,7 +1387,6 @@ class MainActivity : BaseLocaleActivity() {
                 null
             } else {
                 {
-                    heroCarouselPaused = false
                     railPreviewItem = null
                     list.post {
                         if (!isAnyHomeRailFocused()) {
@@ -1442,7 +1425,6 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun previewHomeRailItem(item: HomeRailAdapter.HomeRailItem) {
         railPreviewItem = item
-        heroCarouselPaused = true
         bindHero(HeroItem.Rail(item))
     }
 
@@ -1717,16 +1699,14 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun bindHero(item: HeroItem, quickRotate: Boolean = false) {
+    private fun bindHero(item: HeroItem) {
         heroPlotRequestId += 1
         val requestId = heroPlotRequestId
         val backdropRequestId = ++heroBackdropRequestId
 
         heroTitle.text = item.title
-        if (!quickRotate) {
-            heroSubtitle.text = ""
-            heroPlot.text = getString(R.string.hero_plot_empty)
-        }
+        heroSubtitle.text = ""
+        heroPlot.text = getString(R.string.hero_plot_empty)
 
         when (item) {
             is HeroItem.Movie -> {
@@ -1980,16 +1960,15 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun startHeroRotation() {
-        heroHandler.removeCallbacks(heroCarouselTick)
+        heroHandler.removeCallbacks(heroRotateRunnable)
         if (!DeviceUi.useDpadFocus(this)) return
         if (heroItems.size > 1 && currentTab == Tab.HOME) {
-            val delay = if (heroRotateFirstTick) HERO_ROTATE_FIRST_MS else HERO_ROTATE_MS
-            heroHandler.postDelayed(heroCarouselTick, delay)
+            heroHandler.postDelayed(heroRotateRunnable, HERO_ROTATE_MS)
         }
     }
 
     private fun stopHeroRotation() {
-        heroHandler.removeCallbacks(heroCarouselTick)
+        heroHandler.removeCallbacks(heroRotateRunnable)
     }
 
     private fun setupCatalogTab(tab: Tab) {
@@ -2973,8 +2952,6 @@ class MainActivity : BaseLocaleActivity() {
             }
             if (homeLoaded) {
                 railPreviewItem = null
-                heroCarouselPaused = false
-                heroRotateFirstTick = true
                 startHeroRotation()
             }
         } else if (currentTab == Tab.LIVE) {

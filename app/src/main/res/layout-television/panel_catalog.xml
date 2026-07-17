@@ -7,60 +7,12 @@
     <FrameLayout
         android:id="@+id/catalogHeroContainer"
         android:layout_width="match_parent"
-        android:layout_height="200dp"
-        android:background="@color/gtv_bg">
-
-        <ImageView
-            android:id="@+id/catalogHeroImage"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:contentDescription="@null"
-            android:scaleType="centerCrop"
-            android:src="@drawable/hero_placeholder_bg" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/hero_scrim_left" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="bottom"
-            android:orientation="vertical"
-            android:paddingHorizontal="14dp"
-            android:paddingBottom="12dp">
-
-            <TextView
-                android:id="@+id/catalogHeroTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:fontFamily="sans-serif-medium"
-                android:maxLines="2"
-                android:textColor="@android:color/white"
-                android:textSize="24sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/catalogHeroSubtitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:ellipsize="end"
-                android:letterSpacing="0.03"
-                android:maxLines="1"
-                android:textAllCaps="true"
-                android:textColor="@color/gtv_red_hi"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-    </FrameLayout>
+        android:layout_height="0dp"
+        android:visibility="gone" />
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
         android:orientation="horizontal">
 
         <androidx.recyclerview.widget.RecyclerView
@@ -71,7 +23,7 @@
             android:clipToPadding="false"
             android:descendantFocusability="afterDescendants"
             android:nextFocusRight="@+id/catalogGrid"
-            android:padding="8dp"
+            android:padding="6dp"
             android:scrollbars="vertical" />
 
         <View
@@ -90,7 +42,7 @@
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
                 android:nextFocusLeft="@+id/catalogCategoryList"
-                android:padding="8dp"
+                android:padding="6dp"
                 android:scrollbars="vertical" />
 
             <TextView
@@ -111,6 +63,24 @@
                 android:text="@string/catalog_empty"
                 android:textColor="@color/gtv_text_dim"
                 android:textSize="16sp"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/catalogHeroImage"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/catalogHeroTitle"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/catalogHeroSubtitle"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
                 android:visibility="gone" />
         </FrameLayout>
     </LinearLayout>

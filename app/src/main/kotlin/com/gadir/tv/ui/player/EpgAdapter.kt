@@ -33,12 +33,15 @@ class EpgAdapter(
             nowSeconds >= item.start && nowSeconds < item.end
         holder.time.text = formatRange(item.start, item.end)
         holder.title.text = item.title
-        holder.itemView.setBackgroundResource(
-            if (isCurrent) R.drawable.btn_trailer_hero else android.R.color.transparent,
-        )
+        holder.itemView.isActivated = isCurrent
         holder.time.setTextColor(
             holder.itemView.context.getColor(
-                if (isCurrent) R.color.gtv_red_hi else R.color.gtv_text_dim,
+                if (isCurrent) android.R.color.white else R.color.gtv_text_dim,
+            ),
+        )
+        holder.title.setTextColor(
+            holder.itemView.context.getColor(
+                if (isCurrent) R.color.gtv_red_hi else android.R.color.white,
             ),
         )
     }

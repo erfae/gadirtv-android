@@ -33,48 +33,19 @@
         android:src="@drawable/ic_back"
         android:visibility="gone" />
 
-    <LinearLayout
-        android:id="@+id/vlcOverlay"
+    <include
+        android:id="@+id/vlcVodControls"
+        layout="@layout/overlay_vod_controls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="@drawable/player_overlay_scrim"
-        android:orientation="vertical"
-        android:paddingHorizontal="24dp"
-        android:paddingTop="28dp"
-        android:paddingBottom="20dp">
+        android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/vlcTitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:fontFamily="sans-serif-medium"
-            android:maxLines="2"
-            android:textColor="@android:color/white"
-            android:textSize="22sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/vlcEpgNow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:ellipsize="end"
-            android:fontFamily="sans-serif-medium"
-            android:maxLines="2"
-            android:textColor="#F2FFFFFF"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/vlcEpgNext"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/gtv_text_dim"
-            android:textSize="12sp"
-            android:visibility="gone" />
-    </LinearLayout>
+    <include
+        android:id="@+id/vlcEpgPanel"
+        layout="@layout/overlay_epg_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:visibility="gone" />
 </FrameLayout>
