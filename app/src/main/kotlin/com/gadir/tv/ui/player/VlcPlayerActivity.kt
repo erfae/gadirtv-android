@@ -101,14 +101,23 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         }
 
         val settings = AppSettings(this)
-        val options = com.gadir.tv.player.VlcAudioOptions.baseOptions(settings.networkBufferMs)
+        val bufferMs = if (isLivePlayback) settings.networkBufferMs else AppSettings.BUFFER_FAST_MS
+        val options = com.gadir.tv.player.VlcAudioOptions.baseOptions(bufferMs)
         libVlc = LibVLC(this, options)
         mediaPlayer = MediaPlayer(libVlc).apply {
             attachViews(findViewById(R.id.vlcVideo), null, false, false)
             volume = VLC_VOLUME
             setEventListener { event ->
                 when (event.type) {
-                    MediaPlayer.Event.EncounteredError -> tryNextUrl()
+                    MediaPlayer.Event.EncounteredError -> {
+                        if (!tryNextUrl()) {
+                            android.widget.Toast.makeText(
+                                this@VlcPlayerActivity,
+                                R.string.series_playback_failed,
+                                android.widget.Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                    }
                     MediaPlayer.Event.Playing -> {
                         if (resumeSeekPending && resumePositionMs > 0L) {
                             mediaPlayer?.time = resumePositionMs

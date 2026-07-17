@@ -20,6 +20,7 @@ object VodStreamUrls {
                 urls.add(api.movieStreamUrl(profile, streamId, ext))
             }
         }
+        urls.add(api.movieStreamUrlWithoutExtension(profile, streamId))
         return urls.filter { it.isNotBlank() }
     }
 
@@ -37,6 +38,7 @@ object VodStreamUrls {
                 urls.add(api.seriesStreamUrl(profile, episodeId, ext))
             }
         }
+        urls.add(api.seriesStreamUrlWithoutExtension(profile, episodeId))
         return urls.filter { it.isNotBlank() }
     }
 }

@@ -72,7 +72,10 @@ import com.gadir.tv.util.HostUtils
 import java.util.Date
 import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -83,6 +86,7 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_LIMIT_COMPACT = 1
         private const val HERO_LIMIT_TV = 8
         private const val HERO_ROTATE_MS = 5000L
+        private const val HERO_ROTATE_FIRST_MS = 2500L
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -177,6 +181,9 @@ class MainActivity : BaseLocaleActivity() {
     private var heroBackdropRequestId = 0
     private var heroIndex = 0
     private var railPreviewItem: HomeRailAdapter.HomeRailItem? = null
+    private var heroCarouselPaused = false
+    private var heroRotateFirstTick = true
+    private var heroRotationJob: Job? = null
     private var homeLoaded = false
     private var shouldFocusHomeRailsOnResume = true
     private var catalogLoadToken = 0
@@ -194,14 +201,18 @@ class MainActivity : BaseLocaleActivity() {
     private var previewContainer: View? = null
     private val miniControlsHandler = Handler(Looper.getMainLooper())
     private val hideMiniControlsRunnable = Runnable { hideMiniPreviewControls() }
-    private val heroHandler = Handler(Looper.getMainLooper())
-    private val heroRotateRunnable = object : Runnable {
-        override fun run() {
-            if (currentTab == Tab.HOME && heroItems.size > 1 && railPreviewItem == null) {
-                advanceHeroCarousel()
-            }
-            if (currentTab == Tab.HOME && heroItems.size > 1) {
-                heroHandler.postDelayed(this, HERO_ROTATE_MS)
+    private fun startHeroRotationLoop() {
+        heroRotationJob?.cancel()
+        if (!DeviceUi.useDpadFocus(this) || currentTab != Tab.HOME || heroItems.size <= 1) return
+        heroRotationJob = lifecycleScope.launch {
+            val firstDelay = if (heroRotateFirstTick) HERO_ROTATE_FIRST_MS else HERO_ROTATE_MS
+            delay(firstDelay)
+            while (isActive && currentTab == Tab.HOME && heroItems.size > 1) {
+                if (!heroCarouselPaused && !isAnyHomeRailFocused() && railPreviewItem == null) {
+                    advanceHeroCarousel(quickRotate = true)
+                    heroRotateFirstTick = false
+                }
+                delay(HERO_ROTATE_MS)
             }
         }
     }
@@ -818,6 +829,9 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun openCatalogTabAtFirstGroup(tab: Tab) {
+        catalogCategoryHandler.removeCallbacksAndMessages(null)
+        catalogCategoryFocusToken++
+        pendingCatalogCategory = null
         val cats = catalogCategoriesFor(tab)
         catalogCategories.clear()
         catalogCategories.addAll(cats)
@@ -858,6 +872,11 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun bindNavTab(view: View, tab: Tab) {
         view.setOnClickListener { showTab(tab) }
+        if (DeviceUi.useDpadFocus(this)) {
+            view.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus && currentTab != tab) showTab(tab)
+            }
+        }
     }
 
     private fun showTab(tab: Tab) {
@@ -885,6 +904,7 @@ class MainActivity : BaseLocaleActivity() {
                     }
                 } else {
                     railPreviewItem = null
+                    heroCarouselPaused = false
                     startHeroRotation()
                     if (DeviceUi.useDpadFocus(this)) focusHeroOnStart()
                 }
@@ -919,13 +939,11 @@ class MainActivity : BaseLocaleActivity() {
                 if (!ready) {
                     setupCatalogTab(tab)
                     if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
-                } else if (!DeviceUi.isCompact(this)) {
-                    openCatalogTabAtFirstGroup(tab)
-                } else {
-                    restoreCatalogTab(tab)
                 }
                 if (!DeviceUi.isCompact(this)) {
-                    panelCatalog.post { focusFirstCatalogCategory() }
+                    openCatalogTabAtFirstGroup(tab)
+                } else if (ready) {
+                    restoreCatalogTab(tab)
                 }
             }
         }
@@ -1122,15 +1140,70 @@ class MainActivity : BaseLocaleActivity() {
         if (DeviceUi.isCompact(this)) HOME_RAIL_LIMIT_COMPACT else Int.MAX_VALUE
 
     private fun populateHeroItems() {
-        val pool = buildList {
-            recentMovies.forEach { add(HeroItem.Rail(it)) }
-            recentSeries.forEach { add(HeroItem.Rail(it)) }
+        val heroLimit = heroItemLimit()
+        val seen = mutableSetOf<Pair<String, Int>>()
+        val pool = mutableListOf<HomeRailAdapter.HomeRailItem>()
+
+        fun addItem(item: HomeRailAdapter.HomeRailItem) {
+            val key = item.kind to item.id
+            if (seen.add(key)) pool.add(item)
         }
-        val limit = (heroItemLimit() * 2).coerceAtMost(pool.size)
-        heroItems.addAll(pool.shuffled().take(limit))
+
+        recentMovies.forEach(::addItem)
+        recentSeries.forEach(::addItem)
+        favoriteItems.filter {
+            it.kind == HomeRailAdapter.HomeRailItem.KIND_MOVIE ||
+                it.kind == HomeRailAdapter.HomeRailItem.KIND_SERIES
+        }.forEach(::addItem)
+
+        if (pool.size < 2) {
+            PlaylistRepository.allCachedVod()
+                .sortedByDescending { it.added }
+                .take(16)
+                .forEach { movie ->
+                    addItem(
+                        HomeRailAdapter.HomeRailItem(
+                            id = movie.streamId,
+                            title = movie.name,
+                            imageUrl = movie.icon,
+                            badge = getString(R.string.hero_type_movie),
+                            kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
+                            extension = movie.extension,
+                        ),
+                    )
+                }
+            PlaylistRepository.allCachedSeries()
+                .sortedByDescending { it.added }
+                .take(16)
+                .forEach { series ->
+                    addItem(
+                        HomeRailAdapter.HomeRailItem(
+                            id = series.seriesId,
+                            title = series.name,
+                            imageUrl = series.cover,
+                            badge = getString(R.string.hero_type_series),
+                            kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
+                        ),
+                    )
+                }
+        }
+
+        val movies = pool.filter { it.kind == HomeRailAdapter.HomeRailItem.KIND_MOVIE }.shuffled()
+        val series = pool.filter { it.kind == HomeRailAdapter.HomeRailItem.KIND_SERIES }.shuffled()
+        var movieIdx = 0
+        var seriesIdx = 0
+        val maxItems = (heroLimit * 2).coerceAtMost(pool.size)
+        while (heroItems.size < maxItems && (movieIdx < movies.size || seriesIdx < series.size)) {
+            if (movieIdx < movies.size) {
+                heroItems.add(HeroItem.Rail(movies[movieIdx++]))
+            }
+            if (seriesIdx < series.size && heroItems.size < maxItems) {
+                heroItems.add(HeroItem.Rail(series[seriesIdx++]))
+            }
+        }
     }
 
-    private fun advanceHeroCarousel() {
+    private fun advanceHeroCarousel(quickRotate: Boolean = false) {
         if (heroItems.size <= 1) return
         var next = heroIndex
         repeat(8) {
@@ -1138,7 +1211,23 @@ class MainActivity : BaseLocaleActivity() {
             if (next != heroIndex || heroItems.size == 1) return@repeat
         }
         heroIndex = next
-        bindHero(heroItems[heroIndex])
+        bindHero(heroItems[heroIndex], quickRotate = quickRotate)
+        if (quickRotate) {
+            scheduleHeroPlotRefresh()
+        }
+    }
+
+    private fun scheduleHeroPlotRefresh() {
+        val index = heroIndex
+        val item = heroItems.getOrNull(index) ?: return
+        lifecycleScope.launch {
+            delay(900L)
+            if (heroIndex == index && currentTab == Tab.HOME &&
+                !heroCarouselPaused && railPreviewItem == null
+            ) {
+                bindHero(item, quickRotate = false)
+            }
+        }
     }
 
     private fun heroItemLimit(): Int =
@@ -1181,6 +1270,8 @@ class MainActivity : BaseLocaleActivity() {
         heroItems.clear()
         populateHeroItems()
         heroIndex = 0
+        heroRotateFirstTick = true
+        heroCarouselPaused = false
         railPreviewItem = null
 
         panelHome.post {
@@ -1424,6 +1515,7 @@ class MainActivity : BaseLocaleActivity() {
             } else {
                 {
                     railPreviewItem = null
+                    heroCarouselPaused = false
                     list.post {
                         if (!isAnyHomeRailFocused()) {
                             heroItems.getOrNull(heroIndex)?.let { bindHero(it) }
@@ -1461,6 +1553,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun previewHomeRailItem(item: HomeRailAdapter.HomeRailItem) {
         railPreviewItem = item
+        heroCarouselPaused = true
         bindHero(HeroItem.Rail(item))
     }
 
@@ -1552,16 +1645,24 @@ class MainActivity : BaseLocaleActivity() {
         val record = resumeStore.get(ResumeStore.KIND_MOVIE, streamId.toString())
         if (record != null) {
             val profile = PlaylistRepository.profile ?: return
+            val urls = VodStreamUrls.movieCandidates(api, profile, streamId, extension)
+            val url = urls.firstOrNull().orEmpty()
+            if (url.isBlank()) {
+                openMovieDetail(streamId, title, cover, extension)
+                return
+            }
             ResumePlaybackHelper.play(
                 context = this,
                 resumeStore = resumeStore,
                 request = PlaybackRequest(
                     title = title,
-                    url = api.movieStreamUrl(profile, streamId, extension),
+                    url = url,
                     kind = ResumeStore.KIND_MOVIE,
                     contentId = streamId.toString(),
                     imageUrl = cover,
                     extension = extension,
+                    positionMs = record.positionMs,
+                    alternateUrls = urls.drop(1),
                 ),
             )
             return
@@ -1735,14 +1836,18 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun bindHero(item: HeroItem) {
-        heroPlotRequestId += 1
+    private fun bindHero(item: HeroItem, quickRotate: Boolean = false) {
+        if (!quickRotate) {
+            heroPlotRequestId += 1
+        }
         val requestId = heroPlotRequestId
         val backdropRequestId = ++heroBackdropRequestId
 
         heroTitle.text = item.title
-        heroSubtitle.text = ""
-        heroPlot.text = getString(R.string.hero_plot_empty)
+        if (!quickRotate) {
+            heroSubtitle.text = ""
+            heroPlot.text = getString(R.string.hero_plot_empty)
+        }
 
         when (item) {
             is HeroItem.Movie -> {
@@ -1755,7 +1860,7 @@ class MainActivity : BaseLocaleActivity() {
                     kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
                     backdropRequestId = backdropRequestId,
                 )
-                if (DeviceUi.useDpadFocus(this)) {
+                if (DeviceUi.useDpadFocus(this) && !quickRotate) {
                     loadMoviePlot(item.movie.streamId, requestId, backdropRequestId)
                 }
             }
@@ -1769,7 +1874,7 @@ class MainActivity : BaseLocaleActivity() {
                     kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
                     backdropRequestId = backdropRequestId,
                 )
-                if (DeviceUi.useDpadFocus(this)) {
+                if (DeviceUi.useDpadFocus(this) && !quickRotate) {
                     loadSeriesPlot(item.series.seriesId, requestId, backdropRequestId)
                 }
             }
@@ -1790,8 +1895,10 @@ class MainActivity : BaseLocaleActivity() {
                     kind = item.item.kind,
                     backdropRequestId = backdropRequestId,
                 )
-                heroSubtitle.text = item.item.subtitle
-                if (DeviceUi.useDpadFocus(this)) {
+                if (!quickRotate) {
+                    heroSubtitle.text = item.item.subtitle
+                }
+                if (DeviceUi.useDpadFocus(this) && !quickRotate) {
                     when (item.item.kind) {
                         HomeRailAdapter.HomeRailItem.KIND_MOVIE ->
                             loadMoviePlot(item.item.id, requestId, backdropRequestId)
@@ -1996,15 +2103,16 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun startHeroRotation() {
-        heroHandler.removeCallbacks(heroRotateRunnable)
+        heroRotationJob?.cancel()
         if (!DeviceUi.useDpadFocus(this)) return
         if (heroItems.size > 1 && currentTab == Tab.HOME) {
-            heroHandler.postDelayed(heroRotateRunnable, HERO_ROTATE_MS)
+            startHeroRotationLoop()
         }
     }
 
     private fun stopHeroRotation() {
-        heroHandler.removeCallbacks(heroRotateRunnable)
+        heroRotationJob?.cancel()
+        heroRotationJob = null
     }
 
     private fun setupCatalogTab(tab: Tab) {
@@ -2934,10 +3042,10 @@ class MainActivity : BaseLocaleActivity() {
             Tab.MOVIES, Tab.SERIES -> {
                 when {
                     isFocusInHeader() -> focusBottomTab(currentTab)
-                    isFocusInBottomNav() -> focusCatalogCategoryList()
-                    isFocusInList(catalogGrid) -> focusCatalogCategoryList()
+                    isFocusInBottomNav() -> focusFirstCatalogCategory()
+                    isFocusInList(catalogGrid) -> focusFirstCatalogCategory()
                     isFocusInList(catalogCategoryList) -> focusBottomTab(currentTab)
-                    else -> focusCatalogCategoryList()
+                    else -> focusFirstCatalogCategory()
                 }
             }
         }
@@ -2991,6 +3099,8 @@ class MainActivity : BaseLocaleActivity() {
             }
             if (homeLoaded) {
                 railPreviewItem = null
+                heroCarouselPaused = false
+                heroRotateFirstTick = true
                 startHeroRotation()
             }
         } else if (currentTab == Tab.LIVE) {
