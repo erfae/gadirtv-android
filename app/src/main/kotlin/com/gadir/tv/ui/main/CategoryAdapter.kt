@@ -25,6 +25,10 @@ class CategoryAdapter(
         val name: TextView = view.findViewById(R.id.categoryName)
     }
 
+    fun refreshSelection() {
+        notifyDataSetChanged()
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_category, parent, false)
@@ -33,9 +37,11 @@ class CategoryAdapter(
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val item = items[position]
+        val selected = item.id == selectedId()
 
         holder.name.text = item.name
-        holder.itemView.isSelected = item.id == selectedId()
+        holder.itemView.isSelected = selected
+        holder.itemView.isActivated = selected
         if (position == 0 && upFocusViewId != View.NO_ID) {
             holder.itemView.nextFocusUpId = upFocusViewId
         }
