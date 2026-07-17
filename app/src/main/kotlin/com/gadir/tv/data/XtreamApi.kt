@@ -281,19 +281,31 @@ class XtreamApi(
     private fun parseSeriesEpisode(element: JsonElement, seasonKey: String): SeriesEpisode? {
         val ep = element.asJsonObjectOrNull() ?: return null
         val epInfo = ep.getAsJsonObject("info")
-        val id = ep.get("id")?.asIntOrZero() ?: 0
+        val id = ep.get("id")?.asIntOrZero()
+            ?: ep.get("episode_id")?.asIntOrZero()
+            ?: epInfo?.get("id")?.asIntOrZero()
+            ?: epInfo?.get("episode_id")?.asIntOrZero()
+            ?: 0
         if (id <= 0) return null
         val season = normalizeSeasonKey(
             ep.get("season")?.asStringOrNull()?.takeIf { it.isNotBlank() }
                 ?: ep.get("season_number")?.asStringOrNull()?.takeIf { it.isNotBlank() }
+                ?: epInfo?.get("season")?.asStringOrNull()?.takeIf { it.isNotBlank() }
                 ?: seasonKey,
         )
+        val episodeNum = ep.get("episode_num")?.asIntOrZero()
+            ?: ep.get("episode_number")?.asIntOrZero()
+            ?: epInfo?.get("episode_num")?.asIntOrZero()
+            ?: 0
         return SeriesEpisode(
             id = id,
-            title = ep.get("title")?.asStringOrNull()?.trim().orEmpty(),
-            episodeNum = ep.get("episode_num")?.asIntOrZero() ?: 0,
+            title = ep.get("title")?.asStringOrNull()?.trim()
+                ?: epInfo?.get("title")?.asStringOrNull()?.trim().orEmpty(),
+            episodeNum = episodeNum,
             season = season,
-            extension = ep.get("container_extension")?.asStringOrNull()?.ifBlank { "mp4" } ?: "mp4",
+            extension = ep.get("container_extension")?.asStringOrNull()?.ifBlank { "mp4" }
+                ?: epInfo?.get("container_extension")?.asStringOrNull()?.ifBlank { "mp4" }
+                ?: "mp4",
             plot = epInfo?.get("plot")?.asStringOrNull()?.trim().orEmpty(),
             image = imageUrl(epInfo, "movie_image", "cover_big", "cover")
                 .ifBlank { imageUrl(ep, "movie_image", "cover_big", "cover") },
