@@ -79,7 +79,9 @@ class HomeRailAdapter(
 
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             if (hasFocus) onFocus?.invoke(item)
-            view.post { FocusScaleHelper.applyConeFocus(view, hasFocus) }
+            if (DeviceUi.useDpadFocus(holder.itemView.context)) {
+                view.post { FocusScaleHelper.applyConeFocus(view, hasFocus) }
+            }
         }
         holder.itemView.setOnClickListener { onClick(item) }
         holder.itemView.setOnLongClickListener {
