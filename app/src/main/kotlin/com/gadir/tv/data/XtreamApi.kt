@@ -379,8 +379,22 @@ class XtreamApi(
     fun movieStreamUrl(profile: Profile, streamId: Int, ext: String = "mp4"): String =
         buildStreamUrl(profile, "movie", streamId, ext)
 
+    fun movieStreamUrlWithoutExtension(profile: Profile, streamId: Int): String {
+        val host = HostUtils.baseUrl(profile.host)
+        val u = encode(profile.username)
+        val pw = encode(profile.password)
+        return "$host/movie/$u/$pw/$streamId"
+    }
+
     fun seriesStreamUrl(profile: Profile, episodeId: Int, ext: String = "mp4"): String =
         buildStreamUrl(profile, "series", episodeId, ext)
+
+    fun seriesStreamUrlWithoutExtension(profile: Profile, episodeId: Int): String {
+        val host = HostUtils.baseUrl(profile.host)
+        val u = encode(profile.username)
+        val pw = encode(profile.password)
+        return "$host/series/$u/$pw/$episodeId"
+    }
 
     fun shortEpg(
         profile: Profile,
