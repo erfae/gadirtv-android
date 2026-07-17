@@ -29,7 +29,6 @@
         android:clipToPadding="false"
         android:descendantFocusability="afterDescendants"
         android:nextFocusLeft="@+id/categoryList"
-        android:nextFocusRight="@+id/previewContainer"
         android:padding="6dp"
         android:scrollbars="vertical" />
 
@@ -57,6 +56,13 @@
             android:keepScreenOn="true"
             app:show_buffering="when_playing"
             app:use_controller="false" />
+
+        <org.videolan.libvlc.util.VLCVideoLayout
+            android:id="@+id/miniVlcPlayer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:keepScreenOn="true"
+            android:visibility="gone" />
 
         <include
             android:id="@+id/miniNoSignal"

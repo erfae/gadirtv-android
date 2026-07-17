@@ -7,7 +7,6 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
 import com.gadir.tv.R
 import com.gadir.tv.util.ChannelIconHelper
 import com.gadir.tv.model.LiveChannel
@@ -75,7 +74,6 @@ class ChannelAdapter(
         val item = itemAt(position) ?: return
         holder.number.text = (position + 1).toString()
         holder.name.text = item.name
-        Glide.with(holder.icon).clear(holder.icon)
         ChannelIconHelper.load(holder.icon, item)
         holder.favorite.setImageResource(
             if (isFavorite(item)) R.drawable.ic_favorite_on else R.drawable.ic_favorite_off,

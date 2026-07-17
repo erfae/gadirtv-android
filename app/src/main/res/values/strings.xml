@@ -41,6 +41,7 @@
     <string name="hero_type_movie">Película</string>
     <string name="hero_type_series">Serie</string>
     <string name="hero_plot_empty">Sinopsis no disponible.</string>
+    <string name="series_playback_failed">No se pudo reproducir el episodio. Abriendo detalle…</string>
     <string name="rail_recent_movies">Películas recientes</string>
     <string name="rail_recent_series">Series recientes</string>
     <string name="home_empty">No se pudo cargar contenido reciente.</string>

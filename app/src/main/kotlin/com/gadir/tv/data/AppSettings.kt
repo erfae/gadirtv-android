@@ -1,10 +1,11 @@
 package com.gadir.tv.data
 
 import android.content.Context
+import com.gadir.tv.util.DeviceUi
 
 class AppSettings(context: Context) {
-    private val prefs = (context.applicationContext ?: context)
-        .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext ?: context
+    private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     var autoplayPreview: Boolean
         get() = prefs.getBoolean(KEY_AUTOPLAY, true)
@@ -36,8 +37,10 @@ class AppSettings(context: Context) {
         set(value) = prefs.edit().putString(KEY_LIVE_SORT, value).apply()
 
     var previewSound: Boolean
-        get() = prefs.getBoolean(KEY_PREVIEW_SOUND, true)
+        get() = prefs.getBoolean(KEY_PREVIEW_SOUND, defaultPreviewSound())
         set(value) = prefs.edit().putBoolean(KEY_PREVIEW_SOUND, value).apply()
+
+    private fun defaultPreviewSound(): Boolean = !DeviceUi.useDpadFocus(appContext)
 
     var networkBufferMs: Int
         get() = prefs.getInt(KEY_NETWORK_BUFFER, BUFFER_DEFAULT_MS)

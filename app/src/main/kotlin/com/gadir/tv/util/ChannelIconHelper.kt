@@ -34,15 +34,22 @@ object ChannelIconHelper {
             add("$base/images/$streamId.jpg")
             add("$base/images/$streamId.jpeg")
             add("$base/images/$streamId.webp")
+            add("$base/imgs/$streamId.png")
+            add("$base/imgs/$streamId.jpg")
+            add("$base/logo/$streamId.png")
+            add("$base/logos/$streamId.png")
+            add("$base/stream/logo/$streamId.png")
             add("$base/streaming/images/$streamId.png")
             add("$base/streaming/images/$streamId.jpg")
             add("$base/live/$user/$pass/$streamId.png")
             add("$base/live/$user/$pass/$streamId.jpg")
             add("$base/live/$user/$pass/$streamId.ts.png")
+            add("$base/streaming/clients_live.php?username=$user&password=$pass&stream=$streamId&type=image")
             if (epgChannelId.isNotBlank()) {
                 val epg = encode(epgChannelId)
                 add("$base/images/$epg.png")
                 add("$base/images/$epg.jpg")
+                add("$base/imgs/$epg.png")
             }
         }.distinct().filter { it.isNotBlank() }
     }

@@ -162,17 +162,9 @@ object ImageLoader {
         val headers = LazyHeaders.Builder()
             .addHeader("User-Agent", PlaylistRepository.userAgent)
             .addHeader("Accept", "image/*,*/*")
-        val panelHost = PlaylistRepository.profile?.host?.let { panelHostFrom(it) }
-        val urlHost = runCatching { Uri.parse(url).host?.lowercase() }.getOrNull()
-        if (panelHost != null && urlHost != null && urlHost == panelHost) {
-            headers.addHeader(
-                "Referer",
-                HostUtils.baseUrl(PlaylistRepository.profile!!.host) + "/",
-            )
+        PlaylistRepository.profile?.host?.let { host ->
+            headers.addHeader("Referer", HostUtils.baseUrl(host) + "/")
         }
         return GlideUrl(url, headers.build())
     }
-
-    private fun panelHostFrom(host: String): String? =
-        runCatching { Uri.parse(HostUtils.baseUrl(host)).host?.lowercase() }.getOrNull()
 }
