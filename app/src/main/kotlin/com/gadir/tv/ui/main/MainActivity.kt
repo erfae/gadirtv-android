@@ -1,12 +1,14 @@
 package com.gadir.tv.ui.main
 
 import android.content.Intent
+import android.view.Gravity
 import android.view.KeyEvent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.ViewStub
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
@@ -401,7 +403,21 @@ class MainActivity : BaseLocaleActivity() {
         panelHome.findViewById<View>(R.id.heroContainer)?.minimumHeight = heroHeight
         if (DeviceUi.isCompact(this)) {
             headerDate.visibility = View.GONE
+        } else {
+            configureHeroPosterLayout()
         }
+    }
+
+    private fun configureHeroPosterLayout() {
+        val posterWidth = dp(96)
+        val posterHeight = dp(140)
+        val params = (heroPoster.layoutParams as? FrameLayout.LayoutParams)
+            ?: FrameLayout.LayoutParams(posterWidth, posterHeight)
+        params.width = posterWidth
+        params.height = posterHeight
+        params.gravity = Gravity.END or Gravity.CENTER_VERTICAL
+        params.marginEnd = dp(20)
+        heroPoster.layoutParams = params
     }
 
     private fun ensureLiveTabReady() {
@@ -1611,7 +1627,10 @@ class MainActivity : BaseLocaleActivity() {
         val heroBackdrop = backdrop.ifBlank { poster }
         loadHeroImage(heroImage, heroBackdrop, contentId, kind)
         if (poster.isNotBlank()) {
+            heroPoster.visibility = View.VISIBLE
             loadHeroImage(heroPoster, poster, contentId, kind)
+        } else {
+            heroPoster.visibility = View.GONE
         }
     }
 
@@ -2412,14 +2431,15 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun schedulePreview(channel: LiveChannel) {
-        if (currentTab != Tab.LIVE || livePreviewPaused || reloadingChannels) return
+        if (currentTab != Tab.LIVE || reloadingChannels) return
+        livePreviewPaused = false
         withChannelAccess(channel) {
             schedulePreviewInternal(channel)
         }
     }
 
     private fun schedulePreviewInternal(channel: LiveChannel) {
-        if (currentTab != Tab.LIVE || livePreviewPaused || reloadingChannels) return
+        if (currentTab != Tab.LIVE || reloadingChannels) return
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val channelChanged = previewingStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) {
@@ -2487,7 +2507,14 @@ class MainActivity : BaseLocaleActivity() {
     private fun previewChannel(channel: LiveChannel, token: Int) {
         if (token != previewToken || livePreviewPaused) return
         val profile = PlaylistRepository.profile ?: return
-        if (!ensurePreviewPlayer()) return
+        if (!ensurePreviewPlayer()) {
+            livePanel().post {
+                if (token == previewToken && !livePreviewPaused && ensurePreviewPlayer()) {
+                    previewChannel(channel, token)
+                }
+            }
+            return
+        }
         updatePreviewInfo(channel)
         if (!appSettings.autoplayPreview) {
             cancelMiniPreviewPlayback()
