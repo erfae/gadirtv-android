@@ -7,6 +7,9 @@ object DeviceUi {
     fun isCompact(context: Context): Boolean =
         context.resources.configuration.smallestScreenWidthDp < 600
 
+    /** D-pad / TV: onFocus handlers are safe. Touch devices must use onClick only. */
+    fun useDpadFocus(context: Context): Boolean = !isCompact(context)
+
     fun isLandscape(context: Context): Boolean =
         context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
