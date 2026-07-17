@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.util.ChannelIconHelper
+import com.gadir.tv.util.TvNavHelper
 import com.gadir.tv.model.LiveChannel
 
 class ChannelAdapter(
@@ -138,15 +139,23 @@ class ChannelAdapter(
                         onMoveUp?.invoke()
                         onMoveUp != null
                     } else {
-                        false
+                        val list = holder.itemView.parent as? RecyclerView
+                        if (list != null) {
+                            TvNavHelper.moveFocus(list, pos, pos - 1, itemCount())
+                        }
+                        list != null
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    if (pos == itemCount() - 1) {
+                    if (pos < itemCount() - 1) {
+                        val list = holder.itemView.parent as? RecyclerView
+                        if (list != null) {
+                            TvNavHelper.moveFocus(list, pos, pos + 1, itemCount())
+                        }
+                        list != null
+                    } else {
                         onMoveDown?.invoke()
                         onMoveDown != null
-                    } else {
-                        false
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {

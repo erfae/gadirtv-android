@@ -258,6 +258,8 @@ class MainActivity : BaseLocaleActivity() {
         if (DeviceUi.useDpadFocus(this)) {
             liveCategoryList.setPreserveFocusAfterLayout(false)
             channelList.setPreserveFocusAfterLayout(true)
+            liveCategoryList.setItemViewCacheSize(24)
+            channelList.setItemViewCacheSize(32)
         }
     }
 
@@ -371,6 +373,8 @@ class MainActivity : BaseLocaleActivity() {
         if (DeviceUi.useDpadFocus(this)) {
             catalogCategoryList.setPreserveFocusAfterLayout(false)
             catalogGrid.setPreserveFocusAfterLayout(true)
+            catalogCategoryList.setItemViewCacheSize(24)
+            catalogGrid.setItemViewCacheSize(30)
             panelCatalog.findViewById<View>(R.id.catalogHeroContainer)?.visibility = View.GONE
         }
         configureCatalogGrid()
