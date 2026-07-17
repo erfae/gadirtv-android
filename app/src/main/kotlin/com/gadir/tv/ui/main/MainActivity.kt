@@ -82,8 +82,8 @@ class MainActivity : BaseLocaleActivity() {
         private const val HOME_RAIL_LIMIT_COMPACT = 12
         private const val HERO_LIMIT_COMPACT = 1
         private const val HERO_LIMIT_TV = 8
-        private const val HERO_ROTATE_MS = 5000L
-        private const val HERO_ROTATE_FIRST_MS = 2500L
+        private const val HERO_ROTATE_MS = 8000L
+        private const val HERO_ROTATE_FIRST_MS = 4000L
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -113,6 +113,7 @@ class MainActivity : BaseLocaleActivity() {
     private var moviesCatalogReady = false
     private var seriesCatalogReady = false
     private var currentTab = Tab.HOME
+    private var previousTab = Tab.HOME
 
     private lateinit var tabHome: View
     private lateinit var tabLive: View
@@ -131,7 +132,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private lateinit var catalogCategoryList: RecyclerView
     private lateinit var catalogGrid: RecyclerView
-    private lateinit var catalogLoading: TextView
+    private lateinit var catalogLoading: View
     private lateinit var catalogEmpty: TextView
     private lateinit var catalogHeroImage: ImageView
     private lateinit var catalogHeroTitle: TextView
@@ -174,7 +175,15 @@ class MainActivity : BaseLocaleActivity() {
     private val recentMovies = mutableListOf<HomeRailAdapter.HomeRailItem>()
     private val recentSeries = mutableListOf<HomeRailAdapter.HomeRailItem>()
     private val heroItems = mutableListOf<HeroItem>()
-    private var heroPlotRequestId = 0
+    private val heroPlotCache = mutableMapOf<String, CachedHeroPlot>()
+
+    private data class CachedHeroPlot(
+        val plot: String,
+        val subtitle: String,
+        val backdrop: String,
+        val poster: String,
+        val title: String = "",
+    )
     private var heroBackdropRequestId = 0
     private var heroIndex = 0
     private var railPreviewItem: HomeRailAdapter.HomeRailItem? = null
@@ -356,6 +365,7 @@ class MainActivity : BaseLocaleActivity() {
         catalogCategoryList.nextFocusUpId = R.id.btnReload
         if (DeviceUi.useDpadFocus(this)) {
             catalogCategoryList.setPreserveFocusAfterLayout(false)
+            catalogGrid.setPreserveFocusAfterLayout(true)
             panelCatalog.findViewById<View>(R.id.catalogHeroContainer)?.visibility = View.GONE
         }
         configureCatalogGrid()
@@ -850,13 +860,17 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun highlightCatalogCategory(tab: Tab, catId: String) {
         if (catId == selectedCatalogCategoryId) return
+        val oldId = selectedCatalogCategoryId
         selectedCatalogCategoryId = catId
         when (tab) {
             Tab.MOVIES -> movieCategoryId = catId
             Tab.SERIES -> seriesCategoryId = catId
             else -> Unit
         }
-        catalogCategoryAdapter?.refreshSelection()
+        val oldIndex = catalogCategories.indexOfFirst { it.id == oldId }
+        val newIndex = catalogCategories.indexOfFirst { it.id == catId }
+        if (oldIndex >= 0) catalogCategoryAdapter?.notifyItemChanged(oldIndex)
+        if (newIndex >= 0) catalogCategoryAdapter?.notifyItemChanged(newIndex)
     }
 
     private fun enterCatalogTabFocus() {
@@ -906,12 +920,11 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun openTab(tab: Tab) {
         showTab(tab)
-        if (DeviceUi.useDpadFocus(this) && (tab == Tab.MOVIES || tab == Tab.SERIES)) {
-            enterCatalogTabFocus()
-        }
     }
 
     private fun showTab(tab: Tab) {
+        val enteringFromOtherTab = currentTab != tab
+        previousTab = currentTab
         currentTab = tab
         tabHome.isSelected = tab == Tab.HOME
         tabLive.isSelected = tab == Tab.LIVE
@@ -973,8 +986,12 @@ class MainActivity : BaseLocaleActivity() {
                     if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
                 }
                 if (DeviceUi.useDpadFocus(this)) {
-                    openCatalogTabAtFirstGroup(tab)
-                    enterCatalogTabFocus()
+                    if (enteringFromOtherTab) {
+                        openCatalogTabAtFirstGroup(tab)
+                        enterCatalogTabFocus()
+                    } else {
+                        restoreCatalogTab(tab)
+                    }
                 } else if (ready) {
                     restoreCatalogTab(tab)
                 }
@@ -1863,13 +1880,11 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun bindHero(item: HeroItem) {
-        heroPlotRequestId += 1
-        val requestId = heroPlotRequestId
         val backdropRequestId = ++heroBackdropRequestId
 
         heroTitle.text = item.title
         heroSubtitle.text = ""
-        heroPlot.text = getString(R.string.hero_plot_empty)
+        heroPlot.text = getString(R.string.hero_plot_loading)
 
         when (item) {
             is HeroItem.Movie -> {
@@ -1882,9 +1897,11 @@ class MainActivity : BaseLocaleActivity() {
                     kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
                     backdropRequestId = backdropRequestId,
                 )
-                if (DeviceUi.useDpadFocus(this)) {
-                    loadMoviePlot(item.movie.streamId, requestId, backdropRequestId)
-                }
+                applyCachedHeroPlot(
+                    kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
+                    id = item.movie.streamId,
+                    backdropRequestId = backdropRequestId,
+                ) ?: loadMoviePlot(item.movie.streamId, backdropRequestId)
             }
             is HeroItem.Series -> {
                 applyHeroMeta(
@@ -1896,9 +1913,11 @@ class MainActivity : BaseLocaleActivity() {
                     kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
                     backdropRequestId = backdropRequestId,
                 )
-                if (DeviceUi.useDpadFocus(this)) {
-                    loadSeriesPlot(item.series.seriesId, requestId, backdropRequestId)
-                }
+                applyCachedHeroPlot(
+                    kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
+                    id = item.series.seriesId,
+                    backdropRequestId = backdropRequestId,
+                ) ?: loadSeriesPlot(item.series.seriesId, backdropRequestId)
             }
             is HeroItem.Rail -> {
                 applyHeroMeta(
@@ -1918,17 +1937,59 @@ class MainActivity : BaseLocaleActivity() {
                     backdropRequestId = backdropRequestId,
                 )
                 heroSubtitle.text = item.item.subtitle
-                if (DeviceUi.useDpadFocus(this)) {
-                    when (item.item.kind) {
-                        HomeRailAdapter.HomeRailItem.KIND_MOVIE ->
-                            loadMoviePlot(item.item.id, requestId, backdropRequestId)
-                        HomeRailAdapter.HomeRailItem.KIND_SERIES ->
-                            loadSeriesPlot(item.item.id, requestId, backdropRequestId)
-                        HomeRailAdapter.HomeRailItem.KIND_LIVE -> Unit
-                    }
+                when (item.item.kind) {
+                    HomeRailAdapter.HomeRailItem.KIND_MOVIE ->
+                        applyCachedHeroPlot(
+                            kind = item.item.kind,
+                            id = item.item.id,
+                            backdropRequestId = backdropRequestId,
+                        ) ?: loadMoviePlot(item.item.id, backdropRequestId)
+                    HomeRailAdapter.HomeRailItem.KIND_SERIES ->
+                        applyCachedHeroPlot(
+                            kind = item.item.kind,
+                            id = item.item.id,
+                            backdropRequestId = backdropRequestId,
+                        ) ?: loadSeriesPlot(item.item.id, backdropRequestId)
+                    HomeRailAdapter.HomeRailItem.KIND_LIVE ->
+                        heroPlot.text = getString(R.string.hero_plot_empty)
                 }
             }
         }
+    }
+
+    private fun heroPlotCacheKey(kind: String, id: Int): String = "$kind:$id"
+
+    private fun heroItemContentKey(item: HeroItem): Pair<String, Int>? = when (item) {
+        is HeroItem.Movie -> HomeRailAdapter.HomeRailItem.KIND_MOVIE to item.movie.streamId
+        is HeroItem.Series -> HomeRailAdapter.HomeRailItem.KIND_SERIES to item.series.seriesId
+        is HeroItem.Rail -> when (item.item.kind) {
+            HomeRailAdapter.HomeRailItem.KIND_MOVIE,
+            HomeRailAdapter.HomeRailItem.KIND_SERIES,
+            -> item.item.kind to item.item.id
+            else -> null
+        }
+    }
+
+    private fun isHeroShowing(kind: String, id: Int): Boolean {
+        if (currentTab != Tab.HOME || railPreviewItem != null) return false
+        val key = heroItemContentKey(heroItems.getOrNull(heroIndex) ?: return false) ?: return false
+        return key.first == kind && key.second == id
+    }
+
+    private fun applyCachedHeroPlot(kind: String, id: Int, backdropRequestId: Int): Boolean {
+        val cached = heroPlotCache[heroPlotCacheKey(kind, id)] ?: return false
+        if (!isHeroShowing(kind, id)) return true
+        if (cached.title.isNotBlank()) heroTitle.text = cached.title
+        heroPlot.text = cached.plot
+        heroSubtitle.text = cached.subtitle
+        applyHeroBackdrop(
+            backdrop = cached.backdrop,
+            poster = cached.poster,
+            backdropRequestId = backdropRequestId,
+            contentId = id,
+            kind = kind,
+        )
+        return true
     }
 
     private fun applyHeroMeta(
@@ -2001,52 +2062,78 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun loadMoviePlot(streamId: Int, requestId: Int, backdropRequestId: Int) {
+    private fun loadMoviePlot(streamId: Int, backdropRequestId: Int) {
         val profile = PlaylistRepository.profile ?: return
+        val kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE
         lifecycleScope.launch {
             try {
                 val info = withContext(Dispatchers.IO) { api.vodInfo(profile, streamId) }
-                if (requestId != heroPlotRequestId || isDestroyed) return@launch
-                if (info == null) return@launch
+                if (isDestroyed || info == null) return@launch
+                val backdrop = info.backdrop.ifBlank { info.cover }
+                heroPlotCache[heroPlotCacheKey(kind, streamId)] = CachedHeroPlot(
+                    plot = info.plot.ifBlank { getString(R.string.hero_plot_empty) },
+                    subtitle = listOf(info.genre, info.releaseDate, info.rating)
+                        .filter { it.isNotBlank() }
+                        .joinToString(" · "),
+                    backdrop = backdrop,
+                    poster = info.cover,
+                    title = info.name,
+                )
+                if (!isHeroShowing(kind, streamId)) return@launch
                 if (info.name.isNotBlank()) heroTitle.text = info.name
                 heroPlot.text = info.plot.ifBlank { getString(R.string.hero_plot_empty) }
                 heroSubtitle.text = listOf(info.genre, info.releaseDate, info.rating)
                     .filter { it.isNotBlank() }
                     .joinToString(" · ")
-                val backdrop = info.backdrop.ifBlank { info.cover }
                 applyHeroBackdrop(
                     backdrop = backdrop,
                     poster = info.cover,
                     backdropRequestId = backdropRequestId,
                     contentId = streamId,
-                    kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
+                    kind = kind,
                 )
             } catch (_: Exception) {
+                if (isHeroShowing(kind, streamId)) {
+                    heroPlot.text = getString(R.string.hero_plot_empty)
+                }
             }
         }
     }
 
-    private fun loadSeriesPlot(seriesId: Int, requestId: Int, backdropRequestId: Int) {
+    private fun loadSeriesPlot(seriesId: Int, backdropRequestId: Int) {
         val profile = PlaylistRepository.profile ?: return
+        val kind = HomeRailAdapter.HomeRailItem.KIND_SERIES
         lifecycleScope.launch {
             try {
                 val detail = withContext(Dispatchers.IO) { api.seriesInfo(profile, seriesId) }
-                if (requestId != heroPlotRequestId || isDestroyed) return@launch
-                if (detail == null) return@launch
+                if (isDestroyed || detail == null) return@launch
+                val backdrop = detail.backdrop.ifBlank { detail.cover }
+                heroPlotCache[heroPlotCacheKey(kind, seriesId)] = CachedHeroPlot(
+                    plot = detail.plot.ifBlank { getString(R.string.hero_plot_empty) },
+                    subtitle = listOf(detail.genre, detail.releaseDate, detail.rating)
+                        .filter { it.isNotBlank() }
+                        .joinToString(" · "),
+                    backdrop = backdrop,
+                    poster = detail.cover,
+                    title = detail.name,
+                )
+                if (!isHeroShowing(kind, seriesId)) return@launch
                 if (detail.name.isNotBlank()) heroTitle.text = detail.name
                 heroPlot.text = detail.plot.ifBlank { getString(R.string.hero_plot_empty) }
                 heroSubtitle.text = listOf(detail.genre, detail.releaseDate, detail.rating)
                     .filter { it.isNotBlank() }
                     .joinToString(" · ")
-                val backdrop = detail.backdrop.ifBlank { detail.cover }
                 applyHeroBackdrop(
                     backdrop = backdrop,
                     poster = detail.cover,
                     backdropRequestId = backdropRequestId,
                     contentId = seriesId,
-                    kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
+                    kind = kind,
                 )
             } catch (_: Exception) {
+                if (isHeroShowing(kind, seriesId)) {
+                    heroPlot.text = getString(R.string.hero_plot_empty)
+                }
             }
         }
     }
@@ -2213,9 +2300,11 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun bindCatalogCategoryAdapter(tab: Tab) {
         val applyCategory: (Category) -> Unit = { cat ->
-            catalogCategoryHandler.removeCallbacksAndMessages(null)
-            highlightCatalogCategory(tab, cat.id)
-            loadCatalogItems(tab, cat.id)
+            if (cat.id != selectedCatalogCategoryId) {
+                catalogCategoryHandler.removeCallbacksAndMessages(null)
+                highlightCatalogCategory(tab, cat.id)
+                loadCatalogItems(tab, cat.id)
+            }
         }
 
         catalogCategoryAdapter = CategoryAdapter(
@@ -2270,9 +2359,14 @@ class MainActivity : BaseLocaleActivity() {
 
         val profile = PlaylistRepository.profile ?: return
         val token = ++catalogLoadToken
+        val focusInGrid = isFocusInList(catalogGrid)
         catalogLoading.visibility = View.VISIBLE
         catalogEmpty.visibility = View.GONE
-        catalogGrid.visibility = View.INVISIBLE
+        if (focusInGrid) {
+            catalogGrid.alpha = 0.35f
+        } else {
+            catalogGrid.visibility = View.INVISIBLE
+        }
 
         lifecycleScope.launch {
             try {
@@ -2294,6 +2388,7 @@ class MainActivity : BaseLocaleActivity() {
 
                 if (token != catalogLoadToken) return@launch
                 catalogLoading.visibility = View.GONE
+                catalogGrid.alpha = 1f
                 catalogGrid.visibility = View.VISIBLE
                 when (tab) {
                     Tab.MOVIES -> bindMovies(items as List<VodMovie>)
@@ -2303,6 +2398,7 @@ class MainActivity : BaseLocaleActivity() {
             } catch (_: Exception) {
                 if (token != catalogLoadToken) return@launch
                 catalogLoading.visibility = View.GONE
+                catalogGrid.alpha = 1f
                 catalogGrid.visibility = View.VISIBLE
                 posterItems.clear()
                 catalogGrid.adapter?.notifyDataSetChanged()
@@ -2396,6 +2492,9 @@ class MainActivity : BaseLocaleActivity() {
         catalogCategories.firstOrNull { it.id == selectedCatalogCategoryId }?.name.orEmpty()
 
     private fun bindMovies(movies: List<VodMovie>) {
+        catalogLoading.visibility = View.GONE
+        catalogGrid.alpha = 1f
+        catalogGrid.visibility = View.VISIBLE
         val cover = movies.firstOrNull { it.icon.isNotBlank() }?.icon.orEmpty()
         bindCatalogHero(Tab.MOVIES, selectedCatalogCategoryName(), cover)
         posterItems.clear()
@@ -2413,6 +2512,9 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun bindSeries(series: List<SeriesItem>) {
+        catalogLoading.visibility = View.GONE
+        catalogGrid.alpha = 1f
+        catalogGrid.visibility = View.VISIBLE
         val cover = series.firstOrNull { it.cover.isNotBlank() }?.cover.orEmpty()
         bindCatalogHero(Tab.SERIES, selectedCatalogCategoryName(), cover)
         posterItems.clear()
@@ -2429,8 +2531,17 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun updateCatalogGrid() {
+        val focusInGrid = isFocusInList(catalogGrid)
+        val focusedIndex = if (focusInGrid) {
+            catalogGrid.focusedChild?.let { catalogGrid.getChildAdapterPosition(it) }?.takeIf { it >= 0 }
+        } else {
+            null
+        }
         catalogGrid.adapter?.notifyDataSetChanged()
         catalogEmpty.visibility = if (posterItems.isEmpty()) View.VISIBLE else View.GONE
+        if (focusedIndex != null) {
+            catalogGrid.post { TvNavHelper.focusItem(catalogGrid, focusedIndex) }
+        }
     }
 
     private fun onPosterClick(tab: Tab, item: PosterAdapter.PosterItem) {
@@ -3112,10 +3223,7 @@ class MainActivity : BaseLocaleActivity() {
                 currentPreviewChannel?.let { schedulePreview(it) }
             }
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
-            if (DeviceUi.useDpadFocus(this)) {
-                openCatalogTabAtFirstGroup(currentTab)
-                enterCatalogTabFocus()
-            } else {
+            if (!DeviceUi.useDpadFocus(this)) {
                 refreshCatalogResumeCategory(currentTab)
             }
         }

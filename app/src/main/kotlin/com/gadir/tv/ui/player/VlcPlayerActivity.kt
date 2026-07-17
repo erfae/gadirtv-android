@@ -442,7 +442,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_POSITION_MS = "position_ms"
         private const val VLC_VOLUME = com.gadir.tv.player.VlcAudioOptions.VOLUME_FULLSCREEN
         private const val SEEK_STEP_MS = 10_000L
-        private const val CONTROLS_HIDE_MS = 12_000L
+        private const val CONTROLS_HIDE_MS = 5_000L
 
         fun intent(
             context: Context,

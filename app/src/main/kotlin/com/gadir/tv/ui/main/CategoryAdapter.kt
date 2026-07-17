@@ -37,19 +37,20 @@ class CategoryAdapter(
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val item = items[position]
-        val selected = item.id == selectedId()
+        val contentSelected = item.id == selectedId()
 
         holder.name.text = item.name
-        holder.itemView.isSelected = selected
-        holder.itemView.isActivated = selected
+        applyCategoryVisual(holder.itemView, contentSelected, holder.itemView.hasFocus())
         if (position == 0 && upFocusViewId != View.NO_ID) {
             holder.itemView.nextFocusUpId = upFocusViewId
         }
 
-        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
+        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
-            if (hasFocus) onFocus?.invoke(items[pos])
+            val cat = items[pos]
+            applyCategoryVisual(view, cat.id == selectedId(), hasFocus)
+            if (hasFocus) onFocus?.invoke(cat)
         }
 
         holder.itemView.setOnClickListener {
@@ -94,6 +95,11 @@ class CategoryAdapter(
                 else -> false
             }
         }
+    }
+
+    private fun applyCategoryVisual(view: View, contentSelected: Boolean, focused: Boolean) {
+        view.isSelected = focused || contentSelected
+        view.isActivated = focused
     }
 
     override fun getItemCount(): Int = items.size
