@@ -67,11 +67,8 @@ class CategoryAdapter(
                     onMoveLeft != null
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    val pos = holder.bindingAdapterPosition
-                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
-                    onClick(items[pos])
                     onMoveRight?.invoke()
-                    true
+                    onMoveRight != null
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     val pos = holder.bindingAdapterPosition

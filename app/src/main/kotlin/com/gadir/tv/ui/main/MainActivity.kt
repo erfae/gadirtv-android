@@ -833,13 +833,15 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun focusFirstCatalogCategory() {
-        if (catalogCategories.isEmpty()) return
-        val tab = currentTab
-        if (tab != Tab.MOVIES && tab != Tab.SERIES) return
-        val first = catalogCategories.first()
-        highlightCatalogCategory(tab, first.id)
-        loadCatalogItems(tab, first.id)
         focusCatalogAtIndex(0)
+    }
+
+    private fun showCatalogSelectPrompt() {
+        catalogLoading.visibility = View.GONE
+        catalogGrid.alpha = 1f
+        catalogGrid.visibility = View.INVISIBLE
+        catalogEmpty.visibility = View.VISIBLE
+        catalogEmpty.text = getString(R.string.catalog_select_group)
     }
 
     private fun openCatalogTabAtFirstGroup(tab: Tab) {
@@ -847,15 +849,16 @@ class MainActivity : BaseLocaleActivity() {
         val cats = catalogCategoriesFor(tab)
         catalogCategories.clear()
         catalogCategories.addAll(cats)
-        val firstId = cats.firstOrNull()?.id
-        selectedCatalogCategoryId = firstId
+        selectedCatalogCategoryId = null
         when (tab) {
-            Tab.MOVIES -> movieCategoryId = firstId
-            Tab.SERIES -> seriesCategoryId = firstId
+            Tab.MOVIES -> movieCategoryId = null
+            Tab.SERIES -> seriesCategoryId = null
             else -> Unit
         }
+        posterItems.clear()
+        updateCatalogGrid()
+        showCatalogSelectPrompt()
         bindCatalogCategoryAdapter(tab)
-        firstId?.let { loadCatalogItems(tab, it) }
     }
 
     private fun highlightCatalogCategory(tab: Tab, catId: String) {
@@ -2233,7 +2236,7 @@ class MainActivity : BaseLocaleActivity() {
             else -> null
         }
         selectedCatalogCategoryId = if (DeviceUi.useDpadFocus(this)) {
-            cats.firstOrNull()?.id
+            null
         } else {
             savedId?.takeIf { id -> cats.any { it.id == id } } ?: cats.firstOrNull()?.id
         }
@@ -2281,7 +2284,11 @@ class MainActivity : BaseLocaleActivity() {
             Tab.SERIES -> seriesCategoryId = selectedCatalogCategoryId
             else -> Unit
         }
-        selectedCatalogCategoryId?.let { loadCatalogItems(tab, it) }
+        if (DeviceUi.useDpadFocus(this)) {
+            showCatalogSelectPrompt()
+        } else {
+            selectedCatalogCategoryId?.let { loadCatalogItems(tab, it) }
+        }
     }
 
     private fun restoreCatalogTab(tab: Tab) {
@@ -2293,30 +2300,54 @@ class MainActivity : BaseLocaleActivity() {
             Tab.SERIES -> seriesCategoryId
             else -> null
         }?.takeIf { id -> cats.any { it.id == id } }
-            ?: cats.firstOrNull()?.id
         bindCatalogCategoryAdapter(tab)
-        selectedCatalogCategoryId?.let { loadCatalogItems(tab, it) }
+        if (DeviceUi.useDpadFocus(this)) {
+            val selectedId = selectedCatalogCategoryId
+            if (selectedId == null) {
+                showCatalogSelectPrompt()
+            } else {
+                showCachedCatalogItems(tab, selectedId)
+            }
+        } else {
+            selectedCatalogCategoryId = selectedCatalogCategoryId ?: cats.firstOrNull()?.id
+            selectedCatalogCategoryId?.let { loadCatalogItems(tab, it) }
+        }
+    }
+
+    private fun showCachedCatalogItems(tab: Tab, categoryId: String) {
+        when (tab) {
+            Tab.MOVIES -> when (categoryId) {
+                ResumeStore.RESUME_CATEGORY_ID -> bindResumeMovies()
+                else -> PlaylistRepository.cachedVod(categoryId)?.let { bindMovies(it) }
+                    ?: showCatalogSelectPrompt()
+            }
+            Tab.SERIES -> when (categoryId) {
+                ResumeStore.RESUME_CATEGORY_ID -> bindResumeSeries()
+                else -> PlaylistRepository.cachedSeries(categoryId)?.let { bindSeries(it) }
+                    ?: showCatalogSelectPrompt()
+            }
+            else -> Unit
+        }
     }
 
     private fun bindCatalogCategoryAdapter(tab: Tab) {
         val applyCategory: (Category) -> Unit = { cat ->
-            if (cat.id != selectedCatalogCategoryId) {
-                catalogCategoryHandler.removeCallbacksAndMessages(null)
-                highlightCatalogCategory(tab, cat.id)
-                loadCatalogItems(tab, cat.id)
-            }
+            catalogCategoryHandler.removeCallbacksAndMessages(null)
+            highlightCatalogCategory(tab, cat.id)
+            loadCatalogItems(tab, cat.id)
         }
 
         catalogCategoryAdapter = CategoryAdapter(
             items = catalogCategories,
             selectedId = { selectedCatalogCategoryId },
             onClick = applyCategory,
-            onFocus = if (DeviceUi.useDpadFocus(this)) {
-                applyCategory
-            } else {
-                null
+            onFocus = null,
+            onMoveRight = {
+                val index = catalogCategories.indexOfFirst { it.id == selectedCatalogCategoryId }
+                if (index >= 0 && posterItems.isNotEmpty()) {
+                    focusFirstCatalogItem()
+                }
             },
-            onMoveRight = { focusFirstCatalogItem() },
             onMoveUp = { focusHeaderReload() },
             upFocusViewId = R.id.btnReload,
         )
