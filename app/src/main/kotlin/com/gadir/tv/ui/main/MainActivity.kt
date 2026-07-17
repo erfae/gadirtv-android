@@ -107,6 +107,7 @@ class MainActivity : BaseLocaleActivity() {
     private var pendingPreview: Runnable? = null
     private var previewToken = 0
     private var selectedLiveCategoryId: String? = null
+    private var liveChannelsLoaded = false
     private var selectedCatalogCategoryId: String? = null
     private var movieCategoryId: String? = null
     private var seriesCategoryId: String? = null
@@ -194,9 +195,7 @@ class MainActivity : BaseLocaleActivity() {
     private var shouldFocusHomeRailsOnResume = true
     private var catalogLoadToken = 0
     private val catalogCategoryHandler = Handler(Looper.getMainLooper())
-    private var liveCategoryApplyToken = 0
     private val liveCategoryHandler = Handler(Looper.getMainLooper())
-    private var pendingLiveCategory: Runnable? = null
     private var reloadingChannels = false
     private var channelsLoadToken = 0
     private var livePreviewPaused = false
@@ -254,6 +253,10 @@ class MainActivity : BaseLocaleActivity() {
         }
         liveCategoryList.layoutManager = LinearLayoutManager(this)
         channelList.layoutManager = LinearLayoutManager(this)
+        if (DeviceUi.useDpadFocus(this)) {
+            liveCategoryList.setPreserveFocusAfterLayout(false)
+            channelList.setPreserveFocusAfterLayout(true)
+        }
     }
 
     private val liveCategories = mutableListOf<Category>()
@@ -495,11 +498,7 @@ class MainActivity : BaseLocaleActivity() {
         )
         liveCategories.addAll(PlaylistRepository.categories)
 
-        val applyLiveCategory: (Category) -> Unit = { cat ->
-            applyLiveCategoryNow(cat, liveCategoryId(cat))
-        }
-
-        bindLiveCategoryAdapter(applyLiveCategory)
+        bindLiveCategoryAdapter()
         channelList.setItemViewCacheSize(24)
         channelAdapter = ChannelAdapter(
             items = channels,
@@ -532,8 +531,15 @@ class MainActivity : BaseLocaleActivity() {
             onToggleLock = { channel -> toggleChannelLock(channel) },
         )
         channelList.adapter = channelAdapter
-        selectedLiveCategoryId = liveChannelStore.lastCategoryId?.takeIf { it.isNotEmpty() }
-        reloadChannels(keepCategoryFocus = true)
+        if (DeviceUi.useDpadFocus(this)) {
+            liveChannelsLoaded = false
+            selectedLiveCategoryId = null
+            showLiveSelectPrompt()
+        } else {
+            selectedLiveCategoryId = liveChannelStore.lastCategoryId?.takeIf { it.isNotEmpty() }
+            liveChannelsLoaded = true
+            reloadChannels(keepCategoryFocus = true)
+        }
     }
 
     private fun liveCategoryId(cat: Category): String? = when (cat.id) {
@@ -543,35 +549,55 @@ class MainActivity : BaseLocaleActivity() {
         else -> cat.id
     }
 
-    private fun scheduleLiveCategoryApply(cat: Category, newId: String?) {
-        if (newId == selectedLiveCategoryId) return
-        liveCategoryApplyToken++
-        val token = liveCategoryApplyToken
-        pendingLiveCategory?.let { liveCategoryHandler.removeCallbacks(it) }
-        val task = Runnable {
-            if (token != liveCategoryApplyToken || currentTab != Tab.LIVE) return@Runnable
-            applyLiveCategoryNow(cat, newId)
-        }
-        pendingLiveCategory = task
-        liveCategoryHandler.postDelayed(task, 200L)
+    private fun applyLiveCategoryClick(cat: Category) {
+        val newId = liveCategoryId(cat)
+        if (liveChannelsLoaded && newId == selectedLiveCategoryId) return
+        highlightLiveCategory(newId)
+        liveChannelsLoaded = true
+        reloadChannels(keepCategoryFocus = true, autoPreviewFirst = false)
     }
 
-    private fun applyLiveCategoryNow(cat: Category, newId: String?) {
-        if (newId == selectedLiveCategoryId) return
-        try {
-            selectedLiveCategoryId = newId
-            scrollLiveCategoryToSelection()
-            reloadChannels(
-                keepCategoryFocus = true,
-                autoPreviewFirst = DeviceUi.useDpadFocus(this),
-            )
-        } catch (_: Exception) {
-            selectedLiveCategoryId = newId
-            scrollLiveCategoryToSelection()
-            reloadChannels(
-                keepCategoryFocus = true,
-                autoPreviewFirst = DeviceUi.useDpadFocus(this),
-            )
+    private fun highlightLiveCategory(newId: String?) {
+        val oldId = selectedLiveCategoryId
+        selectedLiveCategoryId = newId
+        val oldIndex = liveCategories.indexOfFirst { liveCategoryId(it) == oldId }
+        val newIndex = liveCategories.indexOfFirst { liveCategoryId(it) == newId }
+        (liveCategoryList.adapter as? CategoryAdapter)?.let { adapter ->
+            if (oldIndex >= 0) adapter.notifyItemChanged(oldIndex)
+            if (newIndex >= 0) adapter.notifyItemChanged(newIndex)
+        }
+    }
+
+    private fun liveCategoryAdapterSelectedId(): String? {
+        if (!liveChannelsLoaded) return null
+        return selectedLiveCategoryId ?: ""
+    }
+
+    private fun showLiveSelectPrompt() {
+        if (!liveTabReady) return
+        teardownLivePreviewPlayback()
+        previewTitle.text = getString(R.string.catalog_select_group)
+        epgNow.text = ""
+        epgNext.visibility = View.GONE
+        previewLogo.visibility = View.GONE
+    }
+
+    private fun openLiveTabAtFirstGroup() {
+        liveCategoryHandler.removeCallbacksAndMessages(null)
+        liveChannelsLoaded = false
+        selectedLiveCategoryId = null
+        channels.clear()
+        channelAdapter?.notifyDataSetChanged()
+        showLiveSelectPrompt()
+        bindLiveCategoryAdapter()
+    }
+
+    private fun enterLiveTabFocus() {
+        if (liveCategories.isEmpty()) return
+        liveCategoryList.post {
+            (liveCategoryList.layoutManager as? LinearLayoutManager)
+                ?.scrollToPositionWithOffset(0, 0)
+            TvNavHelper.focusItem(liveCategoryList, 0)
         }
     }
 
@@ -613,23 +639,20 @@ class MainActivity : BaseLocaleActivity() {
         )
         liveCategories.addAll(PlaylistRepository.categories)
         selectedLiveCategoryId = currentId
-        val applyLiveCategory: (Category) -> Unit = { cat ->
-            applyLiveCategoryNow(cat, liveCategoryId(cat))
-        }
-        bindLiveCategoryAdapter(applyLiveCategory)
+        bindLiveCategoryAdapter()
     }
 
-    private fun bindLiveCategoryAdapter(applyLiveCategory: (Category) -> Unit) {
+    private fun bindLiveCategoryAdapter() {
         liveCategoryList.adapter = CategoryAdapter(
             items = liveCategories,
-            selectedId = { liveSelectedCategoryKey() },
-            onClick = applyLiveCategory,
-            onFocus = if (DeviceUi.useDpadFocus(this)) {
-                applyLiveCategory
-            } else {
-                null
+            selectedId = { liveCategoryAdapterSelectedId() },
+            onClick = { cat -> applyLiveCategoryClick(cat) },
+            onFocus = null,
+            onMoveRight = {
+                if (liveChannelsLoaded && channels.isNotEmpty()) {
+                    focusFirstChannel()
+                }
             },
-            onMoveRight = { focusFirstChannel() },
             onMoveUp = { focusHeaderReload() },
             upFocusViewId = R.id.btnReload,
         )
@@ -730,9 +753,6 @@ class MainActivity : BaseLocaleActivity() {
         TvNavHelper.focusItem(channelList, index)
     }
 
-    private fun liveSelectedCategoryKey(): String =
-        selectedLiveCategoryId ?: ""
-
     private fun focusHeader() {
         btnSettings.requestFocus()
     }
@@ -784,18 +804,15 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun focusFirstLiveCategory() {
         pauseLivePreviewPlayback()
-        liveCategoryList.post {
-            (liveCategoryList.layoutManager as? LinearLayoutManager)
-                ?.scrollToPositionWithOffset(0, 0)
-            TvNavHelper.focusItem(liveCategoryList, 0)
-        }
+        enterLiveTabFocus()
     }
 
     private fun focusCategoryList() {
         pauseLivePreviewPlayback()
         scrollLiveCategoryToSelection()
         liveCategoryList.post {
-            TvNavHelper.focusItem(liveCategoryList, liveCategoryIndex())
+            val index = if (liveChannelsLoaded) liveCategoryIndex() else 0
+            TvNavHelper.focusItem(liveCategoryList, index)
         }
     }
 
@@ -888,7 +905,11 @@ class MainActivity : BaseLocaleActivity() {
     private fun focusCatalogCategoryList() {
         val index = catalogCategories.indexOfFirst { it.id == selectedCatalogCategoryId }
             .takeIf { it >= 0 } ?: 0
-        TvNavHelper.focusItem(catalogCategoryList, index)
+        catalogCategoryList.post {
+            (catalogCategoryList.layoutManager as? LinearLayoutManager)
+                ?.scrollToPositionWithOffset(index, 0)
+            TvNavHelper.focusItem(catalogCategoryList, index)
+        }
     }
 
     private fun catalogCategoryIndex(): Int {
@@ -967,11 +988,18 @@ class MainActivity : BaseLocaleActivity() {
                     if (currentTab != Tab.LIVE) return@post
                     ensurePreviewPlayer()
                     if (DeviceUi.useDpadFocus(this)) {
-                        focusFirstLiveCategory()
+                        if (enteringFromOtherTab) {
+                            openLiveTabAtFirstGroup()
+                            enterLiveTabFocus()
+                        } else if (!liveChannelsLoaded) {
+                            enterLiveTabFocus()
+                        } else {
+                            focusCategoryList()
+                        }
                     } else {
                         restoreLiveTabSession()
                     }
-                    if (DeviceUi.useDpadFocus(this)) {
+                    if (liveChannelsLoaded && DeviceUi.useDpadFocus(this)) {
                         val channel = currentPreviewChannel ?: channels.firstOrNull()
                         channel?.let { schedulePreview(it) }
                     }
@@ -1342,6 +1370,7 @@ class MainActivity : BaseLocaleActivity() {
                 homeEmpty.visibility = View.GONE
                 bindHero(heroItems[heroIndex])
                 startHeroRotation()
+                prefetchHeroPlots()
                 if (DeviceUi.useDpadFocus(this)) {
                     focusHeroOnStart()
                 }
@@ -1979,6 +2008,51 @@ class MainActivity : BaseLocaleActivity() {
         return key.first == kind && key.second == id
     }
 
+    private fun prefetchHeroPlots() {
+        val profile = PlaylistRepository.profile ?: return
+        lifecycleScope.launch {
+            heroItems.forEach { item ->
+                val key = heroItemContentKey(item) ?: return@forEach
+                val (kind, id) = key
+                if (heroPlotCache.containsKey(heroPlotCacheKey(kind, id))) return@forEach
+                try {
+                    when (kind) {
+                        HomeRailAdapter.HomeRailItem.KIND_MOVIE -> {
+                            val info = withContext(Dispatchers.IO) { api.vodInfo(profile, id) } ?: return@forEach
+                            val backdrop = info.backdrop.ifBlank { info.cover }
+                            heroPlotCache[heroPlotCacheKey(kind, id)] = CachedHeroPlot(
+                                plot = info.plot.ifBlank { getString(R.string.hero_plot_empty) },
+                                subtitle = listOf(info.genre, info.releaseDate, info.rating)
+                                    .filter { it.isNotBlank() }
+                                    .joinToString(" · "),
+                                backdrop = backdrop,
+                                poster = info.cover,
+                                title = info.name,
+                            )
+                        }
+                        HomeRailAdapter.HomeRailItem.KIND_SERIES -> {
+                            val detail = withContext(Dispatchers.IO) { api.seriesInfo(profile, id) } ?: return@forEach
+                            val backdrop = detail.backdrop.ifBlank { detail.cover }
+                            heroPlotCache[heroPlotCacheKey(kind, id)] = CachedHeroPlot(
+                                plot = detail.plot.ifBlank { getString(R.string.hero_plot_empty) },
+                                subtitle = listOf(detail.genre, detail.releaseDate, detail.rating)
+                                    .filter { it.isNotBlank() }
+                                    .joinToString(" · "),
+                                backdrop = backdrop,
+                                poster = detail.cover,
+                                title = detail.name,
+                            )
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+            }
+            if (currentTab == Tab.HOME && railPreviewItem == null) {
+                heroItems.getOrNull(heroIndex)?.let { bindHero(it) }
+            }
+        }
+    }
+
     private fun applyCachedHeroPlot(kind: String, id: Int, backdropRequestId: Int): Boolean {
         val cached = heroPlotCache[heroPlotCacheKey(kind, id)] ?: return false
         if (!isHeroShowing(kind, id)) return true
@@ -2071,7 +2145,13 @@ class MainActivity : BaseLocaleActivity() {
         lifecycleScope.launch {
             try {
                 val info = withContext(Dispatchers.IO) { api.vodInfo(profile, streamId) }
-                if (isDestroyed || info == null) return@launch
+                if (isDestroyed) return@launch
+                if (info == null) {
+                    if (isHeroShowing(kind, streamId)) {
+                        heroPlot.text = getString(R.string.hero_plot_empty)
+                    }
+                    return@launch
+                }
                 val backdrop = info.backdrop.ifBlank { info.cover }
                 heroPlotCache[heroPlotCacheKey(kind, streamId)] = CachedHeroPlot(
                     plot = info.plot.ifBlank { getString(R.string.hero_plot_empty) },
@@ -2109,7 +2189,13 @@ class MainActivity : BaseLocaleActivity() {
         lifecycleScope.launch {
             try {
                 val detail = withContext(Dispatchers.IO) { api.seriesInfo(profile, seriesId) }
-                if (isDestroyed || detail == null) return@launch
+                if (isDestroyed) return@launch
+                if (detail == null) {
+                    if (isHeroShowing(kind, seriesId)) {
+                        heroPlot.text = getString(R.string.hero_plot_empty)
+                    }
+                    return@launch
+                }
                 val backdrop = detail.backdrop.ifBlank { detail.cover }
                 heroPlotCache[heroPlotCacheKey(kind, seriesId)] = CachedHeroPlot(
                     plot = detail.plot.ifBlank { getString(R.string.hero_plot_empty) },
@@ -3245,12 +3331,10 @@ class MainActivity : BaseLocaleActivity() {
         } else if (currentTab == Tab.LIVE) {
             ensureLiveTabReady()
             livePreviewPaused = false
-            if (DeviceUi.useDpadFocus(this)) {
-                focusFirstLiveCategory()
-            } else {
+            if (!DeviceUi.useDpadFocus(this)) {
                 focusChannelAt(currentPreviewChannel)
             }
-            if (appSettings.autoplayPreview && currentPreviewChannel != null) {
+            if (appSettings.autoplayPreview && liveChannelsLoaded && currentPreviewChannel != null) {
                 currentPreviewChannel?.let { schedulePreview(it) }
             }
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
@@ -3262,7 +3346,6 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onDestroy() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
-        pendingLiveCategory?.let { liveCategoryHandler.removeCallbacks(it) }
         clockHandler.removeCallbacks(clockRunnable)
         miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
         stopHeroRotation()

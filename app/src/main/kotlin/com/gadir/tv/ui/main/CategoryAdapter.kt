@@ -1,10 +1,12 @@
 package com.gadir.tv.ui.main
 
+import android.graphics.Typeface
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.model.Category
@@ -40,7 +42,7 @@ class CategoryAdapter(
         val contentSelected = item.id == selectedId()
 
         holder.name.text = item.name
-        applyCategoryVisual(holder.itemView, contentSelected, holder.itemView.hasFocus())
+        applyCategoryVisual(holder, contentSelected, holder.itemView.hasFocus())
         if (position == 0 && upFocusViewId != View.NO_ID) {
             holder.itemView.nextFocusUpId = upFocusViewId
         }
@@ -49,7 +51,7 @@ class CategoryAdapter(
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
             val cat = items[pos]
-            applyCategoryVisual(view, cat.id == selectedId(), hasFocus)
+            applyCategoryVisual(holder, cat.id == selectedId(), hasFocus)
             if (hasFocus) onFocus?.invoke(cat)
         }
 
@@ -94,9 +96,22 @@ class CategoryAdapter(
         }
     }
 
-    private fun applyCategoryVisual(view: View, contentSelected: Boolean, focused: Boolean) {
-        view.isSelected = focused || contentSelected
+    private fun applyCategoryVisual(holder: Holder, contentSelected: Boolean, focused: Boolean) {
+        val view = holder.itemView
+        view.isSelected = focused
         view.isActivated = focused
+        val context = holder.name.context
+        holder.name.setTextColor(
+            when {
+                focused -> ContextCompat.getColor(context, android.R.color.white)
+                contentSelected -> ContextCompat.getColor(context, R.color.gtv_red_hi)
+                else -> ContextCompat.getColor(context, android.R.color.white)
+            },
+        )
+        holder.name.setTypeface(
+            null,
+            if (contentSelected && !focused) Typeface.BOLD else Typeface.NORMAL,
+        )
     }
 
     override fun getItemCount(): Int = items.size
