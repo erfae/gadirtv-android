@@ -17,6 +17,7 @@ class HomeRailAdapter(
     private val items: List<HomeRailItem>,
     private val onClick: (HomeRailItem) -> Unit,
     private val onFocus: ((HomeRailItem) -> Unit)? = null,
+    private val onBlur: (() -> Unit)? = null,
     private val onToggleFavorite: ((HomeRailItem) -> Unit)? = null,
     private val isFavorite: ((HomeRailItem) -> Boolean)? = null,
     private val onMoveUp: (() -> Unit)? = null,
@@ -78,7 +79,11 @@ class HomeRailAdapter(
         holder.favoriteBadge.visibility = if (fav) View.VISIBLE else View.GONE
 
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
-            if (hasFocus) onFocus?.invoke(item)
+            if (hasFocus) {
+                onFocus?.invoke(item)
+            } else {
+                onBlur?.invoke()
+            }
             if (DeviceUi.useDpadFocus(holder.itemView.context)) {
                 view.post { FocusScaleHelper.applyConeFocus(view, hasFocus) }
             }

@@ -77,7 +77,7 @@ class MainActivity : BaseLocaleActivity() {
     companion object {
         private const val HOME_RAIL_LIMIT_COMPACT = 12
         private const val HERO_LIMIT_COMPACT = 1
-        private const val HERO_LIMIT_TV = 6
+        private const val HERO_LIMIT_TV = 8
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -541,22 +541,20 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun applyLiveCategoryNow(cat: Category, newId: String?) {
         if (newId == selectedLiveCategoryId) return
-        withLiveCategoryAccess(cat, newId) {
-            try {
-                selectedLiveCategoryId = newId
-                scrollLiveCategoryToSelection()
-                reloadChannels(
-                    keepCategoryFocus = true,
-                    autoPreviewFirst = !DeviceUi.isCompact(this),
-                )
-            } catch (_: Exception) {
-                selectedLiveCategoryId = newId
-                scrollLiveCategoryToSelection()
-                reloadChannels(
-                    keepCategoryFocus = true,
-                    autoPreviewFirst = !DeviceUi.isCompact(this),
-                )
-            }
+        try {
+            selectedLiveCategoryId = newId
+            scrollLiveCategoryToSelection()
+            reloadChannels(
+                keepCategoryFocus = true,
+                autoPreviewFirst = !DeviceUi.isCompact(this),
+            )
+        } catch (_: Exception) {
+            selectedLiveCategoryId = newId
+            scrollLiveCategoryToSelection()
+            reloadChannels(
+                keepCategoryFocus = true,
+                autoPreviewFirst = !DeviceUi.isCompact(this),
+            )
         }
     }
 
@@ -855,7 +853,6 @@ class MainActivity : BaseLocaleActivity() {
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
                 livePreviewPaused = false
-                VolumeHelper.boostOnPlaybackStart(this)
                 livePanel().post {
                     if (currentTab != Tab.LIVE) return@post
                     ensurePreviewPlayer()
@@ -1121,6 +1118,11 @@ class MainActivity : BaseLocaleActivity() {
             .ifEmpty { recentSeries.take(heroLimit) }
         var movieIdx = 0
         var seriesIdx = 0
+        var favIdx = 0
+        val heroFavorites = favoriteItems.filter {
+            it.kind == HomeRailAdapter.HomeRailItem.KIND_MOVIE ||
+                it.kind == HomeRailAdapter.HomeRailItem.KIND_SERIES
+        }
         while (heroItems.size < heroLimit * 2) {
             if (movieIdx < heroMovies.size) {
                 heroItems.add(HeroItem.Rail(heroMovies[movieIdx++]))
@@ -1128,7 +1130,15 @@ class MainActivity : BaseLocaleActivity() {
             if (seriesIdx < heroSeries.size) {
                 heroItems.add(HeroItem.Rail(heroSeries[seriesIdx++]))
             }
-            if (movieIdx >= heroMovies.size && seriesIdx >= heroSeries.size) break
+            if (favIdx < heroFavorites.size && heroItems.size < heroLimit * 2) {
+                heroItems.add(HeroItem.Rail(heroFavorites[favIdx++]))
+            }
+            if (movieIdx >= heroMovies.size &&
+                seriesIdx >= heroSeries.size &&
+                favIdx >= heroFavorites.size
+            ) {
+                break
+            }
         }
         heroIndex = 0
         railPreviewItem = null
@@ -1368,6 +1378,14 @@ class MainActivity : BaseLocaleActivity() {
             } else {
                 { item -> previewHomeRailItem(item) }
             },
+            onBlur = if (DeviceUi.isCompact(this)) {
+                null
+            } else {
+                {
+                    railPreviewItem = null
+                    startHeroRotation()
+                }
+            },
             onToggleFavorite = { item -> toggleHomeFavorite(item) },
             isFavorite = { item -> isHomeFavorite(item) },
             onMoveUp = onMoveUp,
@@ -1530,8 +1548,9 @@ class MainActivity : BaseLocaleActivity() {
         extension: String,
         imageUrl: String = "",
         positionMs: Long = 0L,
+        categoryId: String = "",
     ) {
-        withMovieAccess(title) {
+        withMovieAccess(title, categoryId) {
             playMovieInternal(title, streamId, extension, imageUrl, positionMs)
         }
     }
@@ -1994,15 +2013,13 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun applyCatalogCategory(tab: Tab, cat: Category) {
         if (cat.id == selectedCatalogCategoryId) return
-        withCatalogCategoryAccess(tab, cat) {
-            selectedCatalogCategoryId = cat.id
-            when (tab) {
-                Tab.MOVIES -> movieCategoryId = cat.id
-                Tab.SERIES -> seriesCategoryId = cat.id
-                else -> Unit
-            }
-            loadCatalogItems(tab, cat.id)
+        selectedCatalogCategoryId = cat.id
+        when (tab) {
+            Tab.MOVIES -> movieCategoryId = cat.id
+            Tab.SERIES -> seriesCategoryId = cat.id
+            else -> Unit
         }
+        loadCatalogItems(tab, cat.id)
     }
 
     private fun configureCatalogGrid() {
@@ -2221,6 +2238,7 @@ class MainActivity : BaseLocaleActivity() {
                         streamId = item.id,
                         extension = item.extension,
                         imageUrl = item.imageUrl,
+                        categoryId = categoryId,
                     )
                 } else {
                     openMovieEntry(
@@ -2514,17 +2532,49 @@ class MainActivity : BaseLocaleActivity() {
             teardownLivePreviewPlayback()
             ensurePreviewPlayer()
             setPreviewVideoVisible(false)
-            panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.GONE
+            hideNoSignal()
         }
         val token = previewToken
         val delayMs = if (usesExoPreview()) 300L else 250L
         val task = Runnable {
-            if (token == previewToken && !reloadingChannels && !livePreviewPaused) {
+            if (token != previewToken || reloadingChannels || livePreviewPaused) return@Runnable
+            if (parentalStore.requiresPinForChannel(channel, selectedLiveCategoryId)) {
+                withChannelAccess(channel) {
+                    if (token == previewToken) previewChannel(channel, token)
+                }
+            } else {
                 previewChannel(channel, token)
             }
         }
         pendingPreview = task
         previewHandler.postDelayed(task, delayMs)
+    }
+
+    private fun hideNoSignal() {
+        panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.GONE
+    }
+
+    private fun showNoSignal() {
+        cancelPreviewTimeout()
+        setPreviewVideoVisible(false)
+        panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.VISIBLE
+    }
+
+    private fun armPreviewTimeout(token: Int) {
+        cancelPreviewTimeout()
+        val task = Runnable {
+            if (token != previewToken || previewIsSettled()) return@Runnable
+            if (!tryNextPreviewUrl(token)) {
+                showNoSignal()
+            }
+        }
+        previewTimeoutRunnable = task
+        previewHandler.postDelayed(task, 10_000L)
+    }
+
+    private fun cancelPreviewTimeout() {
+        previewTimeoutRunnable?.let { previewHandler.removeCallbacks(it) }
+        previewTimeoutRunnable = null
     }
 
     private fun schedulePreviewInternal(channel: LiveChannel) {
@@ -2573,6 +2623,8 @@ class MainActivity : BaseLocaleActivity() {
             livePanel().post {
                 if (token == previewToken && !livePreviewPaused && ensurePreviewPlayer()) {
                     previewChannel(channel, token)
+                } else if (token == previewToken) {
+                    showNoSignal()
                 }
             }
             return
@@ -2592,23 +2644,26 @@ class MainActivity : BaseLocaleActivity() {
         }
         val url = previewUrls.getOrNull(previewUrlIndex).orEmpty()
         if (url.isBlank()) {
-            panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.VISIBLE
+            showNoSignal()
             return
         }
         playMiniPreviewUrl(url, token)
     }
 
     private var previewPlaybackToken = 0
+    private var previewTimeoutRunnable: Runnable? = null
 
     private fun playMiniPreviewUrl(url: String, token: Int) {
         if (token != previewToken || url.isBlank()) return
         previewPlaybackToken = token
         setPreviewVideoVisible(false)
+        hideNoSignal()
         val volume = if (appSettings.previewSound) {
             LiveVlcPlayer.VOLUME_PREVIEW
         } else {
             0
         }
+        armPreviewTimeout(token)
         if (usesExoPreview()) {
             miniExoPlayer?.play(url, volume)
         } else {
@@ -2657,11 +2712,11 @@ class MainActivity : BaseLocaleActivity() {
     private fun tryNextPreviewUrl(token: Int = previewToken): Boolean {
         if (token != previewToken) return false
         if (previewUrlIndex >= previewUrls.lastIndex) {
-            panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.VISIBLE
+            showNoSignal()
             return false
         }
         previewUrlIndex += 1
-        panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.GONE
+        hideNoSignal()
         if (!ensurePreviewPlayer()) return false
         playMiniPreviewUrl(previewUrls[previewUrlIndex], token)
         return true
@@ -2811,6 +2866,13 @@ class MainActivity : BaseLocaleActivity() {
         stopHeroRotation()
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (currentTab == Tab.HOME && homeLoaded) {
+            startHeroRotation()
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         if (currentTab == Tab.HOME) {
@@ -2943,11 +3005,12 @@ class MainActivity : BaseLocaleActivity() {
             },
             onPlaying = {
                 if (previewPlaybackToken != previewToken) return@LiveExoPreviewPlayer
+                cancelPreviewTimeout()
                 if (previewUrlIndex in previewUrls.indices) {
                     previewWorkingUrl = previewUrls[previewUrlIndex]
                 }
                 setPreviewVideoVisible(true)
-                noSignal.visibility = View.GONE
+                hideNoSignal()
             },
         )
     }
@@ -2970,11 +3033,12 @@ class MainActivity : BaseLocaleActivity() {
             },
             onPlaying = {
                 if (previewPlaybackToken != previewToken) return@LiveVlcPlayer
+                cancelPreviewTimeout()
                 if (previewUrlIndex in previewUrls.indices) {
                     previewWorkingUrl = previewUrls[previewUrlIndex]
                 }
                 setPreviewVideoVisible(true)
-                noSignal.visibility = View.GONE
+                hideNoSignal()
             },
         )
     }
