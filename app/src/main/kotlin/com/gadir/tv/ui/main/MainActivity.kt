@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
-import android.view.ViewGroup
 import android.view.ViewStub
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -393,29 +392,15 @@ class MainActivity : BaseLocaleActivity() {
         (value * resources.displayMetrics.density).toInt()
 
     private fun configureHeroLayout() {
-        val metrics = resources.displayMetrics
-        val heroHeight = when {
-            DeviceUi.isCompact(this) ->
-                (metrics.heightPixels * 0.48f).toInt().coerceIn(dp(260), dp(380))
-            DeviceUi.isTelevision(this) ->
-                (metrics.heightPixels * 0.42f).toInt().coerceIn(dp(260), dp(360))
-            else -> dp(220)
+        val heroHeight = if (DeviceUi.isCompact(this)) {
+            (resources.displayMetrics.heightPixels * 0.48f).toInt().coerceIn(dp(260), dp(380))
+        } else {
+            dp(220)
         }
-        val container = panelHome.findViewById<View>(R.id.heroContainer)
-        container?.layoutParams = container?.layoutParams?.apply { height = heroHeight }
-        container?.minimumHeight = heroHeight
-        heroImage.layoutParams = heroImage.layoutParams.apply {
-            height = ViewGroup.LayoutParams.MATCH_PARENT
-        }
+        heroImage.layoutParams = heroImage.layoutParams.apply { height = heroHeight }
+        panelHome.findViewById<View>(R.id.heroContainer)?.minimumHeight = heroHeight
         panelHome.findViewById<View>(R.id.heroScrim)?.layoutParams =
-            panelHome.findViewById<View>(R.id.heroScrim)?.layoutParams?.apply {
-                height = ViewGroup.LayoutParams.MATCH_PARENT
-            }
-        if (DeviceUi.isTelevision(this)) {
-            heroPlot.maxLines = 3
-            heroTitle.maxLines = 2
-            heroPoster.visibility = View.VISIBLE
-        }
+            panelHome.findViewById<View>(R.id.heroScrim)?.layoutParams?.apply { height = heroHeight }
     }
 
     private fun ensureLiveTabReady() {
@@ -467,7 +452,8 @@ class MainActivity : BaseLocaleActivity() {
                 }
             },
             onOpen = { channel ->
-                if (currentPreviewChannel?.streamId == channel.streamId) {
+                val sameChannel = currentPreviewChannel?.streamId == channel.streamId
+                if (sameChannel && (previewIsSettled() || DeviceUi.isCompact(this))) {
                     openFullscreen(channel)
                 } else {
                     selectChannelPreview(channel)
@@ -732,7 +718,6 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun focusCategoryList() {
         stopLivePreview()
-        scrollLiveCategoryToSelection()
         TvNavHelper.focusItem(liveCategoryList, liveCategoryIndex())
     }
 
@@ -2442,15 +2427,14 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun schedulePreview(channel: LiveChannel) {
-        if (currentTab != Tab.LIVE || reloadingChannels) return
-        livePreviewPaused = false
+        if (currentTab != Tab.LIVE || livePreviewPaused || reloadingChannels) return
         withChannelAccess(channel) {
             schedulePreviewInternal(channel)
         }
     }
 
     private fun schedulePreviewInternal(channel: LiveChannel) {
-        if (currentTab != Tab.LIVE || reloadingChannels) return
+        if (currentTab != Tab.LIVE || livePreviewPaused || reloadingChannels) return
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val channelChanged = previewingStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) {
@@ -2763,19 +2747,13 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (currentTab == Tab.HOME) {
-            if (heroItems.size > 1 && railPreviewItem == null) {
-                startHeroRotation()
-            }
-            if (shouldFocusHomeRailsOnResume && DeviceUi.useDpadFocus(this)) {
-                focusHeroOnStart()
-            }
+        if (currentTab == Tab.HOME && shouldFocusHomeRailsOnResume && DeviceUi.useDpadFocus(this)) {
+            focusHeroOnStart()
         } else if (currentTab == Tab.LIVE) {
             ensureLiveTabReady()
             livePreviewPaused = false
-            scrollLiveCategoryToSelection()
-            liveCategoryList.adapter?.let { (it as? CategoryAdapter)?.refreshSelection() }
             focusChannelAt(currentPreviewChannel)
+            liveCategoryList.adapter?.let { (it as? CategoryAdapter)?.refreshSelection() }
             if (appSettings.autoplayPreview && currentPreviewChannel != null) {
                 currentPreviewChannel?.let { schedulePreview(it) }
             }
