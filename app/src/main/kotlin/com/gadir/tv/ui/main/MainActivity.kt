@@ -72,7 +72,7 @@ class MainActivity : BaseLocaleActivity() {
 
     companion object {
         private const val HOME_RAIL_LIMIT_COMPACT = 12
-        private const val HERO_LIMIT_COMPACT = 1
+        private const val HERO_LIMIT_COMPACT = 5
         private const val HERO_LIMIT_TV = 6
     }
     private val api = XtreamApi()
@@ -393,15 +393,14 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun configureHeroLayout() {
         val heroHeight = if (DeviceUi.isCompact(this)) {
-            (resources.displayMetrics.heightPixels * 0.36f).toInt().coerceIn(dp(200), dp(300))
+            (resources.displayMetrics.heightPixels * 0.48f).toInt().coerceIn(dp(260), dp(380))
         } else {
             dp(220)
         }
         heroImage.layoutParams = heroImage.layoutParams.apply { height = heroHeight }
         panelHome.findViewById<View>(R.id.heroContainer)?.minimumHeight = heroHeight
-        if (DeviceUi.isCompact(this)) {
-            headerDate.visibility = View.GONE
-        }
+        panelHome.findViewById<View>(R.id.heroScrim)?.layoutParams =
+            panelHome.findViewById<View>(R.id.heroScrim)?.layoutParams?.apply { height = heroHeight }
     }
 
     private fun ensureLiveTabReady() {
@@ -453,7 +452,8 @@ class MainActivity : BaseLocaleActivity() {
                 }
             },
             onOpen = { channel ->
-                if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
+                val sameChannel = currentPreviewChannel?.streamId == channel.streamId
+                if (sameChannel && (previewIsSettled() || DeviceUi.isCompact(this))) {
                     openFullscreen(channel)
                 } else {
                     selectChannelPreview(channel)
@@ -508,12 +508,15 @@ class MainActivity : BaseLocaleActivity() {
                 resetLivePreviewUi()
                 selectedLiveCategoryId = newId
                 (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+                scrollLiveCategoryToSelection()
                 reloadChannels(
                     keepCategoryFocus = true,
                     autoPreviewFirst = !DeviceUi.isCompact(this),
                 )
             } catch (_: Exception) {
                 selectedLiveCategoryId = newId
+                (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+                scrollLiveCategoryToSelection()
                 reloadChannels(
                     keepCategoryFocus = true,
                     autoPreviewFirst = !DeviceUi.isCompact(this),
@@ -604,6 +607,7 @@ class MainActivity : BaseLocaleActivity() {
             reloadChannels(keepCategoryFocus = true)
         }
         (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+        scrollLiveCategoryToSelection()
         restoreLastChannel()
     }
 
@@ -727,6 +731,15 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun scrollLiveCategoryToSelection() {
+        if (!liveTabReady) return
+        val index = liveCategoryIndex()
+        liveCategoryList.post {
+            (liveCategoryList.layoutManager as? LinearLayoutManager)
+                ?.scrollToPositionWithOffset(index, 0)
+        }
+    }
+
     private fun focusCatalogCategoryList() {
         val index = catalogCategories.indexOfFirst { it.id == selectedCatalogCategoryId }
             .takeIf { it >= 0 } ?: 0
@@ -788,7 +801,10 @@ class MainActivity : BaseLocaleActivity() {
                 stopHeroRotation()
                 livePreviewPaused = false
                 VolumeHelper.boostOnPlaybackStart(this)
-                restoreLiveTabSession()
+                livePanel().post {
+                    ensurePreviewPlayer()
+                    restoreLiveTabSession()
+                }
             }
             Tab.MOVIES, Tab.SERIES -> {
                 panelHome.visibility = View.GONE
@@ -1787,7 +1803,6 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun startHeroRotation() {
         heroHandler.removeCallbacks(heroRotateRunnable)
-        if (!DeviceUi.useDpadFocus(this)) return
         if (heroItems.size > 1 && currentTab == Tab.HOME) {
             heroHandler.postDelayed(heroRotateRunnable, 8000L)
         }
@@ -2487,7 +2502,14 @@ class MainActivity : BaseLocaleActivity() {
     private fun previewChannel(channel: LiveChannel, token: Int) {
         if (token != previewToken || livePreviewPaused) return
         val profile = PlaylistRepository.profile ?: return
-        if (!ensurePreviewPlayer()) return
+        if (!ensurePreviewPlayer()) {
+            livePanel().post {
+                if (token == previewToken && !livePreviewPaused && ensurePreviewPlayer()) {
+                    previewChannel(channel, token)
+                }
+            }
+            return
+        }
         updatePreviewInfo(channel)
         if (!appSettings.autoplayPreview) {
             cancelMiniPreviewPlayback()
@@ -2619,7 +2641,12 @@ class MainActivity : BaseLocaleActivity() {
                 previewWorkingUrl?.let { add(it) }
             }
             addAll(candidates)
-        }.distinct()
+        }.distinct().filter { it.isNotBlank() }
+        if (urls.isEmpty()) {
+            Toast.makeText(this, R.string.epg_unavailable, Toast.LENGTH_SHORT).show()
+            livePreviewPaused = false
+            return
+        }
         PlaybackLauncher.play(
             context = this,
             request = PlaybackRequest(
