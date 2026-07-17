@@ -8,7 +8,9 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
+import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.ImageLoader
+import com.gadir.tv.util.TvNavHelper
 
 class PosterAdapter(
     private val items: List<PosterItem>,
@@ -44,7 +46,11 @@ class PosterAdapter(
         val item = items[position]
         holder.title.text = item.title
         if (item.imageUrl.isNotEmpty()) {
-            ImageLoader.loadPoster(holder.image, item.imageUrl)
+            if (DeviceUi.isTelevision(holder.itemView.context)) {
+                ImageLoader.loadPoster(holder.image, item.imageUrl, 200, 280)
+            } else {
+                ImageLoader.loadPoster(holder.image, item.imageUrl)
+            }
         } else {
             holder.image.setImageResource(R.drawable.tv_banner)
         }
@@ -83,6 +89,38 @@ class PosterAdapter(
                     if (pos < columnCount) {
                         onMoveUp?.invoke()
                         onMoveUp != null
+                    } else {
+                        val list = holder.itemView.parent as? RecyclerView
+                        if (list != null) {
+                            TvNavHelper.moveFocus(list, pos, pos - columnCount, items.size)
+                        }
+                        list != null
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    val pos = holder.bindingAdapterPosition
+                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
+                    val next = pos + columnCount
+                    if (next < items.size) {
+                        val list = holder.itemView.parent as? RecyclerView
+                        if (list != null) {
+                            TvNavHelper.moveFocus(list, pos, next, items.size)
+                        }
+                        list != null
+                    } else {
+                        false
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    val pos = holder.bindingAdapterPosition
+                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
+                    val col = pos % columnCount
+                    if (col < columnCount - 1 && pos + 1 < items.size) {
+                        val list = holder.itemView.parent as? RecyclerView
+                        if (list != null) {
+                            TvNavHelper.moveFocus(list, pos, pos + 1, items.size)
+                        }
+                        list != null
                     } else {
                         false
                     }

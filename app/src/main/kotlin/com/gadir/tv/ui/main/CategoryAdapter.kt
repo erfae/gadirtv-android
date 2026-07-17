@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.model.Category
+import com.gadir.tv.util.TvNavHelper
 
 class CategoryAdapter(
     private val items: List<Category>,
@@ -74,14 +75,31 @@ class CategoryAdapter(
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     val pos = holder.bindingAdapterPosition
+                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
                     if (pos == 0) {
                         onMoveUp?.invoke()
                         true
                     } else {
+                        val list = holder.itemView.parent as? RecyclerView
+                        if (list != null) {
+                            TvNavHelper.moveFocus(list, pos, pos - 1, items.size)
+                        }
+                        list != null
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    val pos = holder.bindingAdapterPosition
+                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
+                    if (pos < items.lastIndex) {
+                        val list = holder.itemView.parent as? RecyclerView
+                        if (list != null) {
+                            TvNavHelper.moveFocus(list, pos, pos + 1, items.size)
+                        }
+                        list != null
+                    } else {
                         false
                     }
                 }
-                KeyEvent.KEYCODE_DPAD_DOWN -> false
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     val pos = holder.bindingAdapterPosition
                     if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
