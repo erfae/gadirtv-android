@@ -28,6 +28,7 @@
     <string name="tab_movies">Movies</string>
     <string name="tab_series">Series</string>
     <string name="catalog_empty">No content in this group</string>
+    <string name="catalog_select_group">Press OK on a group to load</string>
     <string name="season_label">Season %1$s</string>
     <string name="seasons_label">SEASONS</string>
     <string name="episodes_label">EPISODES</string>
