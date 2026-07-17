@@ -81,7 +81,6 @@
                 android:layout_marginTop="8dp"
                 android:hint="@string/parental_pin_current"
                 app:boxStrokeColor="@color/gtv_red"
-                app:endIconMode="password_toggle"
                 app:hintTextColor="@color/gtv_text_dim">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -101,7 +100,6 @@
                 android:layout_marginTop="8dp"
                 android:hint="@string/parental_pin_new"
                 app:boxStrokeColor="@color/gtv_red"
-                app:endIconMode="password_toggle"
                 app:hintTextColor="@color/gtv_text_dim">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -121,7 +119,6 @@
                 android:layout_marginTop="8dp"
                 android:hint="@string/parental_pin_confirm"
                 app:boxStrokeColor="@color/gtv_red"
-                app:endIconMode="password_toggle"
                 app:hintTextColor="@color/gtv_text_dim">
 
                 <com.google.android.material.textfield.TextInputEditText

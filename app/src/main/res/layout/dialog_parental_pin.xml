@@ -21,7 +21,6 @@
         android:layout_marginTop="12dp"
         android:hint="@string/parental_pin_hint"
         app:boxStrokeColor="@color/gtv_red"
-        app:endIconMode="password_toggle"
         app:hintTextColor="@color/gtv_text_dim"
         style="@style/Widget.GadirTV.TextInput">
 
