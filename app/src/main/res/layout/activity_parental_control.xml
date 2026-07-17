@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="@color/gtv_bg"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:padding="16dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -32,14 +32,14 @@
             android:layout_marginStart="16dp"
             android:text="@string/parental_title"
             android:textColor="@android:color/white"
-            android:textSize="22sp"
+            android:textSize="20sp"
             android:textStyle="bold" />
     </LinearLayout>
 
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="10dp"
         android:layout_weight="1"
         android:fillViewport="true">
 
@@ -59,7 +59,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
+                android:layout_marginTop="14dp"
                 android:text="@string/parental_pin_section"
                 android:textColor="@color/gtv_red_hi"
                 android:textSize="12sp"
@@ -69,20 +69,20 @@
                 android:id="@+id/parentalPinStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="6dp"
                 android:textColor="@color/gtv_text_dim"
                 android:textSize="13sp" />
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/parentalCurrentPinLayout"
+                style="@style/Widget.GadirTV.TextInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="8dp"
                 android:hint="@string/parental_pin_current"
                 app:boxStrokeColor="@color/gtv_red"
                 app:endIconMode="password_toggle"
-                app:hintTextColor="@color/gtv_text_dim"
-                style="@style/Widget.GadirTV.TextInput">
+                app:hintTextColor="@color/gtv_text_dim">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/parentalCurrentPinInput"
@@ -95,14 +95,14 @@
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/parentalNewPinLayout"
+                style="@style/Widget.GadirTV.TextInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:hint="@string/parental_pin_new"
                 app:boxStrokeColor="@color/gtv_red"
                 app:endIconMode="password_toggle"
-                app:hintTextColor="@color/gtv_text_dim"
-                style="@style/Widget.GadirTV.TextInput">
+                app:hintTextColor="@color/gtv_text_dim">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/parentalNewPinInput"
@@ -115,14 +115,14 @@
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/parentalConfirmPinLayout"
+                style="@style/Widget.GadirTV.TextInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:hint="@string/parental_pin_confirm"
                 app:boxStrokeColor="@color/gtv_red"
                 app:endIconMode="password_toggle"
-                app:hintTextColor="@color/gtv_text_dim"
-                style="@style/Widget.GadirTV.TextInput">
+                app:hintTextColor="@color/gtv_text_dim">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/parentalConfirmPinInput"
@@ -137,14 +137,14 @@
                 android:id="@+id/btnSaveParentalPin"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="10dp"
                 android:text="@string/parental_pin_save" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
-                android:text="@string/parental_channel_lock_section"
+                android:layout_marginTop="16dp"
+                android:text="@string/parental_groups_section"
                 android:textColor="@color/gtv_red_hi"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -152,10 +152,66 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="@string/parental_channel_lock_hint"
+                android:layout_marginTop="4dp"
+                android:text="@string/parental_groups_hint"
                 android:textColor="@color/gtv_text_dim"
                 android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/parentalAdultCount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="@color/gtv_text_dim"
+                android:textSize="12sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/parental_section_live"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/parentalLiveGroups"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                android:overScrollMode="never" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/parental_section_movies"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/parentalVodGroups"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                android:overScrollMode="never" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/parental_section_series"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/parentalSeriesGroups"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                android:overScrollMode="never" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

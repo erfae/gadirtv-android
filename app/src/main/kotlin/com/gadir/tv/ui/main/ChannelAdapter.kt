@@ -82,8 +82,7 @@ class ChannelAdapter(
         )
         val locked = isLocked(item)
         holder.lock.setImageResource(if (locked) R.drawable.ic_lock_on else R.drawable.ic_lock_off)
-        holder.lock.visibility = if (canLock(item) || locked) View.VISIBLE else View.INVISIBLE
-        holder.lock.alpha = if (canLock(item)) 1f else 0.35f
+        holder.lock.visibility = if (locked) View.VISIBLE else View.GONE
 
         holder.itemView.isSelected = holder.itemView.hasFocus()
         holder.number.isSelected = holder.itemView.hasFocus()

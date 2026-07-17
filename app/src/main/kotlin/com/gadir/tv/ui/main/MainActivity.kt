@@ -25,6 +25,7 @@ import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.LiveChannelStore
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ParentalControlStore
+import com.gadir.tv.data.ParentalSession
 import com.gadir.tv.data.ProfileStore
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
@@ -122,6 +123,9 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var catalogGrid: RecyclerView
     private lateinit var catalogLoading: TextView
     private lateinit var catalogEmpty: TextView
+    private lateinit var catalogHeroImage: ImageView
+    private lateinit var catalogHeroTitle: TextView
+    private lateinit var catalogHeroSubtitle: TextView
 
     private lateinit var heroImage: ImageView
     private lateinit var heroType: TextView
@@ -271,6 +275,7 @@ class MainActivity : BaseLocaleActivity() {
         resumeStore = ResumeStore(this)
         appSettings = AppSettings(this)
         parentalStore = ParentalControlStore(this)
+        parentalStore.ensureAdultDefaultsBlocked()
 
         headerClock = findViewById(R.id.headerClock)
         headerDate = findViewById(R.id.headerDate)
@@ -309,6 +314,9 @@ class MainActivity : BaseLocaleActivity() {
         catalogGrid = panelCatalog.findViewById(R.id.catalogGrid)
         catalogLoading = panelCatalog.findViewById(R.id.catalogLoading)
         catalogEmpty = panelCatalog.findViewById(R.id.catalogEmpty)
+        catalogHeroImage = panelCatalog.findViewById(R.id.catalogHeroImage)
+        catalogHeroTitle = panelCatalog.findViewById(R.id.catalogHeroTitle)
+        catalogHeroSubtitle = panelCatalog.findViewById(R.id.catalogHeroSubtitle)
 
         heroImage = panelHome.findViewById(R.id.heroImage)
         heroType = panelHome.findViewById(R.id.heroType)
@@ -375,7 +383,7 @@ class MainActivity : BaseLocaleActivity() {
         }
 
         setupHeaderFocusChain()
-        configureCompactUi()
+        configureHeroLayout()
 
         showTab(Tab.HOME)
     }
@@ -383,17 +391,16 @@ class MainActivity : BaseLocaleActivity() {
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
 
-    private fun configureCompactUi() {
-        if (!DeviceUi.isCompact(this)) return
-        headerDate.visibility = View.GONE
-        val heroHeight = dp(120)
+    private fun configureHeroLayout() {
+        val heroHeight = if (DeviceUi.isCompact(this)) {
+            (resources.displayMetrics.heightPixels * 0.36f).toInt().coerceIn(dp(200), dp(300))
+        } else {
+            dp(220)
+        }
         heroImage.layoutParams = heroImage.layoutParams.apply { height = heroHeight }
         panelHome.findViewById<View>(R.id.heroContainer)?.minimumHeight = heroHeight
-        heroTitle.textSize = 15f
-        heroPlot.maxLines = 1
-        heroPlay.layoutParams = heroPlay.layoutParams.apply { height = dp(36) }
-        listOf(favoritesRail, moviesRail, seriesRail).forEach { rail ->
-            rail.minimumHeight = dp(108)
+        if (DeviceUi.isCompact(this)) {
+            headerDate.visibility = View.GONE
         }
     }
 
@@ -446,15 +453,7 @@ class MainActivity : BaseLocaleActivity() {
                 }
             },
             onOpen = { channel ->
-                if (DeviceUi.isCompact(this)) {
-                    if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
-                        openFullscreen(channel)
-                    } else {
-                        selectChannelPreview(channel)
-                    }
-                } else if (currentPreviewChannel?.streamId == channel.streamId &&
-                    (previewIsSettled() || previewingStreamId == channel.streamId)
-                ) {
+                if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
                     openFullscreen(channel)
                 } else {
                     selectChannelPreview(channel)
@@ -1097,6 +1096,7 @@ class MainActivity : BaseLocaleActivity() {
                 runCatching { BootstrapLoader.load(this@MainActivity, api, profile) }
             }
             result.onSuccess {
+                parentalStore.ensureAdultDefaultsBlocked()
                 when (currentTab) {
                     Tab.LIVE -> {
                         ensureLiveTabReady()
@@ -1626,7 +1626,8 @@ class MainActivity : BaseLocaleActivity() {
         if (DeviceUi.isCompact(this)) {
             val dm = resources.displayMetrics
             val width = dm.widthPixels.coerceAtMost(720)
-            val height = (120f * dm.density).toInt().coerceAtMost(320)
+            val height = heroImage.layoutParams.height.takeIf { it > 0 }
+                ?: (220f * dm.density).toInt()
             ImageLoader.loadHeroBackdrop(target, fallbacks.first(), fallbacks.drop(1), width, height)
         } else {
             ImageLoader.loadHeroBackdrop(target, fallbacks.first(), fallbacks.drop(1))
@@ -2001,9 +2002,8 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun bindResumeMovies() {
         posterItems.clear()
-        resumeStore.loadAll()
-            .filter { it.kind == ResumeStore.KIND_MOVIE }
-            .forEach { record ->
+        val records = resumeStore.loadAll().filter { it.kind == ResumeStore.KIND_MOVIE }
+        records.forEach { record ->
                 val id = record.id.toIntOrNull() ?: return@forEach
                 posterItems.add(
                     PosterAdapter.PosterItem(
@@ -2013,16 +2013,16 @@ class MainActivity : BaseLocaleActivity() {
                         extension = record.extension,
                         resumePositionMs = record.positionMs,
                     ),
-                )
-            }
+            )
+        }
+        bindCatalogHero(Tab.MOVIES, getString(R.string.rail_continue), records.firstOrNull()?.imageUrl.orEmpty())
         updateCatalogGrid()
     }
 
     private fun bindResumeSeries() {
         posterItems.clear()
-        resumeStore.loadAll()
-            .filter { it.kind == ResumeStore.KIND_SERIES }
-            .forEach { record ->
+        val records = resumeStore.loadAll().filter { it.kind == ResumeStore.KIND_SERIES }
+        records.forEach { record ->
                 val id = record.id.toIntOrNull() ?: return@forEach
                 posterItems.add(
                     PosterAdapter.PosterItem(
@@ -2032,8 +2032,9 @@ class MainActivity : BaseLocaleActivity() {
                         extension = record.extension,
                         resumePositionMs = record.positionMs,
                     ),
-                )
-            }
+            )
+        }
+        bindCatalogHero(Tab.SERIES, getString(R.string.rail_continue), records.firstOrNull()?.imageUrl.orEmpty())
         updateCatalogGrid()
     }
 
@@ -2061,7 +2062,30 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun bindCatalogHero(tab: Tab, categoryName: String, imageUrl: String) {
+        catalogHeroTitle.text = categoryName.ifBlank { getString(R.string.catalog_empty) }
+        catalogHeroSubtitle.text = when (tab) {
+            Tab.MOVIES -> getString(R.string.tab_movies)
+            Tab.SERIES -> getString(R.string.tab_series)
+            else -> ""
+        }
+        if (imageUrl.isNotBlank()) {
+            val dm = resources.displayMetrics
+            val width = dm.widthPixels.coerceAtMost(960)
+            val height = catalogHeroImage.layoutParams.height.takeIf { it > 0 }
+                ?: dp(200)
+            ImageLoader.loadHeroBackdrop(catalogHeroImage, imageUrl, emptyList(), width, height)
+        } else {
+            catalogHeroImage.setImageResource(R.drawable.hero_placeholder_bg)
+        }
+    }
+
+    private fun selectedCatalogCategoryName(): String =
+        catalogCategories.firstOrNull { it.id == selectedCatalogCategoryId }?.name.orEmpty()
+
     private fun bindMovies(movies: List<VodMovie>) {
+        val cover = movies.firstOrNull { it.icon.isNotBlank() }?.icon.orEmpty()
+        bindCatalogHero(Tab.MOVIES, selectedCatalogCategoryName(), cover)
         posterItems.clear()
         movies.forEach { movie ->
             posterItems.add(
@@ -2077,6 +2101,8 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun bindSeries(series: List<SeriesItem>) {
+        val cover = series.firstOrNull { it.cover.isNotBlank() }?.cover.orEmpty()
+        bindCatalogHero(Tab.SERIES, selectedCatalogCategoryName(), cover)
         posterItems.clear()
         series.forEach { item ->
             posterItems.add(
@@ -2144,10 +2170,14 @@ class MainActivity : BaseLocaleActivity() {
             action()
             return
         }
+        val catKey = categoryId?.let { ParentalSession.liveCategoryKey(it) }.orEmpty()
         ParentalPinDialog.show(
             this,
             getString(R.string.parental_pin_message, category.name),
-            onVerified = action,
+            onVerified = {
+                if (catKey.isNotEmpty()) ParentalSession.unlock(catKey)
+                action()
+            },
         )
     }
 
@@ -2159,15 +2189,17 @@ class MainActivity : BaseLocaleActivity() {
         ParentalPinDialog.show(
             this,
             getString(R.string.parental_pin_channel, channel.name),
-            onVerified = action,
+            onVerified = {
+                ParentalSession.unlock(ParentalSession.liveChannelKey(channel.streamId))
+                if (channel.categoryId.isNotBlank()) {
+                    ParentalSession.unlock(ParentalSession.liveCategoryKey(channel.categoryId))
+                }
+                action()
+            },
         )
     }
 
     private fun toggleChannelLock(channel: LiveChannel) {
-        if (!parentalStore.canLockChannel(channel)) {
-            Toast.makeText(this, R.string.parental_channel_lock_adult, Toast.LENGTH_SHORT).show()
-            return
-        }
         val unlock = {
             parentalStore.toggleChannelLock(channel.streamId)
             refreshAfterChannelLockToggle(channel)
@@ -2210,14 +2242,57 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun withCatalogCategoryAccess(tab: Tab, category: Category, action: () -> Unit) {
-        action()
+        val needsPin = when (tab) {
+            Tab.MOVIES -> parentalStore.requiresPinForVodCategory(category.id)
+            Tab.SERIES -> parentalStore.requiresPinForSeriesCategory(category.id)
+            else -> false
+        }
+        if (!needsPin) {
+            action()
+            return
+        }
+        val key = when (tab) {
+            Tab.MOVIES -> ParentalSession.vodCategoryKey(category.id)
+            Tab.SERIES -> ParentalSession.seriesCategoryKey(category.id)
+            else -> return
+        }
+        ParentalPinDialog.show(
+            this,
+            getString(R.string.parental_pin_message, category.name),
+            onVerified = {
+                ParentalSession.unlock(key)
+                action()
+            },
+        )
     }
 
     private fun withMovieAccess(title: String, categoryId: String = "", action: () -> Unit) {
+        if (categoryId.isNotBlank() && parentalStore.requiresPinForVodCategory(categoryId)) {
+            ParentalPinDialog.show(
+                this,
+                getString(R.string.parental_pin_content, title),
+                onVerified = {
+                    ParentalSession.unlock(ParentalSession.vodCategoryKey(categoryId))
+                    action()
+                },
+            )
+            return
+        }
         action()
     }
 
     private fun withSeriesAccess(title: String, categoryId: String = "", action: () -> Unit) {
+        if (categoryId.isNotBlank() && parentalStore.requiresPinForSeriesCategory(categoryId)) {
+            ParentalPinDialog.show(
+                this,
+                getString(R.string.parental_pin_content, title),
+                onVerified = {
+                    ParentalSession.unlock(ParentalSession.seriesCategoryKey(categoryId))
+                    action()
+                },
+            )
+            return
+        }
         action()
     }
 

@@ -2,55 +2,111 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal">
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/catalogCategoryList"
-        android:layout_width="120dp"
-        android:layout_height="match_parent"
-        android:clipToPadding="false"
-        android:descendantFocusability="afterDescendants"
-        android:nextFocusRight="@+id/catalogGrid"
-        android:padding="6dp"
-        android:scrollbars="vertical" />
-
-    <View
-        android:layout_width="1dp"
-        android:layout_height="match_parent"
-        android:background="@color/gtv_border" />
+    android:orientation="vertical">
 
     <FrameLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1">
+        android:id="@+id/catalogHeroContainer"
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:background="@color/gtv_bg">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/catalogGrid"
+        <ImageView
+            android:id="@+id/catalogHeroImage"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
+            android:src="@drawable/hero_placeholder_bg" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/hero_scrim_left" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="bottom"
+            android:orientation="vertical"
+            android:paddingHorizontal="14dp"
+            android:paddingBottom="10dp">
+
+            <TextView
+                android:id="@+id/catalogHeroTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@android:color/white"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/catalogHeroSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/gtv_text_dim"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/catalogCategoryList"
+            android:layout_width="120dp"
+            android:layout_height="match_parent"
             android:clipToPadding="false"
-            android:nextFocusLeft="@+id/catalogCategoryList"
+            android:descendantFocusability="afterDescendants"
+            android:nextFocusRight="@+id/catalogGrid"
             android:padding="6dp"
             android:scrollbars="vertical" />
 
-        <TextView
-            android:id="@+id/catalogLoading"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="@string/loading"
-            android:textColor="@color/gtv_text_dim"
-            android:textSize="14sp"
-            android:visibility="gone" />
+        <View
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="@color/gtv_border" />
 
-        <TextView
-            android:id="@+id/catalogEmpty"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="@string/catalog_empty"
-            android:textColor="@color/gtv_text_dim"
-            android:textSize="14sp"
-            android:visibility="gone" />
-    </FrameLayout>
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/catalogGrid"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:nextFocusLeft="@+id/catalogCategoryList"
+                android:padding="6dp"
+                android:scrollbars="vertical" />
+
+            <TextView
+                android:id="@+id/catalogLoading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="@string/loading"
+                android:textColor="@color/gtv_text_dim"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/catalogEmpty"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="@string/catalog_empty"
+                android:textColor="@color/gtv_text_dim"
+                android:textSize="14sp"
+                android:visibility="gone" />
+        </FrameLayout>
+    </LinearLayout>
 </LinearLayout>
