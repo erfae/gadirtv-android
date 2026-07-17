@@ -7,9 +7,10 @@
     <FrameLayout
         android:id="@+id/heroContainer"
         android:layout_width="match_parent"
-        android:layout_height="128dp"
+        android:layout_height="wrap_content"
         android:background="@color/gtv_bg"
-        android:descendantFocusability="afterDescendants">
+        android:descendantFocusability="afterDescendants"
+        android:minHeight="128dp">
 
         <ImageView
             android:id="@+id/heroImage"
@@ -20,6 +21,7 @@
             android:src="@drawable/hero_placeholder_bg" />
 
         <View
+            android:id="@+id/heroScrim"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@drawable/hero_scrim_left" />
