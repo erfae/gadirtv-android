@@ -21,6 +21,7 @@ import com.gadir.tv.model.SeriesEpisode
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
+import com.gadir.tv.player.VodStreamUrls
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.RecyclerViewUtil
@@ -188,7 +189,9 @@ class SeriesDetailActivity : BaseLocaleActivity() {
     private fun playEpisode(ep: SeriesEpisode) {
         val profile = PlaylistRepository.profile ?: return
         val title = "${seriesName.ifBlank { ep.title }} — ${ep.season}x${ep.episodeNum}"
-        val url = api.seriesStreamUrl(profile, ep.id, ep.extension)
+        val urls = VodStreamUrls.seriesCandidates(api, profile, ep.id, ep.extension)
+        val url = urls.firstOrNull().orEmpty()
+        if (url.isBlank()) return
         val image = ep.image.ifEmpty { fallbackCover }
         ResumePlaybackHelper.play(
             context = this,
@@ -200,6 +203,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
                 contentId = ep.id.toString(),
                 imageUrl = image,
                 extension = ep.extension,
+                alternateUrls = urls.drop(1),
             ),
         )
     }

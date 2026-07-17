@@ -14,7 +14,19 @@ object ChannelIconHelper {
 
     fun panelFallbackUrls(profile: Profile?, channel: LiveChannel): List<String> {
         if (profile == null || channel.streamId <= 0) return emptyList()
-        return panelFallbackUrls(profile, channel.streamId, channel.icon, channel.epgChannelId)
+        val baseFallbacks = panelFallbackUrls(
+            profile = profile,
+            streamId = channel.streamId,
+            icon = channel.icon,
+            epgChannelId = channel.epgChannelId,
+            channelName = channel.name,
+        )
+        val direct = channel.directSource.trim()
+        return if (direct.startsWith("http") && looksLikeImage(direct)) {
+            (listOf(direct) + baseFallbacks).distinct()
+        } else {
+            baseFallbacks
+        }
     }
 
     fun panelFallbackUrls(
@@ -22,11 +34,13 @@ object ChannelIconHelper {
         streamId: Int,
         icon: String = "",
         epgChannelId: String = "",
+        channelName: String = "",
     ): List<String> {
         if (profile == null || streamId <= 0) return emptyList()
         val base = HostUtils.baseUrl(profile.host).trimEnd('/')
         val user = encode(profile.username)
         val pass = encode(profile.password)
+        val slug = slugify(channelName)
         return buildList {
             val resolvedIcon = ImageUrlResolver.resolve(icon)
             if (resolvedIcon.isNotBlank()) add(resolvedIcon)
@@ -38,6 +52,7 @@ object ChannelIconHelper {
             add("$base/imgs/$streamId.jpg")
             add("$base/logo/$streamId.png")
             add("$base/logos/$streamId.png")
+            add("$base/static/logos/$streamId.png")
             add("$base/stream/logo/$streamId.png")
             add("$base/streaming/images/$streamId.png")
             add("$base/streaming/images/$streamId.jpg")
@@ -45,6 +60,10 @@ object ChannelIconHelper {
             add("$base/live/$user/$pass/$streamId.jpg")
             add("$base/live/$user/$pass/$streamId.ts.png")
             add("$base/streaming/clients_live.php?username=$user&password=$pass&stream=$streamId&type=image")
+            if (slug.isNotBlank()) {
+                add("$base/images/$slug.png")
+                add("$base/logos/$slug.png")
+            }
             if (epgChannelId.isNotBlank()) {
                 val epg = encode(epgChannelId)
                 add("$base/images/$epg.png")
@@ -52,6 +71,22 @@ object ChannelIconHelper {
                 add("$base/imgs/$epg.png")
             }
         }.distinct().filter { it.isNotBlank() }
+    }
+
+    private fun slugify(name: String): String =
+        name.lowercase()
+            .replace(Regex("[^a-z0-9]+"), "")
+            .take(48)
+
+    private fun looksLikeImage(url: String): Boolean {
+        val lower = url.lowercase()
+        return lower.contains(".png") ||
+            lower.contains(".jpg") ||
+            lower.contains(".jpeg") ||
+            lower.contains(".webp") ||
+            lower.contains(".gif") ||
+            lower.contains("/images/") ||
+            lower.contains("type=image")
     }
 
     private fun encode(value: String): String =

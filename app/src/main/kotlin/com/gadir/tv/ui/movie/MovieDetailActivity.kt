@@ -15,6 +15,7 @@ import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
+import com.gadir.tv.player.VodStreamUrls
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.TvFocusHelper
 import kotlinx.coroutines.Dispatchers
@@ -127,16 +128,20 @@ class MovieDetailActivity : BaseLocaleActivity() {
         val profile = PlaylistRepository.profile ?: return
         val title = findViewById<TextView>(R.id.movieTitle).text.toString()
         val cover = fallbackCover
+        val urls = VodStreamUrls.movieCandidates(api, profile, streamId, extension)
+        val url = urls.firstOrNull().orEmpty()
+        if (url.isBlank()) return
         ResumePlaybackHelper.play(
             context = this,
             resumeStore = resumeStore,
             request = PlaybackRequest(
                 title = title,
-                url = api.movieStreamUrl(profile, streamId, extension),
+                url = url,
                 kind = ResumeStore.KIND_MOVIE,
                 contentId = streamId.toString(),
                 imageUrl = cover,
                 extension = extension,
+                alternateUrls = urls.drop(1),
             ),
         )
     }

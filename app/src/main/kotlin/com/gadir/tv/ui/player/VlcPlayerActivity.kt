@@ -43,6 +43,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private var currentStreamId = 0
     private var currentEpgChannelId = ""
     private var isLivePlayback = false
+    private var resumePositionMs = 0L
+    private var resumeSeekPending = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,6 +72,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         }
         currentStreamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
         isLivePlayback = currentStreamId > 0
+        resumePositionMs = intent.getLongExtra(EXTRA_POSITION_MS, 0L).coerceAtLeast(0L)
+        resumeSeekPending = resumePositionMs > 0L && !isLivePlayback
         loadLiveEpg(currentStreamId, intent.getStringExtra(EXTRA_EPG_CHANNEL_ID).orEmpty())
 
         val settings = AppSettings(this)
@@ -80,8 +84,14 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             attachViews(findViewById<VLCVideoLayout>(R.id.vlcVideo), null, false, false)
             volume = VLC_VOLUME
             setEventListener { event ->
-                if (event.type == MediaPlayer.Event.EncounteredError) {
-                    tryNextUrl()
+                when (event.type) {
+                    MediaPlayer.Event.EncounteredError -> tryNextUrl()
+                    MediaPlayer.Event.Playing -> {
+                        if (resumeSeekPending && resumePositionMs > 0L) {
+                            mediaPlayer?.time = resumePositionMs
+                            resumeSeekPending = false
+                        }
+                    }
                 }
             }
         }
@@ -283,6 +293,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_ALTERNATE_URLS = "alternate_urls"
         private const val EXTRA_STREAM_ID = "stream_id"
         private const val EXTRA_EPG_CHANNEL_ID = "epg_channel_id"
+        private const val EXTRA_POSITION_MS = "position_ms"
         private const val VLC_VOLUME = com.gadir.tv.player.VlcAudioOptions.VOLUME_FULLSCREEN
         private const val CONTROLS_HIDE_MS = 8_000L
 
@@ -293,11 +304,13 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             alternateUrls: List<String> = emptyList(),
             streamId: Int = 0,
             epgChannelId: String = "",
+            positionMs: Long = 0L,
         ): Intent = Intent(context, VlcPlayerActivity::class.java)
             .putExtra(EXTRA_TITLE, title)
             .putExtra(EXTRA_URL, url)
             .putExtra(EXTRA_STREAM_ID, streamId)
             .putExtra(EXTRA_EPG_CHANNEL_ID, epgChannelId)
+            .putExtra(EXTRA_POSITION_MS, positionMs)
             .putStringArrayListExtra(EXTRA_ALTERNATE_URLS, ArrayList(alternateUrls))
     }
 }
