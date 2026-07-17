@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
-import android.view.ViewGroup
 import android.view.ViewStub
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -73,7 +72,7 @@ class MainActivity : BaseLocaleActivity() {
 
     companion object {
         private const val HOME_RAIL_LIMIT_COMPACT = 12
-        private const val HERO_LIMIT_COMPACT = 5
+        private const val HERO_LIMIT_COMPACT = 1
         private const val HERO_LIMIT_TV = 6
     }
     private val api = XtreamApi()
@@ -393,28 +392,15 @@ class MainActivity : BaseLocaleActivity() {
         (value * resources.displayMetrics.density).toInt()
 
     private fun configureHeroLayout() {
-        val metrics = resources.displayMetrics
-        val heroHeight = when {
-            DeviceUi.isCompact(this) ->
-                (metrics.heightPixels * 0.48f).toInt().coerceIn(dp(260), dp(380))
-            DeviceUi.isTelevision(this) ->
-                (metrics.heightPixels * 0.42f).toInt().coerceIn(dp(260), dp(360))
-            else -> dp(220)
+        val heroHeight = if (DeviceUi.isCompact(this)) {
+            (resources.displayMetrics.heightPixels * 0.36f).toInt().coerceIn(dp(200), dp(300))
+        } else {
+            dp(220)
         }
-        val container = panelHome.findViewById<View>(R.id.heroContainer)
-        container?.layoutParams = container?.layoutParams?.apply { height = heroHeight }
-        container?.minimumHeight = heroHeight
-        heroImage.layoutParams = heroImage.layoutParams.apply {
-            height = ViewGroup.LayoutParams.MATCH_PARENT
-        }
-        panelHome.findViewById<View>(R.id.heroScrim)?.layoutParams =
-            panelHome.findViewById<View>(R.id.heroScrim)?.layoutParams?.apply {
-                height = ViewGroup.LayoutParams.MATCH_PARENT
-            }
-        if (DeviceUi.isTelevision(this)) {
-            heroPlot.maxLines = 3
-            heroTitle.maxLines = 2
-            heroPoster.visibility = View.VISIBLE
+        heroImage.layoutParams = heroImage.layoutParams.apply { height = heroHeight }
+        panelHome.findViewById<View>(R.id.heroContainer)?.minimumHeight = heroHeight
+        if (DeviceUi.isCompact(this)) {
+            headerDate.visibility = View.GONE
         }
     }
 
@@ -467,7 +453,7 @@ class MainActivity : BaseLocaleActivity() {
                 }
             },
             onOpen = { channel ->
-                if (currentPreviewChannel?.streamId == channel.streamId) {
+                if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
                     openFullscreen(channel)
                 } else {
                     selectChannelPreview(channel)
@@ -522,15 +508,12 @@ class MainActivity : BaseLocaleActivity() {
                 resetLivePreviewUi()
                 selectedLiveCategoryId = newId
                 (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
-                scrollLiveCategoryToSelection()
                 reloadChannels(
                     keepCategoryFocus = true,
                     autoPreviewFirst = !DeviceUi.isCompact(this),
                 )
             } catch (_: Exception) {
                 selectedLiveCategoryId = newId
-                (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
-                scrollLiveCategoryToSelection()
                 reloadChannels(
                     keepCategoryFocus = true,
                     autoPreviewFirst = !DeviceUi.isCompact(this),
@@ -621,7 +604,6 @@ class MainActivity : BaseLocaleActivity() {
             reloadChannels(keepCategoryFocus = true)
         }
         (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
-        scrollLiveCategoryToSelection()
         restoreLastChannel()
     }
 
@@ -732,7 +714,6 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun focusCategoryList() {
         stopLivePreview()
-        scrollLiveCategoryToSelection()
         TvNavHelper.focusItem(liveCategoryList, liveCategoryIndex())
     }
 
@@ -743,15 +724,6 @@ class MainActivity : BaseLocaleActivity() {
             ParentalControlStore.LOCK_CATEGORY_ID -> 2
             else -> liveCategories.indexOfFirst { it.id == selectedLiveCategoryId }
                 .takeIf { it >= 0 } ?: 0
-        }
-    }
-
-    private fun scrollLiveCategoryToSelection() {
-        if (!liveTabReady) return
-        val index = liveCategoryIndex()
-        liveCategoryList.post {
-            (liveCategoryList.layoutManager as? LinearLayoutManager)
-                ?.scrollToPositionWithOffset(index, 0)
         }
     }
 
@@ -816,10 +788,7 @@ class MainActivity : BaseLocaleActivity() {
                 stopHeroRotation()
                 livePreviewPaused = false
                 VolumeHelper.boostOnPlaybackStart(this)
-                livePanel().post {
-                    ensurePreviewPlayer()
-                    restoreLiveTabSession()
-                }
+                restoreLiveTabSession()
             }
             Tab.MOVIES, Tab.SERIES -> {
                 panelHome.visibility = View.GONE
@@ -1818,6 +1787,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun startHeroRotation() {
         heroHandler.removeCallbacks(heroRotateRunnable)
+        if (!DeviceUi.useDpadFocus(this)) return
         if (heroItems.size > 1 && currentTab == Tab.HOME) {
             heroHandler.postDelayed(heroRotateRunnable, 8000L)
         }
@@ -2442,15 +2412,14 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun schedulePreview(channel: LiveChannel) {
-        if (currentTab != Tab.LIVE || reloadingChannels) return
-        livePreviewPaused = false
+        if (currentTab != Tab.LIVE || livePreviewPaused || reloadingChannels) return
         withChannelAccess(channel) {
             schedulePreviewInternal(channel)
         }
     }
 
     private fun schedulePreviewInternal(channel: LiveChannel) {
-        if (currentTab != Tab.LIVE || reloadingChannels) return
+        if (currentTab != Tab.LIVE || livePreviewPaused || reloadingChannels) return
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val channelChanged = previewingStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) {
@@ -2518,14 +2487,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun previewChannel(channel: LiveChannel, token: Int) {
         if (token != previewToken || livePreviewPaused) return
         val profile = PlaylistRepository.profile ?: return
-        if (!ensurePreviewPlayer()) {
-            livePanel().post {
-                if (token == previewToken && !livePreviewPaused && ensurePreviewPlayer()) {
-                    previewChannel(channel, token)
-                }
-            }
-            return
-        }
+        if (!ensurePreviewPlayer()) return
         updatePreviewInfo(channel)
         if (!appSettings.autoplayPreview) {
             cancelMiniPreviewPlayback()
@@ -2657,12 +2619,7 @@ class MainActivity : BaseLocaleActivity() {
                 previewWorkingUrl?.let { add(it) }
             }
             addAll(candidates)
-        }.distinct().filter { it.isNotBlank() }
-        if (urls.isEmpty()) {
-            Toast.makeText(this, R.string.epg_unavailable, Toast.LENGTH_SHORT).show()
-            livePreviewPaused = false
-            return
-        }
+        }.distinct()
         PlaybackLauncher.play(
             context = this,
             request = PlaybackRequest(
@@ -2763,19 +2720,13 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (currentTab == Tab.HOME) {
-            if (heroItems.size > 1 && railPreviewItem == null) {
-                startHeroRotation()
-            }
-            if (shouldFocusHomeRailsOnResume && DeviceUi.useDpadFocus(this)) {
-                focusHeroOnStart()
-            }
+        if (currentTab == Tab.HOME && shouldFocusHomeRailsOnResume && DeviceUi.useDpadFocus(this)) {
+            focusHeroOnStart()
         } else if (currentTab == Tab.LIVE) {
             ensureLiveTabReady()
             livePreviewPaused = false
-            scrollLiveCategoryToSelection()
-            liveCategoryList.adapter?.let { (it as? CategoryAdapter)?.refreshSelection() }
             focusChannelAt(currentPreviewChannel)
+            liveCategoryList.adapter?.let { (it as? CategoryAdapter)?.refreshSelection() }
             if (appSettings.autoplayPreview && currentPreviewChannel != null) {
                 currentPreviewChannel?.let { schedulePreview(it) }
             }
