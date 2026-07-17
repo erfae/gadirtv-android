@@ -72,9 +72,7 @@ import com.gadir.tv.util.HostUtils
 import java.util.Date
 import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -183,13 +181,10 @@ class MainActivity : BaseLocaleActivity() {
     private var heroCarouselPaused = false
     private var heroRotateFirstTick = true
     private var catalogCategoryAdapter: CategoryAdapter? = null
-    private var heroPlotJob: Job? = null
     private var homeLoaded = false
     private var shouldFocusHomeRailsOnResume = true
     private var catalogLoadToken = 0
-    private var catalogCategoryFocusToken = 0
     private val catalogCategoryHandler = Handler(Looper.getMainLooper())
-    private var pendingCatalogCategory: Runnable? = null
     private var liveCategoryApplyToken = 0
     private val liveCategoryHandler = Handler(Looper.getMainLooper())
     private var pendingLiveCategory: Runnable? = null
@@ -205,7 +200,7 @@ class MainActivity : BaseLocaleActivity() {
     private val heroRotateRunnable = object : Runnable {
         override fun run() {
             if (currentTab == Tab.HOME && heroItems.size > 1 && railPreviewItem == null) {
-                advanceHeroCarousel(quickRotate = true)
+                advanceHeroCarousel()
                 heroRotateFirstTick = false
             }
             if (currentTab == Tab.HOME && heroItems.size > 1) {
@@ -243,7 +238,7 @@ class MainActivity : BaseLocaleActivity() {
         epgNow = panel.findViewById(R.id.epgNow)
         epgNext = panel.findViewById(R.id.epgNext)
         previewContainer = panel.findViewById(R.id.previewContainer)
-        if (!DeviceUi.isCompact(this)) {
+        if (DeviceUi.useDpadFocus(this)) {
             previewContainer?.isFocusable = false
             previewContainer?.isFocusableInTouchMode = false
             channelList.nextFocusRightId = View.NO_ID
@@ -375,7 +370,6 @@ class MainActivity : BaseLocaleActivity() {
                 if (hasFocus) {
                     railPreviewItem = null
                     heroCarouselPaused = false
-                    heroPlotJob?.cancel()
                     bindHero(heroItems.getOrNull(heroIndex) ?: return@setOnFocusChangeListener)
                     startHeroRotation()
                 }
@@ -421,10 +415,10 @@ class MainActivity : BaseLocaleActivity() {
     private fun configureHeroLayout() {
         val metrics = resources.displayMetrics
         val heroHeight = when {
-            DeviceUi.isCompact(this) ->
-                (metrics.heightPixels * 0.40f).toInt().coerceIn(dp(220), dp(320))
             DeviceUi.useDpadFocus(this) ->
                 (metrics.heightPixels * 0.45f).toInt().coerceIn(dp(280), dp(400))
+            DeviceUi.isCompact(this) ->
+                (metrics.heightPixels * 0.40f).toInt().coerceIn(dp(220), dp(320))
             else -> dp(220)
         }
         val container = panelHome.findViewById<View>(R.id.heroContainer)
@@ -433,7 +427,7 @@ class MainActivity : BaseLocaleActivity() {
         heroImage.layoutParams = heroImage.layoutParams.apply {
             height = ViewGroup.LayoutParams.MATCH_PARENT
         }
-        if (DeviceUi.isCompact(this)) {
+        if (!DeviceUi.useDpadFocus(this)) {
             headerDate.visibility = View.GONE
         } else {
             configureHeroPosterLayout()
@@ -499,20 +493,18 @@ class MainActivity : BaseLocaleActivity() {
         channelList.setItemViewCacheSize(24)
         channelAdapter = ChannelAdapter(
             items = channels,
-            onFocus = if (DeviceUi.isCompact(this)) {
-                { }
-            } else {
+            onFocus = if (DeviceUi.useDpadFocus(this)) {
                 { channel -> schedulePreview(channel) }
+            } else {
+                { }
             },
             onOpen = { channel ->
-                if (DeviceUi.isCompact(this)) {
-                    if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
-                        openFullscreen(channel)
-                    } else {
-                        selectChannelPreview(channel)
-                    }
-                } else {
+                if (DeviceUi.useDpadFocus(this)) {
                     openFullscreen(channel)
+                } else if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
+                    openFullscreen(channel)
+                } else {
+                    selectChannelPreview(channel)
                 }
             },
             onMoveLeft = { focusCategoryList() },
@@ -561,14 +553,14 @@ class MainActivity : BaseLocaleActivity() {
             scrollLiveCategoryToSelection()
             reloadChannels(
                 keepCategoryFocus = true,
-                autoPreviewFirst = !DeviceUi.isCompact(this),
+                autoPreviewFirst = DeviceUi.useDpadFocus(this),
             )
         } catch (_: Exception) {
             selectedLiveCategoryId = newId
             scrollLiveCategoryToSelection()
             reloadChannels(
                 keepCategoryFocus = true,
-                autoPreviewFirst = !DeviceUi.isCompact(this),
+                autoPreviewFirst = DeviceUi.useDpadFocus(this),
             )
         }
     }
@@ -622,10 +614,10 @@ class MainActivity : BaseLocaleActivity() {
             items = liveCategories,
             selectedId = { liveSelectedCategoryKey() },
             onClick = applyLiveCategory,
-            onFocus = if (DeviceUi.isCompact(this)) {
-                null
-            } else {
+            onFocus = if (DeviceUi.useDpadFocus(this)) {
                 applyLiveCategory
+            } else {
+                null
             },
             onMoveRight = { focusFirstChannel() },
             onMoveUp = { focusHeaderReload() },
@@ -666,7 +658,7 @@ class MainActivity : BaseLocaleActivity() {
         }
         channelList.scrollToPosition(index)
         TvNavHelper.focusItem(channelList, index)
-        if (!DeviceUi.isCompact(this)) {
+        if (DeviceUi.useDpadFocus(this)) {
             schedulePreviewAfterChannelFocus(index)
         }
     }
@@ -842,8 +834,6 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun openCatalogTabAtFirstGroup(tab: Tab) {
         catalogCategoryHandler.removeCallbacksAndMessages(null)
-        catalogCategoryFocusToken++
-        pendingCatalogCategory = null
         val cats = catalogCategoriesFor(tab)
         catalogCategories.clear()
         catalogCategories.addAll(cats)
@@ -860,20 +850,22 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun highlightCatalogCategory(tab: Tab, catId: String) {
         if (catId == selectedCatalogCategoryId) return
-        val oldIndex = catalogCategories.indexOfFirst { it.id == selectedCatalogCategoryId }
         selectedCatalogCategoryId = catId
         when (tab) {
             Tab.MOVIES -> movieCategoryId = catId
             Tab.SERIES -> seriesCategoryId = catId
             else -> Unit
         }
-        if (oldIndex >= 0) catalogCategoryAdapter?.notifyItemChanged(oldIndex)
-        val newIndex = catalogCategories.indexOfFirst { it.id == catId }
-        if (newIndex >= 0) catalogCategoryAdapter?.notifyItemChanged(newIndex)
+        catalogCategoryAdapter?.refreshSelection()
     }
 
     private fun enterCatalogTabFocus() {
-        panelCatalog.postDelayed({ focusCatalogAtIndex(0) }, 120L)
+        if (catalogCategories.isEmpty()) return
+        catalogCategoryList.post {
+            (catalogCategoryList.layoutManager as? LinearLayoutManager)
+                ?.scrollToPositionWithOffset(0, 0)
+            TvNavHelper.focusItem(catalogCategoryList, 0)
+        }
     }
 
     private fun focusCatalogCategoryList() {
@@ -901,10 +893,21 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun bindNavTab(view: View, tab: Tab) {
         view.setOnClickListener {
-            showTab(tab)
-            if (!DeviceUi.isCompact(this) && (tab == Tab.MOVIES || tab == Tab.SERIES)) {
-                enterCatalogTabFocus()
+            openTab(tab)
+        }
+        if (DeviceUi.useDpadFocus(this)) {
+            view.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus && currentTab != tab) {
+                    openTab(tab)
+                }
             }
+        }
+    }
+
+    private fun openTab(tab: Tab) {
+        showTab(tab)
+        if (DeviceUi.useDpadFocus(this) && (tab == Tab.MOVIES || tab == Tab.SERIES)) {
+            enterCatalogTabFocus()
         }
     }
 
@@ -947,12 +950,12 @@ class MainActivity : BaseLocaleActivity() {
                 livePanel().post {
                     if (currentTab != Tab.LIVE) return@post
                     ensurePreviewPlayer()
-                    if (!DeviceUi.isCompact(this)) {
+                    if (DeviceUi.useDpadFocus(this)) {
                         focusFirstLiveCategory()
                     } else {
                         restoreLiveTabSession()
                     }
-                    if (!DeviceUi.isCompact(this)) {
+                    if (DeviceUi.useDpadFocus(this)) {
                         val channel = currentPreviewChannel ?: channels.firstOrNull()
                         channel?.let { schedulePreview(it) }
                     }
@@ -969,7 +972,7 @@ class MainActivity : BaseLocaleActivity() {
                     setupCatalogTab(tab)
                     if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
                 }
-                if (!DeviceUi.isCompact(this)) {
+                if (DeviceUi.useDpadFocus(this)) {
                     openCatalogTabAtFirstGroup(tab)
                     enterCatalogTabFocus()
                 } else if (ready) {
@@ -1167,7 +1170,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun homeRailItemLimit(): Int =
-        if (DeviceUi.isCompact(this)) HOME_RAIL_LIMIT_COMPACT else Int.MAX_VALUE
+        if (DeviceUi.useDpadFocus(this)) Int.MAX_VALUE else HOME_RAIL_LIMIT_COMPACT
 
     private fun populateHeroItems() {
         val heroLimit = heroItemLimit()
@@ -1242,7 +1245,7 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun advanceHeroCarousel(quickRotate: Boolean = false) {
+    private fun advanceHeroCarousel() {
         if (heroItems.size <= 1) return
         var next = heroIndex
         repeat(8) {
@@ -1250,26 +1253,11 @@ class MainActivity : BaseLocaleActivity() {
             if (next != heroIndex || heroItems.size == 1) return@repeat
         }
         heroIndex = next
-        bindHero(heroItems[heroIndex], quickRotate = quickRotate)
-        if (quickRotate) {
-            scheduleHeroPlotLoad()
-        }
-    }
-
-    private fun scheduleHeroPlotLoad() {
-        heroPlotJob?.cancel()
-        val index = heroIndex
-        val item = heroItems.getOrNull(index) ?: return
-        heroPlotJob = lifecycleScope.launch {
-            delay(1200L)
-            if (heroIndex == index && currentTab == Tab.HOME && railPreviewItem == null) {
-                bindHero(item, quickRotate = false)
-            }
-        }
+        bindHero(heroItems[heroIndex])
     }
 
     private fun heroItemLimit(): Int =
-        if (DeviceUi.isCompact(this)) HERO_LIMIT_COMPACT else HERO_LIMIT_TV
+        if (DeviceUi.useDpadFocus(this)) HERO_LIMIT_TV else HERO_LIMIT_COMPACT
 
     private fun applyHomeDataInternal(movies: List<VodMovie>, series: List<SeriesItem>) {
         val railLimit = homeRailItemLimit()
@@ -1301,7 +1289,7 @@ class MainActivity : BaseLocaleActivity() {
         }
 
         buildFavoriteItems()
-        if (DeviceUi.isCompact(this)) {
+        if (!DeviceUi.useDpadFocus(this)) {
             while (favoriteItems.size > railLimit) favoriteItems.removeAt(favoriteItems.lastIndex)
         }
 
@@ -1543,14 +1531,12 @@ class MainActivity : BaseLocaleActivity() {
         list.adapter = HomeRailAdapter(
             items = items,
             onClick = { item -> onHomeRailClick(item) },
-            onFocus = if (DeviceUi.isCompact(this)) {
-                null
-            } else {
+            onFocus = if (DeviceUi.useDpadFocus(this)) {
                 { item -> previewHomeRailItem(item) }
-            },
-            onBlur = if (DeviceUi.isCompact(this)) {
-                null
             } else {
+                null
+            },
+            onBlur = if (DeviceUi.useDpadFocus(this)) {
                 {
                     railPreviewItem = null
                     heroCarouselPaused = false
@@ -1561,6 +1547,8 @@ class MainActivity : BaseLocaleActivity() {
                         }
                     }
                 }
+            } else {
+                null
             },
             onToggleFavorite = { item -> toggleHomeFavorite(item) },
             isFavorite = { item -> isHomeFavorite(item) },
@@ -1874,18 +1862,14 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun bindHero(item: HeroItem, quickRotate: Boolean = false) {
-        if (!quickRotate) {
-            heroPlotRequestId += 1
-        }
+    private fun bindHero(item: HeroItem) {
+        heroPlotRequestId += 1
         val requestId = heroPlotRequestId
         val backdropRequestId = ++heroBackdropRequestId
 
         heroTitle.text = item.title
-        if (!quickRotate) {
-            heroSubtitle.text = ""
-            heroPlot.text = getString(R.string.hero_plot_empty)
-        }
+        heroSubtitle.text = ""
+        heroPlot.text = getString(R.string.hero_plot_empty)
 
         when (item) {
             is HeroItem.Movie -> {
@@ -1898,7 +1882,7 @@ class MainActivity : BaseLocaleActivity() {
                     kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
                     backdropRequestId = backdropRequestId,
                 )
-                if (DeviceUi.useDpadFocus(this) && !quickRotate) {
+                if (DeviceUi.useDpadFocus(this)) {
                     loadMoviePlot(item.movie.streamId, requestId, backdropRequestId)
                 }
             }
@@ -1912,7 +1896,7 @@ class MainActivity : BaseLocaleActivity() {
                     kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
                     backdropRequestId = backdropRequestId,
                 )
-                if (DeviceUi.useDpadFocus(this) && !quickRotate) {
+                if (DeviceUi.useDpadFocus(this)) {
                     loadSeriesPlot(item.series.seriesId, requestId, backdropRequestId)
                 }
             }
@@ -1933,10 +1917,8 @@ class MainActivity : BaseLocaleActivity() {
                     kind = item.item.kind,
                     backdropRequestId = backdropRequestId,
                 )
-                if (!quickRotate) {
-                    heroSubtitle.text = item.item.subtitle
-                }
-                if (DeviceUi.useDpadFocus(this) && !quickRotate) {
+                heroSubtitle.text = item.item.subtitle
+                if (DeviceUi.useDpadFocus(this)) {
                     when (item.item.kind) {
                         HomeRailAdapter.HomeRailItem.KIND_MOVIE ->
                             loadMoviePlot(item.item.id, requestId, backdropRequestId)
@@ -1978,7 +1960,7 @@ class MainActivity : BaseLocaleActivity() {
     ) {
         val fallbacks = heroImageFallbacks(url, contentId, kind)
         if (fallbacks.isEmpty()) return
-        if (DeviceUi.isCompact(this)) {
+        if (!DeviceUi.useDpadFocus(this)) {
             val dm = resources.displayMetrics
             val width = dm.widthPixels.coerceAtMost(720)
             val height = heroImage.layoutParams.height.takeIf { it > 0 }
@@ -2163,10 +2145,10 @@ class MainActivity : BaseLocaleActivity() {
             Tab.SERIES -> seriesCategoryId
             else -> null
         }
-        selectedCatalogCategoryId = if (DeviceUi.isCompact(this)) {
-            savedId?.takeIf { id -> cats.any { it.id == id } } ?: cats.firstOrNull()?.id
-        } else {
+        selectedCatalogCategoryId = if (DeviceUi.useDpadFocus(this)) {
             cats.firstOrNull()?.id
+        } else {
+            savedId?.takeIf { id -> cats.any { it.id == id } } ?: cats.firstOrNull()?.id
         }
         posterItems.clear()
         catalogGrid.adapter = PosterAdapter(
@@ -2232,7 +2214,6 @@ class MainActivity : BaseLocaleActivity() {
     private fun bindCatalogCategoryAdapter(tab: Tab) {
         val applyCategory: (Category) -> Unit = { cat ->
             catalogCategoryHandler.removeCallbacksAndMessages(null)
-            catalogCategoryFocusToken++
             highlightCatalogCategory(tab, cat.id)
             loadCatalogItems(tab, cat.id)
         }
@@ -2241,10 +2222,10 @@ class MainActivity : BaseLocaleActivity() {
             items = catalogCategories,
             selectedId = { selectedCatalogCategoryId },
             onClick = applyCategory,
-            onFocus = if (DeviceUi.isCompact(this)) {
-                null
+            onFocus = if (DeviceUi.useDpadFocus(this)) {
+                applyCategory
             } else {
-                { cat -> scheduleCatalogCategoryApply(tab, cat) }
+                null
             },
             onMoveRight = { focusFirstCatalogItem() },
             onMoveUp = { focusHeaderReload() },
@@ -2254,22 +2235,8 @@ class MainActivity : BaseLocaleActivity() {
         catalogCategoryList.nextFocusUpId = R.id.btnReload
     }
 
-    private fun scheduleCatalogCategoryApply(tab: Tab, cat: Category) {
-        highlightCatalogCategory(tab, cat.id)
-        catalogCategoryFocusToken++
-        val token = catalogCategoryFocusToken
-        pendingCatalogCategory?.let { catalogCategoryHandler.removeCallbacks(it) }
-        val task = Runnable {
-            if (token != catalogCategoryFocusToken || currentTab != tab) return@Runnable
-            if (selectedCatalogCategoryId != cat.id) return@Runnable
-            loadCatalogItems(tab, cat.id)
-        }
-        pendingCatalogCategory = task
-        catalogCategoryHandler.postDelayed(task, 200L)
-    }
-
     private fun configureCatalogGrid() {
-        val span = if (DeviceUi.isCompact(this)) 3 else 5
+        val span = if (DeviceUi.useDpadFocus(this)) 5 else 3
         catalogGrid.layoutManager = GridLayoutManager(this, span)
     }
 
@@ -2700,7 +2667,7 @@ class MainActivity : BaseLocaleActivity() {
                     if (channels.isEmpty()) return@post
                     val previewIndex = 0
                     channelList.scrollToPosition(previewIndex)
-                    if (autoPreviewFirst && !DeviceUi.isCompact(this@MainActivity)) {
+                    if (autoPreviewFirst && DeviceUi.useDpadFocus(this@MainActivity)) {
                         TvNavHelper.focusItem(channelList, previewIndex)
                     }
                     schedulePreviewAfterChannelFocus(previewIndex)
@@ -3136,7 +3103,7 @@ class MainActivity : BaseLocaleActivity() {
         } else if (currentTab == Tab.LIVE) {
             ensureLiveTabReady()
             livePreviewPaused = false
-            if (!DeviceUi.isCompact(this)) {
+            if (DeviceUi.useDpadFocus(this)) {
                 focusFirstLiveCategory()
             } else {
                 focusChannelAt(currentPreviewChannel)
@@ -3145,8 +3112,9 @@ class MainActivity : BaseLocaleActivity() {
                 currentPreviewChannel?.let { schedulePreview(it) }
             }
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
-            if (!DeviceUi.isCompact(this)) {
+            if (DeviceUi.useDpadFocus(this)) {
                 openCatalogTabAtFirstGroup(currentTab)
+                enterCatalogTabFocus()
             } else {
                 refreshCatalogResumeCategory(currentTab)
             }
@@ -3156,7 +3124,6 @@ class MainActivity : BaseLocaleActivity() {
     override fun onDestroy() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingLiveCategory?.let { liveCategoryHandler.removeCallbacks(it) }
-        pendingCatalogCategory?.let { catalogCategoryHandler.removeCallbacks(it) }
         clockHandler.removeCallbacks(clockRunnable)
         miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
         stopHeroRotation()

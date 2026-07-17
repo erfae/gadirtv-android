@@ -7,8 +7,12 @@ object DeviceUi {
     fun isCompact(context: Context): Boolean =
         context.resources.configuration.smallestScreenWidthDp < 600
 
+    /** True on Android TV / TV boxes even when smallestScreenWidthDp is under 600. */
+    fun isTvUi(context: Context): Boolean =
+        isTelevision(context) || !isCompact(context)
+
     /** D-pad / TV: onFocus handlers are safe. Touch devices must use onClick only. */
-    fun useDpadFocus(context: Context): Boolean = !isCompact(context)
+    fun useDpadFocus(context: Context): Boolean = isTvUi(context)
 
     fun isLandscape(context: Context): Boolean =
         context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
