@@ -8,33 +8,50 @@ import java.util.Locale
 import java.util.TimeZone
 
 object HeaderClockHelper {
-    fun formatTime(context: Context, now: Date = Date()): String =
-        DateFormat.getTimeFormat(context).format(now)
+    fun formatTime(context: Context, now: Date = Date()): String {
+        val locale = Locale.getDefault()
+        val pattern = when (locale.language.lowercase(Locale.ROOT)) {
+            "es" -> "HH:mm"
+            else -> DateFormat.getBestDateTimePattern(locale, "HH:mm")
+        }
+        return SimpleDateFormat(pattern, locale).apply {
+            timeZone = TimeZone.getDefault()
+        }.format(now)
+    }
 
     fun formatDate(context: Context, now: Date = Date()): String {
         val locale = Locale.getDefault()
         val pattern = when (locale.language.lowercase(Locale.ROOT)) {
-            "es" -> "d 'de' MMMM yyyy"
-            else -> DateFormat.getBestDateTimePattern(locale, "d MMMM yyyy")
+            "es" -> "EEEE, d 'de' MMMM 'de' yyyy"
+            else -> DateFormat.getBestDateTimePattern(locale, "EEEE, d MMMM yyyy")
         }
         val formatted = SimpleDateFormat(pattern, locale).apply {
             timeZone = TimeZone.getDefault()
         }.format(now)
         return if (locale.language.equals("es", ignoreCase = true)) {
-            capitalizeSpanishMonth(formatted)
+            capitalizeSpanishDate(formatted)
         } else {
             formatted
         }
     }
 
-    private fun capitalizeSpanishMonth(text: String): String {
+    private fun capitalizeSpanishDate(text: String): String {
         val parts = text.split(" de ")
-        if (parts.size < 2) return text
-        val month = parts[1].trim()
-        if (month.isEmpty()) return text
-        val capitalizedMonth = month.replaceFirstChar { ch ->
+        if (parts.isEmpty()) return text
+        val weekday = parts[0].trim().replaceFirstChar { ch ->
             if (ch.isLowerCase()) ch.titlecase(locale = Locale.getDefault()) else ch.toString()
         }
-        return "${parts[0]} de $capitalizedMonth"
+        if (parts.size == 1) return weekday
+        val day = parts[1].trim()
+        if (parts.size == 2) return "$weekday, $day"
+        val month = parts[2].trim().replaceFirstChar { ch ->
+            if (ch.isLowerCase()) ch.titlecase(locale = Locale.getDefault()) else ch.toString()
+        }
+        val year = parts.getOrNull(3)?.trim().orEmpty()
+        return if (year.isNotEmpty()) {
+            "$weekday, $day de $month de $year"
+        } else {
+            "$weekday, $day de $month"
+        }
     }
 }

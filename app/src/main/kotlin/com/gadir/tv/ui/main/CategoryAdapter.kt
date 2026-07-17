@@ -35,11 +35,14 @@ class CategoryAdapter(
         val active = isSelected(item)
 
         holder.name.text = item.name
-        holder.itemView.isSelected = active || holder.itemView.hasFocus()
+        holder.itemView.isSelected = active
 
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             view.isSelected = isSelected(item) || hasFocus
-            if (!hasFocus) return@setOnFocusChangeListener
+            if (!hasFocus) {
+                view.isSelected = isSelected(item)
+                return@setOnFocusChangeListener
+            }
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
             onFocus?.invoke(items[pos])
@@ -48,6 +51,7 @@ class CategoryAdapter(
         holder.itemView.setOnClickListener {
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
+            holder.itemView.requestFocus()
             onClick(items[pos])
         }
 
