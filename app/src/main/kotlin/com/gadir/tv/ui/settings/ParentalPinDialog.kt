@@ -8,6 +8,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.gadir.tv.R
 import com.gadir.tv.data.ParentalControlStore
+import com.gadir.tv.util.PinInputHelper
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -25,6 +26,7 @@ object ParentalPinDialog {
         view.findViewById<TextView>(R.id.parentalPinMessage).text = message
         val input = view.findViewById<TextInputEditText>(R.id.parentalPinInput)
         val layout = view.findViewById<TextInputLayout>(R.id.parentalPinLayout)
+        PinInputHelper.applyMask(input)
 
         val dialog = MaterialAlertDialogBuilder(context)
             .setTitle(R.string.parental_pin_title)

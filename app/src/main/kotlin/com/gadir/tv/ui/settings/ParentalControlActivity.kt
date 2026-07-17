@@ -10,6 +10,7 @@ import com.gadir.tv.data.ParentalSession
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.util.TvFocusHelper
+import com.gadir.tv.util.PinInputHelper
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 
@@ -38,6 +39,8 @@ class ParentalControlActivity : BaseLocaleActivity() {
         currentPinLayout = findViewById(R.id.parentalCurrentPinLayout)
         newPinLayout = findViewById(R.id.parentalNewPinLayout)
         confirmPinLayout = findViewById(R.id.parentalConfirmPinLayout)
+
+        listOf(currentPinInput, newPinInput, confirmPinInput).forEach { PinInputHelper.applyMask(it) }
 
         TvFocusHelper.bindButton(findViewById(R.id.btnParentalBack)) { finish() }
         TvFocusHelper.bindButton(findViewById(R.id.btnSaveParentalPin)) { changePin() }
