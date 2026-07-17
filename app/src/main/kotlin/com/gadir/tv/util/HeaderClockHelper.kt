@@ -8,8 +8,22 @@ import java.util.Locale
 import java.util.TimeZone
 
 object HeaderClockHelper {
-    fun formatTime(context: Context, now: Date = Date()): String =
-        DateFormat.getTimeFormat(context).format(now)
+    fun formatTime(context: Context, now: Date = Date()): String {
+        val time = DateFormat.getTimeFormat(context).format(now)
+        val date = formatDateShort(context, now)
+        return if (date.isBlank()) time else "$time  ·  $date"
+    }
+
+    fun formatDateShort(context: Context, now: Date = Date()): String {
+        val locale = Locale.getDefault()
+        val pattern = when (locale.language.lowercase(Locale.ROOT)) {
+            "es" -> "EEE d MMM"
+            else -> DateFormat.getBestDateTimePattern(locale, "EEE d MMM")
+        }
+        return SimpleDateFormat(pattern, locale).apply {
+            timeZone = TimeZone.getDefault()
+        }.format(now)
+    }
 
     fun formatDate(context: Context, now: Date = Date()): String {
         val locale = Locale.getDefault()

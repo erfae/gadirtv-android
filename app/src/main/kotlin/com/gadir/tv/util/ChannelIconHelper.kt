@@ -64,6 +64,12 @@ object ChannelIconHelper {
                 add("$base/images/$slug.png")
                 add("$base/logos/$slug.png")
             }
+            slugVariants(channelName).forEach { variant ->
+                add("$base/images/$variant.png")
+                add("$base/images/$variant.jpg")
+                add("$base/logos/$variant.png")
+                add("$base/imgs/$variant.png")
+            }
             if (epgChannelId.isNotBlank()) {
                 val epg = encode(epgChannelId)
                 add("$base/images/$epg.png")
@@ -77,6 +83,18 @@ object ChannelIconHelper {
         name.lowercase()
             .replace(Regex("[^a-z0-9]+"), "")
             .take(48)
+
+    private fun slugVariants(name: String): List<String> = buildList {
+        val base = slugify(name)
+        if (base.isNotBlank()) add(base)
+        val compact = name.lowercase().replace(Regex("[^a-z0-9]"), "")
+        if (compact.isNotBlank() && compact != base) add(compact)
+        val dashed = name.lowercase()
+            .trim()
+            .replace(Regex("\\s+"), "-")
+            .replace(Regex("[^a-z0-9-]"), "")
+        if (dashed.isNotBlank() && dashed !in this) add(dashed)
+    }
 
     private fun looksLikeImage(url: String): Boolean {
         val lower = url.lowercase()

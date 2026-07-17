@@ -21,6 +21,7 @@ import com.gadir.tv.model.EpgEntry
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.player.LiveChannelNavigator
 import com.gadir.tv.player.LiveStreamUrls
+import com.gadir.tv.util.EpgFormatter
 import com.gadir.tv.util.VolumeHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -100,6 +101,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         playUrl(url)
         VolumeHelper.boostOnPlaybackStart(this)
 
+        showOverlaysOnPlaybackStart()
+
         findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
             VolumeHelper.adjust(this, raise = true)
             showOverlays()
@@ -108,8 +111,6 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             VolumeHelper.adjust(this, raise = false)
             showOverlays()
         }
-
-        hideOverlays()
     }
 
     private fun loadLiveEpg(streamId: Int, epgChannelId: String = "") {
@@ -124,7 +125,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         epgNowView.visibility = View.VISIBLE
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {
-                api.shortEpg(profile, streamId, epgChannelId = epgChannelId, limit = 4)
+                api.shortEpg(profile, streamId, epgChannelId = epgChannelId, limit = 8)
             }
             if (streamId != currentStreamId) return@launch
             applyLiveEpg(epg)
@@ -137,19 +138,19 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             epgNextView.visibility = View.GONE
             return
         }
-        val now = System.currentTimeMillis() / 1000L
-        val currentIndex = epg.indexOfFirst { entry ->
-            entry.start > 0L && entry.end > 0L && now >= entry.start && now < entry.end
-        }.takeIf { it >= 0 } ?: 0
+        val currentIndex = EpgFormatter.currentIndex(epg)
         val current = epg[currentIndex]
-        epgNowView.text = getString(R.string.epg_now) + ": " + current.title
+        epgNowView.text = EpgFormatter.formatNowLine(this, current)
         epgNowView.visibility = View.VISIBLE
         val next = epg.getOrNull(currentIndex + 1)
         if (next != null) {
-            epgNextView.text = getString(R.string.epg_next) + ": " + next.title
+            epgNextView.text = EpgFormatter.formatNextLine(this, next)
             epgNextView.visibility = View.VISIBLE
         } else {
             epgNextView.visibility = View.GONE
+        }
+        if (overlaysVisible) {
+            findViewById<View>(R.id.vlcOverlay).visibility = View.VISIBLE
         }
     }
 
@@ -308,8 +309,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_EPG_CHANNEL_ID = "epg_channel_id"
         private const val EXTRA_POSITION_MS = "position_ms"
         private const val VLC_VOLUME = com.gadir.tv.player.VlcAudioOptions.VOLUME_FULLSCREEN
-        private const val CONTROLS_HIDE_MS = 8_000L
-        private const val CONTROLS_HIDE_ON_START_MS = 15_000L
+        private const val CONTROLS_HIDE_MS = 10_000L
+        private const val CONTROLS_HIDE_ON_START_MS = 20_000L
 
         fun intent(
             context: Context,
