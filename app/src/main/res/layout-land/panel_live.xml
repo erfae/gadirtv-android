@@ -7,7 +7,7 @@
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/categoryList"
-        android:layout_width="100dp"
+        android:layout_width="152dp"
         android:layout_height="match_parent"
         android:clipToPadding="false"
         android:descendantFocusability="afterDescendants"
@@ -41,7 +41,7 @@
         android:id="@+id/previewContainer"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="1.15"
+        android:layout_weight="0.95"
         android:background="@drawable/preview_focus_bg"
         android:clickable="true"
         android:descendantFocusability="blocksDescendants"
