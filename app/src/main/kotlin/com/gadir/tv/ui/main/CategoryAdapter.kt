@@ -11,7 +11,7 @@ import com.gadir.tv.model.Category
 
 class CategoryAdapter(
     private val items: List<Category>,
-    private val selectedId: () -> String?,
+    private val selectedId: () -> String? = { null },
     private val onClick: (Category) -> Unit,
     private val onFocus: ((Category) -> Unit)? = null,
     private val onMoveRight: (() -> Unit)? = null,
@@ -19,8 +19,6 @@ class CategoryAdapter(
     private val onMoveUp: (() -> Unit)? = null,
     private val onMoveDown: (() -> Unit)? = null,
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
-
-    private var lastSelectedIndex: Int = RecyclerView.NO_POSITION
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
         val name: TextView = view.findViewById(R.id.categoryName)
@@ -34,18 +32,14 @@ class CategoryAdapter(
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val item = items[position]
-        val active = isSelected(item)
 
         holder.name.text = item.name
-        holder.itemView.isSelected = active
+        holder.itemView.isSelected = false
 
-        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
-            if (hasFocus) {
-                onFocus?.invoke(items[pos])
-            }
-            view.isSelected = isSelected(items[pos])
+            if (hasFocus) onFocus?.invoke(items[pos])
         }
 
         holder.itemView.setOnClickListener {
@@ -95,34 +89,6 @@ class CategoryAdapter(
                 else -> false
             }
         }
-    }
-
-    private fun isSelected(item: Category): Boolean {
-        val selected = selectedId()
-        return when {
-            selected == null -> item.id.isEmpty()
-            else -> item.id == selected || (item.id.isEmpty() && selected.isEmpty())
-        }
-    }
-
-    private fun selectedIndex(): Int = items.indexOfFirst { isSelected(it) }
-
-    fun refreshSelection() {
-        val newIndex = selectedIndex()
-        if (lastSelectedIndex in items.indices && lastSelectedIndex != newIndex) {
-            notifyItemChanged(lastSelectedIndex)
-        }
-        if (newIndex in items.indices) {
-            notifyItemChanged(newIndex)
-        }
-        lastSelectedIndex = newIndex
-    }
-
-    fun refreshSelectionAt(vararg positions: Int) {
-        positions.distinct().forEach { pos ->
-            if (pos in items.indices) notifyItemChanged(pos)
-        }
-        lastSelectedIndex = selectedIndex()
     }
 
     override fun getItemCount(): Int = items.size
