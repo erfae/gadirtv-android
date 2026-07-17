@@ -25,7 +25,7 @@ object ImageLoader {
 
     private val channelOptions = RequestOptions()
         .diskCacheStrategy(DiskCacheStrategy.ALL)
-        .override(128, 128)
+        .override(96, 96)
         .centerInside()
         .placeholder(R.drawable.tv_banner)
         .error(R.drawable.tv_banner)

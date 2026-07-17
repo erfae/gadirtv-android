@@ -8,23 +8,43 @@ import java.net.URLEncoder
 
 object ChannelIconHelper {
     fun load(target: ImageView, channel: LiveChannel) {
-        val fallbacks = panelFallbackUrls(PlaylistRepository.profile, channel.streamId)
+        val fallbacks = panelFallbackUrls(PlaylistRepository.profile, channel)
         ImageLoader.loadChannelIcon(target, channel.icon, fallbacks)
     }
 
-    fun panelFallbackUrls(profile: Profile?, streamId: Int): List<String> {
+    fun panelFallbackUrls(profile: Profile?, channel: LiveChannel): List<String> {
+        if (profile == null || channel.streamId <= 0) return emptyList()
+        return panelFallbackUrls(profile, channel.streamId, channel.icon, channel.epgChannelId)
+    }
+
+    fun panelFallbackUrls(
+        profile: Profile?,
+        streamId: Int,
+        icon: String = "",
+        epgChannelId: String = "",
+    ): List<String> {
         if (profile == null || streamId <= 0) return emptyList()
-        val base = HostUtils.baseUrl(profile.host)
+        val base = HostUtils.baseUrl(profile.host).trimEnd('/')
         val user = encode(profile.username)
         val pass = encode(profile.password)
-        return listOf(
-            "$base/images/$streamId.png",
-            "$base/images/$streamId.jpg",
-            "$base/streaming/images/$streamId.png",
-            "$base/streaming/images/$streamId.jpg",
-            "$base/live/$user/$pass/$streamId.png",
-            "$base/live/$user/$pass/$streamId.jpg",
-        )
+        return buildList {
+            val resolvedIcon = ImageUrlResolver.resolve(icon)
+            if (resolvedIcon.isNotBlank()) add(resolvedIcon)
+            add("$base/images/$streamId.png")
+            add("$base/images/$streamId.jpg")
+            add("$base/images/$streamId.jpeg")
+            add("$base/images/$streamId.webp")
+            add("$base/streaming/images/$streamId.png")
+            add("$base/streaming/images/$streamId.jpg")
+            add("$base/live/$user/$pass/$streamId.png")
+            add("$base/live/$user/$pass/$streamId.jpg")
+            add("$base/live/$user/$pass/$streamId.ts.png")
+            if (epgChannelId.isNotBlank()) {
+                val epg = encode(epgChannelId)
+                add("$base/images/$epg.png")
+                add("$base/images/$epg.jpg")
+            }
+        }.distinct().filter { it.isNotBlank() }
     }
 
     private fun encode(value: String): String =
