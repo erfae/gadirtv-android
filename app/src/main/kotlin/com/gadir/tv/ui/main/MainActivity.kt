@@ -70,6 +70,7 @@ import com.gadir.tv.util.VolumeHelper
 import com.gadir.tv.util.HeaderClockHelper
 import com.gadir.tv.util.HostUtils
 import java.util.Date
+import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -81,7 +82,7 @@ class MainActivity : BaseLocaleActivity() {
         private const val HOME_RAIL_LIMIT_COMPACT = 12
         private const val HERO_LIMIT_COMPACT = 1
         private const val HERO_LIMIT_TV = 8
-        private const val HERO_ROTATE_MS = 8000L
+        private const val HERO_ROTATE_MS = 5000L
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -196,10 +197,8 @@ class MainActivity : BaseLocaleActivity() {
     private val heroHandler = Handler(Looper.getMainLooper())
     private val heroRotateRunnable = object : Runnable {
         override fun run() {
-            if (currentTab != Tab.HOME) return
-            if (railPreviewItem == null && heroItems.size > 1) {
-                heroIndex = (heroIndex + 1) % heroItems.size
-                bindHero(heroItems[heroIndex])
+            if (currentTab == Tab.HOME && heroItems.size > 1 && railPreviewItem == null) {
+                advanceHeroCarousel()
             }
             if (currentTab == Tab.HOME && heroItems.size > 1) {
                 heroHandler.postDelayed(this, HERO_ROTATE_MS)
@@ -812,8 +811,26 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun focusFirstCatalogCategory() {
         catalogCategoryList.post {
+            (catalogCategoryList.layoutManager as? LinearLayoutManager)
+                ?.scrollToPositionWithOffset(0, 0)
             TvNavHelper.focusItem(catalogCategoryList, 0)
         }
+    }
+
+    private fun openCatalogTabAtFirstGroup(tab: Tab) {
+        val cats = catalogCategoriesFor(tab)
+        catalogCategories.clear()
+        catalogCategories.addAll(cats)
+        val firstId = cats.firstOrNull()?.id
+        selectedCatalogCategoryId = firstId
+        when (tab) {
+            Tab.MOVIES -> movieCategoryId = firstId
+            Tab.SERIES -> seriesCategoryId = firstId
+            else -> Unit
+        }
+        bindCatalogCategoryAdapter(tab)
+        firstId?.let { loadCatalogItems(tab, it) }
+        focusFirstCatalogCategory()
     }
 
     private fun focusCatalogCategoryList() {
@@ -867,7 +884,9 @@ class MainActivity : BaseLocaleActivity() {
                         }
                     }
                 } else {
+                    railPreviewItem = null
                     startHeroRotation()
+                    if (DeviceUi.useDpadFocus(this)) focusHeroOnStart()
                 }
             }
             Tab.LIVE -> {
@@ -900,6 +919,8 @@ class MainActivity : BaseLocaleActivity() {
                 if (!ready) {
                     setupCatalogTab(tab)
                     if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
+                } else if (!DeviceUi.isCompact(this)) {
+                    openCatalogTabAtFirstGroup(tab)
                 } else {
                     restoreCatalogTab(tab)
                 }
@@ -1101,8 +1122,23 @@ class MainActivity : BaseLocaleActivity() {
         if (DeviceUi.isCompact(this)) HOME_RAIL_LIMIT_COMPACT else Int.MAX_VALUE
 
     private fun populateHeroItems() {
-        recentMovies.forEach { movie -> heroItems.add(HeroItem.Rail(movie)) }
-        recentSeries.forEach { series -> heroItems.add(HeroItem.Rail(series)) }
+        val pool = buildList {
+            recentMovies.forEach { add(HeroItem.Rail(it)) }
+            recentSeries.forEach { add(HeroItem.Rail(it)) }
+        }
+        val limit = (heroItemLimit() * 2).coerceAtMost(pool.size)
+        heroItems.addAll(pool.shuffled().take(limit))
+    }
+
+    private fun advanceHeroCarousel() {
+        if (heroItems.size <= 1) return
+        var next = heroIndex
+        repeat(8) {
+            next = Random.nextInt(heroItems.size)
+            if (next != heroIndex || heroItems.size == 1) return@repeat
+        }
+        heroIndex = next
+        bindHero(heroItems[heroIndex])
     }
 
     private fun heroItemLimit(): Int =
@@ -1981,8 +2017,11 @@ class MainActivity : BaseLocaleActivity() {
             Tab.SERIES -> seriesCategoryId
             else -> null
         }
-        selectedCatalogCategoryId = savedId?.takeIf { id -> cats.any { it.id == id } }
-            ?: cats.firstOrNull()?.id
+        selectedCatalogCategoryId = if (DeviceUi.isCompact(this)) {
+            savedId?.takeIf { id -> cats.any { it.id == id } } ?: cats.firstOrNull()?.id
+        } else {
+            cats.firstOrNull()?.id
+        }
         posterItems.clear()
         catalogGrid.adapter = PosterAdapter(
             items = posterItems,
@@ -2966,9 +3005,10 @@ class MainActivity : BaseLocaleActivity() {
                 currentPreviewChannel?.let { schedulePreview(it) }
             }
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
-            refreshCatalogResumeCategory(currentTab)
             if (!DeviceUi.isCompact(this)) {
-                panelCatalog.post { focusFirstCatalogCategory() }
+                openCatalogTabAtFirstGroup(currentTab)
+            } else {
+                refreshCatalogResumeCategory(currentTab)
             }
         }
     }
