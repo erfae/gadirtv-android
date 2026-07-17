@@ -1,12 +1,13 @@
 package com.gadir.tv.ui.main
 
 import android.content.Intent
-import android.view.Gravity
 import android.view.KeyEvent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewStub
 import android.widget.FrameLayout
 import android.widget.ImageButton
@@ -394,13 +395,20 @@ class MainActivity : BaseLocaleActivity() {
         (value * resources.displayMetrics.density).toInt()
 
     private fun configureHeroLayout() {
-        val heroHeight = if (DeviceUi.isCompact(this)) {
-            (resources.displayMetrics.heightPixels * 0.36f).toInt().coerceIn(dp(200), dp(300))
-        } else {
-            dp(220)
+        val metrics = resources.displayMetrics
+        val heroHeight = when {
+            DeviceUi.isCompact(this) ->
+                (metrics.heightPixels * 0.40f).toInt().coerceIn(dp(220), dp(320))
+            DeviceUi.isTelevision(this) ->
+                (metrics.heightPixels * 0.45f).toInt().coerceIn(dp(280), dp(400))
+            else -> dp(220)
         }
-        heroImage.layoutParams = heroImage.layoutParams.apply { height = heroHeight }
-        panelHome.findViewById<View>(R.id.heroContainer)?.minimumHeight = heroHeight
+        val container = panelHome.findViewById<View>(R.id.heroContainer)
+        container?.layoutParams = container?.layoutParams?.apply { height = heroHeight }
+        container?.minimumHeight = heroHeight
+        heroImage.layoutParams = heroImage.layoutParams.apply {
+            height = ViewGroup.LayoutParams.MATCH_PARENT
+        }
         if (DeviceUi.isCompact(this)) {
             headerDate.visibility = View.GONE
         } else {
@@ -409,14 +417,14 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun configureHeroPosterLayout() {
-        val posterWidth = dp(96)
-        val posterHeight = dp(140)
+        val posterWidth = dp(100)
+        val posterHeight = dp(145)
         val params = (heroPoster.layoutParams as? FrameLayout.LayoutParams)
             ?: FrameLayout.LayoutParams(posterWidth, posterHeight)
         params.width = posterWidth
         params.height = posterHeight
         params.gravity = Gravity.END or Gravity.CENTER_VERTICAL
-        params.marginEnd = dp(20)
+        params.marginEnd = dp(24)
         heroPoster.layoutParams = params
     }
 
@@ -469,7 +477,15 @@ class MainActivity : BaseLocaleActivity() {
                 }
             },
             onOpen = { channel ->
-                if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
+                if (DeviceUi.isCompact(this)) {
+                    if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
+                        openFullscreen(channel)
+                    } else {
+                        selectChannelPreview(channel)
+                    }
+                } else if (currentPreviewChannel?.streamId == channel.streamId &&
+                    (previewIsSettled() || previewingStreamId == channel.streamId)
+                ) {
                     openFullscreen(channel)
                 } else {
                     selectChannelPreview(channel)
@@ -521,15 +537,17 @@ class MainActivity : BaseLocaleActivity() {
         if (newId == selectedLiveCategoryId) return
         withLiveCategoryAccess(cat, newId) {
             try {
-                resetLivePreviewUi()
                 selectedLiveCategoryId = newId
                 (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+                scrollLiveCategoryToSelection()
                 reloadChannels(
                     keepCategoryFocus = true,
                     autoPreviewFirst = !DeviceUi.isCompact(this),
                 )
             } catch (_: Exception) {
                 selectedLiveCategoryId = newId
+                (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+                scrollLiveCategoryToSelection()
                 reloadChannels(
                     keepCategoryFocus = true,
                     autoPreviewFirst = !DeviceUi.isCompact(this),
@@ -730,7 +748,10 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun focusCategoryList() {
         stopLivePreview()
-        TvNavHelper.focusItem(liveCategoryList, liveCategoryIndex())
+        scrollLiveCategoryToSelection()
+        liveCategoryList.post {
+            TvNavHelper.focusItem(liveCategoryList, liveCategoryIndex())
+        }
     }
 
     private fun liveCategoryIndex(): Int {
@@ -740,6 +761,15 @@ class MainActivity : BaseLocaleActivity() {
             ParentalControlStore.LOCK_CATEGORY_ID -> 2
             else -> liveCategories.indexOfFirst { it.id == selectedLiveCategoryId }
                 .takeIf { it >= 0 } ?: 0
+        }
+    }
+
+    private fun scrollLiveCategoryToSelection() {
+        if (!liveTabReady) return
+        val index = liveCategoryIndex()
+        liveCategoryList.post {
+            (liveCategoryList.layoutManager as? LinearLayoutManager)
+                ?.scrollToPositionWithOffset(index, 0)
         }
     }
 
