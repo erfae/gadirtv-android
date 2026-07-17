@@ -20,6 +20,8 @@ class CategoryAdapter(
     private val onMoveDown: (() -> Unit)? = null,
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
+    private var lastSelectedIndex: Int = RecyclerView.NO_POSITION
+
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
         val name: TextView = view.findViewById(R.id.categoryName)
     }
@@ -35,14 +37,15 @@ class CategoryAdapter(
         val active = isSelected(item)
 
         holder.name.text = item.name
-        holder.itemView.isSelected = active || holder.itemView.hasFocus()
+        holder.itemView.isSelected = active
 
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
-            view.isSelected = isSelected(item) || hasFocus
-            if (!hasFocus) return@setOnFocusChangeListener
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
-            onFocus?.invoke(items[pos])
+            if (hasFocus) {
+                onFocus?.invoke(items[pos])
+            }
+            view.isSelected = isSelected(items[pos])
         }
 
         holder.itemView.setOnClickListener {
@@ -95,18 +98,31 @@ class CategoryAdapter(
     }
 
     private fun isSelected(item: Category): Boolean {
-        val selected = selectedId() ?: return false
-        return item.id == selected || (item.id.isEmpty() && selected.isEmpty())
+        val selected = selectedId()
+        return when {
+            selected == null -> item.id.isEmpty()
+            else -> item.id == selected || (item.id.isEmpty() && selected.isEmpty())
+        }
     }
 
+    private fun selectedIndex(): Int = items.indexOfFirst { isSelected(it) }
+
     fun refreshSelection() {
-        notifyDataSetChanged()
+        val newIndex = selectedIndex()
+        if (lastSelectedIndex in items.indices && lastSelectedIndex != newIndex) {
+            notifyItemChanged(lastSelectedIndex)
+        }
+        if (newIndex in items.indices) {
+            notifyItemChanged(newIndex)
+        }
+        lastSelectedIndex = newIndex
     }
 
     fun refreshSelectionAt(vararg positions: Int) {
         positions.distinct().forEach { pos ->
             if (pos in items.indices) notifyItemChanged(pos)
         }
+        lastSelectedIndex = selectedIndex()
     }
 
     override fun getItemCount(): Int = items.size
