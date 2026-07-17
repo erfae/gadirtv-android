@@ -65,6 +65,7 @@ class CategoryAdapter(
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     val pos = holder.bindingAdapterPosition
                     if (pos == 0) {
+                        onMoveUp?.invoke()
                         onMoveUp != null
                     } else {
                         false
