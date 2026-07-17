@@ -69,6 +69,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : BaseLocaleActivity() {
+
+    companion object {
+        private const val HOME_RAIL_LIMIT_COMPACT = 12
+        private const val HERO_LIMIT_COMPACT = 1
+        private const val HERO_LIMIT_TV = 6
+    }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
     private lateinit var favoritesStore: FavoritesStore
@@ -795,7 +801,7 @@ class MainActivity : BaseLocaleActivity() {
                 refreshHomeIfNeeded(profile, cachedMovies.size)
                 return
             }
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             homeLoading.visibility = View.GONE
             homeEmpty.visibility = View.VISIBLE
             return
@@ -819,7 +825,7 @@ class MainActivity : BaseLocaleActivity() {
                 applyHomeData(movies, series)
                 homeLoading.visibility = View.GONE
                 homeLoaded = true
-            } catch (_: Exception) {
+            } catch (_: Throwable) {
                 if (isDestroyed) return@launch
                 homeLoading.visibility = View.GONE
                 homeEmpty.visibility = View.VISIBLE
@@ -992,15 +998,22 @@ class MainActivity : BaseLocaleActivity() {
     private fun applyHomeData(movies: List<VodMovie>, series: List<SeriesItem>) {
         try {
             applyHomeDataInternal(movies, series)
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             homeLoading.visibility = View.GONE
             homeEmpty.visibility = View.VISIBLE
         }
     }
 
+    private fun homeRailItemLimit(): Int =
+        if (DeviceUi.isCompact(this)) HOME_RAIL_LIMIT_COMPACT else Int.MAX_VALUE
+
+    private fun heroItemLimit(): Int =
+        if (DeviceUi.isCompact(this)) HERO_LIMIT_COMPACT else HERO_LIMIT_TV
+
     private fun applyHomeDataInternal(movies: List<VodMovie>, series: List<SeriesItem>) {
+        val railLimit = homeRailItemLimit()
         recentMovies.clear()
-        movies.forEach { movie ->
+        movies.take(railLimit).forEach { movie ->
             recentMovies.add(
                 HomeRailAdapter.HomeRailItem(
                     id = movie.streamId,
@@ -1014,7 +1027,7 @@ class MainActivity : BaseLocaleActivity() {
         }
 
         recentSeries.clear()
-        series.forEach { item ->
+        series.take(railLimit).forEach { item ->
             recentSeries.add(
                 HomeRailAdapter.HomeRailItem(
                     id = item.seriesId,
@@ -1028,12 +1041,17 @@ class MainActivity : BaseLocaleActivity() {
 
         buildFavoriteItems()
         buildResumeItems()
+        if (DeviceUi.isCompact(this)) {
+            while (favoriteItems.size > railLimit) favoriteItems.removeAt(favoriteItems.lastIndex)
+            while (resumeItems.size > railLimit) resumeItems.removeAt(resumeItems.lastIndex)
+        }
 
         heroItems.clear()
-        val heroMovies = recentMovies.filter { it.imageUrl.isNotBlank() }.take(6)
-            .ifEmpty { recentMovies.take(6) }
-        val heroSeries = recentSeries.filter { it.imageUrl.isNotBlank() }.take(6)
-            .ifEmpty { recentSeries.take(6) }
+        val heroLimit = heroItemLimit()
+        val heroMovies = recentMovies.filter { it.imageUrl.isNotBlank() }.take(heroLimit)
+            .ifEmpty { recentMovies.take(heroLimit) }
+        val heroSeries = recentSeries.filter { it.imageUrl.isNotBlank() }.take(heroLimit)
+            .ifEmpty { recentSeries.take(heroLimit) }
         heroMovies.forEach { heroItems.add(HeroItem.Rail(it)) }
         heroSeries.forEach { heroItems.add(HeroItem.Rail(it)) }
         heroIndex = 0
@@ -1541,7 +1559,9 @@ class MainActivity : BaseLocaleActivity() {
                     kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
                     backdropRequestId = backdropRequestId,
                 )
-                loadMoviePlot(item.movie.streamId, requestId, backdropRequestId)
+                if (DeviceUi.useDpadFocus(this)) {
+                    loadMoviePlot(item.movie.streamId, requestId, backdropRequestId)
+                }
             }
             is HeroItem.Series -> {
                 applyHeroMeta(
@@ -1553,7 +1573,9 @@ class MainActivity : BaseLocaleActivity() {
                     kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
                     backdropRequestId = backdropRequestId,
                 )
-                loadSeriesPlot(item.series.seriesId, requestId, backdropRequestId)
+                if (DeviceUi.useDpadFocus(this)) {
+                    loadSeriesPlot(item.series.seriesId, requestId, backdropRequestId)
+                }
             }
             is HeroItem.Rail -> {
                 applyHeroMeta(
@@ -1573,12 +1595,14 @@ class MainActivity : BaseLocaleActivity() {
                     backdropRequestId = backdropRequestId,
                 )
                 heroSubtitle.text = item.item.subtitle
-                when (item.item.kind) {
-                    HomeRailAdapter.HomeRailItem.KIND_MOVIE ->
-                        loadMoviePlot(item.item.id, requestId, backdropRequestId)
-                    HomeRailAdapter.HomeRailItem.KIND_SERIES ->
-                        loadSeriesPlot(item.item.id, requestId, backdropRequestId)
-                    HomeRailAdapter.HomeRailItem.KIND_LIVE -> Unit
+                if (DeviceUi.useDpadFocus(this)) {
+                    when (item.item.kind) {
+                        HomeRailAdapter.HomeRailItem.KIND_MOVIE ->
+                            loadMoviePlot(item.item.id, requestId, backdropRequestId)
+                        HomeRailAdapter.HomeRailItem.KIND_SERIES ->
+                            loadSeriesPlot(item.item.id, requestId, backdropRequestId)
+                        HomeRailAdapter.HomeRailItem.KIND_LIVE -> Unit
+                    }
                 }
             }
         }
@@ -1610,7 +1634,14 @@ class MainActivity : BaseLocaleActivity() {
     ) {
         val fallbacks = heroImageFallbacks(url, contentId, kind)
         if (fallbacks.isEmpty()) return
-        ImageLoader.loadHeroBackdrop(target, fallbacks.first(), fallbacks.drop(1))
+        if (DeviceUi.isCompact(this)) {
+            val dm = resources.displayMetrics
+            val width = dm.widthPixels.coerceAtMost(720)
+            val height = (168f * dm.density).toInt().coerceAtMost(400)
+            ImageLoader.loadHeroBackdrop(target, fallbacks.first(), fallbacks.drop(1), width, height)
+        } else {
+            ImageLoader.loadHeroBackdrop(target, fallbacks.first(), fallbacks.drop(1))
+        }
     }
 
     private fun heroImageFallbacks(primary: String, contentId: Int, kind: String): List<String> {
@@ -1766,6 +1797,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun startHeroRotation() {
         heroHandler.removeCallbacks(heroRotateRunnable)
+        if (!DeviceUi.useDpadFocus(this)) return
         if (heroItems.size > 1 && currentTab == Tab.HOME) {
             heroHandler.postDelayed(heroRotateRunnable, 8000L)
         }

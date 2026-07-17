@@ -1,5 +1,6 @@
 package com.gadir.tv.util
 
+import android.app.Activity
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.widget.ImageView
@@ -16,6 +17,13 @@ import com.gadir.tv.R
 import com.gadir.tv.data.PlaylistRepository
 
 object ImageLoader {
+    private fun canLoadInto(target: ImageView): Boolean {
+        if (!target.isAttachedToWindow) return false
+        val ctx = target.context
+        if (ctx is Activity && (ctx.isFinishing || ctx.isDestroyed)) return false
+        return true
+    }
+
     private val channelOptions = RequestOptions()
         .diskCacheStrategy(DiskCacheStrategy.ALL)
         .override(128, 128)
@@ -53,7 +61,13 @@ object ImageLoader {
         .placeholder(R.drawable.hero_placeholder_bg)
         .error(R.drawable.hero_placeholder_bg)
 
-    fun loadHeroBackdrop(target: ImageView, url: String, fallbacks: List<String> = emptyList()) {
+    fun loadHeroBackdrop(
+        target: ImageView,
+        url: String,
+        fallbacks: List<String> = emptyList(),
+        width: Int = 0,
+        height: Int = 0,
+    ) {
         val candidates = buildList {
             val primary = ImageUrlResolver.resolve(url)
             if (primary.isNotEmpty()) add(primary)
@@ -66,11 +80,15 @@ object ImageLoader {
             target.setImageResource(R.drawable.hero_placeholder_bg)
             return
         }
+        var options = heroBackdropOptions.centerCrop()
+        if (width > 0 && height > 0) {
+            options = options.override(width, height)
+        }
         loadWithFallback(
             target = target,
             urls = candidates,
             index = 0,
-            options = heroBackdropOptions.centerCrop(),
+            options = options,
             errorDrawable = R.drawable.hero_placeholder_bg,
         )
     }
@@ -82,16 +100,21 @@ object ImageLoader {
         height: Int,
         options: RequestOptions,
     ) {
+        if (!canLoadInto(target)) return
         val resolved = ImageUrlResolver.resolve(url)
         if (resolved.isEmpty()) {
             target.setImageResource(R.drawable.tv_banner)
             return
         }
-        var request = Glide.with(target).load(glideUrl(resolved)).apply(options)
-        if (width > 0 && height > 0) {
-            request = request.override(width, height)
+        try {
+            var request = Glide.with(target).load(glideUrl(resolved)).apply(options)
+            if (width > 0 && height > 0) {
+                request = request.override(width, height)
+            }
+            request.into(target)
+        } catch (_: Throwable) {
+            target.setImageResource(R.drawable.tv_banner)
         }
-        request.into(target)
     }
 
     private fun loadWithFallback(
@@ -101,33 +124,38 @@ object ImageLoader {
         options: RequestOptions,
         errorDrawable: Int = R.drawable.tv_banner,
     ) {
+        if (!canLoadInto(target)) return
         if (index >= urls.size) {
             target.setImageResource(errorDrawable)
             return
         }
-        Glide.with(target)
-            .load(glideUrl(urls[index]))
-            .apply(options)
-            .listener(object : RequestListener<Drawable> {
-                override fun onLoadFailed(
-                    e: GlideException?,
-                    model: Any?,
-                    targetView: Target<Drawable>,
-                    isFirstResource: Boolean,
-                ): Boolean {
-                    loadWithFallback(target, urls, index + 1, options, errorDrawable)
-                    return true
-                }
+        try {
+            Glide.with(target)
+                .load(glideUrl(urls[index]))
+                .apply(options)
+                .listener(object : RequestListener<Drawable> {
+                    override fun onLoadFailed(
+                        e: GlideException?,
+                        model: Any?,
+                        targetView: Target<Drawable>,
+                        isFirstResource: Boolean,
+                    ): Boolean {
+                        loadWithFallback(target, urls, index + 1, options, errorDrawable)
+                        return true
+                    }
 
-                override fun onResourceReady(
-                    resource: Drawable,
-                    model: Any,
-                    targetView: Target<Drawable>?,
-                    dataSource: DataSource,
-                    isFirstResource: Boolean,
-                ): Boolean = false
-            })
-            .into(target)
+                    override fun onResourceReady(
+                        resource: Drawable,
+                        model: Any,
+                        targetView: Target<Drawable>?,
+                        dataSource: DataSource,
+                        isFirstResource: Boolean,
+                    ): Boolean = false
+                })
+                .into(target)
+        } catch (_: Throwable) {
+            target.setImageResource(errorDrawable)
+        }
     }
 
     private fun glideUrl(url: String): Any {
