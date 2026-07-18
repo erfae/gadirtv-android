@@ -918,6 +918,15 @@ class MainActivity : BaseLocaleActivity() {
             .takeIf { it >= 0 } ?: 0
     }
 
+    private fun focusedCatalogCategoryIndex(): Int {
+        val child = catalogCategoryList.focusedChild
+        if (child != null) {
+            val pos = catalogCategoryList.getChildAdapterPosition(child)
+            if (pos >= 0) return pos
+        }
+        return catalogCategoryIndex()
+    }
+
     private fun focusFirstCatalogItem() {
         if (posterItems.isEmpty()) return
         TvNavHelper.focusItem(catalogGrid, 0)
@@ -1012,13 +1021,15 @@ class MainActivity : BaseLocaleActivity() {
                 panelCatalog.visibility = View.VISIBLE
                 stopHeroRotation()
                 suspendLivePreview()
+                val switchingBetweenCatalog =
+                    (previousTab == Tab.MOVIES || previousTab == Tab.SERIES) && previousTab != tab
                 val ready = if (tab == Tab.MOVIES) moviesCatalogReady else seriesCatalogReady
-                if (!ready) {
+                if (!ready || switchingBetweenCatalog) {
                     setupCatalogTab(tab)
                     if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
                 }
                 if (DeviceUi.useDpadFocus(this)) {
-                    if (enteringFromOtherTab) {
+                    if (enteringFromOtherTab || switchingBetweenCatalog) {
                         openCatalogTabAtFirstGroup(tab)
                         enterCatalogTabFocus()
                     } else {
@@ -1414,9 +1425,8 @@ class MainActivity : BaseLocaleActivity() {
                 loadHome()
                 when (currentTab) {
                     Tab.MOVIES, Tab.SERIES -> {
-                        moviesCatalogReady = true
-                        seriesCatalogReady = true
                         setupCatalogTab(currentTab)
+                        openCatalogTabAtFirstGroup(currentTab)
                     }
                     Tab.LIVE -> currentPreviewChannel?.let { schedulePreview(it) }
                     Tab.HOME -> Unit
@@ -2391,7 +2401,7 @@ class MainActivity : BaseLocaleActivity() {
         if (DeviceUi.useDpadFocus(this)) {
             val selectedId = selectedCatalogCategoryId
             if (selectedId == null) {
-                showCatalogSelectPrompt()
+                openCatalogTabAtFirstGroup(tab)
             } else {
                 showCachedCatalogItems(tab, selectedId)
             }
@@ -2405,13 +2415,17 @@ class MainActivity : BaseLocaleActivity() {
         when (tab) {
             Tab.MOVIES -> when (categoryId) {
                 ResumeStore.RESUME_CATEGORY_ID -> bindResumeMovies()
-                else -> PlaylistRepository.cachedVod(categoryId)?.let { bindMovies(it) }
-                    ?: showCatalogSelectPrompt()
+                else -> {
+                    val cached = PlaylistRepository.cachedVod(categoryId)
+                    if (cached != null) bindMovies(cached) else loadCatalogItems(tab, categoryId)
+                }
             }
             Tab.SERIES -> when (categoryId) {
                 ResumeStore.RESUME_CATEGORY_ID -> bindResumeSeries()
-                else -> PlaylistRepository.cachedSeries(categoryId)?.let { bindSeries(it) }
-                    ?: showCatalogSelectPrompt()
+                else -> {
+                    val cached = PlaylistRepository.cachedSeries(categoryId)
+                    if (cached != null) bindSeries(cached) else loadCatalogItems(tab, categoryId)
+                }
             }
             else -> Unit
         }
@@ -2428,7 +2442,7 @@ class MainActivity : BaseLocaleActivity() {
             },
             onFocus = null,
             onMoveRight = {
-                val index = catalogCategoryIndex()
+                val index = focusedCatalogCategoryIndex()
                 catalogCategories.getOrNull(index)?.let { cat ->
                     withCatalogCategoryAccess(tab, cat) {
                         selectCatalogGroup(tab, cat, enterContent = true)
