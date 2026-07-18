@@ -43,6 +43,7 @@ class PlayerActivity : BaseLocaleActivity() {
     private var epgLoaded = false
     private var liveStreamId = 0
     private val pendingLiveUrls = ArrayDeque<String>()
+    private val pendingVodUrls = ArrayDeque<String>()
 
     private lateinit var volumeControls: View
     private lateinit var epgPanel: View
@@ -92,6 +93,7 @@ class PlayerActivity : BaseLocaleActivity() {
 
         override fun onPlayerError(error: PlaybackException) {
             if (isLive && tryNextLiveUrl()) return
+            if (!isLive && tryNextVodUrl()) return
         }
     }
 
@@ -112,6 +114,12 @@ class PlayerActivity : BaseLocaleActivity() {
             pendingLiveUrls.add(url)
             intent.getStringArrayListExtra(EXTRA_ALTERNATE_URLS)?.forEach { alt ->
                 if (alt.isNotBlank() && alt !in pendingLiveUrls) pendingLiveUrls.add(alt)
+            }
+        } else {
+            pendingVodUrls.clear()
+            pendingVodUrls.add(url)
+            intent.getStringArrayListExtra(EXTRA_ALTERNATE_URLS)?.forEach { alt ->
+                if (alt.isNotBlank() && alt !in pendingVodUrls) pendingVodUrls.add(alt)
             }
         }
 
@@ -204,6 +212,17 @@ class PlayerActivity : BaseLocaleActivity() {
         liveUrlSettled = false
         playbackMonitor?.reset()
         exo.setMediaItem(LiveStreamUrls.mediaItem(next))
+        exo.prepare()
+        exo.playWhenReady = true
+        return true
+    }
+
+    private fun tryNextVodUrl(): Boolean {
+        if (pendingVodUrls.isEmpty()) return false
+        pendingVodUrls.removeFirst()
+        val next = pendingVodUrls.firstOrNull() ?: return false
+        val exo = player ?: return false
+        exo.setMediaItem(MediaItem.fromUri(Uri.parse(next)))
         exo.prepare()
         exo.playWhenReady = true
         return true
