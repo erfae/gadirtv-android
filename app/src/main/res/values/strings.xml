@@ -143,6 +143,9 @@
     <string name="bootstrap_series">Series…</string>
     <string name="bootstrap_home">Preparando inicio…</string>
     <string name="bootstrap_catalog">Descargando catálogo completo…</string>
+    <string name="bootstrap_posters">Descargando carátulas…</string>
+    <string name="bootstrap_plots">Descargando sinopsis…</string>
+    <string name="bootstrap_epg">Descargando guía TV…</string>
     <string name="bootstrap_loading_group">Cargando: %1$s…</string>
     <string name="series_load_failed">No se pudo cargar la serie</string>
     <string name="series_reload">Recargar serie</string>

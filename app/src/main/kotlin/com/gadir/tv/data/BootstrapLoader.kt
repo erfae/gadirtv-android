@@ -42,6 +42,13 @@ object BootstrapLoader {
             val recentSeries = async { HomeLoader.loadRecentSeries(api, profile) }
             PlaylistRepository.setHomeRecent(recentMovies.await(), recentSeries.await())
 
+            ContentPreloader.preloadAll(
+                context = context,
+                api = api,
+                profile = profile,
+                onProgress = onProgress,
+            )
+
             PlaylistRepository.markBootstrapReady()
         }
     }

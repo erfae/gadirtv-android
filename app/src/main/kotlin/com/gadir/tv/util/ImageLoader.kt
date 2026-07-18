@@ -19,7 +19,6 @@ object ImageLoader {
     private fun canLoadInto(target: ImageView): Boolean {
         val ctx = target.context
         if (ctx is Activity && (ctx.isFinishing || ctx.isDestroyed)) return false
-        if (!target.isAttachedToWindow) return false
         return true
     }
 
@@ -37,12 +36,10 @@ object ImageLoader {
         .error(R.drawable.tv_banner)
 
     fun clear(target: ImageView) {
-        if (!canLoadInto(target)) {
-            target.setImageResource(R.drawable.channel_icon_placeholder)
-            return
-        }
         try {
-            Glide.with(target).clear(target)
+            if (canLoadInto(target)) {
+                Glide.with(target).clear(target)
+            }
         } catch (_: Throwable) {
             // Glide may throw if the activity is tearing down.
         }
@@ -201,7 +198,9 @@ object ImageLoader {
         }
     }
 
-    private fun glideUrl(url: String): Any {
+    private fun glideUrl(url: String): Any = glideModel(url)
+
+    fun glideModel(url: String): Any {
         if (!url.startsWith("http")) return url
         val headers = LazyHeaders.Builder()
             .addHeader("User-Agent", PlaylistRepository.userAgent)

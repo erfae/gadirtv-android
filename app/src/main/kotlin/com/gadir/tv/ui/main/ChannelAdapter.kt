@@ -69,31 +69,10 @@ class ChannelAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_channel, parent, false)
-        return Holder(view)
-    }
+        val holder = Holder(view)
 
-    override fun onViewRecycled(holder: Holder) {
-        ImageLoader.clear(holder.icon)
-        super.onViewRecycled(holder)
-    }
-
-    override fun onBindViewHolder(holder: Holder, position: Int) {
-        val item = itemAt(position) ?: return
-        holder.number.text = (position + 1).toString()
-        holder.name.text = item.name
-        ChannelIconHelper.loadListIcon(holder.icon, item)
-        holder.favorite.setImageResource(
-            if (isFavorite(item)) R.drawable.ic_favorite_on else R.drawable.ic_favorite_off,
-        )
-        val locked = isLocked(item)
-        holder.lock.setImageResource(if (locked) R.drawable.ic_lock_on else R.drawable.ic_lock_off)
-        holder.lock.visibility = if (locked) View.VISIBLE else View.GONE
-
-        holder.itemView.isSelected = holder.itemView.hasFocus()
-        holder.number.isSelected = holder.itemView.hasFocus()
-
-        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
-            view.isSelected = hasFocus
+        holder.itemView.setOnFocusChangeListener { itemView, hasFocus ->
+            itemView.isSelected = hasFocus
             holder.number.isSelected = hasFocus
             if (!hasFocus) return@setOnFocusChangeListener
             val pos = holder.bindingAdapterPosition
@@ -161,6 +140,28 @@ class ChannelAdapter(
                 else -> false
             }
         }
+
+        return holder
+    }
+
+    override fun onViewRecycled(holder: Holder) {
+        ImageLoader.clear(holder.icon)
+        super.onViewRecycled(holder)
+    }
+
+    override fun onBindViewHolder(holder: Holder, position: Int) {
+        val item = itemAt(position) ?: return
+        holder.number.text = (position + 1).toString()
+        holder.name.text = item.name
+        ChannelIconHelper.loadListIcon(holder.icon, item)
+        holder.favorite.setImageResource(
+            if (isFavorite(item)) R.drawable.ic_favorite_on else R.drawable.ic_favorite_off,
+        )
+        val locked = isLocked(item)
+        holder.lock.setImageResource(if (locked) R.drawable.ic_lock_on else R.drawable.ic_lock_off)
+        holder.lock.visibility = if (locked) View.VISIBLE else View.GONE
+        holder.itemView.isSelected = holder.itemView.hasFocus()
+        holder.number.isSelected = holder.itemView.hasFocus()
     }
 
     private fun handleVerticalKey(holder: Holder, direction: Int): Boolean {

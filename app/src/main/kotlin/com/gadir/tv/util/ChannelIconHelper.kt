@@ -1,6 +1,7 @@
 package com.gadir.tv.util
 
 import android.widget.ImageView
+import com.gadir.tv.R
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.Profile
@@ -10,9 +11,9 @@ object ChannelIconHelper {
     private const val LIST_ICON_MAX_FALLBACKS = 4
 
     fun loadListIcon(target: ImageView, channel: LiveChannel) {
+        if (target.getTag(R.id.image_load_tag) == channel.streamId) return
         val density = target.resources.displayMetrics.density
         val size = (44 * density).toInt().coerceAtLeast(96)
-        ImageLoader.clear(target)
         ImageLoader.loadChannelIcon(
             target = target,
             url = channel.icon,
