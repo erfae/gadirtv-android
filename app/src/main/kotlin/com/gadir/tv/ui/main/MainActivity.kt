@@ -113,6 +113,7 @@ class MainActivity : BaseLocaleActivity() {
     private var pendingPreview: Runnable? = null
     private var previewToken = 0
     private var selectedLiveCategoryId: String? = null
+    private var liveBrowsingCategoryId: String? = null
     private var liveChannelsLoaded = false
     private var liveEnterContentOnLoad = false
     private var liveCategoryFocusIndex = 0
@@ -546,7 +547,8 @@ class MainActivity : BaseLocaleActivity() {
         liveCategories.addAll(PlaylistRepository.categories)
 
         bindLiveCategoryAdapter()
-        channelList.setItemViewCacheSize(24)
+        warmLiveCategoryPrefetch()
+        channelList.setItemViewCacheSize(48)
         channelAdapter = ChannelAdapter(
             items = channels,
             onFocus = if (DeviceUi.useDpadFocus(this)) {
@@ -606,25 +608,76 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun applyLiveCategoryClick(cat: Category, enterContent: Boolean = false) {
         val newId = liveCategoryId(cat)
+        if (enterContent && liveChannelsLoaded && newId == selectedLiveCategoryId && channels.isNotEmpty()) {
+            focusFirstChannel()
+            return
+        }
+        showLiveCategoryChannels(cat, enterContent)
+    }
+
+    private fun showLiveCategoryChannels(cat: Category, enterContent: Boolean) {
+        val newId = liveCategoryId(cat)
         val newIndex = liveCategories.indexOfFirst { liveCategoryId(it) == newId }
         if (newIndex >= 0) liveCategoryFocusIndex = newIndex
 
-        if (liveChannelsLoaded && newId == selectedLiveCategoryId && channels.isNotEmpty()) {
-            channelList.visibility = View.VISIBLE
-            if (enterContent) focusFirstChannel()
+        val loaded = liveCategoryPrefetch[newId] ?: channelsForLiveCategory(newId).also {
+            liveCategoryPrefetch[newId] = it
+        }
+
+        liveBrowsingCategoryId = newId
+        ++channelsLoadToken
+        reloadingChannels = false
+        channels.clear()
+        channels.addAll(loaded)
+        channelList.stopScroll()
+        channelAdapter?.notifyDataSetChanged()
+        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+
+        if (loaded.isEmpty()) {
+            channelList.visibility = View.INVISIBLE
+            showLiveSelectPrompt()
             return
         }
 
-        highlightLiveCategory(newId)
-        liveChannelsLoaded = true
-        liveEnterContentOnLoad = enterContent
+        channelList.visibility = View.VISIBLE
+        prefetchLiveChannelIcons(loaded)
 
-        val prefetched = liveCategoryPrefetch[newId]
-        if (prefetched != null) {
-            applyLiveChannels(prefetched, enterContent)
-            return
+        val previewIndex = 0
+        channelList.scrollToPosition(previewIndex)
+        loaded.getOrNull(previewIndex)?.let { schedulePreview(it) }
+
+        if (enterContent) {
+            liveChannelsLoaded = true
+            selectedLiveCategoryId = newId
+            liveEnterContentOnLoad = false
+            highlightLiveCategory(newId)
+            focusFirstChannel()
         }
-        reloadChannels(keepCategoryFocus = true, autoPreviewFirst = enterContent)
+    }
+
+    private fun liveCategoryCount(cat: Category): Int? {
+        if (cat.id == "") return null
+        val id = liveCategoryId(cat)
+        return liveCategoryPrefetch[id]?.size ?: channelsForLiveCategory(id).size
+    }
+
+    private fun catalogCategoryCount(tab: Tab, cat: Category): Int? {
+        if (cat.id == ResumeStore.RESUME_CATEGORY_ID) return null
+        return when (tab) {
+            Tab.MOVIES -> PlaylistRepository.cachedVod(cat.id)?.size
+            Tab.SERIES -> PlaylistRepository.cachedSeries(cat.id)?.size
+            else -> null
+        }
+    }
+
+    private fun warmLiveCategoryPrefetch() {
+        liveCategories.forEach { cat ->
+            val id = liveCategoryId(cat)
+            if (!liveCategoryPrefetch.containsKey(id)) {
+                liveCategoryPrefetch[id] = channelsForLiveCategory(id)
+            }
+        }
+        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
     }
 
     private fun channelsForLiveCategory(categoryId: String?): List<LiveChannel> =
@@ -648,58 +701,20 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun prefetchLiveCategory(categoryId: String?) {
         if (liveCategoryPrefetch.containsKey(categoryId)) return
-        val token = ++livePrefetchToken
-        lifecycleScope.launch {
-            val loaded = try {
-                withContext(Dispatchers.Default) { channelsForLiveCategory(categoryId) }
-            } catch (_: Exception) {
-                emptyList()
-            }
-            if (token != livePrefetchToken) return@launch
-            liveCategoryPrefetch[categoryId] = loaded
-            if (loaded.isNotEmpty()) {
-                prefetchLiveChannelIcons(loaded)
-            }
-        }
+        liveCategoryPrefetch[categoryId] = channelsForLiveCategory(categoryId)
+        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
     }
 
     private fun prefetchLiveChannelIcons(channelBatch: List<LiveChannel>) {
+        if (channelBatch.isEmpty()) return
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
-                channelBatch.take(60).forEach { channel ->
+                channelBatch.forEach { channel ->
                     runCatching { ChannelIconHelper.preloadListIcon(this@MainActivity, channel) }
                 }
             }
             if (currentTab == Tab.LIVE && channels.isNotEmpty()) {
                 channelAdapter?.notifyDataSetChanged()
-            }
-        }
-    }
-
-    private fun applyLiveChannels(loaded: List<LiveChannel>, enterContent: Boolean) {
-        ++channelsLoadToken
-        reloadingChannels = false
-        channels.clear()
-        channels.addAll(loaded)
-        channelList.stopScroll()
-        channelAdapter?.notifyDataSetChanged()
-        if (channels.isEmpty()) {
-            channelList.visibility = View.INVISIBLE
-            showLiveSelectPrompt()
-            return
-        }
-        channelList.visibility = View.VISIBLE
-        prefetchLiveChannelIcons(loaded)
-        val previewIndex = 0
-        channelList.scrollToPosition(previewIndex)
-        when {
-            liveEnterContentOnLoad || enterContent -> {
-                liveEnterContentOnLoad = false
-                TvNavHelper.focusItem(channelList, previewIndex)
-                schedulePreviewAfterChannelFocus(previewIndex)
-            }
-            else -> {
-                channels.getOrNull(previewIndex)?.let { schedulePreview(it) }
             }
         }
     }
@@ -716,8 +731,8 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun liveCategoryAdapterSelectedId(): String? {
-        if (!liveChannelsLoaded) return null
-        return selectedLiveCategoryId ?: ""
+        val id = liveBrowsingCategoryId ?: return null
+        return id ?: ""
     }
 
     private fun showLiveSelectPrompt() {
@@ -730,23 +745,13 @@ class MainActivity : BaseLocaleActivity() {
         setPreviewVideoVisible(false)
     }
 
-    private fun updateLiveCategoryBrowsingUi(cat: Category) {
-        if (!DeviceUi.useDpadFocus(this)) return
-        val catId = liveCategoryId(cat)
-        if (liveChannelsLoaded && catId == selectedLiveCategoryId && channels.isNotEmpty()) {
-            channelList.visibility = View.VISIBLE
-        } else {
-            channelList.visibility = View.INVISIBLE
-            showLiveSelectPrompt()
-        }
-    }
-
     private fun openLiveTabAtFirstGroup() {
         liveCategoryHandler.removeCallbacksAndMessages(null)
         if (liveCategories.isEmpty()) return
         livePrefetchToken++
         liveCategoryPrefetch.clear()
         liveChannelsLoaded = false
+        liveBrowsingCategoryId = null
         selectedLiveCategoryId = null
         liveEnterContentOnLoad = false
         liveCategoryFocusIndex = 0
@@ -755,6 +760,7 @@ class MainActivity : BaseLocaleActivity() {
         channelList.visibility = View.INVISIBLE
         pauseLivePreviewPlayback()
         showLiveSelectPrompt()
+        warmLiveCategoryPrefetch()
         (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
     }
 
@@ -803,6 +809,7 @@ class MainActivity : BaseLocaleActivity() {
         )
         liveCategories.addAll(PlaylistRepository.categories)
         selectedLiveCategoryId = currentId
+        warmLiveCategoryPrefetch()
         bindLiveCategoryAdapter()
     }
 
@@ -810,19 +817,18 @@ class MainActivity : BaseLocaleActivity() {
         liveCategoryList.adapter = CategoryAdapter(
             items = liveCategories,
             selectedId = { liveCategoryAdapterSelectedId() },
+            itemCount = { cat -> liveCategoryCount(cat) },
             onClick = { cat -> applyLiveCategoryClick(cat, enterContent = true) },
             onFocus = { cat ->
                 val idx = liveCategories.indexOfFirst { liveCategoryId(it) == liveCategoryId(cat) }
                 if (idx >= 0) liveCategoryFocusIndex = idx
-                updateLiveCategoryBrowsingUi(cat)
-                prefetchLiveCategory(liveCategoryId(cat))
+                showLiveCategoryChannels(cat, enterContent = false)
             },
             onMoveRight = {
                 val index = focusedLiveCategoryIndex()
                 val cat = liveCategories.getOrNull(index) ?: return@CategoryAdapter
                 val catId = liveCategoryId(cat)
-                if (liveChannelsLoaded && catId == selectedLiveCategoryId && channels.isNotEmpty()) {
-                    channelList.visibility = View.VISIBLE
+                if (catId == liveBrowsingCategoryId && channels.isNotEmpty()) {
                     focusFirstChannel()
                 }
             },
@@ -1176,6 +1182,7 @@ class MainActivity : BaseLocaleActivity() {
                         else -> Unit
                     }
                 }
+                catalogCategoryAdapter?.refreshSelection()
             } catch (_: Exception) {
             }
         }
@@ -2786,6 +2793,7 @@ class MainActivity : BaseLocaleActivity() {
         catalogCategoryAdapter = CategoryAdapter(
             items = catalogCategories,
             selectedId = { catalogAdapterSelectedId(tab) },
+            itemCount = { cat -> catalogCategoryCount(tab, cat) },
             onClick = { cat ->
                 withCatalogCategoryAccess(tab, cat) {
                     selectCatalogGroup(tab, cat, enterContent = true)

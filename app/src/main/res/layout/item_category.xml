@@ -1,16 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<TextView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/categoryName"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/category_item_bg"
     android:focusable="true"
     android:focusableInTouchMode="true"
-    android:letterSpacing="0.02"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
     android:paddingHorizontal="14dp"
-    android:paddingVertical="12dp"
-    android:ellipsize="end"
-    android:maxLines="2"
-    android:textColor="@android:color/white"
-    android:textSize="14sp"
-    android:fontFamily="@font/gtv_font_ui" />
+    android:paddingVertical="12dp">
+
+    <TextView
+        android:id="@+id/categoryName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:fontFamily="@font/gtv_font_ui"
+        android:letterSpacing="0.02"
+        android:maxLines="2"
+        android:textColor="@android:color/white"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/categoryCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:fontFamily="@font/gtv_font_numbers"
+        android:textColor="@android:color/white"
+        android:textSize="13sp"
+        android:visibility="gone" />
+</LinearLayout>

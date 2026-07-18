@@ -10,6 +10,7 @@
     <string name="loading">Loading content…</string>
     <string name="loading_playlist">Loading…</string>
     <string name="category_all">All</string>
+    <string name="category_count_format">(%1$d)</string>
     <string name="select_channel">Select a channel</string>
     <string name="version_label">v1.12.0</string>
     <string name="login_subtitle">TV, movies and series on your Android TV</string>

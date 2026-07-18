@@ -15,6 +15,7 @@ import com.gadir.tv.util.TvNavHelper
 class CategoryAdapter(
     private val items: List<Category>,
     private val selectedId: () -> String? = { null },
+    private val itemCount: (Category) -> Int? = { null },
     private val onClick: (Category) -> Unit,
     private val onFocus: ((Category) -> Unit)? = null,
     private val onMoveRight: (() -> Unit)? = null,
@@ -26,6 +27,7 @@ class CategoryAdapter(
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
         val name: TextView = view.findViewById(R.id.categoryName)
+        val count: TextView = view.findViewById(R.id.categoryCount)
     }
 
     fun refreshSelection() {
@@ -43,12 +45,19 @@ class CategoryAdapter(
         val contentSelected = item.id == selectedId()
 
         holder.name.text = item.name
+        val count = itemCount(item)
+        if (count != null && count > 0) {
+            holder.count.visibility = View.VISIBLE
+            holder.count.text = holder.itemView.context.getString(R.string.category_count_format, count)
+        } else {
+            holder.count.visibility = View.GONE
+        }
         applyCategoryVisual(holder, contentSelected, holder.itemView.hasFocus())
         if (position == 0 && upFocusViewId != View.NO_ID) {
             holder.itemView.nextFocusUpId = upFocusViewId
         }
 
-        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
             val cat = items[pos]
@@ -121,6 +130,13 @@ class CategoryAdapter(
         view.isActivated = focused
         val context = holder.name.context
         holder.name.setTextColor(
+            when {
+                focused -> ContextCompat.getColor(context, android.R.color.white)
+                contentSelected -> ContextCompat.getColor(context, R.color.gtv_red_hi)
+                else -> ContextCompat.getColor(context, android.R.color.white)
+            },
+        )
+        holder.count.setTextColor(
             when {
                 focused -> ContextCompat.getColor(context, android.R.color.white)
                 contentSelected -> ContextCompat.getColor(context, R.color.gtv_red_hi)
