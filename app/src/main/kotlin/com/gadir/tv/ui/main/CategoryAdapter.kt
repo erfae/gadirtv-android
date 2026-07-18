@@ -23,6 +23,7 @@ class CategoryAdapter(
     private val onMoveUp: (() -> Unit)? = null,
     private val onMoveDown: (() -> Unit)? = null,
     private val upFocusViewId: Int = View.NO_ID,
+    private val navigationLocked: () -> Boolean = { false },
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
@@ -64,7 +65,7 @@ class CategoryAdapter(
             if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
             val cat = items[pos]
             applyCategoryVisual(holder, cat.id == selectedId(), hasFocus)
-            if (hasFocus) onFocus?.invoke(cat)
+            if (hasFocus && !navigationLocked()) onFocus?.invoke(cat)
         }
 
         holder.itemView.setOnClickListener {
@@ -102,6 +103,7 @@ class CategoryAdapter(
      * Stops at the first/last group without jumping the whole list to the top.
      */
     private fun handleVerticalKey(holder: Holder, direction: Int): Boolean {
+        if (navigationLocked()) return true
         val pos = holder.bindingAdapterPosition
         if (pos == RecyclerView.NO_POSITION) return false
 
