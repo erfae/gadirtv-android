@@ -54,9 +54,9 @@ object ContentPreloader {
         preloadHomeAssets(context, api, profile)
         preloadPrioritizedChannelIcons(context)
         preloadEpg(api, profile, prioritizedChannels(context))
+        preloadRemainingChannelIcons(context)
         CatalogPreloader.preloadRemaining(api, profile)
         preloadCatalogPosters(context)
-        preloadRemainingChannelIcons(context)
     }
 
     private suspend fun preloadHomeAssets(

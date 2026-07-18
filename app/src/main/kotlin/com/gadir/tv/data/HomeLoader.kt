@@ -106,10 +106,11 @@ object CatalogPreloader {
                     async {
                         semaphore.withPermit {
                             onCategory?.invoke(category.name)
-                            PlaylistRepository.cacheVod(
-                                category.id,
-                                api.vodStreams(profile, category.id),
-                            )
+                            runCatching {
+                                api.vodStreams(profile, category.id)
+                            }.getOrNull()?.let { movies ->
+                                PlaylistRepository.cacheVod(category.id, movies)
+                            }
                         }
                     }
                 }
@@ -119,10 +120,11 @@ object CatalogPreloader {
                     async {
                         semaphore.withPermit {
                             onCategory?.invoke(category.name)
-                            PlaylistRepository.cacheSeries(
-                                category.id,
-                                api.seriesList(profile, category.id),
-                            )
+                            runCatching {
+                                api.seriesList(profile, category.id)
+                            }.getOrNull()?.let { series ->
+                                PlaylistRepository.cacheSeries(category.id, series)
+                            }
                         }
                     }
                 }
