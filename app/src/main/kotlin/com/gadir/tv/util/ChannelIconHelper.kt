@@ -5,6 +5,7 @@ import com.gadir.tv.R
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.Profile
+import com.gadir.tv.util.ImagePreloader
 import java.net.URLEncoder
 
 object ChannelIconHelper {
@@ -22,6 +23,16 @@ object ChannelIconHelper {
             loadTag = channel.streamId,
             maxFallbacks = LIST_ICON_MAX_FALLBACKS,
         )
+    }
+
+    suspend fun preloadListIcon(context: android.content.Context, channel: LiveChannel) {
+        val fallbacks = panelFallbackUrls(PlaylistRepository.profile, channel)
+        val urls = buildList {
+            if (channel.icon.isNotBlank()) add(channel.icon)
+            addAll(fallbacks.take(LIST_ICON_MAX_FALLBACKS))
+        }.distinct().filter { it.isNotBlank() }
+        if (urls.isEmpty()) return
+        ImagePreloader.preloadUrls(context, urls, 128, 128, 2)
     }
 
     fun loadPanelIcon(target: ImageView, channel: LiveChannel) {
