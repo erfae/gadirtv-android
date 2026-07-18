@@ -97,7 +97,7 @@ class CategoryAdapter(
         if (direction < 0) {
             if (pos == 0) {
                 onMoveUp?.invoke()
-                return onMoveUp != null
+                return true
             }
         } else if (pos >= items.lastIndex) {
             onMoveDown?.invoke()

@@ -172,7 +172,7 @@ class ChannelAdapter(
         if (direction < 0) {
             if (pos == 0) {
                 onMoveUp?.invoke()
-                return onMoveUp != null
+                return true
             }
         } else if (pos >= total - 1) {
             onMoveDown?.invoke()

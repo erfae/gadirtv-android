@@ -9,7 +9,7 @@ import com.gadir.tv.util.ImagePreloader
 import java.net.URLEncoder
 
 object ChannelIconHelper {
-    private const val LIST_ICON_MAX_FALLBACKS = 12
+    private const val LIST_ICON_MAX_FALLBACKS = 24
 
     fun loadListIcon(target: ImageView, channel: LiveChannel) {
         val density = target.resources.displayMetrics.density

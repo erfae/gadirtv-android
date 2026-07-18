@@ -13,5 +13,7 @@ object VlcAudioOptions {
         "--network-caching=$networkBufferMs",
         "--live-caching=$networkBufferMs",
         "--no-video-title-show",
+        "--avcodec-hw=any",
+        "--http-reconnect",
     )
 }
