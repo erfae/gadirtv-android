@@ -7,97 +7,12 @@
     <FrameLayout
         android:id="@+id/catalogHeroContainer"
         android:layout_width="match_parent"
-        android:layout_height="168dp"
-        android:background="@color/gtv_bg">
-
-        <ImageView
-            android:id="@+id/catalogHeroImage"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:contentDescription="@null"
-            android:scaleType="centerCrop"
-            android:src="@drawable/hero_placeholder_bg" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/hero_scrim_left" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="20dp"
-            android:paddingVertical="12dp">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/catalogHeroTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:fontFamily="sans-serif-medium"
-                    android:maxLines="2"
-                    android:textColor="@android:color/white"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/catalogHeroSubtitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="@color/gtv_red_hi"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/catalogHeroPlot"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:ellipsize="end"
-                    android:lineSpacingExtra="1dp"
-                    android:maxLines="3"
-                    android:textColor="#E6FFFFFF"
-                    android:textSize="13sp" />
-
-                <TextView
-                    android:id="@+id/catalogHeroSeasons"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:ellipsize="end"
-                    android:maxLines="2"
-                    android:textColor="@color/gtv_text_dim"
-                    android:textSize="12sp"
-                    android:visibility="gone" />
-            </LinearLayout>
-
-            <ImageView
-                android:id="@+id/catalogHeroPoster"
-                android:layout_width="88dp"
-                android:layout_height="124dp"
-                android:layout_marginStart="16dp"
-                android:background="@color/gtv_surface"
-                android:contentDescription="@null"
-                android:scaleType="centerCrop"
-                android:src="@drawable/hero_placeholder_bg" />
-        </LinearLayout>
-    </FrameLayout>
+        android:layout_height="0dp"
+        android:visibility="gone" />
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
         android:orientation="horizontal">
 
         <androidx.recyclerview.widget.RecyclerView
@@ -167,6 +82,24 @@
                 android:text="@string/catalog_empty"
                 android:textColor="@color/gtv_text_dim"
                 android:textSize="16sp"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/catalogHeroImage"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/catalogHeroTitle"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/catalogHeroSubtitle"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
                 android:visibility="gone" />
         </FrameLayout>
     </LinearLayout>
