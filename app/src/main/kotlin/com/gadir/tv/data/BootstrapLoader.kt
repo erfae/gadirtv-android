@@ -16,6 +16,7 @@ object BootstrapLoader {
         onProgress: ((String) -> Unit)? = null,
     ) = withContext(Dispatchers.IO) {
         coroutineScope {
+            ContentPreloader.cancelBackgroundPreload()
             PlaylistRepository.setProfile(profile)
             PlaylistRepository.clearContentCache()
 
@@ -41,13 +42,6 @@ object BootstrapLoader {
             val recentMovies = async { HomeLoader.loadRecentMovies(api, profile) }
             val recentSeries = async { HomeLoader.loadRecentSeries(api, profile) }
             PlaylistRepository.setHomeRecent(recentMovies.await(), recentSeries.await())
-
-            ContentPreloader.preloadAll(
-                context = context,
-                api = api,
-                profile = profile,
-                onProgress = onProgress,
-            )
 
             PlaylistRepository.markBootstrapReady()
         }
