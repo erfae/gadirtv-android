@@ -604,11 +604,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun enterLiveTabFocus() {
         if (liveCategories.isEmpty()) return
-        liveCategoryList.post {
-            (liveCategoryList.layoutManager as? LinearLayoutManager)
-                ?.scrollToPositionWithOffset(0, 0)
-            TvNavHelper.focusItem(liveCategoryList, 0)
-        }
+        liveCategoryList.post { TvNavHelper.focusCategoryItem(liveCategoryList, 0) }
     }
 
     private fun resetLivePreviewUi() {
@@ -818,10 +814,9 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun focusCategoryList() {
         pauseLivePreviewPlayback()
-        scrollLiveCategoryToSelection()
         liveCategoryList.post {
             val index = if (liveChannelsLoaded) liveCategoryIndex() else 0
-            TvNavHelper.focusItem(liveCategoryList, index)
+            TvNavHelper.focusCategoryItem(liveCategoryList, index)
         }
     }
 
@@ -833,15 +828,6 @@ class MainActivity : BaseLocaleActivity() {
             .takeIf { it >= 0 } ?: 0
     }
 
-    private fun scrollLiveCategoryToSelection() {
-        if (!liveTabReady) return
-        val index = liveCategoryIndex()
-        liveCategoryList.post {
-            (liveCategoryList.layoutManager as? LinearLayoutManager)
-                ?.scrollToPositionWithOffset(index, 0)
-        }
-    }
-
     private fun focusHeaderReload() {
         btnReload.post {
             homeScrollView.smoothScrollTo(0, 0)
@@ -851,11 +837,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun focusCatalogAtIndex(index: Int) {
         if (catalogCategories.isEmpty() || index < 0) return
-        catalogCategoryList.post {
-            (catalogCategoryList.layoutManager as? LinearLayoutManager)
-                ?.scrollToPositionWithOffset(index, 0)
-            TvNavHelper.focusItem(catalogCategoryList, index)
-        }
+        catalogCategoryList.post { TvNavHelper.focusCategoryItem(catalogCategoryList, index) }
     }
 
     private fun focusFirstCatalogCategory() {
@@ -922,21 +904,13 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun enterCatalogTabFocus() {
         if (catalogCategories.isEmpty()) return
-        catalogCategoryList.post {
-            (catalogCategoryList.layoutManager as? LinearLayoutManager)
-                ?.scrollToPositionWithOffset(0, 0)
-            TvNavHelper.focusItem(catalogCategoryList, 0)
-        }
+        catalogCategoryList.post { TvNavHelper.focusCategoryItem(catalogCategoryList, 0) }
     }
 
     private fun focusCatalogCategoryList() {
         val index = catalogCategories.indexOfFirst { it.id == selectedCatalogCategoryId }
             .takeIf { it >= 0 } ?: 0
-        catalogCategoryList.post {
-            (catalogCategoryList.layoutManager as? LinearLayoutManager)
-                ?.scrollToPositionWithOffset(index, 0)
-            TvNavHelper.focusItem(catalogCategoryList, index)
-        }
+        catalogCategoryList.post { TvNavHelper.focusCategoryItem(catalogCategoryList, index) }
     }
 
     private fun catalogCategoryIndex(): Int {

@@ -73,33 +73,8 @@ class CategoryAdapter(
                     onMoveRight?.invoke()
                     onMoveRight != null
                 }
-                KeyEvent.KEYCODE_DPAD_UP -> {
-                    val pos = holder.bindingAdapterPosition
-                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
-                    if (pos == 0) {
-                        onMoveUp?.invoke()
-                        true
-                    } else {
-                        val list = holder.itemView.parent as? RecyclerView
-                        if (list != null) {
-                            TvNavHelper.moveFocus(list, pos, pos - 1, items.size)
-                        }
-                        list != null
-                    }
-                }
-                KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    val pos = holder.bindingAdapterPosition
-                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
-                    if (pos < items.lastIndex) {
-                        val list = holder.itemView.parent as? RecyclerView
-                        if (list != null) {
-                            TvNavHelper.moveFocus(list, pos, pos + 1, items.size)
-                        }
-                        list != null
-                    } else {
-                        false
-                    }
-                }
+                KeyEvent.KEYCODE_DPAD_UP -> handleVerticalKey(holder, -1)
+                KeyEvent.KEYCODE_DPAD_DOWN -> handleVerticalKey(holder, +1)
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     val pos = holder.bindingAdapterPosition
                     if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
@@ -109,6 +84,35 @@ class CategoryAdapter(
                 else -> false
             }
         }
+    }
+
+    /**
+     * NetTV-style group navigation: move one row at a time with a stable focus line.
+     * Stops at the first/last group without jumping the whole list to the top.
+     */
+    private fun handleVerticalKey(holder: Holder, direction: Int): Boolean {
+        val pos = holder.bindingAdapterPosition
+        if (pos == RecyclerView.NO_POSITION) return false
+
+        if (direction < 0) {
+            if (pos == 0) {
+                onMoveUp?.invoke()
+                return onMoveUp != null
+            }
+        } else if (pos >= items.lastIndex) {
+            onMoveDown?.invoke()
+            return true
+        }
+
+        val list = holder.itemView.parent as? RecyclerView ?: return false
+        val target = pos + direction
+        if (list.findViewHolderForAdapterPosition(target) != null) {
+            return false
+        }
+
+        TvNavHelper.scrollCategoryStep(list, direction)
+        TvNavHelper.requestFocusAt(list, target)
+        return true
     }
 
     private fun applyCategoryVisual(holder: Holder, contentSelected: Boolean, focused: Boolean) {
