@@ -7,11 +7,50 @@ import com.gadir.tv.model.Profile
 import java.net.URLEncoder
 
 object ChannelIconHelper {
-    fun load(target: ImageView, channel: LiveChannel) {
-        val fallbacks = panelFallbackUrls(PlaylistRepository.profile, channel)
+    private const val LIST_ICON_MAX_FALLBACKS = 4
+
+    fun loadListIcon(target: ImageView, channel: LiveChannel) {
         val density = target.resources.displayMetrics.density
         val size = (44 * density).toInt().coerceAtLeast(96)
-        ImageLoader.loadChannelIcon(target, channel.icon, fallbacks, size)
+        ImageLoader.clear(target)
+        ImageLoader.loadChannelIcon(
+            target = target,
+            url = channel.icon,
+            fallbacks = listFallbackUrls(PlaylistRepository.profile, channel),
+            sizePx = size,
+            loadTag = channel.streamId,
+            maxFallbacks = LIST_ICON_MAX_FALLBACKS,
+        )
+    }
+
+    fun loadPanelIcon(target: ImageView, channel: LiveChannel) {
+        val fallbacks = panelFallbackUrls(PlaylistRepository.profile, channel)
+        val density = target.resources.displayMetrics.density
+        val size = (64 * density).toInt().coerceAtLeast(128)
+        ImageLoader.loadChannelIcon(
+            target = target,
+            url = channel.icon,
+            fallbacks = fallbacks,
+            sizePx = size,
+            loadTag = "panel:${channel.streamId}",
+        )
+    }
+
+    /** @deprecated Use [loadListIcon] or [loadPanelIcon]. */
+    fun load(target: ImageView, channel: LiveChannel) = loadPanelIcon(target, channel)
+
+    private fun listFallbackUrls(profile: Profile?, channel: LiveChannel): List<String> {
+        if (profile == null || channel.streamId <= 0) return emptyList()
+        val base = HostUtils.baseUrl(profile.host).trimEnd('/')
+        val streamId = channel.streamId
+        return buildList {
+            add("$base/images/$streamId.png")
+            add("$base/images/$streamId.jpg")
+            val direct = channel.directSource.trim()
+            if (direct.startsWith("http") && looksLikeImage(direct)) {
+                add(0, direct)
+            }
+        }.distinct().filter { it.isNotBlank() }
     }
 
     fun panelFallbackUrls(profile: Profile?, channel: LiveChannel): List<String> {

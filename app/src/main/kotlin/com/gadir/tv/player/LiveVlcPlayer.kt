@@ -36,17 +36,25 @@ class LiveVlcPlayer(
     }
 
     fun play(url: String, volume: Int) {
-        mediaPlayer.stop()
-        val media = Media(libVlc, Uri.parse(url))
-        mediaPlayer.media = media
-        media.release()
-        mediaPlayer.volume = volume
-        mediaPlayer.play()
+        try {
+            mediaPlayer.stop()
+            val media = Media(libVlc, Uri.parse(url))
+            mediaPlayer.media = media
+            media.release()
+            mediaPlayer.volume = volume
+            mediaPlayer.play()
+        } catch (_: Throwable) {
+            onError()
+        }
     }
 
     fun stop() {
-        mediaPlayer.stop()
-        mediaPlayer.volume = 0
+        try {
+            mediaPlayer.stop()
+            mediaPlayer.volume = 0
+        } catch (_: Throwable) {
+            // libVLC may throw if the surface was detached during teardown.
+        }
     }
 
     fun pause() {

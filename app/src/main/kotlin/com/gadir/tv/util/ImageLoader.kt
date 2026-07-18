@@ -2,7 +2,6 @@ package com.gadir.tv.util
 
 import android.app.Activity
 import android.graphics.drawable.Drawable
-import android.net.Uri
 import android.widget.ImageView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.DataSource
@@ -20,22 +19,46 @@ object ImageLoader {
     private fun canLoadInto(target: ImageView): Boolean {
         val ctx = target.context
         if (ctx is Activity && (ctx.isFinishing || ctx.isDestroyed)) return false
+        if (!target.isAttachedToWindow) return false
         return true
     }
 
-    private val channelOptions = RequestOptions()
-        .diskCacheStrategy(DiskCacheStrategy.ALL)
-        .override(128, 128)
-        .fitCenter()
-        .placeholder(R.drawable.tv_banner)
-        .error(R.drawable.tv_banner)
+    private fun channelOptions(sizePx: Int = 128): RequestOptions =
+        RequestOptions()
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .override(sizePx, sizePx)
+            .fitCenter()
+            .placeholder(R.drawable.channel_icon_placeholder)
+            .error(R.drawable.channel_icon_placeholder)
 
     private val posterOptions = RequestOptions()
         .diskCacheStrategy(DiskCacheStrategy.ALL)
         .placeholder(R.drawable.tv_banner)
         .error(R.drawable.tv_banner)
 
-    fun loadChannelIcon(target: ImageView, url: String, fallbacks: List<String> = emptyList(), sizePx: Int = 0) {
+    fun clear(target: ImageView) {
+        if (!canLoadInto(target)) {
+            target.setImageResource(R.drawable.channel_icon_placeholder)
+            return
+        }
+        try {
+            Glide.with(target).clear(target)
+        } catch (_: Throwable) {
+            // Glide may throw if the activity is tearing down.
+        }
+        target.setTag(R.id.image_load_tag, null)
+        target.setImageResource(R.drawable.channel_icon_placeholder)
+    }
+
+    fun loadChannelIcon(
+        target: ImageView,
+        url: String,
+        fallbacks: List<String> = emptyList(),
+        sizePx: Int = 0,
+        loadTag: Any? = null,
+        maxFallbacks: Int = Int.MAX_VALUE,
+    ) {
+        val size = sizePx.coerceAtLeast(96)
         val candidates = buildList {
             val primary = ImageUrlResolver.resolve(url)
             if (primary.isNotEmpty()) add(primary)
@@ -43,17 +66,22 @@ object ImageLoader {
                 val resolved = ImageUrlResolver.resolve(candidate)
                 if (resolved.isNotEmpty() && resolved !in this) add(resolved)
             }
+        }.take(maxFallbacks.coerceAtLeast(1))
+        if (loadTag != null) {
+            target.setTag(R.id.image_load_tag, loadTag)
         }
         if (candidates.isEmpty()) {
-            target.setImageResource(R.drawable.tv_banner)
+            target.setImageResource(R.drawable.channel_icon_placeholder)
             return
         }
-        val options = if (sizePx > 0) {
-            channelOptions.override(sizePx, sizePx)
-        } else {
-            channelOptions
-        }
-        loadWithFallback(target, candidates, 0, options)
+        loadWithFallback(
+            target = target,
+            urls = candidates,
+            index = 0,
+            options = channelOptions(size),
+            loadTag = loadTag,
+            errorDrawable = R.drawable.channel_icon_placeholder,
+        )
     }
 
     fun loadPoster(target: ImageView, url: String, width: Int = 0, height: Int = 0) {
@@ -126,11 +154,15 @@ object ImageLoader {
         urls: List<String>,
         index: Int,
         options: RequestOptions,
-        errorDrawable: Int = R.drawable.tv_banner,
+        loadTag: Any? = null,
+        errorDrawable: Int = R.drawable.channel_icon_placeholder,
     ) {
         if (!canLoadInto(target)) return
+        if (loadTag != null && target.getTag(R.id.image_load_tag) != loadTag) return
         if (index >= urls.size) {
-            target.setImageResource(errorDrawable)
+            if (loadTag == null || target.getTag(R.id.image_load_tag) == loadTag) {
+                target.setImageResource(errorDrawable)
+            }
             return
         }
         try {
@@ -144,7 +176,7 @@ object ImageLoader {
                         targetView: Target<Drawable>,
                         isFirstResource: Boolean,
                     ): Boolean {
-                        loadWithFallback(target, urls, index + 1, options, errorDrawable)
+                        loadWithFallback(target, urls, index + 1, options, loadTag, errorDrawable)
                         return true
                     }
 
@@ -154,11 +186,18 @@ object ImageLoader {
                         targetView: Target<Drawable>?,
                         dataSource: DataSource,
                         isFirstResource: Boolean,
-                    ): Boolean = false
+                    ): Boolean {
+                        if (loadTag != null && target.getTag(R.id.image_load_tag) != loadTag) {
+                            return true
+                        }
+                        return false
+                    }
                 })
                 .into(target)
         } catch (_: Throwable) {
-            target.setImageResource(errorDrawable)
+            if (loadTag == null || target.getTag(R.id.image_load_tag) == loadTag) {
+                target.setImageResource(errorDrawable)
+            }
         }
     }
 
