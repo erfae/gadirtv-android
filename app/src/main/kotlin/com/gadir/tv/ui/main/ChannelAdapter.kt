@@ -127,12 +127,20 @@ class ChannelAdapter(
             val channel = itemAt(pos) ?: return@setOnKeyListener false
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    onMoveLeft?.invoke()
-                    onMoveLeft != null
+                    if (onMoveLeft != null) {
+                        onMoveLeft.invoke()
+                        true
+                    } else {
+                        false
+                    }
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    onMoveRight?.invoke()
-                    onMoveRight != null
+                    if (onMoveRight != null) {
+                        onMoveRight.invoke()
+                        true
+                    } else {
+                        true
+                    }
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     if (pos == 0) {
