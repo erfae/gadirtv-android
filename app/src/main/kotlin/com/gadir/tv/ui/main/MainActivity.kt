@@ -23,10 +23,12 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
+import com.gadir.tv.data.EpgCache
 import com.gadir.tv.data.FavoritesStore
 import com.gadir.tv.data.BootstrapLoader
 import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.LiveChannelStore
+import com.gadir.tv.data.PlotCache
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ParentalControlStore
 import com.gadir.tv.data.ParentalSession
@@ -84,6 +86,7 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_LIMIT_TV = 8
         private const val HERO_ROTATE_MS = 8000L
         private const val HERO_ROTATE_FIRST_MS = 4000L
+        private const val CHANNEL_PREVIEW_DELAY_MS = 850L
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -102,7 +105,6 @@ class MainActivity : BaseLocaleActivity() {
     private var previewUrls = listOf<String>()
     private var previewUrlIndex = 0
     private var previewWorkingUrl: String? = null
-    private val epgCache = mutableMapOf<Int, List<EpgEntry>>()
     private val previewHandler = Handler(Looper.getMainLooper())
     private var pendingPreview: Runnable? = null
     private var previewToken = 0
@@ -497,7 +499,6 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun setupLiveTab() {
-        epgCache.clear()
         liveCategories.clear()
         liveCategories.add(Category(id = "", name = getString(R.string.category_all)))
         liveCategories.add(
@@ -548,6 +549,14 @@ class MainActivity : BaseLocaleActivity() {
             onToggleLock = { channel -> toggleChannelLock(channel) },
         )
         channelList.adapter = channelAdapter
+        channelList.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) return
+                pendingPreview?.let { previewHandler.removeCallbacks(it) }
+                pendingPreview = null
+                teardownLivePreviewPlayback()
+            }
+        })
         if (DeviceUi.useDpadFocus(this)) {
             liveChannelsLoaded = false
             selectedLiveCategoryId = null
@@ -2075,13 +2084,29 @@ class MainActivity : BaseLocaleActivity() {
         return key.first == kind && key.second == id
     }
 
+    private fun cachedHeroPlot(kind: String, id: Int): CachedHeroPlot? {
+        heroPlotCache[heroPlotCacheKey(kind, id)]?.let { return it }
+        PlotCache.get(kind, id)?.let { entry ->
+            val cached = CachedHeroPlot(
+                plot = entry.plot,
+                subtitle = entry.subtitle,
+                backdrop = entry.backdrop,
+                poster = entry.poster,
+                title = entry.title,
+            )
+            heroPlotCache[heroPlotCacheKey(kind, id)] = cached
+            return cached
+        }
+        return null
+    }
+
     private fun prefetchHeroPlots() {
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
             heroItems.forEach { item ->
                 val key = heroItemContentKey(item) ?: return@forEach
                 val (kind, id) = key
-                if (heroPlotCache.containsKey(heroPlotCacheKey(kind, id))) return@forEach
+                if (cachedHeroPlot(kind, id) != null) return@forEach
                 try {
                     when (kind) {
                         HomeRailAdapter.HomeRailItem.KIND_MOVIE -> {
@@ -2121,7 +2146,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun applyCachedHeroPlot(kind: String, id: Int, backdropRequestId: Int): Boolean {
-        val cached = heroPlotCache[heroPlotCacheKey(kind, id)] ?: return false
+        val cached = cachedHeroPlot(kind, id) ?: return false
         if (!isHeroShowing(kind, id)) return true
         if (cached.title.isNotBlank()) heroTitle.text = cached.title
         heroPlot.text = cached.plot
@@ -3068,7 +3093,13 @@ class MainActivity : BaseLocaleActivity() {
             previewUrlIndex = 0
         }
         val token = previewToken
-        val delayMs = if (usesExoPreview()) 300L else 250L
+        val delayMs = if (DeviceUi.useDpadFocus(this)) {
+            CHANNEL_PREVIEW_DELAY_MS
+        } else if (usesExoPreview()) {
+            300L
+        } else {
+            250L
+        }
         val task = Runnable {
             if (token != previewToken || reloadingChannels || livePreviewPaused) return@Runnable
             if (parentalStore.requiresPinForChannel(channel, selectedLiveCategoryId)) {
@@ -3122,12 +3153,12 @@ class MainActivity : BaseLocaleActivity() {
         previewLogo.visibility = View.VISIBLE
         ChannelIconHelper.loadPanelIcon(previewLogo, channel)
         updatePreviewLockButton(channel)
-        epgCache[channel.streamId]?.takeIf { it.isNotEmpty() }?.let { applyEpg(channel, it) } ?: run {
+        EpgCache.get(channel.streamId)?.takeIf { it.isNotEmpty() }?.let { applyEpg(channel, it) } ?: run {
             epgNow.text = getString(R.string.epg_loading)
             epgNext.visibility = View.GONE
         }
         val profile = PlaylistRepository.profile ?: return
-        if (epgCache[channel.streamId]?.isNotEmpty() == true) return
+        if (EpgCache.get(channel.streamId)?.isNotEmpty() == true) return
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {
                 api.shortEpg(
@@ -3139,7 +3170,7 @@ class MainActivity : BaseLocaleActivity() {
             }
             if (currentPreviewChannel?.streamId != channel.streamId) return@launch
             if (epg.isNotEmpty()) {
-                epgCache[channel.streamId] = epg
+                EpgCache.put(channel.streamId, epg)
             }
             applyEpg(channel, epg)
         }

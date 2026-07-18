@@ -120,6 +120,8 @@ object PlaylistRepository {
         homeRecentMovies = emptyList()
         homeRecentSeries = emptyList()
         bootstrapReady = false
+        PlotCache.clear()
+        EpgCache.clear()
     }
 
     fun clear() {
@@ -135,5 +137,7 @@ object PlaylistRepository {
         bootstrapReady = false
         accountInfo = null
         userAgent = "XCIPTV"
+        PlotCache.clear()
+        EpgCache.clear()
     }
 }
