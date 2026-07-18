@@ -249,9 +249,18 @@ class MainActivity : BaseLocaleActivity() {
         epgNext = panel.findViewById(R.id.epgNext)
         previewContainer = panel.findViewById(R.id.previewContainer)
         if (DeviceUi.useDpadFocus(this)) {
-            previewContainer?.isFocusable = false
-            previewContainer?.isFocusableInTouchMode = false
-            channelList.nextFocusRightId = View.NO_ID
+            previewContainer?.isFocusable = true
+            previewContainer?.isFocusableInTouchMode = true
+            channelList.nextFocusLeftId = View.NO_ID
+            if (isLivePreviewBesideChannels()) {
+                channelList.nextFocusRightId = R.id.previewContainer
+                previewContainer?.nextFocusLeftId = R.id.channelList
+            } else {
+                channelList.nextFocusRightId = View.NO_ID
+                channelList.nextFocusDownId = R.id.previewContainer
+                previewContainer?.nextFocusUpId = R.id.channelList
+            }
+            liveCategoryList.nextFocusRightId = R.id.channelList
         }
         liveCategoryList.layoutManager = LinearLayoutManager(this)
         channelList.layoutManager = LinearLayoutManager(this)
@@ -522,7 +531,8 @@ class MainActivity : BaseLocaleActivity() {
                     selectChannelPreview(channel)
                 }
             },
-            onMoveLeft = { focusCategoryList() },
+            onMoveLeft = { enterLivePreviewFromChannels() },
+            onMoveRight = { enterLivePreviewFromChannels() },
             isFavorite = { favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId) },
             onToggleFavorite = { channel ->
                 favoritesStore.toggle(FavoritesStore.KIND_LIVE, channel.streamId)
@@ -655,7 +665,7 @@ class MainActivity : BaseLocaleActivity() {
             onClick = { cat -> applyLiveCategoryClick(cat, enterContent = true) },
             onFocus = null,
             onMoveRight = {
-                val index = if (liveChannelsLoaded) liveCategoryIndex() else 0
+                val index = focusedLiveCategoryIndex()
                 liveCategories.getOrNull(index)?.let { applyLiveCategoryClick(it, enterContent = true) }
             },
             onMoveUp = { focusHeaderReload() },
@@ -666,6 +676,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun focusFirstChannel() {
         if (channels.isEmpty()) return
+        clearLiveCategoryFocusRing()
         TvNavHelper.focusItem(channelList, 0)
     }
 
@@ -743,7 +754,33 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun focusPreviewPanel() {
         if (currentPreviewChannel == null) return
+        clearLiveCategoryFocusRing()
         previewContainer?.requestFocus()
+    }
+
+    private fun enterLivePreviewFromChannels() {
+        if (currentPreviewChannel == null) return
+        focusPreviewPanel()
+    }
+
+    private fun clearLiveCategoryFocusRing() {
+        liveCategoryList.focusedChild?.clearFocus()
+        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+    }
+
+    private fun focusedLiveCategoryIndex(): Int {
+        val child = liveCategoryList.focusedChild
+        if (child != null) {
+            val pos = liveCategoryList.getChildAdapterPosition(child)
+            if (pos >= 0) return pos
+        }
+        return liveCategoryIndex()
+    }
+
+    private fun isLivePreviewBesideChannels(): Boolean {
+        val preview = previewContainer ?: return false
+        val params = preview.layoutParams as? LinearLayout.LayoutParams ?: return false
+        return params.width == 0 && params.weight > 0f
     }
 
     private fun isFocusInPreviewPanel(): Boolean {
@@ -755,6 +792,7 @@ class MainActivity : BaseLocaleActivity() {
         val target = channel ?: currentPreviewChannel ?: return
         val index = channels.indexOfFirst { it.streamId == target.streamId }
         if (index < 0) return
+        clearLiveCategoryFocusRing()
         TvNavHelper.focusItem(channelList, index)
     }
 
@@ -817,6 +855,7 @@ class MainActivity : BaseLocaleActivity() {
         liveCategoryList.post {
             val index = if (liveChannelsLoaded) liveCategoryIndex() else 0
             TvNavHelper.focusCategoryItem(liveCategoryList, index)
+            (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
         }
     }
 
@@ -3288,6 +3327,7 @@ class MainActivity : BaseLocaleActivity() {
                 when {
                     isFocusInHeader() -> focusBottomTab(Tab.LIVE)
                     isFocusInBottomNav() -> focusCategoryList()
+                    isFocusInPreviewPanel() -> focusChannelAt(currentPreviewChannel)
                     isFocusInList(channelList) -> focusCategoryList()
                     isFocusInList(liveCategoryList) -> focusBottomTab(Tab.LIVE)
                     else -> focusCategoryList()
