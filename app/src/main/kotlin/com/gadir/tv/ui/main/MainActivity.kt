@@ -532,7 +532,7 @@ class MainActivity : BaseLocaleActivity() {
                     selectChannelPreview(channel)
                 }
             },
-            onMoveLeft = { enterLivePreviewFromChannels() },
+            onMoveLeft = { focusCategoryList() },
             onMoveRight = { enterLivePreviewFromChannels() },
             isFavorite = { favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId) },
             onToggleFavorite = { channel ->
@@ -3058,7 +3058,6 @@ class MainActivity : BaseLocaleActivity() {
         val channelChanged = previewingStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) return
         if (channelChanged) {
-            previewToken++
             teardownLivePreviewPlayback()
             ensurePreviewPlayer()
             setPreviewVideoVisible(false)
@@ -3121,7 +3120,7 @@ class MainActivity : BaseLocaleActivity() {
         liveChannelStore.lastCategoryId = selectedLiveCategoryId ?: ""
         previewTitle.text = channel.name
         previewLogo.visibility = View.VISIBLE
-        ChannelIconHelper.load(previewLogo, channel)
+        ChannelIconHelper.loadPanelIcon(previewLogo, channel)
         updatePreviewLockButton(channel)
         epgCache[channel.streamId]?.takeIf { it.isNotEmpty() }?.let { applyEpg(channel, it) } ?: run {
             epgNow.text = getString(R.string.epg_loading)
@@ -3198,10 +3197,16 @@ class MainActivity : BaseLocaleActivity() {
             0
         }
         armPreviewTimeout(token)
-        if (usesExoPreview()) {
-            miniExoPlayer?.play(url, volume)
-        } else {
-            miniVlcPlayer?.play(url, volume)
+        try {
+            if (usesExoPreview()) {
+                miniExoPlayer?.play(url, volume)
+            } else {
+                miniVlcPlayer?.play(url, volume)
+            }
+        } catch (_: Throwable) {
+            if (token == previewToken && !tryNextPreviewUrl(token)) {
+                showNoSignal()
+            }
         }
     }
 

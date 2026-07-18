@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.util.ChannelIconHelper
+import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.TvNavHelper
 import com.gadir.tv.model.LiveChannel
 
@@ -71,11 +72,16 @@ class ChannelAdapter(
         return Holder(view)
     }
 
+    override fun onViewRecycled(holder: Holder) {
+        ImageLoader.clear(holder.icon)
+        super.onViewRecycled(holder)
+    }
+
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val item = itemAt(position) ?: return
         holder.number.text = (position + 1).toString()
         holder.name.text = item.name
-        ChannelIconHelper.load(holder.icon, item)
+        ChannelIconHelper.loadListIcon(holder.icon, item)
         holder.favorite.setImageResource(
             if (isFavorite(item)) R.drawable.ic_favorite_on else R.drawable.ic_favorite_off,
         )
