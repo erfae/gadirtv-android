@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="TextAppearance.GadirTV" parent="TextAppearance.AppCompat">
+        <item name="android:fontFamily">@font/gtv_font_ui</item>
+        <item name="fontFamily">@font/gtv_font_ui</item>
+    </style>
+
+    <style name="TextAppearance.GadirTV.Title" parent="TextAppearance.AppCompat.Title">
+        <item name="android:fontFamily">@font/gtv_font_title</item>
+        <item name="fontFamily">@font/gtv_font_title</item>
+    </style>
+
+    <style name="TextAppearance.GadirTV.Numbers" parent="TextAppearance.GadirTV">
+        <item name="android:fontFamily">@font/gtv_font_numbers</item>
+        <item name="fontFamily">@font/gtv_font_numbers</item>
+    </style>
+</resources>

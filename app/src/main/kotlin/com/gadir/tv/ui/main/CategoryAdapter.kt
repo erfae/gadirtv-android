@@ -1,12 +1,12 @@
 package com.gadir.tv.ui.main
 
-import android.graphics.Typeface
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.model.Category
@@ -128,8 +128,10 @@ class CategoryAdapter(
             },
         )
         holder.name.setTypeface(
-            null,
-            if (contentSelected && !focused) Typeface.BOLD else Typeface.NORMAL,
+            ResourcesCompat.getFont(
+                context,
+                if (contentSelected && !focused) R.font.gtv_font_title else R.font.gtv_font_ui,
+            ),
         )
     }
 

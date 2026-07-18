@@ -7,6 +7,25 @@
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="android:statusBarColor">@color/gtv_bg</item>
         <item name="android:navigationBarColor">@color/gtv_bg</item>
+        <item name="android:fontFamily">@font/gtv_font_ui</item>
+        <item name="fontFamily">@font/gtv_font_ui</item>
+        <item name="android:textViewStyle">@style/Widget.GadirTV.TextView</item>
+        <item name="materialButtonStyle">@style/Widget.GadirTV.Button</item>
+        <item name="textAppearanceHeadline6">@style/TextAppearance.GadirTV.Title</item>
+        <item name="textAppearanceSubtitle1">@style/TextAppearance.GadirTV</item>
+        <item name="textAppearanceBody1">@style/TextAppearance.GadirTV</item>
+        <item name="textAppearanceBody2">@style/TextAppearance.GadirTV</item>
+        <item name="textAppearanceCaption">@style/TextAppearance.GadirTV</item>
+    </style>
+
+    <style name="Widget.GadirTV.TextView" parent="android:Widget.TextView">
+        <item name="android:fontFamily">@font/gtv_font_ui</item>
+        <item name="fontFamily">@font/gtv_font_ui</item>
+    </style>
+
+    <style name="Widget.GadirTV.Button" parent="Widget.MaterialComponents.Button">
+        <item name="android:fontFamily">@font/gtv_font_ui</item>
+        <item name="fontFamily">@font/gtv_font_ui</item>
     </style>
 
     <style name="Theme.GadirTV.Player" parent="Theme.GadirTV">

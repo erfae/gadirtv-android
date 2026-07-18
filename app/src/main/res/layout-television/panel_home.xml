@@ -61,7 +61,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:ellipsize="end"
-                    android:fontFamily="sans-serif-medium"
+                    android:fontFamily="@font/gtv_font_ui"
                     android:maxLines="2"
                     android:textColor="@android:color/white"
                     android:textSize="22sp"
