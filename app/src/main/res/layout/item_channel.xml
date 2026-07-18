@@ -25,14 +25,16 @@
         android:layout_height="48dp"
         android:layout_marginStart="8dp"
         android:background="@drawable/channel_icon_frame"
-        android:padding="5dp">
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:padding="2dp">
 
         <ImageView
             android:id="@+id/channelIcon"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:contentDescription="@null"
-            android:scaleType="fitCenter"
+            android:scaleType="centerInside"
             android:src="@drawable/tv_banner" />
     </FrameLayout>
 

@@ -109,6 +109,7 @@ class MainActivity : BaseLocaleActivity() {
     private var selectedLiveCategoryId: String? = null
     private var liveChannelsLoaded = false
     private var liveEnterContentOnLoad = false
+    private var liveCategoryFocusIndex = 0
     private var catalogEnterContentOnLoad = false
     private var selectedCatalogCategoryId: String? = null
     private var movieCategoryId: String? = null
@@ -571,6 +572,8 @@ class MainActivity : BaseLocaleActivity() {
             return
         }
         highlightLiveCategory(newId)
+        val newIndex = liveCategories.indexOfFirst { liveCategoryId(it) == newId }
+        if (newIndex >= 0) liveCategoryFocusIndex = newIndex
         liveChannelsLoaded = true
         liveEnterContentOnLoad = enterContent
         reloadChannels(keepCategoryFocus = true, autoPreviewFirst = false)
@@ -604,17 +607,22 @@ class MainActivity : BaseLocaleActivity() {
     private fun openLiveTabAtFirstGroup() {
         liveCategoryHandler.removeCallbacksAndMessages(null)
         if (liveCategories.isEmpty()) return
-        val firstId = liveCategoryId(liveCategories.first())
-        selectedLiveCategoryId = firstId
-        liveChannelsLoaded = true
+        liveChannelsLoaded = false
+        selectedLiveCategoryId = null
         liveEnterContentOnLoad = false
-        highlightLiveCategory(firstId)
-        reloadChannels(keepCategoryFocus = true, autoPreviewFirst = false)
+        liveCategoryFocusIndex = 0
+        channels.clear()
+        channelAdapter?.notifyDataSetChanged()
+        teardownLivePreviewPlayback()
+        showLiveSelectPrompt()
+        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
     }
 
     private fun enterLiveTabFocus() {
         if (liveCategories.isEmpty()) return
-        liveCategoryList.post { TvNavHelper.focusCategoryItem(liveCategoryList, 0) }
+        liveCategoryList.post {
+            TvNavHelper.focusCategoryItem(liveCategoryList, liveCategoryFocusIndex)
+        }
     }
 
     private fun resetLivePreviewUi() {
@@ -663,10 +671,17 @@ class MainActivity : BaseLocaleActivity() {
             items = liveCategories,
             selectedId = { liveCategoryAdapterSelectedId() },
             onClick = { cat -> applyLiveCategoryClick(cat, enterContent = true) },
-            onFocus = null,
+            onFocus = { cat ->
+                val idx = liveCategories.indexOfFirst { liveCategoryId(it) == liveCategoryId(cat) }
+                if (idx >= 0) liveCategoryFocusIndex = idx
+            },
             onMoveRight = {
                 val index = focusedLiveCategoryIndex()
-                liveCategories.getOrNull(index)?.let { applyLiveCategoryClick(it, enterContent = true) }
+                val cat = liveCategories.getOrNull(index) ?: return@CategoryAdapter
+                val catId = liveCategoryId(cat)
+                if (liveChannelsLoaded && catId == selectedLiveCategoryId && channels.isNotEmpty()) {
+                    focusFirstChannel()
+                }
             },
             onMoveUp = { focusHeaderReload() },
             upFocusViewId = R.id.btnReload,
@@ -753,8 +768,10 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun focusPreviewPanel() {
-        if (currentPreviewChannel == null) return
+        val channel = currentPreviewChannel ?: return
         clearLiveCategoryFocusRing()
+        livePreviewPaused = false
+        schedulePreviewPlayback(channel)
         previewContainer?.requestFocus()
     }
 
@@ -853,7 +870,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun focusCategoryList() {
         pauseLivePreviewPlayback()
         liveCategoryList.post {
-            val index = if (liveChannelsLoaded) liveCategoryIndex() else 0
+            val index = if (liveChannelsLoaded) liveCategoryIndex() else liveCategoryFocusIndex
             TvNavHelper.focusCategoryItem(liveCategoryList, index)
             (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
         }
@@ -3040,13 +3057,16 @@ class MainActivity : BaseLocaleActivity() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val channelChanged = previewingStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) return
-        if (!channelChanged && previewUrlIndex > 0 && previewUrls.isNotEmpty()) return
         if (channelChanged) {
             previewToken++
             teardownLivePreviewPlayback()
             ensurePreviewPlayer()
             setPreviewVideoVisible(false)
             hideNoSignal()
+            previewUrlIndex = 0
+            previewUrls = emptyList()
+        } else if (!previewIsSettled()) {
+            previewUrlIndex = 0
         }
         val token = previewToken
         val delayMs = if (usesExoPreview()) 300L else 250L
