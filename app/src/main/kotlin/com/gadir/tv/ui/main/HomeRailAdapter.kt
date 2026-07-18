@@ -65,7 +65,7 @@ class HomeRailAdapter(
         val television = DeviceUi.isTelevision(holder.itemView.context)
         if (item.imageUrl.isNotEmpty()) {
             when {
-                television -> ImageLoader.loadPoster(holder.image, item.imageUrl, 220, 124)
+                television -> ImageLoader.loadPoster(holder.image, item.imageUrl, 180, 100)
                 compact && landscape -> ImageLoader.loadPoster(holder.image, item.imageUrl, 96, 108)
                 compact -> ImageLoader.loadPoster(holder.image, item.imageUrl, 130, 180)
                 landscape -> ImageLoader.loadPoster(holder.image, item.imageUrl, 180, 100)

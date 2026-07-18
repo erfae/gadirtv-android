@@ -9,6 +9,7 @@ object PlotCache {
         val backdrop: String = "",
         val poster: String = "",
         val title: String = "",
+        val seasonsSummary: String = "",
     )
 
     private val entries = ConcurrentHashMap<String, Entry>()

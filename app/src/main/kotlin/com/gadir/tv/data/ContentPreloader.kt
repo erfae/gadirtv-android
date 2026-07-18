@@ -239,6 +239,7 @@ object ContentPreloader {
         if (PlotCache.get(kind, item.seriesId) != null) return
         val detail = runCatching { api.seriesInfo(profile, item.seriesId) }.getOrNull() ?: return
         val backdrop = detail.backdrop.ifBlank { detail.cover }
+        val seasonsSummary = formatSeriesSeasons(context, detail.seasons.keys)
         PlotCache.put(
             kind,
             item.seriesId,
@@ -250,8 +251,18 @@ object ContentPreloader {
                 backdrop = backdrop,
                 poster = detail.cover,
                 title = detail.name,
+                seasonsSummary = seasonsSummary,
             ),
         )
+    }
+
+    private fun formatSeriesSeasons(context: Context, seasonKeys: Set<String>): String {
+        if (seasonKeys.isEmpty()) return ""
+        val sorted = seasonKeys.sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
+        val labels = sorted.map { key ->
+            context.getString(R.string.season_label, key)
+        }
+        return context.getString(R.string.seasons_label) + ": " + labels.joinToString(" · ")
     }
 
     private suspend fun preloadEpg(
