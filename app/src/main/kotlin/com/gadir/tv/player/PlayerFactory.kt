@@ -71,10 +71,10 @@ object PlayerFactory {
         val bufferMs = AppSettings(context).networkBufferMs
         return build(
             context = context,
-            minBuffer = (bufferMs * 4).coerceIn(6_000, 18_000),
-            maxBuffer = (bufferMs * 10).coerceIn(20_000, 50_000),
-            playbackBuffer = (bufferMs * 2).coerceIn(2_500, 8_000),
-            rebuffer = (bufferMs * 4).coerceIn(4_000, 12_000),
+            minBuffer = (bufferMs * 8).coerceIn(8_000, 25_000),
+            maxBuffer = (bufferMs * 20).coerceIn(30_000, 90_000),
+            playbackBuffer = (bufferMs * 3).coerceIn(3_000, 12_000),
+            rebuffer = (bufferMs * 6).coerceIn(6_000, 18_000),
             audioAttributes = liveAudioAttributes(),
             handleAudioFocus = false,
         )
@@ -84,10 +84,10 @@ object PlayerFactory {
         val bufferMs = AppSettings(context).networkBufferMs
         return build(
             context = context,
-            minBuffer = (bufferMs * 6).coerceIn(8_000, 25_000),
-            maxBuffer = (bufferMs * 16).coerceIn(25_000, 60_000),
-            playbackBuffer = (bufferMs * 3).coerceIn(2_500, 10_000),
-            rebuffer = (bufferMs * 5).coerceIn(5_000, 15_000),
+            minBuffer = (bufferMs * 8).coerceIn(10_000, 30_000),
+            maxBuffer = (bufferMs * 24).coerceIn(35_000, 90_000),
+            playbackBuffer = (bufferMs * 4).coerceIn(3_000, 12_000),
+            rebuffer = (bufferMs * 6).coerceIn(6_000, 20_000),
             audioAttributes = liveAudioAttributes(),
             handleAudioFocus = true,
         )

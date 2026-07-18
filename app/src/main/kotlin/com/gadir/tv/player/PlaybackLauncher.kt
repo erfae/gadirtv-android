@@ -7,17 +7,15 @@ import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.ui.player.PlayerActivity
 import com.gadir.tv.ui.player.VlcPlayerActivity
-import com.gadir.tv.util.DeviceUi
 
 object PlaybackLauncher {
     fun play(context: Context, request: PlaybackRequest) {
         val settings = AppSettings(context)
         val isVod = request.kind == ResumeStore.KIND_MOVIE || request.kind == ResumeStore.KIND_SERIES
         when {
-            request.kind == ResumeStore.KIND_LIVE -> launchVlc(context, request)
             settings.playerMode == AppSettings.PLAYER_EXTERNAL ->
                 launchExternal(context, request, settings)
-            isVod && (settings.isVlcPlayer || DeviceUi.useDpadFocus(context)) ->
+            request.kind == ResumeStore.KIND_LIVE || isVod ->
                 launchVlc(context, request)
             settings.playerMode == AppSettings.PLAYER_VLC ->
                 launchVlc(context, request)

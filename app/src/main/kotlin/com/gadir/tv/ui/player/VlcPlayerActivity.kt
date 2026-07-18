@@ -101,7 +101,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         }
 
         val settings = AppSettings(this)
-        val bufferMs = if (isLivePlayback) settings.networkBufferMs else AppSettings.BUFFER_FAST_MS
+        val bufferMs = settings.networkBufferMs.coerceAtLeast(AppSettings.BUFFER_FAST_MS)
         val options = com.gadir.tv.player.VlcAudioOptions.baseOptions(bufferMs)
         libVlc = LibVLC(this, options)
         mediaPlayer = MediaPlayer(libVlc).apply {

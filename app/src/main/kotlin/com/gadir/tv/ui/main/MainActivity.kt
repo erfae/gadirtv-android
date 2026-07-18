@@ -93,8 +93,8 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_LIMIT_TV = 8
         private const val HERO_ROTATE_MS = 8000L
         private const val HERO_ROTATE_FIRST_MS = 4000L
-        private const val CHANNEL_PREVIEW_DELAY_MS = 850L
-        private const val PREVIEW_TIMEOUT_MS = 15_000L
+        private const val CHANNEL_PREVIEW_DELAY_MS = 400L
+        private const val PREVIEW_TIMEOUT_MS = 10_000L
         private const val CATALOG_PREFETCH_DELAY_MS = 280L
     }
     private val api = XtreamApi()
@@ -600,7 +600,6 @@ class MainActivity : BaseLocaleActivity() {
                 if (newState == RecyclerView.SCROLL_STATE_IDLE) return
                 pendingPreview?.let { previewHandler.removeCallbacks(it) }
                 pendingPreview = null
-                teardownLivePreviewPlayback()
             }
         })
         if (DeviceUi.useDpadFocus(this)) {
@@ -1104,6 +1103,8 @@ class MainActivity : BaseLocaleActivity() {
     private fun focusCategoryList() {
         pauseLivePreviewPlayback()
         liveChannelsLoaded = false
+        liveBrowsingCategoryId = liveCategories.getOrNull(liveCategoryFocusIndex.coerceAtLeast(0))
+            ?.let { liveCategoryId(it) }
         (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
         liveCategoryList.post {
             val index = liveCategoryFocusIndex.coerceAtLeast(0)
@@ -1157,13 +1158,22 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun browseCatalogCategory(tab: Tab, cat: Category, enterContent: Boolean) {
         val catId = cat.id
-        if (enterContent && catId == selectedCatalogCategoryId && posterItems.isNotEmpty()) {
+        if (enterContent && catId == catalogBrowsingCategoryId && posterItems.isNotEmpty()) {
+            selectedCatalogCategoryId = catId
+            catalogBrowsingCategoryId = null
+            when (tab) {
+                Tab.MOVIES -> moviesGroupLoaded = true
+                Tab.SERIES -> seriesGroupLoaded = true
+                else -> Unit
+            }
+            highlightCatalogCategory(tab, catId)
+            catalogGrid.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
             focusFirstCatalogItem()
             return
         }
         catalogBrowsingCategoryId = catId
-        selectedCatalogCategoryId = catId
         if (enterContent) {
+            selectedCatalogCategoryId = catId
             catalogBrowsingCategoryId = null
             when (tab) {
                 Tab.MOVIES -> moviesGroupLoaded = true
@@ -1259,32 +1269,41 @@ class MainActivity : BaseLocaleActivity() {
 
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
-            catalogCategories.forEach { cat ->
-                if (cat.id == ResumeStore.RESUME_CATEGORY_ID) return@forEach
-                if (catalogCategoryCounts.containsKey(cat.id)) return@forEach
-                try {
-                    val size = withContext(Dispatchers.IO) {
-                        when (tab) {
-                            Tab.MOVIES -> {
-                                val movies = api.vodStreams(profile, cat.id)
-                                PlaylistRepository.cacheVod(cat.id, movies)
-                                movies.size
+            val pending = catalogCategories.filter { cat ->
+                cat.id != ResumeStore.RESUME_CATEGORY_ID && !catalogCategoryCounts.containsKey(cat.id)
+            }
+            if (pending.isEmpty()) return@launch
+
+            val semaphore = Semaphore(6)
+            coroutineScope {
+                pending.map { cat ->
+                    async(Dispatchers.IO) {
+                        semaphore.withPermit {
+                            try {
+                                val size = when (tab) {
+                                    Tab.MOVIES -> {
+                                        val movies = api.vodStreams(profile, cat.id)
+                                        PlaylistRepository.cacheVod(cat.id, movies)
+                                        movies.size
+                                    }
+                                    Tab.SERIES -> {
+                                        val series = api.seriesList(profile, cat.id)
+                                        PlaylistRepository.cacheSeries(cat.id, series)
+                                        series.size
+                                    }
+                                    else -> 0
+                                }
+                                cat.id to size
+                            } catch (_: Exception) {
+                                null
                             }
-                            Tab.SERIES -> {
-                                val series = api.seriesList(profile, cat.id)
-                                PlaylistRepository.cacheSeries(cat.id, series)
-                                series.size
-                            }
-                            else -> 0
                         }
                     }
-                    catalogCategoryCounts[cat.id] = size
-                    withContext(Dispatchers.Main) {
-                        if (currentTab == tab) catalogCategoryAdapter?.refreshSelection()
-                    }
-                } catch (_: Exception) {
+                }.awaitAll().filterNotNull().forEach { (catId, size) ->
+                    catalogCategoryCounts[catId] = size
                 }
             }
+            if (currentTab == tab) catalogCategoryAdapter?.refreshSelection()
         }
     }
 
@@ -1309,19 +1328,22 @@ class MainActivity : BaseLocaleActivity() {
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
             try {
-                withContext(Dispatchers.IO) {
+                val size = withContext(Dispatchers.IO) {
                     when (tab) {
                         Tab.MOVIES -> {
                             val movies = api.vodStreams(profile, catId)
                             PlaylistRepository.cacheVod(catId, movies)
+                            movies
                         }
                         Tab.SERIES -> {
                             val series = api.seriesList(profile, catId)
                             PlaylistRepository.cacheSeries(catId, series)
+                            series
                         }
-                        else -> Unit
+                        else -> emptyList<Any>()
                     }
                 }
+                catalogCategoryCounts[catId] = size.size
                 catalogCategoryAdapter?.refreshSelection()
             } catch (_: Exception) {
             }
@@ -1360,10 +1382,12 @@ class MainActivity : BaseLocaleActivity() {
             Tab.SERIES -> seriesGroupLoaded = false
             else -> Unit
         }
+        catalogBrowsingCategoryId = catalogCategories.getOrNull(catalogCategoryFocusIndex.coerceAtLeast(0))?.id
         (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
         val index = catalogCategories.indexOfFirst { it.id == selectedCatalogCategoryId }
             .takeIf { it >= 0 } ?: catalogCategoryFocusIndex
-        catalogCategoryList.post { TvNavHelper.focusCategoryItem(catalogCategoryList, index) }
+        catalogCategoryFocusIndex = index.coerceAtLeast(0)
+        catalogCategoryList.post { TvNavHelper.focusCategoryItem(catalogCategoryList, catalogCategoryFocusIndex) }
     }
 
     private fun catalogCategoryIndex(): Int {
@@ -3135,8 +3159,11 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun activeCatalogCategoryId(): String? =
+        catalogBrowsingCategoryId ?: selectedCatalogCategoryId
+
     private fun selectedCatalogCategoryName(): String =
-        catalogCategories.firstOrNull { it.id == selectedCatalogCategoryId }?.name.orEmpty()
+        catalogCategories.firstOrNull { it.id == activeCatalogCategoryId() }?.name.orEmpty()
 
     private fun bindMovies(movies: List<VodMovie>) {
         catalogLoading.visibility = View.GONE
@@ -4042,7 +4069,7 @@ class MainActivity : BaseLocaleActivity() {
         miniVlcPlayer = LiveVlcPlayer(
             context = this,
             videoLayout = videoLayout,
-            networkBufferMs = appSettings.networkBufferMs,
+            networkBufferMs = (appSettings.networkBufferMs * 2).coerceIn(2_000, 12_000),
             onError = {
                 setPreviewVideoVisible(false)
                 if (!tryNextPreviewUrl()) {
