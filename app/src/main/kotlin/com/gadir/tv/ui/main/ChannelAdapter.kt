@@ -142,30 +142,8 @@ class ChannelAdapter(
                         true
                     }
                 }
-                KeyEvent.KEYCODE_DPAD_UP -> {
-                    if (pos == 0) {
-                        onMoveUp?.invoke()
-                        onMoveUp != null
-                    } else {
-                        val list = holder.itemView.parent as? RecyclerView
-                        if (list != null) {
-                            TvNavHelper.moveFocus(list, pos, pos - 1, itemCount())
-                        }
-                        list != null
-                    }
-                }
-                KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    if (pos < itemCount() - 1) {
-                        val list = holder.itemView.parent as? RecyclerView
-                        if (list != null) {
-                            TvNavHelper.moveFocus(list, pos, pos + 1, itemCount())
-                        }
-                        list != null
-                    } else {
-                        onMoveDown?.invoke()
-                        onMoveDown != null
-                    }
-                }
+                KeyEvent.KEYCODE_DPAD_UP -> handleVerticalKey(holder, -1)
+                KeyEvent.KEYCODE_DPAD_DOWN -> handleVerticalKey(holder, +1)
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     openChannel(channel)
                     true
@@ -177,6 +155,32 @@ class ChannelAdapter(
                 else -> false
             }
         }
+    }
+
+    private fun handleVerticalKey(holder: Holder, direction: Int): Boolean {
+        val pos = holder.bindingAdapterPosition
+        if (pos == RecyclerView.NO_POSITION) return false
+        val total = itemCount()
+
+        if (direction < 0) {
+            if (pos == 0) {
+                onMoveUp?.invoke()
+                return onMoveUp != null
+            }
+        } else if (pos >= total - 1) {
+            onMoveDown?.invoke()
+            return true
+        }
+
+        val list = holder.itemView.parent as? RecyclerView ?: return false
+        val target = pos + direction
+        if (list.findViewHolderForAdapterPosition(target) != null) {
+            return false
+        }
+
+        TvNavHelper.scrollCategoryStep(list, direction)
+        TvNavHelper.requestFocusAt(list, target)
+        return true
     }
 
     private fun openChannel(item: LiveChannel) {

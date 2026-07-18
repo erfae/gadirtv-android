@@ -9,7 +9,9 @@ import java.net.URLEncoder
 object ChannelIconHelper {
     fun load(target: ImageView, channel: LiveChannel) {
         val fallbacks = panelFallbackUrls(PlaylistRepository.profile, channel)
-        ImageLoader.loadChannelIcon(target, channel.icon, fallbacks)
+        val density = target.resources.displayMetrics.density
+        val size = (44 * density).toInt().coerceAtLeast(96)
+        ImageLoader.loadChannelIcon(target, channel.icon, fallbacks, size)
     }
 
     fun panelFallbackUrls(profile: Profile?, channel: LiveChannel): List<String> {

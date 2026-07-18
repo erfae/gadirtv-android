@@ -35,7 +35,7 @@ object ImageLoader {
         .placeholder(R.drawable.tv_banner)
         .error(R.drawable.tv_banner)
 
-    fun loadChannelIcon(target: ImageView, url: String, fallbacks: List<String> = emptyList()) {
+    fun loadChannelIcon(target: ImageView, url: String, fallbacks: List<String> = emptyList(), sizePx: Int = 0) {
         val candidates = buildList {
             val primary = ImageUrlResolver.resolve(url)
             if (primary.isNotEmpty()) add(primary)
@@ -48,7 +48,12 @@ object ImageLoader {
             target.setImageResource(R.drawable.tv_banner)
             return
         }
-        loadWithFallback(target, candidates, 0, channelOptions)
+        val options = if (sizePx > 0) {
+            channelOptions.override(sizePx, sizePx)
+        } else {
+            channelOptions
+        }
+        loadWithFallback(target, candidates, 0, options)
     }
 
     fun loadPoster(target: ImageView, url: String, width: Int = 0, height: Int = 0) {
