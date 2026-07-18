@@ -119,6 +119,9 @@ class MainActivity : BaseLocaleActivity() {
     private var seriesCategoryId: String? = null
     private var moviesCatalogReady = false
     private var seriesCatalogReady = false
+    private var moviesGroupLoaded = false
+    private var seriesGroupLoaded = false
+    private var catalogCategoryFocusIndex = 0
     private var currentTab = Tab.HOME
     private var previousTab = Tab.HOME
 
@@ -930,33 +933,53 @@ class MainActivity : BaseLocaleActivity() {
         val cats = catalogCategoriesFor(tab)
         catalogCategories.clear()
         catalogCategories.addAll(cats)
-        val firstId = cats.firstOrNull()?.id ?: return
-        selectedCatalogCategoryId = firstId
         when (tab) {
-            Tab.MOVIES -> movieCategoryId = firstId
-            Tab.SERIES -> seriesCategoryId = firstId
+            Tab.MOVIES -> {
+                moviesGroupLoaded = false
+                movieCategoryId = null
+            }
+            Tab.SERIES -> {
+                seriesGroupLoaded = false
+                seriesCategoryId = null
+            }
             else -> Unit
         }
+        selectedCatalogCategoryId = null
         catalogEnterContentOnLoad = false
+        catalogCategoryFocusIndex = 0
+        posterItems.clear()
+        catalogGrid.adapter?.notifyDataSetChanged()
         bindCatalogCategoryAdapter(tab)
-        loadCatalogItems(tab, firstId)
+        showCatalogSelectPrompt()
+        (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+    }
+
+    private fun catalogAdapterSelectedId(tab: Tab): String? {
+        val loaded = when (tab) {
+            Tab.MOVIES -> moviesGroupLoaded
+            Tab.SERIES -> seriesGroupLoaded
+            else -> false
+        }
+        if (!loaded) return null
+        return selectedCatalogCategoryId
     }
 
     private fun selectCatalogGroup(tab: Tab, cat: Category, enterContent: Boolean) {
+        if (!enterContent) return
         val catId = cat.id
         if (catId == selectedCatalogCategoryId && posterItems.isNotEmpty()) {
-            if (enterContent) focusFirstCatalogItem()
+            focusFirstCatalogItem()
             return
         }
-        catalogEnterContentOnLoad = enterContent
+        catalogEnterContentOnLoad = true
         catalogCategoryHandler.removeCallbacksAndMessages(null)
-        highlightCatalogCategory(tab, catId)
-        val loadTask = Runnable { loadCatalogItems(tab, catId) }
-        if (enterContent) {
-            loadCatalogItems(tab, catId)
-        } else {
-            catalogCategoryHandler.postDelayed(loadTask, 280L)
+        when (tab) {
+            Tab.MOVIES -> moviesGroupLoaded = true
+            Tab.SERIES -> seriesGroupLoaded = true
+            else -> Unit
         }
+        highlightCatalogCategory(tab, catId)
+        loadCatalogItems(tab, catId)
     }
 
     private fun maybeEnterCatalogContent() {
@@ -1223,10 +1246,16 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun scrollHomeSectionIntoView(anchor: View) {
+        homeScrollView.post {
+            val rect = android.graphics.Rect(0, 0, anchor.width, anchor.height)
+            homeScrollView.requestChildRectangleOnScreen(anchor, rect, true)
+        }
+    }
+
     private fun focusHomeRailItem(rail: RecyclerView, titleView: View? = null) {
         homeScrollView.post {
-            val scrollY = (titleView?.top ?: rail.top).coerceAtLeast(0)
-            homeScrollView.smoothScrollTo(0, scrollY)
+            titleView?.let { scrollHomeSectionIntoView(it) }
             TvNavHelper.focusItem(rail, 0)
         }
     }
@@ -1287,12 +1316,14 @@ class MainActivity : BaseLocaleActivity() {
         bindHomeRail(
             moviesRail,
             recentMovies,
+            titleView = moviesRailTitle,
             onMoveUp = { focusHomeRailAboveMovies() },
             onMoveDown = { focusHomeRailBelowMovies() },
         )
         bindHomeRail(
             seriesRail,
             recentSeries,
+            titleView = seriesRailTitle,
             onMoveUp = { focusHomeRailAboveSeries() },
             onMoveDown = { tabHome.requestFocus() },
         )
@@ -1479,6 +1510,8 @@ class MainActivity : BaseLocaleActivity() {
         homeLoaded = false
         moviesCatalogReady = false
         seriesCatalogReady = false
+        moviesGroupLoaded = false
+        seriesGroupLoaded = false
         if (currentTab == Tab.HOME) {
             homeLoading.text = getString(R.string.loading_playlist)
             homeLoading.visibility = View.VISIBLE
@@ -1661,6 +1694,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun bindHomeRail(
         list: RecyclerView,
         items: List<HomeRailAdapter.HomeRailItem>,
+        titleView: View? = null,
         onMoveUp: (() -> Unit)? = null,
         onMoveDown: (() -> Unit)? = null,
     ) {
@@ -1671,7 +1705,10 @@ class MainActivity : BaseLocaleActivity() {
             items = items,
             onClick = { item -> onHomeRailClick(item) },
             onFocus = if (DeviceUi.useDpadFocus(this)) {
-                { item -> previewHomeRailItem(item) }
+                { item ->
+                    titleView?.let { scrollHomeSectionIntoView(it) }
+                    previewHomeRailItem(item)
+                }
             } else {
                 null
             },
@@ -2494,11 +2531,16 @@ class MainActivity : BaseLocaleActivity() {
         }?.takeIf { id -> cats.any { it.id == id } }
         bindCatalogCategoryAdapter(tab)
         if (DeviceUi.useDpadFocus(this)) {
+            val loaded = when (tab) {
+                Tab.MOVIES -> moviesGroupLoaded
+                Tab.SERIES -> seriesGroupLoaded
+                else -> false
+            }
             val selectedId = selectedCatalogCategoryId
-            if (selectedId == null) {
-                openCatalogTabAtFirstGroup(tab)
-            } else {
+            if (loaded && selectedId != null) {
                 showCachedCatalogItems(tab, selectedId)
+            } else {
+                openCatalogTabAtFirstGroup(tab)
             }
         } else {
             selectedCatalogCategoryId = selectedCatalogCategoryId ?: cats.firstOrNull()?.id
@@ -2529,20 +2571,28 @@ class MainActivity : BaseLocaleActivity() {
     private fun bindCatalogCategoryAdapter(tab: Tab) {
         catalogCategoryAdapter = CategoryAdapter(
             items = catalogCategories,
-            selectedId = { selectedCatalogCategoryId },
+            selectedId = { catalogAdapterSelectedId(tab) },
             onClick = { cat ->
                 withCatalogCategoryAccess(tab, cat) {
                     selectCatalogGroup(tab, cat, enterContent = true)
                 }
             },
             onFocus = { cat ->
-                withCatalogCategoryAccess(tab, cat) {
-                    selectCatalogGroup(tab, cat, enterContent = false)
-                }
+                val idx = catalogCategories.indexOfFirst { it.id == cat.id }
+                if (idx >= 0) catalogCategoryFocusIndex = idx
             },
             onMoveRight = {
                 val index = focusedCatalogCategoryIndex()
-                catalogCategories.getOrNull(index)?.let { cat ->
+                val cat = catalogCategories.getOrNull(index) ?: return@CategoryAdapter
+                val catId = cat.id
+                val loaded = when (tab) {
+                    Tab.MOVIES -> moviesGroupLoaded
+                    Tab.SERIES -> seriesGroupLoaded
+                    else -> false
+                }
+                if (loaded && catId == selectedCatalogCategoryId && posterItems.isNotEmpty()) {
+                    focusFirstCatalogItem()
+                } else {
                     withCatalogCategoryAccess(tab, cat) {
                         selectCatalogGroup(tab, cat, enterContent = true)
                     }

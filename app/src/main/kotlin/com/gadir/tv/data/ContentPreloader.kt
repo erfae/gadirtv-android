@@ -6,6 +6,7 @@ import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.Profile
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
+import com.gadir.tv.util.ChannelIconHelper
 import com.gadir.tv.util.HostUtils
 import com.gadir.tv.util.ImagePreloader
 import com.gadir.tv.util.ImageUrlResolver
@@ -145,8 +146,11 @@ object ContentPreloader {
     private suspend fun preloadChannelIcons(context: Context, channels: List<LiveChannel>) {
         if (channels.isEmpty()) return
         val profile = PlaylistRepository.profile
-        val urls = channels.mapNotNull { channel ->
-            primaryChannelIconUrl(profile, channel)
+        val urls = channels.flatMap { channel ->
+            buildList {
+                primaryChannelIconUrl(profile, channel)?.let { add(it) }
+                addAll(ChannelIconHelper.panelFallbackUrls(profile, channel).take(4))
+            }
         }.distinct()
         ImagePreloader.preloadUrls(context, urls, 128, 128, ICON_PARALLEL)
     }
