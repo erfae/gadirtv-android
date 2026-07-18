@@ -53,8 +53,10 @@ class CategoryAdapter(
             holder.count.visibility = View.GONE
         }
         applyCategoryVisual(holder, contentSelected, holder.itemView.hasFocus())
-        if (position == 0 && upFocusViewId != View.NO_ID) {
+        if (position == 0) {
             holder.itemView.nextFocusUpId = upFocusViewId
+        } else {
+            holder.itemView.nextFocusUpId = View.NO_ID
         }
 
         holder.itemView.setOnFocusChangeListener { _, hasFocus ->
