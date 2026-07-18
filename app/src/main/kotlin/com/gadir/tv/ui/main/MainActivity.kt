@@ -83,6 +83,7 @@ class MainActivity : BaseLocaleActivity() {
 
     companion object {
         private const val HOME_RAIL_LIMIT_COMPACT = 12
+        private const val HOME_RAIL_LIMIT_TV = 10
         private const val HERO_LIMIT_COMPACT = 1
         private const val HERO_LIMIT_TV = 8
         private const val HERO_ROTATE_MS = 8000L
@@ -145,8 +146,12 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var catalogLoading: View
     private lateinit var catalogEmpty: TextView
     private lateinit var catalogHeroImage: ImageView
+    private var catalogHeroPoster: ImageView? = null
     private lateinit var catalogHeroTitle: TextView
     private lateinit var catalogHeroSubtitle: TextView
+    private var catalogHeroPlot: TextView? = null
+    private var catalogHeroSeasons: TextView? = null
+    private lateinit var catalogHeroContainer: View
 
     private lateinit var heroImage: ImageView
     private lateinit var heroType: TextView
@@ -203,6 +208,8 @@ class MainActivity : BaseLocaleActivity() {
     private var homeLoaded = false
     private var shouldFocusHomeRailsOnResume = true
     private var catalogLoadToken = 0
+    private var catalogPreviewToken = 0
+    private var catalogPreviewItemId: Int? = null
     private val catalogCategoryHandler = Handler(Looper.getMainLooper())
     private val liveCategoryHandler = Handler(Looper.getMainLooper())
     private var reloadingChannels = false
@@ -363,8 +370,12 @@ class MainActivity : BaseLocaleActivity() {
         catalogLoading = panelCatalog.findViewById(R.id.catalogLoading)
         catalogEmpty = panelCatalog.findViewById(R.id.catalogEmpty)
         catalogHeroImage = panelCatalog.findViewById(R.id.catalogHeroImage)
+        catalogHeroPoster = panelCatalog.findViewById(R.id.catalogHeroPoster)
         catalogHeroTitle = panelCatalog.findViewById(R.id.catalogHeroTitle)
         catalogHeroSubtitle = panelCatalog.findViewById(R.id.catalogHeroSubtitle)
+        catalogHeroPlot = panelCatalog.findViewById(R.id.catalogHeroPlot)
+        catalogHeroSeasons = panelCatalog.findViewById(R.id.catalogHeroSeasons)
+        catalogHeroContainer = panelCatalog.findViewById(R.id.catalogHeroContainer)
 
         heroImage = panelHome.findViewById(R.id.heroImage)
         heroType = panelHome.findViewById(R.id.heroType)
@@ -392,7 +403,7 @@ class MainActivity : BaseLocaleActivity() {
             catalogGrid.setPreserveFocusAfterLayout(true)
             catalogCategoryList.setItemViewCacheSize(24)
             catalogGrid.setItemViewCacheSize(30)
-            panelCatalog.findViewById<View>(R.id.catalogHeroContainer)?.visibility = View.GONE
+            catalogHeroContainer.visibility = View.VISIBLE
         }
         configureCatalogGrid()
         favoritesRail.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
@@ -458,7 +469,7 @@ class MainActivity : BaseLocaleActivity() {
         val metrics = resources.displayMetrics
         val heroHeight = when {
             DeviceUi.useDpadFocus(this) ->
-                (metrics.heightPixels * 0.45f).toInt().coerceIn(dp(280), dp(400))
+                (metrics.heightPixels * 0.28f).toInt().coerceIn(dp(165), dp(220))
             DeviceUi.isCompact(this) ->
                 (metrics.heightPixels * 0.40f).toInt().coerceIn(dp(220), dp(320))
             else -> dp(220)
@@ -473,12 +484,22 @@ class MainActivity : BaseLocaleActivity() {
             headerDate.visibility = View.GONE
         } else {
             configureHeroPosterLayout()
+            configureHomeRailsForTv()
         }
     }
 
+    private fun configureHomeRailsForTv() {
+        if (!DeviceUi.useDpadFocus(this)) return
+        val railHeight = dp(108)
+        listOf(moviesRail, seriesRail, favoritesRail, resumeRail).forEach { rail ->
+            rail.minimumHeight = railHeight
+        }
+        homeScrollView.isVerticalScrollBarEnabled = false
+    }
+
     private fun configureHeroPosterLayout() {
-        val posterWidth = if (DeviceUi.isTelevision(this)) dp(120) else dp(100)
-        val posterHeight = if (DeviceUi.isTelevision(this)) dp(170) else dp(145)
+        val posterWidth = if (DeviceUi.isTelevision(this)) dp(90) else dp(100)
+        val posterHeight = if (DeviceUi.isTelevision(this)) dp(128) else dp(145)
         heroPoster.visibility = View.VISIBLE
         when (heroPoster.parent) {
             is FrameLayout -> {
@@ -624,6 +645,14 @@ class MainActivity : BaseLocaleActivity() {
         previewLogo.visibility = View.GONE
     }
 
+    private fun clearLiveBrowsingContent() {
+        if (!liveTabReady || !DeviceUi.useDpadFocus(this)) return
+        channels.clear()
+        channelAdapter?.notifyDataSetChanged()
+        teardownLivePreviewPlayback()
+        showLiveSelectPrompt()
+    }
+
     private fun openLiveTabAtFirstGroup() {
         liveCategoryHandler.removeCallbacksAndMessages(null)
         if (liveCategories.isEmpty()) return
@@ -694,6 +723,13 @@ class MainActivity : BaseLocaleActivity() {
             onFocus = { cat ->
                 val idx = liveCategories.indexOfFirst { liveCategoryId(it) == liveCategoryId(cat) }
                 if (idx >= 0) liveCategoryFocusIndex = idx
+                val catId = liveCategoryId(cat)
+                if (DeviceUi.useDpadFocus(this@MainActivity) &&
+                    liveChannelsLoaded &&
+                    catId != selectedLiveCategoryId
+                ) {
+                    clearLiveBrowsingContent()
+                }
             },
             onMoveRight = {
                 val index = focusedLiveCategoryIndex()
@@ -926,6 +962,38 @@ class MainActivity : BaseLocaleActivity() {
         catalogGrid.visibility = View.INVISIBLE
         catalogEmpty.visibility = View.VISIBLE
         catalogEmpty.text = getString(R.string.catalog_select_group)
+        clearCatalogPreviewPanel()
+    }
+
+    private fun clearCatalogBrowsingContent() {
+        if (!DeviceUi.useDpadFocus(this)) return
+        catalogLoadToken++
+        catalogLoading.visibility = View.GONE
+        posterItems.clear()
+        catalogGrid.adapter?.notifyDataSetChanged()
+        catalogGrid.alpha = 1f
+        catalogGrid.visibility = View.INVISIBLE
+        catalogEmpty.visibility = View.VISIBLE
+        catalogEmpty.text = getString(R.string.catalog_select_group)
+        clearCatalogPreviewPanel()
+    }
+
+    private fun clearCatalogPreviewPanel() {
+        catalogPreviewToken++
+        catalogPreviewItemId = null
+        if (!::catalogHeroContainer.isInitialized) return
+        if (!DeviceUi.useDpadFocus(this)) {
+            catalogHeroContainer.visibility = View.GONE
+            return
+        }
+        catalogHeroContainer.visibility = View.GONE
+        catalogHeroTitle.text = ""
+        catalogHeroSubtitle.text = ""
+        catalogHeroPlot?.text = ""
+        catalogHeroSeasons?.text = ""
+        catalogHeroSeasons?.visibility = View.GONE
+        catalogHeroImage.setImageResource(R.drawable.hero_placeholder_bg)
+        catalogHeroPoster?.setImageResource(R.drawable.hero_placeholder_bg)
     }
 
     private fun openCatalogTabAtFirstGroup(tab: Tab) {
@@ -1339,7 +1407,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun homeRailItemLimit(): Int =
-        if (DeviceUi.useDpadFocus(this)) Int.MAX_VALUE else HOME_RAIL_LIMIT_COMPACT
+        if (DeviceUi.useDpadFocus(this)) HOME_RAIL_LIMIT_TV else HOME_RAIL_LIMIT_COMPACT
 
     private fun populateHeroItems() {
         val heroLimit = heroItemLimit()
@@ -2473,6 +2541,11 @@ class MainActivity : BaseLocaleActivity() {
         catalogGrid.adapter = PosterAdapter(
             items = posterItems,
             onClick = { item -> onPosterClick(tab, item) },
+            onFocus = if (DeviceUi.useDpadFocus(this)) {
+                { item -> previewCatalogPoster(tab, item) }
+            } else {
+                null
+            },
             kind = when (tab) {
                 Tab.MOVIES -> FavoritesStore.KIND_MOVIE
                 Tab.SERIES -> FavoritesStore.KIND_SERIES
@@ -2580,6 +2653,17 @@ class MainActivity : BaseLocaleActivity() {
             onFocus = { cat ->
                 val idx = catalogCategories.indexOfFirst { it.id == cat.id }
                 if (idx >= 0) catalogCategoryFocusIndex = idx
+                val loaded = when (tab) {
+                    Tab.MOVIES -> moviesGroupLoaded
+                    Tab.SERIES -> seriesGroupLoaded
+                    else -> false
+                }
+                if (DeviceUi.useDpadFocus(this@MainActivity) &&
+                    loaded &&
+                    cat.id != selectedCatalogCategoryId
+                ) {
+                    clearCatalogBrowsingContent()
+                }
             },
             onMoveRight = {
                 val index = focusedCatalogCategoryIndex()
@@ -2754,21 +2838,160 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun bindCatalogHero(tab: Tab, categoryName: String, imageUrl: String) {
+        if (!DeviceUi.useDpadFocus(this)) {
+            catalogHeroContainer.visibility = View.VISIBLE
+        } else {
+            catalogHeroContainer.visibility = View.VISIBLE
+        }
         catalogHeroTitle.text = categoryName.ifBlank { getString(R.string.catalog_empty) }
         catalogHeroSubtitle.text = when (tab) {
             Tab.MOVIES -> getString(R.string.tab_movies)
             Tab.SERIES -> getString(R.string.tab_series)
             else -> ""
         }
+        catalogHeroPlot?.text = ""
+        catalogHeroSeasons?.visibility = View.GONE
         if (imageUrl.isNotBlank()) {
             val dm = resources.displayMetrics
             val width = dm.widthPixels.coerceAtMost(960)
             val height = catalogHeroImage.layoutParams.height.takeIf { it > 0 }
-                ?: dp(200)
+                ?: dp(168)
             ImageLoader.loadHeroBackdrop(catalogHeroImage, imageUrl, emptyList(), width, height)
+            catalogHeroPoster?.let { poster ->
+                ImageLoader.loadPoster(poster, imageUrl, 88, 124)
+            }
         } else {
             catalogHeroImage.setImageResource(R.drawable.hero_placeholder_bg)
+            catalogHeroPoster?.setImageResource(R.drawable.hero_placeholder_bg)
         }
+    }
+
+    private fun previewCatalogPoster(tab: Tab, item: PosterAdapter.PosterItem) {
+        if (!DeviceUi.useDpadFocus(this)) return
+        catalogPreviewItemId = item.id
+        val token = ++catalogPreviewToken
+        catalogHeroContainer.visibility = View.VISIBLE
+        catalogHeroTitle.text = item.title
+        catalogHeroSubtitle.text = when (tab) {
+            Tab.MOVIES -> getString(R.string.hero_type_movie)
+            Tab.SERIES -> getString(R.string.hero_type_series)
+            else -> ""
+        }
+        catalogHeroPlot?.text = getString(R.string.hero_plot_loading)
+        catalogHeroSeasons?.visibility = View.GONE
+        if (item.imageUrl.isNotBlank()) {
+            ImageLoader.loadHeroBackdrop(catalogHeroImage, item.imageUrl, emptyList(), dp(640), dp(168))
+            catalogHeroPoster?.let { poster ->
+                ImageLoader.loadPoster(poster, item.imageUrl, 88, 124)
+            }
+        }
+        val kind = when (tab) {
+            Tab.MOVIES -> HomeRailAdapter.HomeRailItem.KIND_MOVIE
+            Tab.SERIES -> HomeRailAdapter.HomeRailItem.KIND_SERIES
+            else -> return
+        }
+        PlotCache.get(kind, item.id)?.let { entry ->
+            applyCatalogPreview(entry, tab, token)
+            return
+        }
+        val profile = PlaylistRepository.profile ?: return
+        lifecycleScope.launch {
+            try {
+                when (tab) {
+                    Tab.MOVIES -> {
+                        val info = withContext(Dispatchers.IO) { api.vodInfo(profile, item.id) }
+                        if (info == null) {
+                            if (catalogPreviewToken == token) {
+                                catalogHeroPlot?.text = getString(R.string.hero_plot_empty)
+                            }
+                            return@launch
+                        }
+                        val backdrop = info.backdrop.ifBlank { info.cover }
+                        val entry = PlotCache.Entry(
+                            plot = info.plot.ifBlank { getString(R.string.hero_plot_empty) },
+                            subtitle = listOf(info.genre, info.releaseDate, info.rating)
+                                .filter { it.isNotBlank() }
+                                .joinToString(" · "),
+                            backdrop = backdrop,
+                            poster = info.cover.ifBlank { item.imageUrl },
+                            title = info.name.ifBlank { item.title },
+                        )
+                        PlotCache.put(kind, item.id, entry)
+                        if (catalogPreviewToken == token && catalogPreviewItemId == item.id) {
+                            applyCatalogPreview(entry, tab, token)
+                        }
+                    }
+                    Tab.SERIES -> {
+                        val detail = withContext(Dispatchers.IO) { api.seriesInfo(profile, item.id) }
+                        if (detail == null) {
+                            if (catalogPreviewToken == token) {
+                                catalogHeroPlot?.text = getString(R.string.hero_plot_empty)
+                            }
+                            return@launch
+                        }
+                        val backdrop = detail.backdrop.ifBlank { detail.cover }
+                        val entry = PlotCache.Entry(
+                            plot = detail.plot.ifBlank { getString(R.string.hero_plot_empty) },
+                            subtitle = listOf(detail.genre, detail.releaseDate, detail.rating)
+                                .filter { it.isNotBlank() }
+                                .joinToString(" · "),
+                            backdrop = backdrop,
+                            poster = detail.cover.ifBlank { item.imageUrl },
+                            title = detail.name.ifBlank { item.title },
+                            seasonsSummary = formatSeriesSeasonsSummary(detail.seasons.keys),
+                        )
+                        PlotCache.put(kind, item.id, entry)
+                        if (catalogPreviewToken == token && catalogPreviewItemId == item.id) {
+                            applyCatalogPreview(entry, tab, token)
+                        }
+                    }
+                    else -> Unit
+                }
+            } catch (_: Exception) {
+                if (catalogPreviewToken == token) {
+                    catalogHeroPlot?.text = getString(R.string.hero_plot_empty)
+                }
+            }
+        }
+    }
+
+    private fun applyCatalogPreview(entry: PlotCache.Entry, tab: Tab, token: Int) {
+        if (catalogPreviewToken != token) return
+        if (entry.title.isNotBlank()) catalogHeroTitle.text = entry.title
+        catalogHeroSubtitle.text = entry.subtitle.ifBlank {
+            when (tab) {
+                Tab.MOVIES -> getString(R.string.hero_type_movie)
+                Tab.SERIES -> getString(R.string.hero_type_series)
+                else -> ""
+            }
+        }
+        catalogHeroPlot?.text = entry.plot
+        if (tab == Tab.SERIES && entry.seasonsSummary.isNotBlank()) {
+            catalogHeroSeasons?.text = entry.seasonsSummary
+            catalogHeroSeasons?.visibility = View.VISIBLE
+        } else {
+            catalogHeroSeasons?.visibility = View.GONE
+        }
+        val backdrop = entry.backdrop.ifBlank { entry.poster }
+        if (backdrop.isNotBlank()) {
+            ImageLoader.loadHeroBackdrop(catalogHeroImage, backdrop, emptyList(), dp(640), dp(168))
+        }
+        if (entry.poster.isNotBlank()) {
+            catalogHeroPoster?.let { poster ->
+                ImageLoader.loadPoster(poster, entry.poster, 88, 124)
+            }
+        }
+    }
+
+    private fun formatSeriesSeasonsSummary(seasonKeys: Set<String>): String {
+        if (seasonKeys.isEmpty()) return ""
+        val sorted = seasonKeys.sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
+        val labels = sorted.map { key -> getString(R.string.season_label, key) }
+        return getString(R.string.seasons_label) + ": " + labels.joinToString(" · ")
+    }
+
+    private fun previewFirstCatalogPoster(tab: Tab) {
+        posterItems.firstOrNull()?.let { previewCatalogPoster(tab, it) }
     }
 
     private fun selectedCatalogCategoryName(): String =
@@ -2792,7 +3015,10 @@ class MainActivity : BaseLocaleActivity() {
             )
         }
         updateCatalogGrid()
-        if (DeviceUi.useDpadFocus(this)) maybeEnterCatalogContent()
+        if (DeviceUi.useDpadFocus(this)) {
+            previewFirstCatalogPoster(Tab.MOVIES)
+            maybeEnterCatalogContent()
+        }
     }
 
     private fun bindSeries(series: List<SeriesItem>) {
@@ -2812,7 +3038,10 @@ class MainActivity : BaseLocaleActivity() {
             )
         }
         updateCatalogGrid()
-        if (DeviceUi.useDpadFocus(this)) maybeEnterCatalogContent()
+        if (DeviceUi.useDpadFocus(this)) {
+            previewFirstCatalogPoster(Tab.SERIES)
+            maybeEnterCatalogContent()
+        }
     }
 
     private fun updateCatalogGrid() {

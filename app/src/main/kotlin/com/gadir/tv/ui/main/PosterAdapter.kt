@@ -15,6 +15,7 @@ import com.gadir.tv.util.TvNavHelper
 class PosterAdapter(
     private val items: List<PosterItem>,
     private val onClick: (PosterItem) -> Unit,
+    private val onFocus: ((PosterItem) -> Unit)? = null,
     private val kind: String? = null,
     private val isFavorite: ((PosterItem) -> Boolean)? = null,
     private val onToggleFavorite: ((PosterItem) -> Unit)? = null,
@@ -58,6 +59,7 @@ class PosterAdapter(
         holder.itemView.isSelected = holder.itemView.hasFocus()
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             view.isSelected = hasFocus
+            if (hasFocus) onFocus?.invoke(item)
         }
 
         holder.itemView.setOnClickListener { onClick(item) }
