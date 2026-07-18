@@ -43,6 +43,27 @@ object TvNavHelper {
         list.scrollBy(0, direction * child.height)
     }
 
+    fun focusContentItem(list: RecyclerView, index: Int, onFocused: (() -> Unit)? = null) {
+        if (index < 0) return
+
+        fun attempt(remaining: Int) {
+            list.post {
+                scrollToIndex(list, index)
+                list.post focusPost@{
+                    val itemView = list.findViewHolderForAdapterPosition(index)?.itemView
+                    if (itemView != null && itemView.requestFocus()) {
+                        onFocused?.invoke()
+                        return@focusPost
+                    }
+                    if (remaining > 0) {
+                        attempt(remaining - 1)
+                    }
+                }
+            }
+        }
+        attempt(12)
+    }
+
     fun requestFocusAt(list: RecyclerView, index: Int) {
         val holder = list.findViewHolderForAdapterPosition(index)
         if (holder?.itemView?.requestFocus() == true) return

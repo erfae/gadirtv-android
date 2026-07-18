@@ -54,6 +54,9 @@ class CategoryAdapter(
             holder.count.visibility = View.GONE
         }
         applyCategoryVisual(holder, contentSelected, holder.itemView.hasFocus())
+        val locked = navigationLocked()
+        holder.itemView.isFocusable = !locked
+        holder.itemView.isFocusableInTouchMode = !locked
         if (position == 0) {
             holder.itemView.nextFocusUpId = upFocusViewId
         } else {
@@ -90,7 +93,8 @@ class CategoryAdapter(
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     val pos = holder.bindingAdapterPosition
                     if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
-                    onClick(items[pos])
+                    val cat = items[pos]
+                    holder.itemView.post { onClick(cat) }
                     true
                 }
                 else -> false
