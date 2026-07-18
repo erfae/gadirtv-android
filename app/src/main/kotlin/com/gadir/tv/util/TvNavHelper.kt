@@ -44,10 +44,12 @@ object TvNavHelper {
     }
 
     fun requestFocusAt(list: RecyclerView, index: Int) {
+        val holder = list.findViewHolderForAdapterPosition(index)
+        if (holder?.itemView?.requestFocus() == true) return
         repeat(5) { attempt ->
             list.postDelayed({
                 list.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
-            }, attempt * 50L)
+            }, (attempt + 1) * 50L)
         }
     }
 
