@@ -26,6 +26,7 @@ import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.EpgCache
 import com.gadir.tv.data.FavoritesStore
 import com.gadir.tv.data.BootstrapLoader
+import com.gadir.tv.data.ContentPreloader
 import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.LiveChannelStore
 import com.gadir.tv.data.PlotCache
@@ -438,6 +439,12 @@ class MainActivity : BaseLocaleActivity() {
         configureHeroLayout()
 
         showTab(Tab.HOME)
+        startContentPreload()
+    }
+
+    private fun startContentPreload() {
+        val activeProfile = PlaylistRepository.profile ?: return
+        ContentPreloader.startBackgroundPreload(this, api, activeProfile)
     }
 
     private fun dp(value: Int): Int =
@@ -1476,6 +1483,7 @@ class MainActivity : BaseLocaleActivity() {
             }
             result.onSuccess {
                 parentalStore.ensureAdultDefaultsBlocked()
+                startContentPreload()
                 when (currentTab) {
                     Tab.LIVE -> {
                         ensureLiveTabReady()
@@ -3353,6 +3361,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun logoutUser() {
         ParentalSession.clear()
+        ContentPreloader.cancelBackgroundPreload()
         ProfileStore(this).clearActive()
         PlaylistRepository.clear()
         startActivity(

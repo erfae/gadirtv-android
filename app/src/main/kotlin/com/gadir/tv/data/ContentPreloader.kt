@@ -9,51 +9,141 @@ import com.gadir.tv.model.VodMovie
 import com.gadir.tv.util.HostUtils
 import com.gadir.tv.util.ImagePreloader
 import com.gadir.tv.util.ImageUrlResolver
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 object ContentPreloader {
-    private const val ICON_PARALLEL = 10
+    private const val ICON_PARALLEL = 8
     private const val PLOT_PARALLEL = 4
-    private const val EPG_PARALLEL = 4
-    private const val EPG_CHANNEL_LIMIT = 120
-    private const val PLOT_LIMIT = 64
+    private const val EPG_PARALLEL = 3
+    private const val EPG_CHANNEL_LIMIT = 40
+    private const val PLOT_LIMIT = 24
+    private const val PRIORITY_CHANNEL_ICONS = 120
+    private const val CHANNEL_ICON_BATCH = 200
 
-    suspend fun preloadAll(
-        context: Context,
-        api: XtreamApi,
-        profile: Profile,
-        onProgress: ((String) -> Unit)? = null,
-    ) = withContext(Dispatchers.IO) {
-        coroutineScope {
-            PlotCache.clear()
-            EpgCache.clear()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var backgroundJob: Job? = null
 
-            onProgress?.invoke(context.getString(R.string.bootstrap_channels))
-            preloadChannelIcons(context, PlaylistRepository.allChannels)
-
-            onProgress?.invoke(context.getString(R.string.bootstrap_catalog))
-            CatalogPreloader.preloadRemaining(api, profile) { name ->
-                onProgress?.invoke(context.getString(R.string.bootstrap_loading_group, name))
-            }
-
-            onProgress?.invoke(context.getString(R.string.bootstrap_plots))
-            preloadPlots(context, api, profile)
-
-            onProgress?.invoke(context.getString(R.string.bootstrap_posters))
-            preloadPosters(context)
-
-            onProgress?.invoke(context.getString(R.string.bootstrap_epg))
-            preloadEpg(api, profile, PlaylistRepository.allChannels)
+    fun startBackgroundPreload(context: Context, api: XtreamApi, profile: Profile) {
+        backgroundJob?.cancel()
+        val appContext = context.applicationContext
+        backgroundJob = scope.launch {
+            preloadInBackground(appContext, api, profile)
         }
     }
 
+    fun cancelBackgroundPreload() {
+        backgroundJob?.cancel()
+        backgroundJob = null
+    }
+
+    private suspend fun preloadInBackground(
+        context: Context,
+        api: XtreamApi,
+        profile: Profile,
+    ) = withContext(Dispatchers.IO) {
+        preloadHomeAssets(context, api, profile)
+        preloadPrioritizedChannelIcons(context)
+        preloadEpg(api, profile, prioritizedChannels(context))
+        CatalogPreloader.preloadRemaining(api, profile)
+        preloadCatalogPosters(context)
+        preloadRemainingChannelIcons(context)
+    }
+
+    private suspend fun preloadHomeAssets(
+        context: Context,
+        api: XtreamApi,
+        profile: Profile,
+    ) = coroutineScope {
+        val posterJob = async {
+            val urls = buildList {
+                PlaylistRepository.homeRecentMovies.forEach { add(it.icon) }
+                PlaylistRepository.homeRecentSeries.forEach { add(it.cover) }
+            }
+            ImagePreloader.preloadUrls(
+                context,
+                urls.filter { it.isNotBlank() }.distinct(),
+                220,
+                320,
+                ICON_PARALLEL,
+            )
+        }
+        val plotJob = async { preloadPlots(context, api, profile) }
+        posterJob.await()
+        plotJob.await()
+        preloadHeroBackdrops(context)
+    }
+
+    private suspend fun preloadHeroBackdrops(context: Context) {
+        val urls = buildList {
+            PlaylistRepository.homeRecentMovies.forEach { movie ->
+                PlotCache.get("movie", movie.streamId)?.let { cached ->
+                    add(cached.backdrop)
+                    add(cached.poster)
+                }
+            }
+            PlaylistRepository.homeRecentSeries.forEach { item ->
+                PlotCache.get("series", item.seriesId)?.let { cached ->
+                    add(cached.backdrop)
+                    add(cached.poster)
+                }
+            }
+        }
+        ImagePreloader.preloadUrls(
+            context,
+            urls.filter { it.isNotBlank() }.distinct(),
+            1280,
+            720,
+            4,
+        )
+    }
+
+    private suspend fun preloadPrioritizedChannelIcons(context: Context) {
+        preloadChannelIcons(context, prioritizedChannels(context))
+    }
+
+    private suspend fun preloadRemainingChannelIcons(context: Context) {
+        val profile = PlaylistRepository.profile ?: return
+        val loaded = prioritizedChannels(context).map { it.streamId }.toSet()
+        val remaining = PlaylistRepository.allChannels
+            .filter { it.streamId !in loaded }
+            .chunked(CHANNEL_ICON_BATCH)
+        remaining.forEach { batch ->
+            preloadChannelIcons(context, batch)
+        }
+    }
+
+    private fun prioritizedChannels(context: Context): List<LiveChannel> {
+        val favorites = FavoritesStore(context)
+        val liveStore = LiveChannelStore(context)
+        val favoriteIds = favorites.load(FavoritesStore.KIND_LIVE)
+        val ordered = linkedSetOf<LiveChannel>()
+        PlaylistRepository.allChannels
+            .filter { it.streamId in favoriteIds }
+            .forEach { ordered.add(it) }
+        val lastCategoryId = liveStore.lastCategoryId?.takeIf { it.isNotEmpty() }
+        PlaylistRepository.channelsFor(lastCategoryId)
+            .take(PRIORITY_CHANNEL_ICONS)
+            .forEach { ordered.add(it) }
+        if (ordered.size < PRIORITY_CHANNEL_ICONS) {
+            PlaylistRepository.allChannels
+                .take(PRIORITY_CHANNEL_ICONS)
+                .forEach { ordered.add(it) }
+        }
+        return ordered.toList()
+    }
+
     private suspend fun preloadChannelIcons(context: Context, channels: List<LiveChannel>) {
+        if (channels.isEmpty()) return
         val profile = PlaylistRepository.profile
         val urls = channels.mapNotNull { channel ->
             primaryChannelIconUrl(profile, channel)
@@ -69,22 +159,8 @@ object ContentPreloader {
         return "$base/images/${channel.streamId}.png"
     }
 
-    private suspend fun preloadPosters(context: Context) {
+    private suspend fun preloadCatalogPosters(context: Context) {
         val urls = buildList {
-            PlaylistRepository.homeRecentMovies.forEach { movie ->
-                add(movie.icon)
-                PlotCache.get("movie", movie.streamId)?.let { cached ->
-                    add(cached.backdrop)
-                    add(cached.poster)
-                }
-            }
-            PlaylistRepository.homeRecentSeries.forEach { item ->
-                add(item.cover)
-                PlotCache.get("series", item.seriesId)?.let { cached ->
-                    add(cached.backdrop)
-                    add(cached.poster)
-                }
-            }
             PlaylistRepository.allCachedVod().forEach { add(it.icon) }
             PlaylistRepository.allCachedSeries().forEach { add(it.cover) }
         }
