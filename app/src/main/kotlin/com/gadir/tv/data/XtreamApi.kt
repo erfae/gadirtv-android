@@ -402,24 +402,24 @@ class XtreamApi(
         epgChannelId: String = "",
         limit: Int = 4,
     ): List<EpgEntry> {
-        if (streamId <= 0) return emptyList()
-        fetchEpgListings(profile, mapOf("stream_id" to streamId.toString()), limit)
-            .takeIf { it.isNotEmpty() }
-            ?.let { return it }
-        if (epgChannelId.isNotBlank() && epgChannelId != streamId.toString()) {
-            fetchEpgListings(profile, mapOf("stream_id" to epgChannelId), limit)
-                .takeIf { it.isNotEmpty() }
-                ?.let { return it }
-            fetchEpgListings(profile, mapOf("epg_channel_id" to epgChannelId), limit)
-                .takeIf { it.isNotEmpty() }
-                ?.let { return it }
+        if (streamId <= 0 && epgChannelId.isBlank()) return emptyList()
+        val attempts = buildList {
+            if (streamId > 0) {
+                add(Triple("get_short_epg", mapOf("stream_id" to streamId.toString()), limit))
+                add(Triple("get_simple_data_table", mapOf("stream_id" to streamId.toString()), limit))
+            }
+            if (epgChannelId.isNotBlank()) {
+                add(Triple("get_short_epg", mapOf("epg_channel_id" to epgChannelId), limit))
+                add(Triple("get_short_epg", mapOf("stream_id" to epgChannelId), limit))
+                add(Triple("get_short_epg", mapOf("channel_id" to epgChannelId), limit))
+                add(Triple("get_simple_data_table", mapOf("epg_channel_id" to epgChannelId), limit))
+                add(Triple("get_simple_data_table", mapOf("stream_id" to epgChannelId), limit))
+            }
+        }.distinct()
+        for ((action, params, requestLimit) in attempts) {
+            val listings = fetchEpgListings(profile, params, requestLimit, action)
+            if (listings.isNotEmpty()) return listings
         }
-        fetchEpgListings(
-            profile,
-            mapOf("stream_id" to streamId.toString()),
-            limit,
-            actionOverride = "get_simple_data_table",
-        ).takeIf { it.isNotEmpty() }?.let { return it }
         return emptyList()
     }
 
@@ -458,7 +458,9 @@ class XtreamApi(
                 root.isJsonObject -> {
                     val obj = root.asJsonObject
                     obj.getAsJsonArray("epg_listings")
+                        ?: obj.getAsJsonArray("epg")
                         ?: obj.getAsJsonArray("data")
+                        ?: obj.getAsJsonArray("listings")
                 }
                 else -> null
             } ?: return emptyList()
@@ -468,7 +470,7 @@ class XtreamApi(
                 EpgEntry(
                     title = title,
                     start = epgTimestamp(row, "start_timestamp", "start"),
-                    end = epgTimestamp(row, "stop_timestamp", "end_timestamp", "end"),
+                    end = epgTimestamp(row, "stop_timestamp", "end_timestamp", "stop", "end"),
                 )
             }.filter { it.title.isNotBlank() }
         } catch (_: Exception) {

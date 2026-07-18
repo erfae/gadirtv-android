@@ -205,6 +205,7 @@ class MainActivity : BaseLocaleActivity() {
     private var reloadingChannels = false
     private var channelsLoadToken = 0
     private var livePreviewPaused = false
+    private var epgLoadToken = 0
     private var liveTabReady = false
     private var miniPreviewControls: View? = null
     private var previewContainer: View? = null
@@ -950,7 +951,12 @@ class MainActivity : BaseLocaleActivity() {
         catalogEnterContentOnLoad = enterContent
         catalogCategoryHandler.removeCallbacksAndMessages(null)
         highlightCatalogCategory(tab, catId)
-        loadCatalogItems(tab, catId)
+        val loadTask = Runnable { loadCatalogItems(tab, catId) }
+        if (enterContent) {
+            loadCatalogItems(tab, catId)
+        } else {
+            catalogCategoryHandler.postDelayed(loadTask, 280L)
+        }
     }
 
     private fun maybeEnterCatalogContent() {
@@ -2529,7 +2535,11 @@ class MainActivity : BaseLocaleActivity() {
                     selectCatalogGroup(tab, cat, enterContent = true)
                 }
             },
-            onFocus = null,
+            onFocus = { cat ->
+                withCatalogCategoryAccess(tab, cat) {
+                    selectCatalogGroup(tab, cat, enterContent = false)
+                }
+            },
             onMoveRight = {
                 val index = focusedCatalogCategoryIndex()
                 catalogCategories.getOrNull(index)?.let { cat ->
@@ -3166,7 +3176,7 @@ class MainActivity : BaseLocaleActivity() {
             epgNext.visibility = View.GONE
         }
         val profile = PlaylistRepository.profile ?: return
-        if (EpgCache.get(channel.streamId)?.isNotEmpty() == true) return
+        val token = ++epgLoadToken
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {
                 api.shortEpg(
@@ -3176,6 +3186,7 @@ class MainActivity : BaseLocaleActivity() {
                     limit = 8,
                 )
             }
+            if (token != epgLoadToken) return@launch
             if (currentPreviewChannel?.streamId != channel.streamId) return@launch
             if (epg.isNotEmpty()) {
                 EpgCache.put(channel.streamId, epg)
