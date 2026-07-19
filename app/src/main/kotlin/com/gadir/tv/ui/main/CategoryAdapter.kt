@@ -18,6 +18,7 @@ class CategoryAdapter(
     private val itemCount: (Category) -> Int? = { null },
     private val onClick: (Category) -> Unit,
     private val onFocus: ((Category) -> Unit)? = null,
+    private val onNavigate: ((Category, Int) -> Unit)? = null,
     private val onMoveRight: (() -> Unit)? = null,
     private val onMoveLeft: (() -> Unit)? = null,
     private val onMoveUp: (() -> Unit)? = null,
@@ -26,20 +27,24 @@ class CategoryAdapter(
     private val navigationLocked: () -> Boolean = { false },
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
+    companion object {
+        private val PAYLOAD_VISUAL = Any()
+    }
+
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
         val name: TextView = view.findViewById(R.id.categoryName)
         val count: TextView = view.findViewById(R.id.categoryCount)
     }
 
-    fun refreshSelection(list: RecyclerView? = null) {
-        val focusIndex = list?.focusedChild?.let { child ->
-            list.getChildAdapterPosition(child).takeIf { it >= 0 }
-        }
-        if (list != null && focusIndex != null) {
-            notifyItemRangeChanged(0, getItemCount())
-            list.post { TvNavHelper.focusCategoryItem(list, focusIndex) }
-        } else {
-            notifyDataSetChanged()
+    /** Refresh counts/selection without rebinding listeners or stealing focus. */
+    fun refreshSelection() {
+        if (items.isEmpty()) return
+        notifyItemRangeChanged(0, items.size, PAYLOAD_VISUAL)
+    }
+
+    fun refreshItem(position: Int) {
+        if (position in items.indices) {
+            notifyItemChanged(position, PAYLOAD_VISUAL)
         }
     }
 
@@ -49,20 +54,16 @@ class CategoryAdapter(
         return Holder(view)
     }
 
-    override fun onBindViewHolder(holder: Holder, position: Int) {
-        val item = items[position]
-        val selectedKey = selectedId()
-        val contentSelected = selectedKey != null && categoryKey(item) == selectedKey
-
-        holder.name.text = item.name
-        val count = itemCount(item)
-        if (count != null) {
-            holder.count.visibility = View.VISIBLE
-            holder.count.text = holder.itemView.context.getString(R.string.category_count_format, count)
-        } else {
-            holder.count.visibility = View.GONE
+    override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.contains(PAYLOAD_VISUAL)) {
+            bindVisuals(holder, position)
+            return
         }
-        applyCategoryVisual(holder, contentSelected, holder.itemView.hasFocus())
+        onBindViewHolder(holder, position)
+    }
+
+    override fun onBindViewHolder(holder: Holder, position: Int) {
+        bindVisuals(holder, position)
         holder.itemView.isFocusable = true
         holder.itemView.isFocusableInTouchMode = true
         if (position == 0) {
@@ -115,6 +116,22 @@ class CategoryAdapter(
         }
     }
 
+    private fun bindVisuals(holder: Holder, position: Int) {
+        val item = items[position]
+        val selectedKey = selectedId()
+        val contentSelected = selectedKey != null && categoryKey(item) == selectedKey
+
+        holder.name.text = item.name
+        val count = itemCount(item)
+        if (count != null) {
+            holder.count.visibility = View.VISIBLE
+            holder.count.text = holder.itemView.context.getString(R.string.category_count_format, count)
+        } else {
+            holder.count.visibility = View.GONE
+        }
+        applyCategoryVisual(holder, contentSelected, holder.itemView.hasFocus())
+    }
+
     /**
      * NetTV-style group navigation: move one row at a time with a stable focus line.
      * Stops at the first/last group without jumping the whole list to the top.
@@ -135,6 +152,16 @@ class CategoryAdapter(
 
         val list = holder.itemView.parent as? RecyclerView ?: return false
         val target = (pos + direction).coerceIn(0, items.lastIndex)
+        val cat = items[target]
+        TvNavHelper.bumpFocusGeneration()
+        onNavigate?.invoke(cat, target)
+
+        val focusDir = if (direction < 0) View.FOCUS_UP else View.FOCUS_DOWN
+        val next = holder.itemView.focusSearch(focusDir)
+        if (next != null && next !== holder.itemView && next.requestFocus()) {
+            return true
+        }
+
         TvNavHelper.focusCategoryItem(list, target)
         return true
     }
