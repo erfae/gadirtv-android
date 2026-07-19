@@ -33,8 +33,7 @@
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="32dp"
-            android:paddingTop="10dp"
-            android:paddingBottom="96dp">
+            android:paddingVertical="10dp">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -93,6 +92,24 @@
                     android:maxLines="2"
                     android:textColor="#E6FFFFFF"
                     android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/heroPlay"
+                    android:layout_width="wrap_content"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/btn_hero_play_solid"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:gravity="center"
+                    android:minWidth="200dp"
+                    android:paddingHorizontal="28dp"
+                    android:paddingVertical="14dp"
+                    android:text="@string/hero_play"
+                    android:textAllCaps="true"
+                    android:textColor="@android:color/white"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <ImageView
@@ -105,29 +122,6 @@
                 android:scaleType="centerCrop"
                 android:src="@drawable/hero_placeholder_bg" />
         </LinearLayout>
-
-        <TextView
-            android:id="@+id/heroPlay"
-            android:layout_width="wrap_content"
-            android:layout_height="80dp"
-            android:layout_gravity="bottom|start"
-            android:layout_marginStart="32dp"
-            android:layout_marginBottom="16dp"
-            android:background="@drawable/btn_hero_play_tv"
-            android:elevation="32dp"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:gravity="center"
-            android:minWidth="360dp"
-            android:paddingHorizontal="52dp"
-            android:paddingVertical="22dp"
-            android:text="@string/hero_play"
-            android:textAllCaps="true"
-            android:textColor="@android:color/white"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:translationZ="32dp"
-            android:visibility="visible" />
     </FrameLayout>
 
     <androidx.core.widget.NestedScrollView

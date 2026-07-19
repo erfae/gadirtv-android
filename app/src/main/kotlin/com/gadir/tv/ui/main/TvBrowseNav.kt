@@ -6,13 +6,13 @@ import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.util.TvNavHelper
 
 /**
- * Navegación TV de 3 niveles: PESTAÑA → GRUPO → CONTENIDO.
+ * Navegación TV estilo Smarters IPTV:
  *
- * Flujo:
- * - OK en pestaña → primer grupo
- * - OK en grupo → primer canal/póster
- * - BACK en contenido → mismo grupo
- * - BACK en grupo → pestaña
+ * - Pestaña inferior: cambiar sección (Inicio / TV / Películas / Series)
+ * - Columna izquierda: grupos/categorías (arriba/abajo)
+ * - Columna derecha: canales o pósters (derecha desde categoría, izquierda para volver)
+ * - OK en canal/póster: abrir/reproducir
+ * - Atrás: contenido → categoría → pestaña
  */
 object TvBrowseNav {
 
