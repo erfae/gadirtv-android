@@ -61,8 +61,15 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:keepScreenOn="true"
+            android:visibility="gone"
             app:show_buffering="when_playing"
             app:use_controller="false" />
+
+        <org.videolan.libvlc.util.VLCVideoLayout
+            android:id="@+id/miniVlcPlayer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:keepScreenOn="true" />
 
         <include
             android:id="@+id/miniNoSignal"
