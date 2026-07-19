@@ -18,8 +18,16 @@ object DeviceUi {
             context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
             !isCompact(context)
 
-    /** D-pad / TV: onFocus handlers are safe. Touch devices must use onClick only. */
-    fun useDpadFocus(context: Context): Boolean = isTvUi(context)
+    /**
+     * D-pad / TV: onFocus handlers are safe. Touch devices must use onClick only.
+     * Xiaomi and other STBs may omit UI_MODE_TYPE_TV but still ship without a touchscreen.
+     */
+    fun useDpadFocus(context: Context): Boolean {
+        val pm = context.packageManager
+        if (isTvUi(context) || pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)) return true
+        if (!pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)) return true
+        return isTelevision(context)
+    }
 
     fun isLandscape(context: Context): Boolean =
         context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
