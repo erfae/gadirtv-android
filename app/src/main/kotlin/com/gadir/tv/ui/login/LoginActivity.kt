@@ -185,7 +185,7 @@ class LoginActivity : BaseLocaleActivity() {
         val displayName = inputName.text?.toString()?.trim().orEmpty().ifEmpty { username }
 
         if (host.isEmpty()) {
-            showError("Introduce el servidor (ej: http://derektv.vip:80)")
+            showError("Introduce el servidor (ej: http://gadir.co:80)")
             return
         }
         if (username.isEmpty() || password.isEmpty()) {

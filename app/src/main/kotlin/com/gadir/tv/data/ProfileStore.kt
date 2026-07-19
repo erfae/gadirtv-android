@@ -18,7 +18,7 @@ class ProfileStore(context: Context) {
             val type = object : TypeToken<List<Profile>>() {}.type
             val original = gson.fromJson<List<Profile>>(raw, type) ?: emptyList()
             val migrated = original.map { normalizeProfile(it) }
-            if (original.any { it.host.contains("gadir.co", ignoreCase = true) }) {
+            if (original.zip(migrated).any { (before, after) -> before.host != after.host }) {
                 saveAll(migrated)
             }
             migrated
@@ -122,7 +122,7 @@ class ProfileStore(context: Context) {
 
     private fun migrateHost(host: String): String {
         val normalized = HostUtils.baseUrl(host)
-        return if (normalized.contains("gadir.co", ignoreCase = true)) {
+        return if (normalized.contains("derektv.vip", ignoreCase = true)) {
             DefaultCredentials.HOST
         } else {
             normalized
