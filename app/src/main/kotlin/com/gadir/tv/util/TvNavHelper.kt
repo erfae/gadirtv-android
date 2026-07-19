@@ -1,5 +1,6 @@
 package com.gadir.tv.util
 
+import android.view.ViewGroup
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -49,6 +50,7 @@ object TvNavHelper {
         fun attempt(remaining: Int) {
             list.post {
                 scrollToIndex(list, index)
+                list.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
                 list.post focusPost@{
                     val itemView = list.findViewHolderForAdapterPosition(index)?.itemView
                     if (itemView != null && itemView.requestFocus()) {
@@ -61,7 +63,7 @@ object TvNavHelper {
                 }
             }
         }
-        attempt(12)
+        attempt(15)
     }
 
     fun requestFocusAt(list: RecyclerView, index: Int) {

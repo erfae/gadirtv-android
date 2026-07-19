@@ -162,6 +162,9 @@ class ChannelAdapter(
         holder.lock.visibility = if (locked) View.VISIBLE else View.GONE
         holder.itemView.isSelected = holder.itemView.hasFocus()
         holder.number.isSelected = holder.itemView.hasFocus()
+        if (position == 0) {
+            holder.itemView.nextFocusUpId = View.NO_ID
+        }
     }
 
     private fun handleVerticalKey(holder: Holder, direction: Int): Boolean {
