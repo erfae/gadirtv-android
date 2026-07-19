@@ -1708,20 +1708,20 @@ class MainActivity : BaseLocaleActivity() {
             val counts = withContext(Dispatchers.IO) {
                 try {
                     when (tab) {
-                        Tab.MOVIES -> {
-                            val movies = api.vodStreams(profile, categoryId = null)
-                            movies.groupBy { it.categoryId }.forEach { (catId, items) ->
-                                PlaylistRepository.cacheVod(catId, items)
-                            }
-                            movies.groupBy { it.categoryId }.mapValues { it.value.size }
-                        }
-                        Tab.SERIES -> {
-                            val series = api.seriesList(profile, categoryId = null)
-                            series.groupBy { it.categoryId }.forEach { (catId, items) ->
-                                PlaylistRepository.cacheSeries(catId, items)
-                            }
-                            series.groupBy { it.categoryId }.mapValues { it.value.size }
-                        }
+                        Tab.MOVIES -> loadCatalogCounts(
+                            categories = PlaylistRepository.vodCategories,
+                            fetchAll = { api.vodStreams(profile, null) },
+                            fetchOne = { id -> api.vodStreams(profile, id) },
+                            cache = { id, items -> PlaylistRepository.cacheVod(id, items) },
+                            idOf = { it.categoryId },
+                        )
+                        Tab.SERIES -> loadCatalogCounts(
+                            categories = PlaylistRepository.seriesCategories,
+                            fetchAll = { api.seriesList(profile, null) },
+                            fetchOne = { id -> api.seriesList(profile, id) },
+                            cache = { id, items -> PlaylistRepository.cacheSeries(id, items) },
+                            idOf = { it.categoryId },
+                        )
                         else -> emptyMap()
                     }
                 } catch (_: Exception) {
@@ -1732,6 +1732,29 @@ class MainActivity : BaseLocaleActivity() {
                 if (catId.isNotBlank()) catalogCategoryCounts[catId] = size
             }
             if (currentTab == tab) catalogCategoryAdapter?.refreshSelection()
+        }
+    }
+
+    private suspend fun <T> loadCatalogCounts(
+        categories: List<Category>,
+        fetchAll: suspend () -> List<T>,
+        fetchOne: suspend (String) -> List<T>,
+        cache: (String, List<T>) -> Unit,
+        idOf: (T) -> String,
+    ): Map<String, Int> {
+        val all = runCatching { fetchAll() }.getOrDefault(emptyList())
+        return if (all.isNotEmpty()) {
+            all.groupBy { idOf(it) }.onEach { (catId, items) ->
+                if (catId.isNotBlank()) cache(catId, items)
+            }.mapValues { it.value.size }
+        } else {
+            val counts = linkedMapOf<String, Int>()
+            categories.forEach { category ->
+                val items = runCatching { fetchOne(category.id) }.getOrDefault(emptyList())
+                cache(category.id, items)
+                counts[category.id] = items.size
+            }
+            counts
         }
     }
 
@@ -3586,6 +3609,11 @@ class MainActivity : BaseLocaleActivity() {
                 }
             } catch (_: Exception) {
                 if (token != catalogLoadToken) return@launch
+                when (tab) {
+                    Tab.MOVIES -> PlaylistRepository.markVodLoadFailed(categoryId)
+                    Tab.SERIES -> PlaylistRepository.markSeriesLoadFailed(categoryId)
+                    else -> Unit
+                }
                 catalogEnterContentOnLoad = false
                 when (tab) {
                     Tab.MOVIES -> moviesGroupLoaded = false
@@ -4347,15 +4375,19 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun tryNextPreviewUrl(token: Int = previewToken): Boolean {
         if (token != previewToken) return false
-        if (previewUrlIndex >= previewUrls.lastIndex) {
-            showNoSignal()
-            return false
+        while (previewUrlIndex < previewUrls.lastIndex) {
+            previewUrlIndex += 1
+            val url = previewUrls[previewUrlIndex]
+            if (DeviceUi.isTvUi(this) && !url.contains(".m3u8", ignoreCase = true)) {
+                continue
+            }
+            hideNoSignal()
+            if (!ensurePreviewPlayer()) return false
+            playMiniPreviewUrl(url, token)
+            return true
         }
-        previewUrlIndex += 1
-        hideNoSignal()
-        if (!ensurePreviewPlayer()) return false
-        playMiniPreviewUrl(previewUrls[previewUrlIndex], token)
-        return true
+        showNoSignal()
+        return false
     }
 
     private fun applyEpg(channel: LiveChannel, epg: List<EpgEntry>) {

@@ -14,6 +14,7 @@ import com.gadir.tv.model.VodMovie
 import com.gadir.tv.net.NativeHttpClient
 import com.gadir.tv.util.HostUtils
 import com.gadir.tv.util.ImageUrlResolver
+import com.gadir.tv.util.NetworkUrlResolver
 import com.gadir.tv.util.MetaExtractor
 import com.google.gson.Gson
 import com.google.gson.JsonArray
@@ -379,7 +380,7 @@ class XtreamApi(
         val host = HostUtils.baseUrl(profile.host)
         val u = encode(profile.username)
         val pw = encode(profile.password)
-        return "$host/live/$u/$pw/$streamId"
+        return NetworkUrlResolver.resolveUrl("$host/live/$u/$pw/$streamId")
     }
 
     fun movieStreamUrl(profile: Profile, streamId: Int, ext: String = "mp4"): String =
@@ -542,7 +543,7 @@ class XtreamApi(
         val host = HostUtils.baseUrl(profile.host)
         val u = encode(profile.username)
         val pw = encode(profile.password)
-        return "$host/$kind/$u/$pw/$streamId.$ext"
+        return NetworkUrlResolver.resolveUrl("$host/$kind/$u/$pw/$streamId.$ext")
     }
 
     private fun fetchCategories(profile: Profile, action: String): List<Category> =
@@ -628,7 +629,7 @@ class XtreamApi(
     private fun fallbackLiveIcon(profile: Profile, streamId: Int): String {
         if (streamId <= 0) return ""
         val base = HostUtils.baseUrl(profile.host)
-        return "$base/images/$streamId.png"
+        return NetworkUrlResolver.resolveUrl("$base/images/$streamId.png")
     }
 
     private fun looksLikeStreamUrl(url: String): Boolean {

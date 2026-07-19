@@ -3,6 +3,7 @@ package com.gadir.tv.player
 import android.content.Context
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -13,11 +14,14 @@ import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.PlaylistRepository
 
 object PlayerFactory {
-    private fun dataSourceFactory() = DefaultHttpDataSource.Factory()
-        .setUserAgent(PlaylistRepository.userAgent)
-        .setAllowCrossProtocolRedirects(true)
-        .setConnectTimeoutMs(25_000)
-        .setReadTimeoutMs(25_000)
+    private fun dataSourceFactory(): DataSource.Factory {
+        val base = DefaultHttpDataSource.Factory()
+            .setUserAgent(PlaylistRepository.userAgent)
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(25_000)
+            .setReadTimeoutMs(25_000)
+        return HostHeaderDataSource.Factory(base)
+    }
 
     private fun vodAudioAttributes() = AudioAttributes.Builder()
         .setUsage(C.USAGE_MEDIA)

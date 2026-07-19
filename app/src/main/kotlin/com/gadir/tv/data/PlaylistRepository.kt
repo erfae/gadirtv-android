@@ -26,6 +26,8 @@ object PlaylistRepository {
 
     private val vodCache = mutableMapOf<String, List<VodMovie>>()
     private val seriesCache = mutableMapOf<String, List<SeriesItem>>()
+    private val vodLoadFailed = mutableSetOf<String>()
+    private val seriesLoadFailed = mutableSetOf<String>()
 
     var homeRecentMovies: List<VodMovie> = emptyList()
         private set
@@ -89,16 +91,34 @@ object PlaylistRepository {
     private fun channelOrderComparator() =
         compareBy<LiveChannel>({ it.num }, { it.streamId })
 
-    fun cachedVod(categoryId: String): List<VodMovie>? = vodCache[categoryId]
+    fun cachedVod(categoryId: String): List<VodMovie>? {
+        if (categoryId in vodLoadFailed) return null
+        return vodCache[categoryId]
+    }
 
     fun cacheVod(categoryId: String, items: List<VodMovie>) {
+        vodLoadFailed.remove(categoryId)
         vodCache[categoryId] = items
     }
 
-    fun cachedSeries(categoryId: String): List<SeriesItem>? = seriesCache[categoryId]
+    fun markVodLoadFailed(categoryId: String) {
+        vodLoadFailed.add(categoryId)
+        vodCache.remove(categoryId)
+    }
+
+    fun cachedSeries(categoryId: String): List<SeriesItem>? {
+        if (categoryId in seriesLoadFailed) return null
+        return seriesCache[categoryId]
+    }
 
     fun cacheSeries(categoryId: String, items: List<SeriesItem>) {
+        seriesLoadFailed.remove(categoryId)
         seriesCache[categoryId] = items
+    }
+
+    fun markSeriesLoadFailed(categoryId: String) {
+        seriesLoadFailed.add(categoryId)
+        seriesCache.remove(categoryId)
     }
 
     fun setHomeRecent(movies: List<VodMovie>, series: List<SeriesItem>) {
@@ -117,6 +137,8 @@ object PlaylistRepository {
     fun clearContentCache() {
         vodCache.clear()
         seriesCache.clear()
+        vodLoadFailed.clear()
+        seriesLoadFailed.clear()
         homeRecentMovies = emptyList()
         homeRecentSeries = emptyList()
         bootstrapReady = false
@@ -132,6 +154,8 @@ object PlaylistRepository {
         seriesCategories = emptyList()
         vodCache.clear()
         seriesCache.clear()
+        vodLoadFailed.clear()
+        seriesLoadFailed.clear()
         homeRecentMovies = emptyList()
         homeRecentSeries = emptyList()
         bootstrapReady = false

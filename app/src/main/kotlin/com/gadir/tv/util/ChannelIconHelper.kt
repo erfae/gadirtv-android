@@ -6,6 +6,7 @@ import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.Profile
 import com.gadir.tv.util.ImagePreloader
+import com.gadir.tv.util.NetworkUrlResolver
 import java.net.URLEncoder
 
 object ChannelIconHelper {
@@ -121,7 +122,7 @@ object ChannelIconHelper {
                 add("$base/images/$epg.jpg")
                 add("$base/imgs/$epg.png")
             }
-        }.distinct().filter { it.isNotBlank() }
+        }.distinct().filter { it.isNotBlank() }.map { NetworkUrlResolver.resolveUrl(it) }
     }
 
     private fun slugify(name: String): String =
