@@ -124,7 +124,6 @@ class MainActivity : BaseLocaleActivity() {
     private var liveBrowseLevel = TvBrowseNav.Level.TAB
     private var catalogBrowseLevel = TvBrowseNav.Level.TAB
     private var livePrefetchToken = 0
-    private var liveIconPrefetchJob: Job? = null
     private val liveCategoryPrefetch = mutableMapOf<String?, List<LiveChannel>>()
     private val liveCategoryCounts = mutableMapOf<String?, Int>()
     private val catalogCategoryCounts = mutableMapOf<String, Int>()
@@ -675,10 +674,12 @@ class MainActivity : BaseLocaleActivity() {
 
         if (channels.isEmpty()) return
 
+        val previousBrowsingId = liveBrowsingCategoryId
         liveChannelsLoaded = true
         liveBrowseLevel = TvBrowseNav.Level.CONTENT
         selectedLiveCategoryId = newId
         liveBrowsingCategoryId = null
+        refreshLiveCategoryHighlight(previousBrowsingId, newId)
         highlightLiveCategory(newId)
         applyLivePanelFocusMode(inContent = true)
         TvBrowseNav.clearListFocus(liveCategoryList)
@@ -737,6 +738,8 @@ class MainActivity : BaseLocaleActivity() {
         }
         if (refreshCategories) {
             (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+        } else if (previousId != newId) {
+            refreshLiveCategoryHighlight(previousId, newId)
         }
 
         if (loaded.isEmpty()) {
@@ -915,9 +918,8 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun prefetchLiveChannelIcons(channelBatch: List<LiveChannel>) {
         if (channelBatch.isEmpty()) return
-        liveIconPrefetchJob?.cancel()
-        liveIconPrefetchJob = lifecycleScope.launch {
-            val batchSize = 32
+        lifecycleScope.launch {
+            val batchSize = 24
             channelBatch.chunked(batchSize).forEach { chunk ->
                 withContext(Dispatchers.IO) {
                     coroutineScope {
@@ -934,9 +936,31 @@ class MainActivity : BaseLocaleActivity() {
                     }
                 }
                 if (currentTab == Tab.LIVE && channels.isNotEmpty()) {
-                    channelAdapter?.notifyDataSetChanged()
+                    val count = channels.size
+                    channelList.post {
+                        channelAdapter?.notifyItemRangeChanged(0, count)
+                    }
                 }
             }
+        }
+    }
+
+    private fun indexForLiveCategoryId(id: String?): Int =
+        liveCategories.indexOfFirst { liveCategoryId(it) == id }
+
+    private fun refreshLiveCategoryHighlight(previousId: String?, newId: String?) {
+        (liveCategoryList.adapter as? CategoryAdapter)?.let { adapter ->
+            indexForLiveCategoryId(previousId).takeIf { it >= 0 }?.let { adapter.notifyItemChanged(it) }
+            indexForLiveCategoryId(newId).takeIf { it >= 0 }?.let { adapter.notifyItemChanged(it) }
+        }
+    }
+
+    private fun refreshCatalogCategoryHighlight(previousId: String?, newId: String?) {
+        catalogCategoryAdapter?.let { adapter ->
+            catalogCategories.indexOfFirst { it.id == previousId }.takeIf { it >= 0 }
+                ?.let { adapter.notifyItemChanged(it) }
+            catalogCategories.indexOfFirst { it.id == newId }.takeIf { it >= 0 }
+                ?.let { adapter.notifyItemChanged(it) }
         }
     }
 
@@ -952,10 +976,14 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun liveCategoryAdapterSelectedId(): String? {
-        liveBrowsingCategoryId?.let { return it ?: "" }
-        if (!liveChannelsLoaded) return null
-        return selectedLiveCategoryId ?: ""
+        return when (liveBrowseLevel) {
+            TvBrowseNav.Level.CONTENT -> selectedLiveCategoryId?.let { liveCategoryIdKey(it) }
+            TvBrowseNav.Level.GROUP -> liveBrowsingCategoryId?.let { liveCategoryIdKey(it) }
+            else -> null
+        }
     }
+
+    private fun liveCategoryIdKey(id: String?): String = id ?: ""
 
     private fun showLiveSelectPrompt() {
         if (!liveTabReady) return
@@ -1367,20 +1395,26 @@ class MainActivity : BaseLocaleActivity() {
             return
         }
         val catId = cat.id
+        val previousId = catalogBrowsingCategoryId
         catalogBrowsingCategoryId = catId
         selectedCatalogCategoryId = catId
         catalogEnterContentOnLoad = false
         applyCatalogPanelFocusMode(tab, inContent = false)
         showCatalogGroupContent(tab, catId)
+        if (previousId != catId) {
+            refreshCatalogCategoryHighlight(previousId, catId)
+        }
     }
 
     private fun enterCatalogContent(tab: Tab, cat: Category) {
         val catId = cat.id
         val idx = catalogCategories.indexOfFirst { it.id == catId }
         if (idx >= 0) catalogCategoryFocusIndex = idx
-        catalogBrowsingCategoryId = catId
+        val previousBrowsingId = catalogBrowsingCategoryId
+        catalogBrowsingCategoryId = null
         selectedCatalogCategoryId = catId
         catalogEnterContentOnLoad = true
+        refreshCatalogCategoryHighlight(previousBrowsingId, catId)
         highlightCatalogCategory(tab, catId)
         applyCatalogPanelFocusMode(tab, inContent = true)
         showCatalogGroupContent(tab, catId)
@@ -1445,9 +1479,11 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun catalogAdapterSelectedId(tab: Tab): String? {
-        catalogBrowsingCategoryId?.let { return it }
-        if (catalogBrowseLevel != TvBrowseNav.Level.CONTENT) return null
-        return selectedCatalogCategoryId
+        return when (catalogBrowseLevel) {
+            TvBrowseNav.Level.CONTENT -> selectedCatalogCategoryId
+            TvBrowseNav.Level.GROUP -> catalogBrowsingCategoryId
+            else -> null
+        }
     }
 
     private fun applyCatalogPanelFocusMode(tab: Tab, inContent: Boolean) {
@@ -4404,7 +4440,8 @@ class MainActivity : BaseLocaleActivity() {
         miniVlcPlayer = LiveVlcPlayer(
             context = this,
             videoLayout = videoLayout,
-            networkBufferMs = (appSettings.networkBufferMs * 2).coerceIn(2_000, 12_000),
+            networkBufferMs = appSettings.networkBufferMs.coerceIn(1_500, 4_000),
+            previewMode = true,
             onError = {
                 setPreviewVideoVisible(false)
                 if (!tryNextPreviewUrl()) {

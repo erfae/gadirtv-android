@@ -18,6 +18,7 @@ import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.LiveChannelStore
 import com.gadir.tv.data.PlaylistRepository
+import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.player.LiveChannelNavigator
@@ -43,7 +44,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private val progressRunnable = object : Runnable {
         override fun run() {
             updateVodProgress()
-            hideHandler.postDelayed(this, 1_000L)
+            hideHandler.postDelayed(this, 500L)
         }
     }
     private val api = XtreamApi()
@@ -64,6 +65,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private var resumeSeekPending = false
     private var userSeeking = false
     private var epgLoaded = false
+    private var vodDurationMs = 0L
+    private var exoFallbackLaunched = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -90,7 +93,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         findViewById<VLCVideoLayout>(R.id.vlcVideo).setOnClickListener { showControls() }
 
         currentStreamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
-        isLivePlayback = currentStreamId > 0
+        val kind = intent.getStringExtra(EXTRA_KIND).orEmpty()
+        isLivePlayback = kind == ResumeStore.KIND_LIVE || currentStreamId > 0
         resumePositionMs = intent.getLongExtra(EXTRA_POSITION_MS, 0L).coerceAtLeast(0L)
         resumeSeekPending = resumePositionMs > 0L && !isLivePlayback
 
@@ -111,11 +115,15 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                 when (event.type) {
                     MediaPlayer.Event.EncounteredError -> {
                         if (!tryNextUrl()) {
-                            android.widget.Toast.makeText(
-                                this@VlcPlayerActivity,
-                                R.string.series_playback_failed,
-                                android.widget.Toast.LENGTH_LONG,
-                            ).show()
+                            if (!isLivePlayback) {
+                                fallbackToExoPlayer()
+                            } else {
+                                android.widget.Toast.makeText(
+                                    this@VlcPlayerActivity,
+                                    R.string.series_playback_failed,
+                                    android.widget.Toast.LENGTH_LONG,
+                                ).show()
+                            }
                         }
                     }
                     MediaPlayer.Event.Playing -> {
@@ -127,6 +135,11 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                         updatePlayPauseIcon()
                     }
                     MediaPlayer.Event.Paused -> updatePlayPauseIcon()
+                    MediaPlayer.Event.LengthChanged -> {
+                        vodDurationMs = mediaPlayer?.length ?: 0L
+                        updateVodProgress()
+                    }
+                    MediaPlayer.Event.TimeChanged -> updateVodProgress()
                 }
             }
         }
@@ -182,7 +195,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         vodSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (!fromUser) return
-                val duration = mediaPlayer?.length ?: 0L
+                val duration = currentVodDuration()
                 if (duration > 0L) {
                     val position = (duration * progress) / seekBar!!.max
                     vodPosition.text = TimeFormat.formatMs(position)
@@ -196,7 +209,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
             override fun onStopTrackingTouch(seekBar: SeekBar?) {
                 userSeeking = false
-                val duration = mediaPlayer?.length ?: 0L
+                val duration = currentVodDuration()
                 if (duration > 0L && seekBar != null) {
                     val position = (duration * seekBar.progress) / seekBar.max
                     mediaPlayer?.time = position
@@ -204,6 +217,11 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                 scheduleHideControls()
             }
         })
+    }
+
+    private fun currentVodDuration(): Long {
+        val length = mediaPlayer?.length ?: 0L
+        return if (length > 0L) length else vodDurationMs
     }
 
     private fun loadFullscreenEpg(streamId: Int, epgChannelId: String) {
@@ -248,6 +266,27 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         return true
     }
 
+    private fun fallbackToExoPlayer() {
+        if (exoFallbackLaunched || isLivePlayback) return
+        exoFallbackLaunched = true
+        val url = pendingUrls.firstOrNull().orEmpty()
+        if (url.isBlank()) return
+        startActivity(
+            PlayerActivity.intent(
+                context = this,
+                title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
+                url = url,
+                kind = intent.getStringExtra(EXTRA_KIND).orEmpty(),
+                contentId = intent.getStringExtra(EXTRA_CONTENT_ID).orEmpty(),
+                imageUrl = intent.getStringExtra(EXTRA_IMAGE_URL).orEmpty(),
+                extension = intent.getStringExtra(EXTRA_EXTENSION).orEmpty().ifBlank { "mkv" },
+                positionMs = resumePositionMs,
+                alternateUrls = pendingUrls.drop(1).toList(),
+            ),
+        )
+        finish()
+    }
+
     private fun togglePlayPause() {
         val player = mediaPlayer ?: return
         if (player.isPlaying) player.pause() else player.play()
@@ -257,11 +296,12 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
     private fun seekBy(deltaMs: Long) {
         val player = mediaPlayer ?: return
-        val duration = player.length
+        val duration = currentVodDuration()
         if (duration <= 0L) return
         val target = (player.time + deltaMs).coerceIn(0L, duration)
         player.time = target
         updateVodProgress()
+        showControls()
     }
 
     private fun updatePlayPauseIcon() {
@@ -275,9 +315,9 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun updateVodProgress() {
         if (isLivePlayback || !::vodSeekBar.isInitialized) return
         val player = mediaPlayer ?: return
-        val duration = player.length
+        val duration = currentVodDuration()
         if (duration <= 0L) return
-        val position = player.time
+        val position = player.time.coerceAtLeast(0L)
         vodDuration.text = TimeFormat.formatMs(duration)
         vodPosition.text = TimeFormat.formatMs(position)
         if (!userSeeking) {
@@ -411,21 +451,27 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    if (!controlsVisible) {
-                        seekBy(-SEEK_STEP_MS)
-                        showControls()
-                        return true
-                    }
+                    seekBy(-SEEK_STEP_MS)
+                    showControls()
+                    return true
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (!controlsVisible) {
-                        seekBy(SEEK_STEP_MS)
-                        showControls()
-                        return true
-                    }
+                    seekBy(SEEK_STEP_MS)
+                    showControls()
+                    return true
                 }
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
                     togglePlayPause()
+                    return true
+                }
+                KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                    seekBy(-SEEK_STEP_MS)
+                    showControls()
+                    return true
+                }
+                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                    seekBy(SEEK_STEP_MS)
+                    showControls()
                     return true
                 }
             }
@@ -440,6 +486,10 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_STREAM_ID = "stream_id"
         private const val EXTRA_EPG_CHANNEL_ID = "epg_channel_id"
         private const val EXTRA_POSITION_MS = "position_ms"
+        private const val EXTRA_KIND = "kind"
+        private const val EXTRA_CONTENT_ID = "content_id"
+        private const val EXTRA_IMAGE_URL = "image_url"
+        private const val EXTRA_EXTENSION = "extension"
         private const val VLC_VOLUME = com.gadir.tv.player.VlcAudioOptions.VOLUME_FULLSCREEN
         private const val SEEK_STEP_MS = 10_000L
         private const val CONTROLS_HIDE_MS = 5_000L
@@ -452,12 +502,20 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             streamId: Int = 0,
             epgChannelId: String = "",
             positionMs: Long = 0L,
+            kind: String = "",
+            contentId: String = "",
+            imageUrl: String = "",
+            extension: String = "mkv",
         ): Intent = Intent(context, VlcPlayerActivity::class.java)
             .putExtra(EXTRA_TITLE, title)
             .putExtra(EXTRA_URL, url)
             .putExtra(EXTRA_STREAM_ID, streamId)
             .putExtra(EXTRA_EPG_CHANNEL_ID, epgChannelId)
             .putExtra(EXTRA_POSITION_MS, positionMs)
+            .putExtra(EXTRA_KIND, kind)
+            .putExtra(EXTRA_CONTENT_ID, contentId)
+            .putExtra(EXTRA_IMAGE_URL, imageUrl)
+            .putExtra(EXTRA_EXTENSION, extension)
             .putStringArrayListExtra(EXTRA_ALTERNATE_URLS, ArrayList(alternateUrls))
     }
 }

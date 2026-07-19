@@ -65,6 +65,10 @@ object PlaybackLauncher {
                 streamId = request.streamId,
                 epgChannelId = request.epgChannelId,
                 positionMs = request.positionMs,
+                kind = request.kind,
+                contentId = request.contentId,
+                imageUrl = request.imageUrl,
+                extension = request.extension,
             ),
         )
     }

@@ -12,8 +12,24 @@ object VlcAudioOptions {
         "--http-user-agent=${PlaylistRepository.userAgent}",
         "--network-caching=$networkBufferMs",
         "--live-caching=$networkBufferMs",
+        "--file-caching=${networkBufferMs.coerceIn(2_000, 8_000)}",
         "--no-video-title-show",
         "--avcodec-hw=any",
         "--http-reconnect",
     )
+
+    /** Preview TV: software decode + drop frames to avoid OOM/crash on FHD/4K. */
+    fun previewOptions(networkBufferMs: Int): ArrayList<String> {
+        val cache = networkBufferMs.coerceIn(800, 2_500)
+        return arrayListOf(
+            "--http-user-agent=${PlaylistRepository.userAgent}",
+            "--network-caching=$cache",
+            "--live-caching=$cache",
+            "--no-video-title-show",
+            "--avcodec-hw=none",
+            "--drop-late-frames",
+            "--skip-frames",
+            "--http-reconnect",
+        )
+    }
 }
