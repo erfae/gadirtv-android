@@ -31,8 +31,16 @@ class CategoryAdapter(
         val count: TextView = view.findViewById(R.id.categoryCount)
     }
 
-    fun refreshSelection() {
-        notifyDataSetChanged()
+    fun refreshSelection(list: RecyclerView? = null) {
+        val focusIndex = list?.focusedChild?.let { child ->
+            list.getChildAdapterPosition(child).takeIf { it >= 0 }
+        }
+        if (list != null && focusIndex != null) {
+            notifyItemRangeChanged(0, getItemCount())
+            list.post { TvNavHelper.focusCategoryItem(list, focusIndex) }
+        } else {
+            notifyDataSetChanged()
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
