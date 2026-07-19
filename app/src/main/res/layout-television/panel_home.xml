@@ -9,6 +9,8 @@
         android:layout_width="match_parent"
         android:layout_height="168dp"
         android:background="@color/gtv_bg"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:descendantFocusability="afterDescendants">
 
         <ImageView
@@ -25,12 +27,14 @@
             android:background="@drawable/hero_scrim_left" />
 
         <LinearLayout
+            android:id="@+id/heroTextColumn"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="32dp"
-            android:paddingVertical="10dp">
+            android:paddingTop="10dp"
+            android:paddingBottom="96dp">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -86,34 +90,9 @@
                     android:layout_marginTop="8dp"
                     android:ellipsize="end"
                     android:lineSpacingExtra="2dp"
-                    android:maxLines="3"
+                    android:maxLines="2"
                     android:textColor="#E6FFFFFF"
                     android:textSize="14sp" />
-
-                <FrameLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:elevation="24dp">
-
-                    <TextView
-                        android:id="@+id/heroPlay"
-                        android:layout_width="wrap_content"
-                        android:layout_height="64dp"
-                        android:layout_gravity="center"
-                        android:background="@drawable/btn_hero_play_solid"
-                        android:focusable="true"
-                        android:focusableInTouchMode="true"
-                        android:gravity="center"
-                        android:minWidth="280dp"
-                        android:paddingHorizontal="44dp"
-                        android:paddingVertical="18dp"
-                        android:text="@string/hero_play"
-                        android:textAllCaps="true"
-                        android:textColor="@android:color/white"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-                </FrameLayout>
             </LinearLayout>
 
             <ImageView
@@ -126,6 +105,29 @@
                 android:scaleType="centerCrop"
                 android:src="@drawable/hero_placeholder_bg" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/heroPlay"
+            android:layout_width="wrap_content"
+            android:layout_height="80dp"
+            android:layout_gravity="bottom|start"
+            android:layout_marginStart="32dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/btn_hero_play_tv"
+            android:elevation="32dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:gravity="center"
+            android:minWidth="360dp"
+            android:paddingHorizontal="52dp"
+            android:paddingVertical="22dp"
+            android:text="@string/hero_play"
+            android:textAllCaps="true"
+            android:textColor="@android:color/white"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:translationZ="32dp"
+            android:visibility="visible" />
     </FrameLayout>
 
     <androidx.core.widget.NestedScrollView

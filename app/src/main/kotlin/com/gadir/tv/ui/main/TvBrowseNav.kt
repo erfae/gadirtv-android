@@ -26,10 +26,10 @@ object TvBrowseNav {
         list.post { TvNavHelper.focusCategoryItem(list, index.coerceAtLeast(0)) }
     }
 
-    fun focusContent(list: RecyclerView, index: Int = 0) {
+    fun focusContent(list: RecyclerView, index: Int = 0, onFocused: (() -> Unit)? = null) {
         list.post {
             list.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-            TvNavHelper.focusItem(list, index.coerceAtLeast(0))
+            TvNavHelper.focusContentItem(list, index.coerceAtLeast(0), onFocused)
         }
     }
 
