@@ -273,26 +273,20 @@ class MainActivity : BaseLocaleActivity() {
         epgNext = panel.findViewById(R.id.epgNext)
         previewContainer = panel.findViewById(R.id.previewContainer)
         if (DeviceUi.useDpadFocus(this)) {
-            previewContainer?.isFocusable = true
-            previewContainer?.isFocusableInTouchMode = true
+            previewContainer?.isFocusable = false
+            previewContainer?.isFocusableInTouchMode = false
             channelList.nextFocusLeftId = R.id.categoryList
-            if (isLivePreviewBesideChannels()) {
-                channelList.nextFocusRightId = R.id.previewContainer
-                previewContainer?.nextFocusLeftId = R.id.channelList
-            } else {
-                channelList.nextFocusRightId = View.NO_ID
-                channelList.nextFocusDownId = R.id.previewContainer
-                previewContainer?.nextFocusUpId = R.id.channelList
-            }
-            liveCategoryList.nextFocusRightId = View.NO_ID
-            liveCategoryList.nextFocusUpId = View.NO_ID
+            channelList.nextFocusRightId = View.NO_ID
+            channelList.nextFocusDownId = View.NO_ID
             channelList.nextFocusUpId = View.NO_ID
+            liveCategoryList.nextFocusRightId = View.NO_ID
+            liveCategoryList.nextFocusUpId = R.id.btnSettings
         }
         liveCategoryList.layoutManager = LinearLayoutManager(this)
         channelList.layoutManager = LinearLayoutManager(this)
         if (DeviceUi.useDpadFocus(this)) {
             liveCategoryList.setPreserveFocusAfterLayout(false)
-            channelList.setPreserveFocusAfterLayout(true)
+            channelList.setPreserveFocusAfterLayout(false)
             liveCategoryList.setItemViewCacheSize(24)
             channelList.setItemViewCacheSize(32)
         }
@@ -409,7 +403,7 @@ class MainActivity : BaseLocaleActivity() {
         catalogCategoryList.layoutManager = LinearLayoutManager(this)
         if (DeviceUi.useDpadFocus(this)) {
             catalogCategoryList.setPreserveFocusAfterLayout(false)
-            catalogGrid.setPreserveFocusAfterLayout(true)
+            catalogGrid.setPreserveFocusAfterLayout(false)
             catalogCategoryList.setItemViewCacheSize(24)
             catalogGrid.setItemViewCacheSize(30)
             panelCatalog.findViewById<View>(R.id.catalogHeroContainer)?.visibility = View.GONE
@@ -607,7 +601,9 @@ class MainActivity : BaseLocaleActivity() {
                 null
             },
             onMoveUp = null,
-            onMoveRight = { enterLivePreviewFromChannels() },
+            onMoveRight = if (DeviceUi.useDpadFocus(this)) null else {
+                { enterLivePreviewFromChannels() }
+            },
             isFavorite = { favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId) },
             onToggleFavorite = { channel ->
                 favoritesStore.toggle(FavoritesStore.KIND_LIVE, channel.streamId)
@@ -648,7 +644,12 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun applyLiveCategoryClick(cat: Category, enterContent: Boolean = false) {
         if (!enterContent) {
-            showLiveCategoryChannels(cat, enterContent = false)
+            showLiveCategoryChannels(
+                cat,
+                enterContent = false,
+                refocusGroup = false,
+                refreshCategories = false,
+            )
             return
         }
         withLiveCategoryAccess(cat, liveCategoryId(cat)) {
@@ -695,9 +696,11 @@ class MainActivity : BaseLocaleActivity() {
             if (newId != null) liveCategoryCounts[newId] = it.size
         }
 
+        val previousId = liveBrowsingCategoryId
         liveBrowsingCategoryId = newId
         ++channelsLoadToken
         reloadingChannels = false
+        val listChanged = previousId != newId || channels.size != loaded.size
         channels.clear()
         channels.addAll(loaded)
         channelList.stopScroll()
@@ -706,7 +709,9 @@ class MainActivity : BaseLocaleActivity() {
         } else {
             TvBrowseNav.blockContentFocus(channelList)
         }
-        channelAdapter?.notifyDataSetChanged()
+        if (listChanged) {
+            channelAdapter?.notifyDataSetChanged()
+        }
         if (refreshCategories) {
             (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
         }
@@ -773,33 +778,42 @@ class MainActivity : BaseLocaleActivity() {
         if (DeviceUi.useDpadFocus(this)) {
             channelList.nextFocusLeftId = R.id.categoryList
             liveCategoryList.nextFocusRightId = View.NO_ID
-            channelList.nextFocusRightId = if (isLivePreviewBesideChannels()) {
-                R.id.previewContainer
-            } else {
-                View.NO_ID
-            }
+            channelList.nextFocusRightId = View.NO_ID
+            channelList.nextFocusDownId = View.NO_ID
         }
     }
 
-    private fun liveCategoryCount(cat: Category): Int? {
-        if (cat.id == "") return null
+    private fun liveCategoryCount(cat: Category): Int {
         val id = liveCategoryId(cat)
+        if (cat.id == "") {
+            return liveCategoryCounts[null]
+                ?: liveCategoryPrefetch[null]?.size
+                ?: PlaylistRepository.channelsFor(null, appSettings.liveSortMode).size
+        }
         return liveCategoryCounts[id]
             ?: liveCategoryPrefetch[id]?.size
-            ?: channelsForLiveCategory(id).size.takeIf { it > 0 }
+            ?: channelsForLiveCategory(id).size
     }
 
-    private fun catalogCategoryCount(tab: Tab, cat: Category): Int? {
-        if (cat.id == ResumeStore.RESUME_CATEGORY_ID) return null
+    private fun catalogCategoryCount(tab: Tab, cat: Category): Int {
+        if (cat.id == ResumeStore.RESUME_CATEGORY_ID) {
+            val kind = when (tab) {
+                Tab.MOVIES -> ResumeStore.KIND_MOVIE
+                Tab.SERIES -> ResumeStore.KIND_SERIES
+                else -> return 0
+            }
+            return resumeStore.loadAll().count { it.kind == kind }
+        }
         return catalogCategoryCounts[cat.id]
             ?: when (tab) {
                 Tab.MOVIES -> PlaylistRepository.cachedVod(cat.id)?.size
                 Tab.SERIES -> PlaylistRepository.cachedSeries(cat.id)?.size
-                else -> null
-            }
+                else -> 0
+            } ?: 0
     }
 
     private fun syncLiveCategoryCounts() {
+        liveCategoryCounts[null] = PlaylistRepository.channelsFor(null, appSettings.liveSortMode).size
         liveCategories.forEach { cat ->
             val id = liveCategoryId(cat) ?: return@forEach
             liveCategoryCounts[id] = channelsForLiveCategory(id).size
@@ -895,7 +909,7 @@ class MainActivity : BaseLocaleActivity() {
                         }.awaitAll()
                     }
                 }
-                if (currentTab == Tab.LIVE && channels.isNotEmpty()) {
+                if (currentTab == Tab.LIVE && liveBrowseLevel == TvBrowseNav.Level.CONTENT) {
                     channelAdapter?.notifyDataSetChanged()
                 }
             }
@@ -1012,8 +1026,10 @@ class MainActivity : BaseLocaleActivity() {
             onClick = { cat -> applyLiveCategoryClick(cat, enterContent = true) },
             onFocus = { cat ->
                 if (liveBrowseLevel == TvBrowseNav.Level.CONTENT) return@CategoryAdapter
-                val idx = liveCategories.indexOfFirst { liveCategoryId(it) == liveCategoryId(cat) }
+                val newId = liveCategoryId(cat)
+                val idx = liveCategories.indexOfFirst { liveCategoryId(it) == newId }
                 if (idx >= 0) liveCategoryFocusIndex = idx
+                if (liveBrowsingCategoryId == newId && channels.isNotEmpty()) return@CategoryAdapter
                 showLiveCategoryChannels(
                     cat,
                     enterContent = false,
@@ -1021,17 +1037,20 @@ class MainActivity : BaseLocaleActivity() {
                     refreshCategories = false,
                 )
             },
-            onMoveRight = null,
+            onMoveRight = {
+                val index = focusedLiveCategoryIndex()
+                val cat = liveCategories.getOrNull(index) ?: return@CategoryAdapter
+                applyLiveCategoryClick(cat, enterContent = true)
+            },
             onMoveLeft = if (DeviceUi.useDpadFocus(this)) {
-                { /* consumir ← en grupo; no salir ni crashear */ }
+                { /* consumir ← en grupo */ }
             } else {
                 null
             },
             onMoveUp = null,
-            upFocusViewId = View.NO_ID,
-            navigationLocked = { liveBrowseLevel == TvBrowseNav.Level.CONTENT },
+            upFocusViewId = R.id.btnSettings,
         )
-        liveCategoryList.nextFocusUpId = View.NO_ID
+        liveCategoryList.nextFocusUpId = R.id.btnSettings
         if (DeviceUi.useDpadFocus(this)) {
             applyLivePanelFocusMode(inContent = liveBrowseLevel == TvBrowseNav.Level.CONTENT)
         }
@@ -1181,12 +1200,12 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun updateHeaderFocusForTab(tab: Tab) {
-        // Header (lupa, ajustes…) solo enfocable en Inicio — evita saltos de foco en TV/Películas/Series.
-        val headerFocusable = tab == Tab.HOME
         listOf(btnSearch, btnReload, btnSettings, btnLogout, btnExit).forEach { button ->
-            button.isFocusable = headerFocusable
-            button.isFocusableInTouchMode = headerFocusable
-            if (!headerFocusable && button.hasFocus()) button.clearFocus()
+            button.isFocusable = true
+            button.isFocusableInTouchMode = true
+        }
+        if (DeviceUi.useDpadFocus(this)) {
+            catalogCategoryList.nextFocusUpId = R.id.btnSettings
         }
     }
 
@@ -1226,18 +1245,10 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun focusFirstLiveCategory() {
-        pauseLivePreviewPlayback()
-        if (!liveChannelsLoaded) {
-            focusCategoryList()
-        } else if (channels.isNotEmpty()) {
-            focusFirstChannel()
-        } else if (liveCategories.isNotEmpty()) {
-            focusCategoryList()
-        }
+        focusCategoryList()
     }
 
     private fun focusCategoryList() {
-        pauseLivePreviewPlayback()
         val index = liveCategoryFocusIndex.coerceIn(0, (liveCategories.size - 1).coerceAtLeast(0))
         liveCategoryFocusIndex = index
         liveBrowsingCategoryId = liveCategories.getOrNull(index)?.let { liveCategoryId(it) }
@@ -1286,10 +1297,17 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun syncCatalogCategoryCounts(tab: Tab) {
         catalogCategories.forEach { cat ->
-            if (cat.id == ResumeStore.RESUME_CATEGORY_ID) return@forEach
-            val size = when (tab) {
-                Tab.MOVIES -> PlaylistRepository.cachedVod(cat.id)?.size
-                Tab.SERIES -> PlaylistRepository.cachedSeries(cat.id)?.size
+            val size = when {
+                cat.id == ResumeStore.RESUME_CATEGORY_ID -> {
+                    val kind = when (tab) {
+                        Tab.MOVIES -> ResumeStore.KIND_MOVIE
+                        Tab.SERIES -> ResumeStore.KIND_SERIES
+                        else -> return@forEach
+                    }
+                    resumeStore.loadAll().count { it.kind == kind }
+                }
+                tab == Tab.MOVIES -> PlaylistRepository.cachedVod(cat.id)?.size
+                tab == Tab.SERIES -> PlaylistRepository.cachedSeries(cat.id)?.size
                 else -> null
             }
             if (size != null) catalogCategoryCounts[cat.id] = size
@@ -1705,8 +1723,6 @@ class MainActivity : BaseLocaleActivity() {
                     ensurePreviewPlayer()
                     if (!DeviceUi.useDpadFocus(this)) {
                         restoreLiveTabSession()
-                    } else if (!enteringFromOtherTab && liveChannelsLoaded) {
-                        restoreLastChannel()
                     }
                 }
             }
@@ -3201,21 +3217,25 @@ class MainActivity : BaseLocaleActivity() {
                 if (catalogBrowseLevel == TvBrowseNav.Level.CONTENT) return@CategoryAdapter
                 val idx = catalogCategories.indexOfFirst { it.id == cat.id }
                 if (idx >= 0) catalogCategoryFocusIndex = idx
+                if (catalogBrowsingCategoryId == cat.id && posterItems.isNotEmpty()) return@CategoryAdapter
                 browseCatalogCategory(tab, cat, enterContent = false)
                 scheduleCatalogPrefetch(tab, cat.id)
             },
-            onMoveRight = null,
+            onMoveRight = {
+                val index = focusedCatalogCategoryIndex()
+                val cat = catalogCategories.getOrNull(index) ?: return@CategoryAdapter
+                selectCatalogGroup(tab, cat, enterContent = true)
+            },
             onMoveLeft = if (DeviceUi.useDpadFocus(this)) {
                 { /* consumir ← en grupo */ }
             } else {
                 null
             },
             onMoveUp = null,
-            upFocusViewId = View.NO_ID,
-            navigationLocked = { catalogBrowseLevel == TvBrowseNav.Level.CONTENT },
+            upFocusViewId = R.id.btnSettings,
         )
         catalogCategoryList.adapter = catalogCategoryAdapter
-        catalogCategoryList.nextFocusUpId = View.NO_ID
+        catalogCategoryList.nextFocusUpId = R.id.btnSettings
     }
 
     private fun configureCatalogGrid() {
