@@ -11,7 +11,7 @@ class AppSettings(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_AUTOPLAY, value).apply()
 
     var playerMode: String
-        get() = prefs.getString(KEY_PLAYER_MODE, PLAYER_VLC) ?: PLAYER_VLC
+        get() = prefs.getString(KEY_PLAYER_MODE, PLAYER_STANDARD) ?: PLAYER_STANDARD
         set(value) = prefs.edit().putString(KEY_PLAYER_MODE, value).apply()
 
     var externalPlayerPackage: String

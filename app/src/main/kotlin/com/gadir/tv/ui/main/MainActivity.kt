@@ -4288,6 +4288,11 @@ class MainActivity : BaseLocaleActivity() {
     private fun startPreviewPlayback(channel: LiveChannel, token: Int, profile: Profile) {
         if (token != previewToken || livePreviewPaused) return
         updatePreviewInfo(channel)
+        if (DeviceUi.isTvUi(this)) {
+            cancelMiniPreviewPlayback()
+            setPreviewVideoVisible(false)
+            return
+        }
         if (!appSettings.autoplayPreview) {
             cancelMiniPreviewPlayback()
             setPreviewVideoVisible(false)
@@ -4422,7 +4427,11 @@ class MainActivity : BaseLocaleActivity() {
         VolumeHelper.boostOnPlaybackStart(this)
         livePreviewPaused = true
         teardownLivePreviewPlayback()
-        val candidates = LiveStreamUrls.candidates(api, profile, channel)
+        val candidates = if (DeviceUi.isTvUi(this)) {
+            LiveStreamUrls.tvCandidates(api, profile, channel)
+        } else {
+            LiveStreamUrls.candidates(api, profile, channel)
+        }
         val urls = buildList {
             if (previewingStreamId == channel.streamId) {
                 previewWorkingUrl?.let { add(it) }
@@ -4654,7 +4663,7 @@ class MainActivity : BaseLocaleActivity() {
         miniExoView = panel.findViewById(R.id.miniExoPlayer)
         miniVlcView = panel.findViewById(R.id.miniVlcPlayer)
         previewUsesExo = when {
-            miniVlcView != null && DeviceUi.isTvUi(this) -> false
+            DeviceUi.isTvUi(this) -> false
             DeviceUi.isCompact(this) && miniExoView != null -> true
             miniVlcView != null -> false
             else -> miniExoView != null

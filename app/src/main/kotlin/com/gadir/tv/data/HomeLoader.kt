@@ -92,6 +92,7 @@ object HomeLoader {
 
 object CatalogPreloader {
     private const val MAX_PARALLEL = 5
+    private const val MAX_RETRIES = 2
 
     suspend fun preloadRemaining(
         api: XtreamApi,
@@ -106,11 +107,7 @@ object CatalogPreloader {
                     async {
                         semaphore.withPermit {
                             onCategory?.invoke(category.name)
-                            runCatching {
-                                api.vodStreams(profile, category.id)
-                            }.getOrNull()?.let { movies ->
-                                PlaylistRepository.cacheVod(category.id, movies)
-                            }
+                            loadVodCategory(api, profile, category.id)
                         }
                     }
                 }
@@ -120,15 +117,33 @@ object CatalogPreloader {
                     async {
                         semaphore.withPermit {
                             onCategory?.invoke(category.name)
-                            runCatching {
-                                api.seriesList(profile, category.id)
-                            }.getOrNull()?.let { series ->
-                                PlaylistRepository.cacheSeries(category.id, series)
-                            }
+                            loadSeriesCategory(api, profile, category.id)
                         }
                     }
                 }
             awaitAll(*(vodJobs + seriesJobs).toTypedArray())
+        }
+    }
+
+    private fun loadVodCategory(api: XtreamApi, profile: Profile, categoryId: String) {
+        repeat(MAX_RETRIES) { attempt ->
+            val movies = runCatching { api.vodStreams(profile, categoryId) }.getOrNull()
+            if (movies != null) {
+                PlaylistRepository.cacheVod(categoryId, movies)
+                return
+            }
+            if (attempt < MAX_RETRIES - 1) Thread.sleep(600L)
+        }
+    }
+
+    private fun loadSeriesCategory(api: XtreamApi, profile: Profile, categoryId: String) {
+        repeat(MAX_RETRIES) { attempt ->
+            val series = runCatching { api.seriesList(profile, categoryId) }.getOrNull()
+            if (series != null) {
+                PlaylistRepository.cacheSeries(categoryId, series)
+                return
+            }
+            if (attempt < MAX_RETRIES - 1) Thread.sleep(600L)
         }
     }
 }

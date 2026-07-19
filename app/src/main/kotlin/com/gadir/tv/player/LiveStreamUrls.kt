@@ -8,24 +8,35 @@ import com.gadir.tv.model.Profile
 import com.gadir.tv.util.NetworkUrlResolver
 
 object LiveStreamUrls {
-    fun candidates(api: XtreamApi, profile: Profile, channel: LiveChannel): List<String> {
+    fun candidates(api: XtreamApi, profile: Profile, channel: LiveChannel): List<String> =
+        buildCandidates(api, profile, channel, tvSafe = false)
+
+    /** Android TV: HLS only — avoids OOM/crash from raw FHD/4K direct_source. */
+    fun tvCandidates(api: XtreamApi, profile: Profile, channel: LiveChannel): List<String> =
+        buildCandidates(api, profile, channel, tvSafe = true)
+
+    private fun buildCandidates(
+        api: XtreamApi,
+        profile: Profile,
+        channel: LiveChannel,
+        tvSafe: Boolean,
+    ): List<String> {
         val urls = linkedSetOf<String>()
-        val ext = channel.extension.ifBlank { "ts" }.lowercase()
-
-        // Panel HLS/TS first (transcoded, TV-safe). direct_source often raw 4K/HDR.
         urls.add(api.streamUrl(profile, channel.streamId, "m3u8"))
-        urls.add(api.streamUrl(profile, channel.streamId, "ts"))
-        if (ext.isNotEmpty() && ext !in setOf("ts", "m3u8")) {
-            urls.add(api.streamUrl(profile, channel.streamId, ext))
-        }
-        urls.add(api.streamUrlWithoutExtension(profile, channel.streamId))
-        if (ext == "mp4") {
-            urls.add(api.streamUrl(profile, channel.streamId, "mp4"))
-        }
-
-        val direct = channel.directSource.trim()
-        if (direct.isNotEmpty() && direct.startsWith("http")) {
-            urls.add(direct)
+        if (!tvSafe) {
+            val ext = channel.extension.ifBlank { "ts" }.lowercase()
+            urls.add(api.streamUrl(profile, channel.streamId, "ts"))
+            if (ext.isNotEmpty() && ext !in setOf("ts", "m3u8")) {
+                urls.add(api.streamUrl(profile, channel.streamId, ext))
+            }
+            urls.add(api.streamUrlWithoutExtension(profile, channel.streamId))
+            if (ext == "mp4") {
+                urls.add(api.streamUrl(profile, channel.streamId, "mp4"))
+            }
+            val direct = channel.directSource.trim()
+            if (direct.isNotEmpty() && direct.startsWith("http")) {
+                urls.add(direct)
+            }
         }
 
         return urls

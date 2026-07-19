@@ -1,32 +1,32 @@
 package com.gadir.tv.player
 
 import android.content.Context
-import android.widget.Toast
-import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.ui.player.PlayerActivity
 import com.gadir.tv.ui.player.VlcPlayerActivity
+import com.gadir.tv.util.DeviceUi
 
 object PlaybackLauncher {
     fun play(context: Context, request: PlaybackRequest) {
         val settings = AppSettings(context)
-        val isVod = request.kind == ResumeStore.KIND_MOVIE || request.kind == ResumeStore.KIND_SERIES
         when {
             settings.playerMode == AppSettings.PLAYER_EXTERNAL ->
                 launchExternal(context, request, settings)
-            request.kind == ResumeStore.KIND_LIVE || isVod ->
-                launchVlc(context, request)
-            settings.playerMode == AppSettings.PLAYER_VLC ->
+            settings.playerMode == AppSettings.PLAYER_VLC && !preferExoForLiveOnTv(context, request) ->
                 launchVlc(context, request)
             else -> launchExo(context, request)
         }
     }
 
+    /** TV live: ExoPlayer (HW decode) is far more stable than libVLC on Xiaomi/Amlogic boxes. */
+    private fun preferExoForLiveOnTv(context: Context, request: PlaybackRequest): Boolean =
+        DeviceUi.isTvUi(context) && request.kind == ResumeStore.KIND_LIVE
+
     private fun launchExternal(context: Context, request: PlaybackRequest, settings: AppSettings) {
         val players = ExternalPlayerHelper.findInstalledPlayers(context)
         if (players.isEmpty()) {
-            Toast.makeText(context, R.string.settings_no_external_player, Toast.LENGTH_LONG).show()
+            android.widget.Toast.makeText(context, com.gadir.tv.R.string.settings_no_external_player, android.widget.Toast.LENGTH_LONG).show()
             launchExo(context, request)
             return
         }
@@ -37,7 +37,7 @@ object PlaybackLauncher {
                 packageName = players.first().packageName
                 settings.externalPlayerPackage = packageName
             } else {
-                Toast.makeText(context, R.string.settings_pick_external_player, Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(context, com.gadir.tv.R.string.settings_pick_external_player, android.widget.Toast.LENGTH_LONG).show()
                 launchExo(context, request)
                 return
             }
@@ -50,7 +50,7 @@ object PlaybackLauncher {
             title = request.title,
         )
         if (!launched) {
-            Toast.makeText(context, R.string.settings_external_player_failed, Toast.LENGTH_LONG).show()
+            android.widget.Toast.makeText(context, com.gadir.tv.R.string.settings_external_player_failed, android.widget.Toast.LENGTH_LONG).show()
             launchExo(context, request)
         }
     }

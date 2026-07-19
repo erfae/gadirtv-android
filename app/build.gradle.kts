@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.kapt")
 }
 
 import java.util.Properties
@@ -21,9 +22,9 @@ android {
         minSdk = 21
         targetSdk = 33
         // Must exceed Flutter v2.5.8 (versionCode 84) so native can replace it.
-        // TV release track (android-native). v1.31.5 IP fallback release.
-        versionCode = 259
-        versionName = "1.31.5"
+        // TV release track (android-native). v1.32.0 final stable TV fix.
+        versionCode = 260
+        versionName = "1.32.0"
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
@@ -102,4 +103,6 @@ dependencies {
         implementation("org.videolan.android:libvlc-all:3.6.0")
 
         implementation("com.github.bumptech.glide:glide:4.16.0")
+        kapt("com.github.bumptech.glide:compiler:4.16.0")
+        implementation("com.github.bumptech.glide:okhttp3-integration:4.16.0")
 }

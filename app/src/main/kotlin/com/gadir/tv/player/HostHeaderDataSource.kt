@@ -4,7 +4,7 @@ import android.net.Uri
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
-import com.gadir.tv.util.NetworkUrlResolver
+import com.gadir.tv.net.PanelHttp
 import java.io.IOException
 
 /** Applies gadir.co IP fallback and Host header for ExoPlayer HTTP requests. */
@@ -17,7 +17,7 @@ class HostHeaderDataSource(
     }
 
     override fun open(dataSpec: DataSpec): Long {
-        val resolved = NetworkUrlResolver.resolve(dataSpec.uri.toString())
+        val resolved = PanelHttp.resolve(dataSpec.uri.toString())
         val headers = LinkedHashMap(dataSpec.httpRequestHeaders)
         resolved.hostHeader?.let { headers["Host"] = it }
         val request = DataSpec.Builder()

@@ -45,6 +45,11 @@ object BootstrapLoader {
             PlaylistRepository.updateVodCategories(vodCategories.await())
             PlaylistRepository.updateSeriesCategories(seriesCategories.await())
 
+            onProgress?.invoke(context.getString(R.string.bootstrap_catalog))
+            CatalogPreloader.preloadRemaining(api, profile) { categoryName ->
+                onProgress?.invoke(context.getString(R.string.bootstrap_loading_group, categoryName))
+            }
+
             PlaylistRepository.markBootstrapReady()
 
             onProgress?.invoke(context.getString(R.string.bootstrap_home))
@@ -60,18 +65,40 @@ object BootstrapLoader {
         val moviesDeferred = async {
             runCatching {
                 withTimeout(BOOTSTRAP_HOME_TIMEOUT_MS) {
-                    filterRecentMovies(api.vodStreams(profile, null))
+                    filterRecentMovies(loadRecentMovies(api, profile))
                 }
             }.getOrDefault(emptyList())
         }
         val seriesDeferred = async {
             runCatching {
                 withTimeout(BOOTSTRAP_HOME_TIMEOUT_MS) {
-                    filterRecentSeries(api.seriesList(profile, null))
+                    filterRecentSeries(loadRecentSeries(api, profile))
                 }
             }.getOrDefault(emptyList())
         }
         moviesDeferred.await() to seriesDeferred.await()
+    }
+
+    private fun loadRecentMovies(api: XtreamApi, profile: Profile): List<VodMovie> {
+        val all = api.vodStreams(profile, null)
+        if (all.isNotEmpty()) return all
+        return PlaylistRepository.vodCategories
+            .filter { !CategorySort.isAdultCategory(it.name) }
+            .flatMap { category ->
+                runCatching { api.vodStreams(profile, category.id) }.getOrDefault(emptyList())
+                    .also { movies -> if (movies.isNotEmpty()) PlaylistRepository.cacheVod(category.id, movies) }
+            }
+    }
+
+    private fun loadRecentSeries(api: XtreamApi, profile: Profile): List<SeriesItem> {
+        val all = api.seriesList(profile, null)
+        if (all.isNotEmpty()) return all
+        return PlaylistRepository.seriesCategories
+            .filter { !CategorySort.isAdultCategory(it.name) }
+            .flatMap { category ->
+                runCatching { api.seriesList(profile, category.id) }.getOrDefault(emptyList())
+                    .also { series -> if (series.isNotEmpty()) PlaylistRepository.cacheSeries(category.id, series) }
+            }
     }
 
     private fun filterRecentMovies(movies: List<VodMovie>): List<VodMovie> {

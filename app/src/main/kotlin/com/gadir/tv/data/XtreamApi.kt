@@ -571,23 +571,39 @@ class XtreamApi(
             }
         }
         val url = "$host/player_api.php?$query"
-        val response = NativeHttpClient.request(url, activeUserAgent)
-        if (response.status != 200 || response.body.isBlank()) return emptyList()
-        return try {
-            val el = gson.fromJson(response.body, JsonElement::class.java)
-            when {
-                el == null || el.isJsonNull -> emptyList()
-                el.isJsonArray -> el.asJsonArray.mapNotNull { it.asJsonObjectOrNull() }
-                else -> emptyList()
+        repeat(3) { attempt ->
+            val response = NativeHttpClient.request(url, activeUserAgent)
+            if (response.status == 200 && response.body.isNotBlank()) {
+                return try {
+                    val el = gson.fromJson(response.body, JsonElement::class.java)
+                    when {
+                        el == null || el.isJsonNull -> emptyList()
+                        el.isJsonArray -> el.asJsonArray.mapNotNull { it.asJsonObjectOrNull() }
+                        else -> emptyList()
+                    }
+                } catch (_: Exception) {
+                    emptyList()
+                }
             }
-        } catch (_: Exception) {
-            emptyList()
+            if (attempt < 2) Thread.sleep(500L * (attempt + 1))
         }
+        return emptyList()
     }
 
     private fun loginSuccess(ua: String, body: String): LoginResult {
         activeUserAgent = ua
         PlaylistRepository.userAgent = ua
+        PlaylistRepository.profile?.host?.let { host ->
+            val base = HostUtils.baseUrl(host)
+            runCatching {
+                val uri = java.net.URI(base)
+                uri.host?.let { hostname ->
+                    if (!hostname.matches(Regex("^\\d{1,3}(\\.\\d{1,3}){3}$"))) {
+                        com.gadir.tv.net.PanelHttp.rememberWorkingIp(hostname, com.gadir.tv.net.PanelHttp.GADIR_IP)
+                    }
+                }
+            }
+        }
         storeAccountInfo(body)
         return LoginResult(true)
     }

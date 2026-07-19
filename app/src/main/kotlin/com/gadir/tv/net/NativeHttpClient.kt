@@ -2,53 +2,21 @@ package com.gadir.tv.net
 
 import android.util.Log
 import com.gadir.tv.util.HostUtils
-import okhttp3.ConnectionSpec
-import okhttp3.Dns
 import okhttp3.FormBody
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
-import java.net.Inet4Address
-import java.net.InetAddress
+import java.net.URI
 import java.net.URL
-import java.util.concurrent.TimeUnit
 
 /** Cliente HTTP Xtream — OkHttp + HttpURLConnection, IPv4, fallback por IP. */
 object NativeHttpClient {
     private const val TAG = "GadirIPTV-HTTP"
     private const val MAX_RETRIES = 3
 
-    /** IP conocida de gadir.co — fallback cuando DNS/TCP al hostname falla en TV Box. */
-    private const val GADIR_IP = "51.91.120.175"
-
-    private val ipv4PreferredDns = object : Dns {
-        override fun lookup(hostname: String): List<InetAddress> {
-            return try {
-                val resolved = Dns.SYSTEM.lookup(hostname)
-                val v4 = resolved.filterIsInstance<Inet4Address>()
-                if (v4.isNotEmpty()) v4 else resolved
-            } catch (e: Exception) {
-                Log.w(TAG, "DNS falló para $hostname: ${e.message}")
-                emptyList()
-            }
-        }
-    }
-
-    private val okHttp = OkHttpClient.Builder()
-        .dns(ipv4PreferredDns)
-        .connectTimeout(25, TimeUnit.SECONDS)
-        .readTimeout(35, TimeUnit.SECONDS)
-        .writeTimeout(25, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .retryOnConnectionFailure(true)
-        .connectionSpecs(listOf(ConnectionSpec.CLEARTEXT, ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS))
-        .build()
-
     fun request(url: String, userAgent: String, method: String = "GET"): HttpResult {
-        val targets = buildTargets(url)
+        val targets = PanelHttp.buildTargets(url)
         var last = HttpResult(0, "", method.uppercase(), "Sin respuesta")
 
         for (target in targets) {
@@ -60,6 +28,13 @@ object NativeHttpClient {
                     }
                     last = result
                     if (result.error == null && result.status > 0) {
+                        if (target.hostHeader != null && result.status in 200..399) {
+                            target.hostHeader?.let { host ->
+                                URI(target.requestUrl).host?.let { ip ->
+                                    PanelHttp.rememberWorkingIp(host, ip)
+                                }
+                            }
+                        }
                         if (result.status == 200 && result.body.isNotBlank()) return result
                         if (result.status !in 500..599 && result.status != 512 && result.status != 429) {
                             return result
@@ -74,35 +49,9 @@ object NativeHttpClient {
         return last
     }
 
-    private data class RequestTarget(
-        val requestUrl: String,
-        val hostHeader: String?,
-        val label: String,
-    )
-
-    private fun buildTargets(url: String): List<RequestTarget> {
-        val normalized = normalizeRequestUrl(url)
-        val uri = java.net.URI(normalized)
-        val hostname = uri.host ?: return listOf(RequestTarget(normalized, null, "direct"))
-        val pathAndQuery = buildString {
-            append(uri.rawPath ?: "")
-            if (!uri.rawQuery.isNullOrBlank()) append('?').append(uri.rawQuery)
-        }
-        val scheme = uri.scheme ?: "http"
-
-        val targets = mutableListOf<RequestTarget>()
-        targets.add(RequestTarget(normalized, null, "host:$hostname"))
-
-        if (hostname.equals("gadir.co", ignoreCase = true)) {
-            val ipUrl = "$scheme://$GADIR_IP$pathAndQuery"
-            targets.add(RequestTarget(ipUrl, "gadir.co", "ip:$GADIR_IP"))
-        }
-        return targets
-    }
-
-    private fun requestOkHttp(target: RequestTarget, userAgent: String, method: String): HttpResult {
+    private fun requestOkHttp(target: PanelHttp.RequestTarget, userAgent: String, method: String): HttpResult {
         return try {
-            val uri = java.net.URI(target.requestUrl)
+            val uri = URI(target.requestUrl)
             val originHost = target.hostHeader ?: uri.host
             val scheme = uri.scheme ?: "http"
             val origin = HostUtils.baseUrl("$scheme://${originHost}${portSuffix(uri)}")
@@ -130,7 +79,7 @@ object NativeHttpClient {
                 Log.i(TAG, "OkHttp GET ${target.requestUrl} [${target.label}] UA=$userAgent")
             }
 
-            okHttp.newCall(builder.build()).execute().use { response ->
+            PanelHttp.okHttpClient.newCall(builder.build()).execute().use { response ->
                 HttpResult(response.code, response.body?.string() ?: "", method.uppercase())
             }
         } catch (e: Exception) {
@@ -139,9 +88,9 @@ object NativeHttpClient {
         }
     }
 
-    private fun requestHttpUrl(target: RequestTarget, userAgent: String, method: String): HttpResult {
+    private fun requestHttpUrl(target: PanelHttp.RequestTarget, userAgent: String, method: String): HttpResult {
         return try {
-            val uri = java.net.URI(target.requestUrl)
+            val uri = URI(target.requestUrl)
             val originHost = target.hostHeader ?: uri.host
             val scheme = uri.scheme ?: "http"
             val origin = HostUtils.baseUrl("$scheme://${originHost}${portSuffix(uri)}")
@@ -191,15 +140,7 @@ object NativeHttpClient {
         }
     }
 
-    private fun normalizeRequestUrl(url: String): String {
-        val qIdx = url.indexOf('?')
-        val base = if (qIdx >= 0) url.substring(0, qIdx) else url
-        val query = if (qIdx >= 0) url.substring(qIdx + 1) else ""
-        val normalizedBase = HostUtils.baseUrl(base)
-        return if (query.isEmpty()) normalizedBase else "$normalizedBase?$query"
-    }
-
-    private fun portSuffix(uri: java.net.URI): String {
+    private fun portSuffix(uri: URI): String {
         val port = uri.port
         if (port <= 0) return ""
         if (port == 80 && uri.scheme == "http") return ""
