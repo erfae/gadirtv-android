@@ -980,6 +980,11 @@ class MainActivity : BaseLocaleActivity() {
         liveCategoryList.nextFocusUpId = View.NO_ID
         if (DeviceUi.useDpadFocus(this)) {
             channelList.nextFocusLeftId = View.NO_ID
+            channelList.nextFocusRightId = if (isLivePreviewBesideChannels()) {
+                R.id.previewContainer
+            } else {
+                View.NO_ID
+            }
             liveCategoryList.nextFocusRightId = R.id.channelList
         }
     }
@@ -3784,16 +3789,18 @@ class MainActivity : BaseLocaleActivity() {
     private fun previewChannel(channel: LiveChannel, token: Int) {
         if (token != previewToken || livePreviewPaused) return
         val profile = PlaylistRepository.profile ?: return
-        if (!ensurePreviewPlayer()) {
-            livePanel().post {
-                if (token == previewToken && !livePreviewPaused && ensurePreviewPlayer()) {
-                    previewChannel(channel, token)
-                } else if (token == previewToken) {
-                    showNoSignal()
-                }
+        runWhenPreviewSurfaceReady {
+            if (token != previewToken || livePreviewPaused || currentTab != Tab.LIVE) return@runWhenPreviewSurfaceReady
+            if (!ensurePreviewPlayer()) {
+                if (token == previewToken) showNoSignal()
+                return@runWhenPreviewSurfaceReady
             }
-            return
+            startPreviewPlayback(channel, token, profile)
         }
+    }
+
+    private fun startPreviewPlayback(channel: LiveChannel, token: Int, profile: Profile) {
+        if (token != previewToken || livePreviewPaused) return
         updatePreviewInfo(channel)
         if (!appSettings.autoplayPreview) {
             cancelMiniPreviewPlayback()
@@ -3934,22 +3941,28 @@ class MainActivity : BaseLocaleActivity() {
         }.filter { it.isNotBlank() }.distinct()
         if (urls.isEmpty()) {
             Toast.makeText(this, R.string.connection_failed, Toast.LENGTH_SHORT).show()
+            livePreviewPaused = false
             return
         }
-        PlaybackLauncher.play(
-            context = this,
-            request = PlaybackRequest(
-                title = channel.name,
-                url = urls.first(),
-                kind = ResumeStore.KIND_LIVE,
-                contentId = channel.streamId.toString(),
-                imageUrl = channel.icon,
-                streamId = channel.streamId,
-                epgChannelId = channel.epgChannelId,
-                extension = channel.extension,
-                alternateUrls = urls.drop(1),
-            ),
-        )
+        try {
+            PlaybackLauncher.play(
+                context = this,
+                request = PlaybackRequest(
+                    title = channel.name,
+                    url = urls.first(),
+                    kind = ResumeStore.KIND_LIVE,
+                    contentId = channel.streamId.toString(),
+                    imageUrl = channel.icon,
+                    streamId = channel.streamId,
+                    epgChannelId = channel.epgChannelId,
+                    extension = channel.extension,
+                    alternateUrls = urls.drop(1),
+                ),
+            )
+        } catch (_: Exception) {
+            livePreviewPaused = false
+            Toast.makeText(this, R.string.connection_failed, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun logoutUser() {
@@ -4143,7 +4156,12 @@ class MainActivity : BaseLocaleActivity() {
         }
         miniExoView = panel.findViewById(R.id.miniExoPlayer)
         miniVlcView = panel.findViewById(R.id.miniVlcPlayer)
-        previewUsesExo = DeviceUi.isCompact(this) && miniExoView != null
+        previewUsesExo = when {
+            miniVlcView != null && DeviceUi.isTvUi(this) -> false
+            DeviceUi.isCompact(this) && miniExoView != null -> true
+            miniVlcView != null -> false
+            else -> miniExoView != null
+        }
         if (previewUsesExo) {
             miniVlcView?.visibility = View.GONE
             miniExoView?.visibility = View.VISIBLE
@@ -4165,14 +4183,44 @@ class MainActivity : BaseLocaleActivity() {
             return miniExoPlayer != null
         }
         if (miniVlcPlayer != null) return true
-        val videoLayout = miniVlcView ?: return false
-        if (!videoLayout.isAttachedToWindow || videoLayout.width <= 0) return false
+        val videoLayout = miniVlcView ?: return ensureExoPreviewFallback()
+        if (!videoLayout.isAttachedToWindow) return false
+        if (videoLayout.width <= 0 || videoLayout.height <= 0) return false
         try {
             recreateMiniVlcPlayer()
         } catch (_: Exception) {
             miniVlcPlayer = null
+            return ensureExoPreviewFallback()
         }
         return miniVlcPlayer != null
+    }
+
+    private fun ensureExoPreviewFallback(): Boolean {
+        if (miniExoView == null) return false
+        previewUsesExo = true
+        miniVlcView?.visibility = View.GONE
+        miniExoView?.visibility = View.VISIBLE
+        if (miniExoPlayer == null) createMiniExoPlayer()
+        return miniExoPlayer != null
+    }
+
+    private fun runWhenPreviewSurfaceReady(block: () -> Unit) {
+        val surface = if (usesExoPreview()) miniExoView else miniVlcView
+        if (surface == null) {
+            block()
+            return
+        }
+        if (surface.width > 0 && surface.height > 0 && surface.isAttachedToWindow) {
+            block()
+            return
+        }
+        surface.post {
+            if (surface.width > 0 && surface.height > 0) {
+                block()
+            } else {
+                surface.post(block)
+            }
+        }
     }
 
     private fun createMiniExoPlayer() {
@@ -4196,6 +4244,7 @@ class MainActivity : BaseLocaleActivity() {
                 }
                 setPreviewVideoVisible(true)
                 hideNoSignal()
+                if (DeviceUi.useDpadFocus(this)) showMiniPreviewControls()
             },
         )
     }
@@ -4224,6 +4273,7 @@ class MainActivity : BaseLocaleActivity() {
                 }
                 setPreviewVideoVisible(true)
                 hideNoSignal()
+                if (DeviceUi.useDpadFocus(this)) showMiniPreviewControls()
             },
         )
     }
