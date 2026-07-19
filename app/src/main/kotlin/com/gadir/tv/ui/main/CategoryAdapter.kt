@@ -47,7 +47,7 @@ class CategoryAdapter(
 
         holder.name.text = item.name
         val count = itemCount(item)
-        if (count != null && count > 0) {
+        if (count != null) {
             holder.count.visibility = View.VISIBLE
             holder.count.text = holder.itemView.context.getString(R.string.category_count_format, count)
         } else {
@@ -57,7 +57,11 @@ class CategoryAdapter(
         holder.itemView.isFocusable = true
         holder.itemView.isFocusableInTouchMode = true
         if (position == 0) {
-            holder.itemView.nextFocusUpId = holder.itemView.id
+            holder.itemView.nextFocusUpId = if (upFocusViewId != View.NO_ID) {
+                upFocusViewId
+            } else {
+                holder.itemView.id
+            }
         } else {
             holder.itemView.nextFocusUpId = View.NO_ID
         }
