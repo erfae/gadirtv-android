@@ -35,7 +35,7 @@
             android:layout_height="match_parent"
             android:contentDescription="@null"
             android:scaleType="centerInside"
-            android:src="@drawable/channel_icon_placeholder" />
+            android:src="@drawable/gadir_logo" />
     </FrameLayout>
 
     <TextView

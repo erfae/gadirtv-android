@@ -58,6 +58,9 @@ class MovieDetailActivity : BaseLocaleActivity() {
             ImageLoader.loadPoster(findViewById(R.id.movieBackdrop), fallbackCover)
         }
         applyPlotCache()
+        if (moviePlot.text.isNullOrBlank()) {
+            moviePlot.text = getString(R.string.hero_plot_loading)
+        }
 
         val btnReload = findViewById<TextView>(R.id.btnMovieReload)
         TvFocusHelper.bindButton(btnReload) { loadMovieDetail() }
@@ -105,7 +108,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
                 withContext(Dispatchers.IO) {
                     withTimeout(18_000L) { api.vodInfo(profile, streamId) }
                 }
-            } catch (_: TimeoutCancellationException) {
+            } catch (_: Exception) {
                 null
             }
             if (token != loadToken) return@launch

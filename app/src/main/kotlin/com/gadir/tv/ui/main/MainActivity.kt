@@ -1687,13 +1687,25 @@ class MainActivity : BaseLocaleActivity() {
         when (tab) {
             Tab.MOVIES -> when (catId) {
                 ResumeStore.RESUME_CATEGORY_ID -> bindResumeMovies()
-                else -> PlaylistRepository.cachedVod(catId)?.let { bindMovies(it) }
-                    ?: loadCatalogItems(tab, catId)
+                else -> {
+                    val cached = PlaylistRepository.cachedVod(catId)
+                    if (!cached.isNullOrEmpty()) {
+                        bindMovies(cached)
+                        return
+                    }
+                    loadCatalogItems(tab, catId)
+                }
             }
             Tab.SERIES -> when (catId) {
                 ResumeStore.RESUME_CATEGORY_ID -> bindResumeSeries()
-                else -> PlaylistRepository.cachedSeries(catId)?.let { bindSeries(it) }
-                    ?: loadCatalogItems(tab, catId)
+                else -> {
+                    val cached = PlaylistRepository.cachedSeries(catId)
+                    if (!cached.isNullOrEmpty()) {
+                        bindSeries(cached)
+                        return
+                    }
+                    loadCatalogItems(tab, catId)
+                }
             }
             else -> Unit
         }
@@ -3470,7 +3482,7 @@ class MainActivity : BaseLocaleActivity() {
                     bindResumeMovies()
                     return
                 }
-                else -> PlaylistRepository.cachedVod(categoryId)?.let {
+                else -> PlaylistRepository.cachedVod(categoryId)?.takeIf { it.isNotEmpty() }?.let {
                     bindMovies(it)
                     return
                 }
@@ -3480,7 +3492,7 @@ class MainActivity : BaseLocaleActivity() {
                     bindResumeSeries()
                     return
                 }
-                else -> PlaylistRepository.cachedSeries(categoryId)?.let {
+                else -> PlaylistRepository.cachedSeries(categoryId)?.takeIf { it.isNotEmpty() }?.let {
                     bindSeries(it)
                     return
                 }
@@ -3527,9 +3539,6 @@ class MainActivity : BaseLocaleActivity() {
                 if (token != catalogLoadToken) return@launch
                 catalogCategoryCounts[categoryId] = items.size
                 catalogCategoryAdapter?.refreshSelection()
-                catalogLoading.visibility = View.GONE
-                catalogGrid.alpha = 1f
-                catalogGrid.visibility = View.VISIBLE
                 when (tab) {
                     Tab.MOVIES -> bindMovies(items as List<VodMovie>)
                     Tab.SERIES -> bindSeries(items as List<SeriesItem>)
@@ -3548,13 +3557,16 @@ class MainActivity : BaseLocaleActivity() {
                     Tab.SERIES -> seriesGroupLoaded = false
                     else -> Unit
                 }
-                catalogLoading.visibility = View.GONE
-                catalogGrid.alpha = 1f
-                catalogGrid.visibility = View.VISIBLE
                 posterItems.clear()
                 catalogGrid.adapter?.notifyDataSetChanged()
                 catalogEmpty.visibility = View.VISIBLE
                 catalogEmpty.text = getString(R.string.catalog_load_failed)
+            } finally {
+                if (token == catalogLoadToken) {
+                    catalogLoading.visibility = View.GONE
+                    catalogGrid.alpha = 1f
+                    catalogGrid.visibility = View.VISIBLE
+                }
             }
         }
     }
@@ -4278,9 +4290,9 @@ class MainActivity : BaseLocaleActivity() {
         } else {
             miniVlcView?.alpha = if (visible) 1f else 0f
         }
-        if (!visible && currentPreviewChannel?.icon?.isNotEmpty() == true) {
+        if (!visible) {
             previewLogo.visibility = View.VISIBLE
-        } else if (visible) {
+        } else {
             previewLogo.visibility = View.GONE
         }
     }
@@ -4583,7 +4595,7 @@ class MainActivity : BaseLocaleActivity() {
         miniExoView = panel.findViewById(R.id.miniExoPlayer)
         miniVlcView = panel.findViewById(R.id.miniVlcPlayer)
         previewUsesExo = when {
-            DeviceUi.isTvUi(this) -> false
+            DeviceUi.isTvUi(this) && miniExoView != null -> true
             DeviceUi.isCompact(this) && miniExoView != null -> true
             miniVlcView != null -> false
             else -> miniExoView != null
@@ -4591,6 +4603,7 @@ class MainActivity : BaseLocaleActivity() {
         if (previewUsesExo) {
             miniVlcView?.visibility = View.GONE
             miniExoView?.visibility = View.VISIBLE
+            createMiniExoPlayer()
         } else {
             miniExoView?.visibility = View.GONE
             miniVlcView?.visibility = View.VISIBLE
@@ -4602,8 +4615,7 @@ class MainActivity : BaseLocaleActivity() {
 
     /** NetTV-style: crea VLC al enlazar el panel (evita race con surface no medido). */
     private fun initMiniVlcPreview() {
-        if (usesExoPreview() || miniVlcPlayer != null) return
-        val videoLayout = miniVlcView ?: return
+        if (usesExoPreview() || miniVlcPlayer != null || miniVlcView == null) return
         try {
             recreateMiniVlcPlayer()
         } catch (_: Exception) {

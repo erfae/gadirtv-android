@@ -68,6 +68,9 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             ImageLoader.loadPoster(findViewById(R.id.seriesBackdrop), fallbackCover)
         }
         applyPlotCache()
+        if (seriesPlot.text.isNullOrBlank()) {
+            seriesPlot.text = getString(R.string.hero_plot_loading)
+        }
 
         seasonList = findViewById(R.id.seasonList)
         episodeList = findViewById(R.id.episodeList)
@@ -125,7 +128,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
                         api.seriesInfo(PlaylistRepository.profile!!, seriesId)
                     }
                 }
-            } catch (_: TimeoutCancellationException) {
+            } catch (_: Exception) {
                 null
             }
             if (token != loadToken) return@launch

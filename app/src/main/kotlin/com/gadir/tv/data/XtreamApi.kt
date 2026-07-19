@@ -571,13 +571,17 @@ class XtreamApi(
             repeat(2) { attempt ->
                 val get = NativeHttpClient.request(url, ua, "GET")
                 val body = get.body.trim()
-                if (get.status == 200 && body.isNotBlank() && body != "[]") return body
+                if (get.status == 200 && body.isNotBlank() && body != "[]" && !body.contains("\"info\":[]")) {
+                    return body
+                }
                 if (get.status == 512 || get.status == 403 || get.status == 405) {
                     val post = NativeHttpClient.request(url, ua, "POST")
                     val postBody = post.body.trim()
-                    if (post.status == 200 && postBody.isNotBlank() && postBody != "[]") return postBody
+                    if (post.status == 200 && postBody.isNotBlank() && postBody != "[]" && !postBody.contains("\"info\":[]")) {
+                        return postBody
+                    }
                 }
-                if (attempt < 1) Thread.sleep(350L)
+                if (attempt < 1) Thread.sleep(250L)
             }
         }
         return null

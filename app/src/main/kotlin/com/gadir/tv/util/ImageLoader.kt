@@ -27,8 +27,8 @@ object ImageLoader {
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .override(sizePx, sizePx)
             .fitCenter()
-            .placeholder(R.drawable.channel_icon_placeholder)
-            .error(R.drawable.channel_icon_placeholder)
+            .placeholder(R.drawable.gadir_logo)
+            .error(R.drawable.gadir_logo)
 
     private val posterOptions = RequestOptions()
         .diskCacheStrategy(DiskCacheStrategy.ALL)
@@ -44,7 +44,7 @@ object ImageLoader {
             // Glide may throw if the activity is tearing down.
         }
         target.setTag(R.id.image_load_tag, null)
-        target.setImageResource(R.drawable.channel_icon_placeholder)
+        target.setImageResource(R.drawable.gadir_logo)
     }
 
     fun loadChannelIcon(
@@ -68,7 +68,7 @@ object ImageLoader {
             target.setTag(R.id.image_load_tag, loadTag)
         }
         if (candidates.isEmpty()) {
-            target.setImageResource(R.drawable.channel_icon_placeholder)
+            target.setImageResource(R.drawable.gadir_logo)
             return
         }
         loadWithFallback(
@@ -77,7 +77,7 @@ object ImageLoader {
             index = 0,
             options = channelOptions(size),
             loadTag = loadTag,
-            errorDrawable = R.drawable.channel_icon_placeholder,
+            errorDrawable = R.drawable.gadir_logo,
         )
     }
 
@@ -152,7 +152,7 @@ object ImageLoader {
         index: Int,
         options: RequestOptions,
         loadTag: Any? = null,
-        errorDrawable: Int = R.drawable.channel_icon_placeholder,
+        errorDrawable: Int = R.drawable.gadir_logo,
     ) {
         if (!canLoadInto(target)) return
         if (loadTag != null && target.getTag(R.id.image_load_tag) != loadTag) return
