@@ -452,7 +452,7 @@ class MainActivity : BaseLocaleActivity() {
                 return@setOnKeyListener false
             }
             if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                focusLastHomeRail()
+                focusHeroOnStart()
                 return@setOnKeyListener true
             }
             false
@@ -462,6 +462,9 @@ class MainActivity : BaseLocaleActivity() {
         configureHeroLayout()
 
         showTab(Tab.HOME)
+        if (DeviceUi.useDpadFocus(this)) {
+            tabHome.post { tabHome.requestFocus() }
+        }
     }
 
     private fun scheduleContentPreloadAfterHome() {
@@ -505,19 +508,26 @@ class MainActivity : BaseLocaleActivity() {
     private fun styleHeroPlayButton() {
         heroPlay.setBackgroundResource(R.drawable.btn_play_hero)
         heroPlay.setTextColor(androidx.core.content.ContextCompat.getColorStateList(this, R.color.hero_play_text))
-        val height = dp(60)
+        val height = dp(64)
         heroPlay.minHeight = height
         heroPlay.minimumHeight = height
-        heroPlay.minWidth = dp(240)
-        heroPlay.setPadding(dp(36), dp(16), dp(36), dp(16))
-        heroPlay.textSize = 18f
-        heroPlay.elevation = dp(8).toFloat()
+        heroPlay.minWidth = dp(260)
+        heroPlay.setPadding(dp(40), dp(18), dp(40), dp(18))
+        heroPlay.textSize = 19f
+        heroPlay.elevation = dp(16).toFloat()
+        heroPlay.translationZ = dp(16).toFloat()
         heroPlay.letterSpacing = 0.06f
+        heroPlay.bringToFront()
         heroPlay.layoutParams = heroPlay.layoutParams.apply {
             this.height = height
             if (this is ViewGroup.MarginLayoutParams) {
                 width = ViewGroup.LayoutParams.WRAP_CONTENT
             }
+        }
+        (heroPlay.parent as? View)?.let { parent ->
+            parent.elevation = dp(16).toFloat()
+            parent.translationZ = dp(16).toFloat()
+            parent.bringToFront()
         }
     }
 
@@ -710,6 +720,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun enterLiveChannelList() {
         if (channels.isEmpty()) return
+        liveCategoryFocusIndex = focusedLiveCategoryIndex().coerceAtLeast(0)
         liveChannelsLoaded = true
         channelList.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
@@ -1182,12 +1193,13 @@ class MainActivity : BaseLocaleActivity() {
     private fun focusCategoryList() {
         pauseLivePreviewPlayback()
         liveChannelsLoaded = false
-        liveBrowsingCategoryId = liveCategories.getOrNull(liveCategoryFocusIndex.coerceAtLeast(0))
-            ?.let { liveCategoryId(it) }
+        val index = liveCategoryFocusIndex.coerceIn(0, (liveCategories.size - 1).coerceAtLeast(0))
+        liveCategoryFocusIndex = index
+        liveBrowsingCategoryId = liveCategories.getOrNull(index)?.let { liveCategoryId(it) }
         applyLivePanelFocusMode(inContent = false)
+        liveCategories.getOrNull(index)?.let { showLiveCategoryChannels(it, enterContent = false) }
         (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
         liveCategoryList.post {
-            val index = liveCategoryFocusIndex.coerceAtLeast(0)
             TvNavHelper.focusCategoryItem(liveCategoryList, index)
         }
     }
@@ -1251,11 +1263,6 @@ class MainActivity : BaseLocaleActivity() {
             catalogBrowsingCategoryId = null
             catalogEnterContentOnLoad = true
             highlightCatalogCategory(tab, catId)
-            when (tab) {
-                Tab.MOVIES -> moviesGroupLoaded = true
-                Tab.SERIES -> seriesGroupLoaded = true
-                else -> Unit
-            }
             catalogGrid.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         } else {
             catalogEnterContentOnLoad = false
@@ -1267,7 +1274,7 @@ class MainActivity : BaseLocaleActivity() {
             catalogGrid.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         }
         catalogCategoryAdapter?.refreshSelection()
-        applyCatalogPanelFocusMode(tab, inContent = enterContent && posterItems.isNotEmpty())
+        applyCatalogPanelFocusMode(tab, inContent = false)
         showCatalogGroupContent(tab, catId)
     }
 
@@ -1291,6 +1298,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun enterCatalogPosterGrid(tab: Tab) {
         if (posterItems.isEmpty()) return
+        catalogCategoryFocusIndex = focusedCatalogCategoryIndex().coerceAtLeast(0)
         when (tab) {
             Tab.MOVIES -> moviesGroupLoaded = true
             Tab.SERIES -> seriesGroupLoaded = true
@@ -1490,13 +1498,14 @@ class MainActivity : BaseLocaleActivity() {
             Tab.SERIES -> seriesGroupLoaded = false
             else -> Unit
         }
-        catalogBrowsingCategoryId = catalogCategories.getOrNull(catalogCategoryFocusIndex.coerceAtLeast(0))?.id
+        val index = catalogCategoryFocusIndex.coerceIn(0, (catalogCategories.size - 1).coerceAtLeast(0))
+        catalogCategoryFocusIndex = index
+        catalogBrowsingCategoryId = catalogCategories.getOrNull(index)?.id
+        catalogEnterContentOnLoad = false
         applyCatalogPanelFocusMode(currentTab, inContent = false)
+        catalogCategories.getOrNull(index)?.let { browseCatalogCategory(currentTab, it, enterContent = false) }
         (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
-        val index = catalogCategories.indexOfFirst { it.id == selectedCatalogCategoryId }
-            .takeIf { it >= 0 } ?: catalogCategoryFocusIndex
-        catalogCategoryFocusIndex = index.coerceAtLeast(0)
-        catalogCategoryList.post { TvNavHelper.focusCategoryItem(catalogCategoryList, catalogCategoryFocusIndex) }
+        catalogCategoryList.post { TvNavHelper.focusCategoryItem(catalogCategoryList, index) }
     }
 
     private fun catalogCategoryIndex(): Int {
@@ -1523,17 +1532,62 @@ class MainActivity : BaseLocaleActivity() {
         bindNavTab(tabLive, Tab.LIVE)
         bindNavTab(tabMovies, Tab.MOVIES)
         bindNavTab(tabSeries, Tab.SERIES)
+        if (DeviceUi.useDpadFocus(this)) {
+            tabHome.nextFocusRightId = R.id.tabLive
+            tabLive.nextFocusLeftId = R.id.tabHome
+            tabLive.nextFocusRightId = R.id.tabMovies
+            tabMovies.nextFocusLeftId = R.id.tabLive
+            tabMovies.nextFocusRightId = R.id.tabSeries
+            tabSeries.nextFocusLeftId = R.id.tabMovies
+            heroPlay.nextFocusRightId = R.id.tabLive
+        }
     }
 
     private fun bindNavTab(view: View, tab: Tab) {
         view.setOnClickListener {
             openTab(tab)
+            if (DeviceUi.useDpadFocus(this)) enterTabPanel(tab)
         }
         if (DeviceUi.useDpadFocus(this)) {
             view.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus && currentTab != tab) {
                     openTab(tab)
                 }
+            }
+            view.setOnKeyListener { _, keyCode, event ->
+                if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+                when (keyCode) {
+                    KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                        if (currentTab == tab) {
+                            enterTabPanel(tab)
+                            return@setOnKeyListener true
+                        }
+                    }
+                }
+                false
+            }
+        }
+    }
+
+    /** OK on bottom tab: enter first group (categories). */
+    private fun enterTabPanel(tab: Tab) {
+        when (tab) {
+            Tab.HOME -> {
+                homeScrollView.post { homeScrollView.smoothScrollTo(0, 0) }
+                focusHeroOnStart()
+            }
+            Tab.LIVE -> {
+                ensureLiveTabReady()
+                liveChannelsLoaded = false
+                openLiveTabAtFirstGroup()
+            }
+            Tab.MOVIES, Tab.SERIES -> {
+                val ready = if (tab == Tab.MOVIES) moviesCatalogReady else seriesCatalogReady
+                if (!ready) {
+                    setupCatalogTab(tab)
+                    if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
+                }
+                openCatalogTabAtFirstGroup(tab)
             }
         }
     }
@@ -1572,7 +1626,9 @@ class MainActivity : BaseLocaleActivity() {
                     railPreviewItem = null
                     heroCarouselPaused = false
                     startHeroRotation()
-                    if (DeviceUi.useDpadFocus(this)) focusHeroOnStart()
+                    if (DeviceUi.useDpadFocus(this)) {
+                        tabHome.post { tabHome.requestFocus() }
+                    }
                 }
             }
             Tab.LIVE -> {
@@ -1584,20 +1640,10 @@ class MainActivity : BaseLocaleActivity() {
                 livePanel().post {
                     if (currentTab != Tab.LIVE) return@post
                     ensurePreviewPlayer()
-                    if (DeviceUi.useDpadFocus(this)) {
-                        if (enteringFromOtherTab) {
-                            openLiveTabAtFirstGroup()
-                        } else if (!liveChannelsLoaded) {
-                            focusCategoryList()
-                        } else {
-                            restoreLastChannel()
-                        }
-                    } else {
+                    if (!DeviceUi.useDpadFocus(this)) {
                         restoreLiveTabSession()
-                    }
-                    if (liveChannelsLoaded && DeviceUi.useDpadFocus(this)) {
-                        val channel = currentPreviewChannel ?: channels.firstOrNull()
-                        channel?.let { schedulePreview(it) }
+                    } else if (!enteringFromOtherTab && liveChannelsLoaded) {
+                        restoreLastChannel()
                     }
                 }
             }
@@ -1614,15 +1660,7 @@ class MainActivity : BaseLocaleActivity() {
                     setupCatalogTab(tab)
                     if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
                 }
-                if (DeviceUi.useDpadFocus(this)) {
-                    if (enteringFromOtherTab || switchingBetweenCatalog) {
-                        openCatalogTabAtFirstGroup(tab)
-                    } else if (!(if (tab == Tab.MOVIES) moviesGroupLoaded else seriesGroupLoaded)) {
-                        focusCatalogCategoryList()
-                    } else {
-                        restoreCatalogTab(tab)
-                    }
-                } else if (ready) {
+                if (!DeviceUi.useDpadFocus(this) && ready) {
                     restoreCatalogTab(tab)
                 }
             }
@@ -3182,6 +3220,12 @@ class MainActivity : BaseLocaleActivity() {
                 }
             } catch (_: Exception) {
                 if (token != catalogLoadToken) return@launch
+                catalogEnterContentOnLoad = false
+                when (tab) {
+                    Tab.MOVIES -> moviesGroupLoaded = false
+                    Tab.SERIES -> seriesGroupLoaded = false
+                    else -> Unit
+                }
                 catalogLoading.visibility = View.GONE
                 catalogGrid.alpha = 1f
                 catalogGrid.visibility = View.VISIBLE
@@ -3964,8 +4008,6 @@ class MainActivity : BaseLocaleActivity() {
             Tab.HOME -> logoutUser()
             Tab.LIVE -> {
                 when {
-                    isFocusInHeader() -> focusBottomTab(Tab.LIVE)
-                    isFocusInBottomNav() -> focusCategoryList()
                     isFocusInPreviewPanel() -> focusChannelAt(currentPreviewChannel)
                     isFocusInList(channelList) -> focusCategoryList()
                     isFocusInList(liveCategoryList) -> focusBottomTab(Tab.LIVE)
@@ -3974,8 +4016,6 @@ class MainActivity : BaseLocaleActivity() {
             }
             Tab.MOVIES, Tab.SERIES -> {
                 when {
-                    isFocusInHeader() -> focusBottomTab(currentTab)
-                    isFocusInBottomNav() -> focusCatalogCategoryList()
                     isFocusInList(catalogGrid) -> focusCatalogCategoryList()
                     isFocusInList(catalogCategoryList) -> focusBottomTab(currentTab)
                     else -> focusCatalogCategoryList()
