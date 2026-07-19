@@ -54,6 +54,9 @@ class CategoryAdapter(
             holder.count.visibility = View.GONE
         }
         applyCategoryVisual(holder, contentSelected, holder.itemView.hasFocus())
+        val locked = navigationLocked()
+        holder.itemView.isFocusable = !locked
+        holder.itemView.isFocusableInTouchMode = !locked
         if (position == 0) {
             holder.itemView.nextFocusUpId = holder.itemView.id
         } else {

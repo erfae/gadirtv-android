@@ -92,19 +92,19 @@
                 <TextView
                     android:id="@+id/heroPlay"
                     android:layout_width="wrap_content"
-                    android:layout_height="56dp"
+                    android:layout_height="60dp"
                     android:background="@drawable/btn_play_hero"
-                    android:elevation="6dp"
+                    android:elevation="8dp"
                     android:focusable="true"
                     android:focusableInTouchMode="true"
                     android:gravity="center"
-                    android:minWidth="220dp"
-                    android:paddingHorizontal="32dp"
-                    android:paddingVertical="14dp"
+                    android:minWidth="240dp"
+                    android:paddingHorizontal="36dp"
+                    android:paddingVertical="16dp"
                     android:text="@string/hero_play"
                     android:textAllCaps="true"
                     android:textColor="@color/hero_play_text"
-                    android:textSize="17sp"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
