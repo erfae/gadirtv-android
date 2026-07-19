@@ -206,6 +206,7 @@ object ImageLoader {
         val headers = LazyHeaders.Builder()
             .addHeader("User-Agent", PlaylistRepository.userAgent)
             .addHeader("Accept", "image/*,*/*")
+        // Host header only for panel URLs (IP rewrite); external picons break with wrong Host.
         resolved.hostHeader?.let { headers.addHeader("Host", it) }
         PlaylistRepository.profile?.host?.let { host ->
             headers.addHeader("Referer", HostUtils.baseUrl(host) + "/")

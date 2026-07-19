@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.data.PlaylistRepository
+import com.gadir.tv.data.PlotCache
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.SeriesDetail
@@ -66,6 +67,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             ImageLoader.loadPoster(findViewById(R.id.seriesPoster), fallbackCover, 280, 420)
             ImageLoader.loadPoster(findViewById(R.id.seriesBackdrop), fallbackCover)
         }
+        applyPlotCache()
 
         seasonList = findViewById(R.id.seasonList)
         episodeList = findViewById(R.id.episodeList)
@@ -84,6 +86,26 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         }
 
         loadSeriesDetail()
+    }
+
+    private fun applyPlotCache() {
+        val cached = PlotCache.get("series", seriesId) ?: return
+        if (cached.title.isNotBlank()) {
+            findViewById<TextView>(R.id.seriesTitle).text = cached.title
+        }
+        if (cached.plot.isNotBlank()) {
+            seriesPlot.text = cached.plot
+        }
+        val backdrop = cached.backdrop.ifBlank { cached.poster }.ifBlank { fallbackCover }
+        val poster = cached.poster.ifBlank { fallbackCover }
+        if (backdrop.isNotEmpty()) {
+            ImageLoader.loadPoster(findViewById(R.id.seriesBackdrop), backdrop)
+        }
+        if (poster.isNotEmpty()) {
+            fallbackCover = poster
+            ImageLoader.loadPoster(findViewById(R.id.seriesPoster), poster, 280, 420)
+        }
+        btnSeriesPlay.visibility = View.VISIBLE
     }
 
     private fun loadSeriesDetail() {
@@ -106,7 +128,9 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             if (token != loadToken) return@launch
             loadingView.visibility = View.GONE
             if (detail == null) {
-                seriesPlot.text = getString(R.string.series_load_failed)
+                if (PlotCache.get("series", seriesId) == null) {
+                    seriesPlot.text = getString(R.string.series_load_failed)
+                }
                 btnSeriesPlay.visibility = View.VISIBLE
                 btnSeriesPlay.requestFocus()
                 seasonList.visibility = View.GONE
@@ -144,6 +168,16 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             fallbackCover = poster
             ImageLoader.loadPoster(findViewById(R.id.seriesPoster), poster, 280, 420)
         }
+        PlotCache.put(
+            "series",
+            seriesId,
+            PlotCache.Entry(
+                plot = detail.plot,
+                backdrop = detail.backdrop,
+                poster = detail.cover.ifBlank { fallbackCover },
+                title = detail.name.ifEmpty { seriesName },
+            ),
+        )
 
         seasons = detail.seasons
         val keys = seasons.keys.sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }

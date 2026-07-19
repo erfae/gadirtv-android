@@ -10,6 +10,7 @@ import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.lifecycle.lifecycleScope
 import com.gadir.tv.R
 import com.gadir.tv.data.PlaylistRepository
+import com.gadir.tv.data.PlotCache
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.VodMovie
@@ -56,6 +57,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
             ImageLoader.loadPoster(findViewById(R.id.moviePoster), fallbackCover, 280, 420)
             ImageLoader.loadPoster(findViewById(R.id.movieBackdrop), fallbackCover)
         }
+        applyPlotCache()
 
         val btnReload = findViewById<TextView>(R.id.btnMovieReload)
         TvFocusHelper.bindButton(btnReload) { loadMovieDetail() }
@@ -67,6 +69,26 @@ class MovieDetailActivity : BaseLocaleActivity() {
         }
 
         loadMovieDetail()
+    }
+
+    private fun applyPlotCache() {
+        val cached = PlotCache.get("movie", streamId) ?: return
+        if (cached.title.isNotBlank()) {
+            findViewById<TextView>(R.id.movieTitle).text = cached.title
+        }
+        if (cached.plot.isNotBlank()) {
+            moviePlot.text = cached.plot
+        }
+        val backdrop = cached.backdrop.ifBlank { cached.poster }.ifBlank { fallbackCover }
+        val poster = cached.poster.ifBlank { fallbackCover }
+        if (backdrop.isNotEmpty()) {
+            ImageLoader.loadPoster(findViewById(R.id.movieBackdrop), backdrop)
+        }
+        if (poster.isNotEmpty()) {
+            fallbackCover = poster
+            ImageLoader.loadPoster(findViewById(R.id.moviePoster), poster, 280, 420)
+        }
+        btnMoviePlay.visibility = View.VISIBLE
     }
 
     private fun loadMovieDetail() {
@@ -86,7 +108,9 @@ class MovieDetailActivity : BaseLocaleActivity() {
             if (token != loadToken) return@launch
             loadingView.visibility = View.GONE
             if (info == null) {
-                moviePlot.text = getString(R.string.movie_load_failed)
+                if (PlotCache.get("movie", streamId) == null) {
+                    moviePlot.text = getString(R.string.movie_load_failed)
+                }
                 btnMoviePlay.visibility = View.VISIBLE
                 btnMoviePlay.requestFocus()
                 return@launch
@@ -128,6 +152,16 @@ class MovieDetailActivity : BaseLocaleActivity() {
 
             btnMoviePlay.visibility = View.VISIBLE
             btnMoviePlay.requestFocus()
+            PlotCache.put(
+                "movie",
+                streamId,
+                PlotCache.Entry(
+                    plot = info.plot,
+                    backdrop = info.backdrop,
+                    poster = info.cover.ifBlank { fallbackCover },
+                    title = info.name.ifEmpty { movieName },
+                ),
+            )
         }
     }
 

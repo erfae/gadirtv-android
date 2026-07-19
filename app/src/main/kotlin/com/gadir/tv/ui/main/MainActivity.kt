@@ -4295,11 +4295,6 @@ class MainActivity : BaseLocaleActivity() {
     private fun startPreviewPlayback(channel: LiveChannel, token: Int, profile: Profile) {
         if (token != previewToken || livePreviewPaused) return
         updatePreviewInfo(channel)
-        if (DeviceUi.isTvUi(this)) {
-            cancelMiniPreviewPlayback()
-            setPreviewVideoVisible(false)
-            return
-        }
         if (!appSettings.autoplayPreview) {
             cancelMiniPreviewPlayback()
             setPreviewVideoVisible(false)
@@ -4390,9 +4385,6 @@ class MainActivity : BaseLocaleActivity() {
         while (previewUrlIndex < previewUrls.lastIndex) {
             previewUrlIndex += 1
             val url = previewUrls[previewUrlIndex]
-            if (DeviceUi.isTvUi(this) && !url.contains(".m3u8", ignoreCase = true)) {
-                continue
-            }
             hideNoSignal()
             if (!ensurePreviewPlayer()) return false
             playMiniPreviewUrl(url, token)
@@ -4670,7 +4662,7 @@ class MainActivity : BaseLocaleActivity() {
         miniExoView = panel.findViewById(R.id.miniExoPlayer)
         miniVlcView = panel.findViewById(R.id.miniVlcPlayer)
         previewUsesExo = when {
-            DeviceUi.isTvUi(this) && miniExoView != null -> true
+            DeviceUi.isTvUi(this) -> false
             DeviceUi.isCompact(this) && miniExoView != null -> true
             miniVlcView != null -> false
             else -> miniExoView != null
@@ -4681,6 +4673,15 @@ class MainActivity : BaseLocaleActivity() {
         } else {
             miniExoView?.visibility = View.GONE
             miniVlcView?.visibility = View.VISIBLE
+            miniVlcView?.post {
+                if (miniVlcPlayer == null && !isDestroyed && currentTab == Tab.LIVE) {
+                    try {
+                        recreateMiniVlcPlayer()
+                    } catch (_: Exception) {
+                        miniVlcPlayer = null
+                    }
+                }
+            }
         }
         miniExoView?.alpha = 0f
         miniVlcView?.alpha = 0f
@@ -4709,7 +4710,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun ensureExoPreviewFallback(): Boolean {
-        if (miniExoView == null) return false
+        if (DeviceUi.isTvUi(this) || miniExoView == null) return false
         previewUsesExo = true
         miniVlcView?.visibility = View.GONE
         miniExoView?.visibility = View.VISIBLE

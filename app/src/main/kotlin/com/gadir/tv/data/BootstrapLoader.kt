@@ -46,11 +46,7 @@ object BootstrapLoader {
             PlaylistRepository.updateVodCategories(vodCategories.await())
             PlaylistRepository.updateSeriesCategories(seriesCategories.await())
 
-            onProgress?.invoke(context.getString(R.string.bootstrap_catalog))
-            CatalogPreloader.prefetchInitial(api, migratedProfile) { categoryName ->
-                onProgress?.invoke(context.getString(R.string.bootstrap_loading_group, categoryName))
-            }
-
+            // NetTV-style: categories first, catalog preload runs in background via ContentPreloader.
             PlaylistRepository.markBootstrapReady()
 
             onProgress?.invoke(context.getString(R.string.bootstrap_home))
