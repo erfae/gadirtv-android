@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">GadirTV</string>
+    <string name="app_name">Gadir IPTV Player</string>
     <string name="login_title">连接 Xtream</string>
     <string name="hint_host">Xtream 服务器 (http://主机:端口)</string>
     <string name="hint_user">用户名</string>
@@ -48,7 +48,7 @@
     <string name="category_favorites">收藏</string>
     <string name="rail_favorites">我的收藏</string>
     <string name="favorite_hint">长按确定键添加收藏</string>
-    <string name="hero_brand">GadirTV</string>
+    <string name="hero_brand">Gadir IPTV</string>
     <string name="back">返回</string>
     <string name="search_title">搜索</string>
     <string name="search_hint">搜索频道、电影或剧集…</string>

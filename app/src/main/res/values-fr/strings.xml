@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">GadirTV</string>
+    <string name="app_name">Gadir IPTV Player</string>
     <string name="login_title">Se connecter à Xtream</string>
     <string name="hint_host">Serveur Xtream (http://hôte:port)</string>
     <string name="hint_user">Nom d\'utilisateur</string>
@@ -48,7 +48,7 @@
     <string name="category_favorites">Favoris</string>
     <string name="rail_favorites">Mes favoris</string>
     <string name="favorite_hint">Maintenez OK pour favori</string>
-    <string name="hero_brand">GadirTV</string>
+    <string name="hero_brand">Gadir IPTV</string>
     <string name="back">Retour</string>
     <string name="search_title">Rechercher</string>
     <string name="search_hint">Rechercher des chaînes, films ou séries…</string>

@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 
 /** Cliente HTTP Xtream — OkHttp + HttpURLConnection, IPv4, fallback por IP. */
 object NativeHttpClient {
-    private const val TAG = "GadirTV-HTTP"
+    private const val TAG = "GadirIPTV-HTTP"
     private const val MAX_RETRIES = 3
 
     /** IP conocida de gadir.co — fallback cuando DNS/TCP al hostname falla en TV Box. */
