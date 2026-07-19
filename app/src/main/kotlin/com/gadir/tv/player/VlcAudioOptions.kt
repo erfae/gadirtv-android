@@ -20,13 +20,15 @@ object VlcAudioOptions {
 
     /** Preview TV: software decode + drop frames to avoid OOM/crash on FHD/4K. */
     fun previewOptions(networkBufferMs: Int): ArrayList<String> {
-        val cache = networkBufferMs.coerceIn(800, 2_500)
+        val cache = networkBufferMs.coerceIn(600, 1_800)
         return arrayListOf(
             "--http-user-agent=${PlaylistRepository.userAgent}",
             "--network-caching=$cache",
             "--live-caching=$cache",
             "--no-video-title-show",
             "--avcodec-hw=none",
+            "--avcodec-fast",
+            "--avcodec-threads=2",
             "--drop-late-frames",
             "--skip-frames",
             "--http-reconnect",

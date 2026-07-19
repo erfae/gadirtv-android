@@ -15,10 +15,16 @@ object ChannelIconHelper {
         val density = target.resources.displayMetrics.density
         val size = (44 * density).toInt().coerceAtLeast(96)
         val fallbacks = panelFallbackUrls(PlaylistRepository.profile, channel)
+        val resolved = ImageUrlResolver.resolve(channel.icon)
+        val primary = resolved.ifBlank { fallbacks.firstOrNull().orEmpty() }
+        val remaining = (fallbacks + listOf(channel.icon))
+            .map { ImageUrlResolver.resolve(it) }
+            .filter { it.isNotBlank() && it != primary }
+            .distinct()
         ImageLoader.loadChannelIcon(
             target = target,
-            url = channel.icon,
-            fallbacks = fallbacks,
+            url = primary,
+            fallbacks = remaining,
             sizePx = size,
             loadTag = channel.streamId,
             maxFallbacks = LIST_ICON_MAX_FALLBACKS,

@@ -89,34 +89,16 @@ object PlaylistRepository {
     private fun channelOrderComparator() =
         compareBy<LiveChannel>({ it.num }, { it.streamId })
 
-    fun cachedVod(categoryId: String): List<VodMovie>? {
-        val items = vodCache[categoryId] ?: return null
-        if (items.isEmpty()) {
-            vodCache.remove(categoryId)
-            return null
-        }
-        return items
-    }
+    fun cachedVod(categoryId: String): List<VodMovie>? = vodCache[categoryId]
 
     fun cacheVod(categoryId: String, items: List<VodMovie>) {
-        if (items.isNotEmpty()) {
-            vodCache[categoryId] = items
-        }
+        vodCache[categoryId] = items
     }
 
-    fun cachedSeries(categoryId: String): List<SeriesItem>? {
-        val items = seriesCache[categoryId] ?: return null
-        if (items.isEmpty()) {
-            seriesCache.remove(categoryId)
-            return null
-        }
-        return items
-    }
+    fun cachedSeries(categoryId: String): List<SeriesItem>? = seriesCache[categoryId]
 
     fun cacheSeries(categoryId: String, items: List<SeriesItem>) {
-        if (items.isNotEmpty()) {
-            seriesCache[categoryId] = items
-        }
+        seriesCache[categoryId] = items
     }
 
     fun setHomeRecent(movies: List<VodMovie>, series: List<SeriesItem>) {

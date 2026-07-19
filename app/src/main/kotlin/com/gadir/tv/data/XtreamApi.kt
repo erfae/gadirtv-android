@@ -150,7 +150,7 @@ class XtreamApi(
         val extra = if (!categoryId.isNullOrEmpty()) mapOf("category_id" to categoryId) else emptyMap()
         return fetchList(profile, "get_live_streams", extra).mapIndexed { index, row ->
             val streamId = row.get("stream_id")?.asIntOrZero() ?: 0
-            val icon = imageUrl(
+            val rawIcon = imageUrl(
                 row,
                 "stream_icon",
                 "logo",
@@ -161,12 +161,18 @@ class XtreamApi(
                 "thumbnail",
                 "logo_url",
                 "tv_archive_icon",
-            ).ifBlank { fallbackLiveIcon(profile, streamId) }
-            val sanitizedIcon = if (icon.isNotBlank() && !looksLikeImageUrl(icon)) "" else icon
+            )
+            val icon = ImageUrlResolver.resolve(rawIcon).ifBlank {
+                if (rawIcon.isNotBlank() && !looksLikeStreamUrl(rawIcon)) {
+                    ImageUrlResolver.resolve(rawIcon)
+                } else {
+                    fallbackLiveIcon(profile, streamId)
+                }
+            }.ifBlank { fallbackLiveIcon(profile, streamId) }
             LiveChannel(
                 streamId = streamId,
                 name = row.get("name")?.asStringOrNull() ?: "",
-                icon = sanitizedIcon.ifBlank { fallbackLiveIcon(profile, streamId) },
+                icon = icon,
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
                 num = row.channelNum(index),
                 extension = row.get("container_extension")?.asStringOrNull()?.ifBlank { "ts" } ?: "ts",
@@ -623,6 +629,13 @@ class XtreamApi(
         if (streamId <= 0) return ""
         val base = HostUtils.baseUrl(profile.host)
         return "$base/images/$streamId.png"
+    }
+
+    private fun looksLikeStreamUrl(url: String): Boolean {
+        val lower = url.lowercase()
+        return lower.contains(".m3u8") ||
+            lower.contains(".ts") ||
+            lower.contains("/live/") && lower.contains(".php")
     }
 
     private fun looksLikeImageUrl(url: String): Boolean {
