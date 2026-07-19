@@ -21,7 +21,7 @@ android {
         minSdk = 21
         targetSdk = 33
         // Must exceed Flutter v2.5.8 (versionCode 84) so native can replace it.
-        // TV release track (android-native). v1.31.5 playback icons catalog fix.
+        // TV release track (android-native). v1.31.5 IP fallback release.
         versionCode = 259
         versionName = "1.31.5"
         ndk {
