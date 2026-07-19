@@ -71,6 +71,10 @@ object TvNavHelper {
         if (holder?.itemView?.requestFocus() == true) return
         repeat(5) { attempt ->
             list.postDelayed({
+                val focusedIndex = list.focusedChild?.let { child ->
+                    list.getChildAdapterPosition(child).takeIf { it >= 0 }
+                }
+                if (focusedIndex != null && focusedIndex != index) return@postDelayed
                 list.findViewHolderForAdapterPosition(index)?.itemView?.requestFocus()
             }, (attempt + 1) * 50L)
         }
