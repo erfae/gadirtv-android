@@ -6,6 +6,15 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
 object TvNavHelper {
+    @Volatile
+    var focusGeneration: Int = 0
+        private set
+
+    /** Cancel pending focus retries after the user navigates manually. */
+    fun bumpFocusGeneration() {
+        focusGeneration++
+    }
+
     fun focusItem(list: RecyclerView, index: Int) {
         if (index < 0) return
         scrollToIndex(list, index)
@@ -15,6 +24,7 @@ object TvNavHelper {
     /** NetTV-style: only scroll when the target group is off-screen; keep in-view items stable. */
     fun focusCategoryItem(list: RecyclerView, index: Int) {
         if (index < 0) return
+        val generation = focusGeneration
         val lm = list.layoutManager as? LinearLayoutManager
         if (lm != null) {
             val first = lm.findFirstVisibleItemPosition()
@@ -29,7 +39,7 @@ object TvNavHelper {
         } else {
             list.scrollToPosition(index)
         }
-        requestFocusAt(list, index)
+        requestFocusAt(list, index, generation)
     }
 
     fun moveFocus(list: RecyclerView, fromIndex: Int, toIndex: Int, itemCount: Int): Boolean {
@@ -66,11 +76,12 @@ object TvNavHelper {
         attempt(15)
     }
 
-    fun requestFocusAt(list: RecyclerView, index: Int) {
+    fun requestFocusAt(list: RecyclerView, index: Int, generation: Int = focusGeneration) {
         val holder = list.findViewHolderForAdapterPosition(index)
         if (holder?.itemView?.requestFocus() == true) return
         repeat(5) { attempt ->
             list.postDelayed({
+                if (generation != focusGeneration) return@postDelayed
                 val focusedIndex = list.focusedChild?.let { child ->
                     list.getChildAdapterPosition(child).takeIf { it >= 0 }
                 }

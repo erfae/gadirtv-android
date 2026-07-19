@@ -793,6 +793,8 @@ class MainActivity : BaseLocaleActivity() {
         relockLiveCategory(categoryId)
         selectedLiveCategoryId = null
         liveChannelsLoaded = false
+        TvNavHelper.bumpFocusGeneration()
+        TvBrowseNav.clearListFocus(channelList)
         applyLivePanelFocusMode(inContent = false)
         if (cat != null && parentalStore.requiresPinForLiveCategory(categoryId)) {
             showLiveBlockedCategory(cat)
@@ -806,9 +808,7 @@ class MainActivity : BaseLocaleActivity() {
         }
         liveCategoryList.post {
             if (currentTab != Tab.LIVE || liveBrowseLevel != TvBrowseNav.Level.GROUP) return@post
-            if (liveCategoryList.focusedChild == null) {
-                TvBrowseNav.focusGroup(liveCategoryList, index)
-            }
+            TvBrowseNav.focusGroup(liveCategoryList, index)
         }
     }
 
@@ -961,7 +961,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun refreshLiveCategorySelection() {
-        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection(liveCategoryList)
+        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
     }
 
     private fun buildLiveCategoryPrefetchMap(): Map<String?, List<LiveChannel>> {
@@ -1015,7 +1015,7 @@ class MainActivity : BaseLocaleActivity() {
         val loaded = channelsForLiveCategory(categoryId)
         liveCategoryPrefetch[categoryId] = loaded
         liveCategoryCounts[categoryId] = loaded.size
-        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection(liveCategoryList)
+        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
     }
 
     private fun prefetchLiveChannelIcons(channelBatch: List<LiveChannel>) {
@@ -1052,17 +1052,17 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun refreshLiveCategoryHighlight(previousId: String?, newId: String?) {
         (liveCategoryList.adapter as? CategoryAdapter)?.let { adapter ->
-            indexForLiveCategoryId(previousId).takeIf { it >= 0 }?.let { adapter.notifyItemChanged(it) }
-            indexForLiveCategoryId(newId).takeIf { it >= 0 }?.let { adapter.notifyItemChanged(it) }
+            indexForLiveCategoryId(previousId).takeIf { it >= 0 }?.let { adapter.refreshItem(it) }
+            indexForLiveCategoryId(newId).takeIf { it >= 0 }?.let { adapter.refreshItem(it) }
         }
     }
 
     private fun refreshCatalogCategoryHighlight(previousId: String?, newId: String?) {
         catalogCategoryAdapter?.let { adapter ->
             catalogCategories.indexOfFirst { it.id == previousId }.takeIf { it >= 0 }
-                ?.let { adapter.notifyItemChanged(it) }
+                ?.let { adapter.refreshItem(it) }
             catalogCategories.indexOfFirst { it.id == newId }.takeIf { it >= 0 }
-                ?.let { adapter.notifyItemChanged(it) }
+                ?.let { adapter.refreshItem(it) }
         }
     }
 
@@ -1072,8 +1072,8 @@ class MainActivity : BaseLocaleActivity() {
         val oldIndex = liveCategories.indexOfFirst { liveCategoryId(it) == oldId }
         val newIndex = liveCategories.indexOfFirst { liveCategoryId(it) == newId }
         (liveCategoryList.adapter as? CategoryAdapter)?.let { adapter ->
-            if (oldIndex >= 0) adapter.notifyItemChanged(oldIndex)
-            if (newIndex >= 0) adapter.notifyItemChanged(newIndex)
+            if (oldIndex >= 0) adapter.refreshItem(oldIndex)
+            if (newIndex >= 0) adapter.refreshItem(newIndex)
         }
     }
 
@@ -1183,6 +1183,19 @@ class MainActivity : BaseLocaleActivity() {
             selectedId = { liveCategoryAdapterSelectedId() },
             itemCount = { cat -> liveCategoryCount(cat) },
             onClick = { cat -> applyLiveCategoryClick(cat, enterContent = true) },
+            onNavigate = { cat, idx ->
+                if (liveBrowseLevel != TvBrowseNav.Level.GROUP) return@CategoryAdapter
+                liveCategoryFocusIndex = idx
+                val newId = liveCategoryId(cat)
+                if (parentalStore.requiresPinForLiveCategory(newId)) return@CategoryAdapter
+                if (liveBrowsingCategoryId == newId) return@CategoryAdapter
+                showLiveCategoryChannels(
+                    cat,
+                    enterContent = false,
+                    refocusGroup = false,
+                    refreshCategories = false,
+                )
+            },
             onFocus = { cat ->
                 if (liveBrowseLevel == TvBrowseNav.Level.CONTENT) return@CategoryAdapter
                 val newId = liveCategoryId(cat)
@@ -1253,7 +1266,7 @@ class MainActivity : BaseLocaleActivity() {
         liveChannelsLoaded = true
         liveBrowseLevel = TvBrowseNav.Level.CONTENT
         TvBrowseNav.allowContentFocus(channelList)
-        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection(liveCategoryList)
+        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
         TvNavHelper.focusItem(channelList, index)
         if (DeviceUi.useDpadFocus(this)) {
             schedulePreviewAfterChannelFocus(index)
@@ -1576,7 +1589,7 @@ class MainActivity : BaseLocaleActivity() {
         catalogBrowsingCategoryId = null
         applyCatalogPanelFocusMode(tab, inContent = true)
         TvBrowseNav.focusContent(catalogGrid, 0) {
-            (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelection(catalogCategoryList)
+            (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
         }
     }
 
@@ -1687,7 +1700,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun warmCatalogCategoryCounts(tab: Tab) {
         syncCatalogCategoryCounts(tab)
-        catalogCategoryAdapter?.refreshSelection(catalogCategoryList)
+        catalogCategoryAdapter?.refreshSelection()
 
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
@@ -1717,7 +1730,7 @@ class MainActivity : BaseLocaleActivity() {
             counts.forEach { (catId, size) ->
                 if (catId.isNotBlank()) catalogCategoryCounts[catId] = size
             }
-            if (currentTab == tab) catalogCategoryAdapter?.refreshSelection(catalogCategoryList)
+            if (currentTab == tab) catalogCategoryAdapter?.refreshSelection()
         }
     }
 
@@ -1758,7 +1771,7 @@ class MainActivity : BaseLocaleActivity() {
                     }
                 }
                 catalogCategoryCounts[catId] = size.size
-                catalogCategoryAdapter?.refreshSelection(catalogCategoryList)
+                catalogCategoryAdapter?.refreshSelection()
             } catch (_: Exception) {
             }
         }
@@ -1780,8 +1793,8 @@ class MainActivity : BaseLocaleActivity() {
         }
         val oldIndex = catalogCategories.indexOfFirst { it.id == oldId }
         val newIndex = catalogCategories.indexOfFirst { it.id == catId }
-        if (oldIndex >= 0) catalogCategoryAdapter?.notifyItemChanged(oldIndex)
-        if (newIndex >= 0) catalogCategoryAdapter?.notifyItemChanged(newIndex)
+        if (oldIndex >= 0) catalogCategoryAdapter?.refreshItem(oldIndex)
+        if (newIndex >= 0) catalogCategoryAdapter?.refreshItem(newIndex)
     }
 
     private fun enterCatalogTabFocus() {
@@ -3448,6 +3461,14 @@ class MainActivity : BaseLocaleActivity() {
             onClick = { cat ->
                 selectCatalogGroup(tab, cat, enterContent = true)
             },
+            onNavigate = { cat, idx ->
+                if (catalogBrowseLevel != TvBrowseNav.Level.GROUP) return@CategoryAdapter
+                catalogCategoryFocusIndex = idx
+                if (catalogCategoryRequiresPin(tab, cat.id)) return@CategoryAdapter
+                if (catalogBrowsingCategoryId == cat.id) return@CategoryAdapter
+                browseCatalogCategory(tab, cat, enterContent = false)
+                scheduleCatalogPrefetch(tab, cat.id)
+            },
             onFocus = { cat ->
                 if (catalogBrowseLevel == TvBrowseNav.Level.CONTENT) return@CategoryAdapter
                 val idx = catalogCategories.indexOfFirst { it.id == cat.id }
@@ -3545,7 +3566,7 @@ class MainActivity : BaseLocaleActivity() {
 
                 if (token != catalogLoadToken) return@launch
                 catalogCategoryCounts[categoryId] = items.size
-                catalogCategoryAdapter?.refreshSelection(catalogCategoryList)
+                catalogCategoryAdapter?.refreshSelection()
                 catalogLoading.visibility = View.GONE
                 catalogGrid.alpha = 1f
                 catalogGrid.visibility = View.VISIBLE
