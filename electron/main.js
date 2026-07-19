@@ -197,7 +197,7 @@ ipcMain.handle('mpv:play', async (evt, { url, name, fullscreen }) => {
     '--demuxer-lavf-analyzeduration=5',
     '--demuxer-lavf-probesize=10000000',
   ];
-  if (name) args.push(`--title=GadirTV — ${name}`);
+  if (name) args.push(`--title=Gadir IPTV Player — ${name}`);
   if (fullscreen) args.push('--fs');
   try {
     mpvProc = spawn(mpv, args, { detached: false, stdio: ['ignore', 'ignore', 'pipe'], cwd: path.dirname(mpv) });
@@ -386,7 +386,7 @@ ipcMain.handle('player:show', async (_evt, { url, name }) => {
       '--demuxer-lavf-analyzeduration=5',
       '--demuxer-lavf-probesize=10000000',
     ];
-    if (name) args.push(`--title=GadirTV — ${name}`);
+    if (name) args.push(`--title=Gadir IPTV Player — ${name}`);
     mpvProc = spawn(mpv, args, { detached: false, stdio: ['ignore', 'ignore', 'pipe'], cwd: path.dirname(mpv) });
     let stderr = '';
     if (mpvProc.stderr) {
@@ -479,7 +479,7 @@ function createWindow() {
     titleBarStyle: 'hidden',
     backgroundColor: '#050505',
     icon: path.join(__dirname, 'icon.png'),
-    title: 'GadirTV',
+    title: 'Gadir IPTV Player',
     autoHideMenuBar: true,
     show: false,
     webPreferences: {

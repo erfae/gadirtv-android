@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const ResEdit = require('resedit');
 
-const target = path.resolve(__dirname, '..', 'dist_manual', 'GadirTV', 'GadirTV.exe');
+const target = path.resolve(__dirname, '..', 'dist_manual', 'GadirIPTVPlayer', 'GadirIPTVPlayer.exe');
 const iconPath = path.resolve(__dirname, '..', 'icon.ico');
 
 if (!fs.existsSync(target)) {
@@ -22,12 +22,12 @@ vi.setProductVersion(1, 0, 0, 0);
 vi.setStringValues(
   { lang: 1033, codepage: 1200 },
   {
-    ProductName: 'GadirTV',
-    FileDescription: 'GadirTV - Reproductor IPTV',
-    CompanyName: 'GadirTV',
-    LegalCopyright: 'Copyright (c) 2026 GadirTV',
-    OriginalFilename: 'GadirTV.exe',
-    InternalName: 'GadirTV',
+    ProductName: 'Gadir IPTV Player',
+    FileDescription: 'Gadir IPTV Player - Reproductor IPTV',
+    CompanyName: 'Gadir IPTV',
+    LegalCopyright: 'Copyright (c) 2026 Gadir IPTV',
+    OriginalFilename: 'GadirIPTVPlayer.exe',
+    InternalName: 'GadirIPTVPlayer',
     FileVersion: '1.0.0.0',
     ProductVersion: '1.0.0.0',
   }
