@@ -115,15 +115,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                 when (event.type) {
                     MediaPlayer.Event.EncounteredError -> {
                         if (!tryNextUrl()) {
-                            if (!isLivePlayback) {
-                                fallbackToExoPlayer()
-                            } else {
-                                android.widget.Toast.makeText(
-                                    this@VlcPlayerActivity,
-                                    R.string.series_playback_failed,
-                                    android.widget.Toast.LENGTH_LONG,
-                                ).show()
-                            }
+                            fallbackToExoPlayer()
                         }
                     }
                     MediaPlayer.Event.Playing -> {
@@ -251,7 +243,12 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun playUrl(url: String) {
         val vlc = libVlc ?: return
         val player = mediaPlayer ?: return
-        val media = Media(vlc, Uri.parse(url))
+        val resolved = com.gadir.tv.util.NetworkUrlResolver.resolve(url)
+        val media = Media(vlc, Uri.parse(resolved.url))
+        resolved.hostHeader?.let { media.addOption(":http-host=$it") }
+        PlaylistRepository.profile?.host?.let { host ->
+            media.addOption(":http-referrer=${com.gadir.tv.util.HostUtils.baseUrl(host)}/")
+        }
         player.media = media
         media.release()
         player.volume = VLC_VOLUME
@@ -267,7 +264,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     }
 
     private fun fallbackToExoPlayer() {
-        if (exoFallbackLaunched || isLivePlayback) return
+        if (exoFallbackLaunched) return
         exoFallbackLaunched = true
         val url = pendingUrls.firstOrNull().orEmpty()
         if (url.isBlank()) return
@@ -279,8 +276,10 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                 kind = intent.getStringExtra(EXTRA_KIND).orEmpty(),
                 contentId = intent.getStringExtra(EXTRA_CONTENT_ID).orEmpty(),
                 imageUrl = intent.getStringExtra(EXTRA_IMAGE_URL).orEmpty(),
-                extension = intent.getStringExtra(EXTRA_EXTENSION).orEmpty().ifBlank { "mkv" },
+                extension = intent.getStringExtra(EXTRA_EXTENSION).orEmpty()
+                    .ifBlank { if (isLivePlayback) "ts" else "mkv" },
                 positionMs = resumePositionMs,
+                streamId = currentStreamId,
                 alternateUrls = pendingUrls.drop(1).toList(),
             ),
         )

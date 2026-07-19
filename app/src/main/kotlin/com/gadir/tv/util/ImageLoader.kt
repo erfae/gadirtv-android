@@ -201,13 +201,15 @@ object ImageLoader {
     private fun glideUrl(url: String): Any = glideModel(url)
 
     fun glideModel(url: String): Any {
-        if (!url.startsWith("http")) return url
+        val resolved = com.gadir.tv.util.NetworkUrlResolver.resolve(url)
+        if (!resolved.url.startsWith("http")) return resolved.url
         val headers = LazyHeaders.Builder()
             .addHeader("User-Agent", PlaylistRepository.userAgent)
             .addHeader("Accept", "image/*,*/*")
+        resolved.hostHeader?.let { headers.addHeader("Host", it) }
         PlaylistRepository.profile?.host?.let { host ->
             headers.addHeader("Referer", HostUtils.baseUrl(host) + "/")
         }
-        return GlideUrl(url, headers.build())
+        return GlideUrl(resolved.url, headers.build())
     }
 }

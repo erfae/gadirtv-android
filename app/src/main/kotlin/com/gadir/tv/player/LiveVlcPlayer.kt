@@ -2,6 +2,9 @@ package com.gadir.tv.player
 
 import android.content.Context
 import android.net.Uri
+import com.gadir.tv.data.PlaylistRepository
+import com.gadir.tv.util.HostUtils
+import com.gadir.tv.util.NetworkUrlResolver
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
@@ -43,7 +46,12 @@ class LiveVlcPlayer(
     fun play(url: String, volume: Int) {
         try {
             mediaPlayer.stop()
-            val media = Media(libVlc, Uri.parse(url))
+            val resolved = NetworkUrlResolver.resolve(url)
+            val media = Media(libVlc, Uri.parse(resolved.url))
+            resolved.hostHeader?.let { media.addOption(":http-host=$it") }
+            PlaylistRepository.profile?.host?.let { host ->
+                media.addOption(":http-referrer=${HostUtils.baseUrl(host)}/")
+            }
             mediaPlayer.media = media
             media.release()
             mediaPlayer.volume = volume
