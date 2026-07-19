@@ -1702,60 +1702,6 @@ class MainActivity : BaseLocaleActivity() {
     private fun warmCatalogCategoryCounts(tab: Tab) {
         syncCatalogCategoryCounts(tab)
         catalogCategoryAdapter?.refreshSelection()
-
-        val profile = PlaylistRepository.profile ?: return
-        lifecycleScope.launch {
-            val counts = withContext(Dispatchers.IO) {
-                try {
-                    when (tab) {
-                        Tab.MOVIES -> loadCatalogCounts(
-                            categories = PlaylistRepository.vodCategories,
-                            fetchAll = { api.vodStreams(profile, null) },
-                            fetchOne = { id -> api.vodStreams(profile, id) },
-                            cache = { id, items -> PlaylistRepository.cacheVod(id, items) },
-                            idOf = { it.categoryId },
-                        )
-                        Tab.SERIES -> loadCatalogCounts(
-                            categories = PlaylistRepository.seriesCategories,
-                            fetchAll = { api.seriesList(profile, null) },
-                            fetchOne = { id -> api.seriesList(profile, id) },
-                            cache = { id, items -> PlaylistRepository.cacheSeries(id, items) },
-                            idOf = { it.categoryId },
-                        )
-                        else -> emptyMap()
-                    }
-                } catch (_: Exception) {
-                    emptyMap()
-                }
-            }
-            counts.forEach { (catId, size) ->
-                if (catId.isNotBlank()) catalogCategoryCounts[catId] = size
-            }
-            if (currentTab == tab) catalogCategoryAdapter?.refreshSelection()
-        }
-    }
-
-    private suspend fun <T> loadCatalogCounts(
-        categories: List<Category>,
-        fetchAll: suspend () -> List<T>,
-        fetchOne: suspend (String) -> List<T>,
-        cache: (String, List<T>) -> Unit,
-        idOf: (T) -> String,
-    ): Map<String, Int> {
-        val all = runCatching { fetchAll() }.getOrDefault(emptyList())
-        return if (all.isNotEmpty()) {
-            all.groupBy { idOf(it) }.onEach { (catId, items) ->
-                if (catId.isNotBlank()) cache(catId, items)
-            }.mapValues { it.value.size }
-        } else {
-            val counts = linkedMapOf<String, Int>()
-            categories.forEach { category ->
-                val items = runCatching { fetchOne(category.id) }.getOrDefault(emptyList())
-                cache(category.id, items)
-                counts[category.id] = items.size
-            }
-            counts
-        }
     }
 
     private fun scheduleCatalogPrefetch(tab: Tab, catId: String) {
@@ -1987,15 +1933,17 @@ class MainActivity : BaseLocaleActivity() {
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
                 livePreviewPaused = false
-                if (DeviceUi.useDpadFocus(this)) {
-                    liveBrowseLevel = TvBrowseNav.Level.TAB
-                }
                 livePanel().post {
                     if (currentTab != Tab.LIVE) return@post
-                    ensurePreviewPlayer()
                     if (DeviceUi.useDpadFocus(this)) {
-                        applyLiveBrowseLevel()
+                        if (liveBrowseLevel == TvBrowseNav.Level.TAB) {
+                            openLiveTabAtFirstGroup()
+                        } else {
+                            ensurePreviewPlayer()
+                            applyLiveBrowseLevel()
+                        }
                     } else {
+                        ensurePreviewPlayer()
                         restoreLiveTabSession()
                     }
                 }
@@ -2020,9 +1968,7 @@ class MainActivity : BaseLocaleActivity() {
                         if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
                     }
                     if (DeviceUi.useDpadFocus(this)) {
-                        catalogCategories.firstOrNull()?.let { cat ->
-                            browseCatalogCategory(tab, cat, enterContent = false)
-                        }
+                        panelCatalog.post { openCatalogTabAtFirstGroup(tab) }
                     }
                 } else if (DeviceUi.useDpadFocus(this)) {
                     restoreCatalogTab(tab)
@@ -2046,13 +1992,11 @@ class MainActivity : BaseLocaleActivity() {
         val bootstrapSeries = PlaylistRepository.homeRecentSeries
         if (bootstrapMovies.isNotEmpty() || bootstrapSeries.isNotEmpty()) {
             presentHomeData(bootstrapMovies, bootstrapSeries)
-            refreshHomeInBackground(profile)
             return
         }
 
         if (PlaylistRepository.bootstrapReady) {
             presentHomeData(emptyList(), emptyList())
-            refreshHomeInBackground(profile)
             return
         }
 
@@ -2084,29 +2028,6 @@ class MainActivity : BaseLocaleActivity() {
         homeLoading.visibility = View.GONE
         homeLoaded = true
         scheduleContentPreloadAfterHome()
-    }
-
-    private fun refreshHomeInBackground(profile: Profile) {
-        if (PlaylistRepository.homeRecentMovies.size >= HOME_RAIL_LIMIT_TV) return
-        lifecycleScope.launch {
-            try {
-                val movies = withContext(Dispatchers.IO) {
-                    HomeLoader.loadRecentMovies(api, profile)
-                }
-                val series = withContext(Dispatchers.IO) {
-                    HomeLoader.loadRecentSeries(api, profile)
-                }
-                if (movies.size <= PlaylistRepository.homeRecentMovies.size &&
-                    series.size <= PlaylistRepository.homeRecentSeries.size
-                ) {
-                    return@launch
-                }
-                PlaylistRepository.setHomeRecent(movies, series)
-                if (isDestroyed || currentTab != Tab.HOME) return@launch
-                applyHomeData(movies, series)
-            } catch (_: Throwable) {
-            }
-        }
     }
 
     private fun updateHeaderAccountInfo() {
@@ -4584,7 +4505,7 @@ class MainActivity : BaseLocaleActivity() {
             if (!DeviceUi.useDpadFocus(this)) {
                 focusChannelAt(currentPreviewChannel)
             }
-            if (appSettings.autoplayPreview && liveChannelsLoaded && currentPreviewChannel != null) {
+            if (appSettings.autoplayPreview && currentPreviewChannel != null) {
                 currentPreviewChannel?.let { schedulePreview(it) }
             }
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
@@ -4673,18 +4594,24 @@ class MainActivity : BaseLocaleActivity() {
         } else {
             miniExoView?.visibility = View.GONE
             miniVlcView?.visibility = View.VISIBLE
-            miniVlcView?.post {
-                if (miniVlcPlayer == null && !isDestroyed && currentTab == Tab.LIVE) {
-                    try {
-                        recreateMiniVlcPlayer()
-                    } catch (_: Exception) {
-                        miniVlcPlayer = null
-                    }
-                }
-            }
+            initMiniVlcPreview()
         }
         miniExoView?.alpha = 0f
         miniVlcView?.alpha = 0f
+    }
+
+    /** NetTV-style: crea VLC al enlazar el panel (evita race con surface no medido). */
+    private fun initMiniVlcPreview() {
+        if (usesExoPreview() || miniVlcPlayer != null) return
+        val videoLayout = miniVlcView ?: return
+        try {
+            recreateMiniVlcPlayer()
+        } catch (_: Exception) {
+            miniVlcPlayer = null
+        }
+        if (miniVlcPlayer == null && DeviceUi.isTvUi(this)) {
+            ensureExoPreviewFallback()
+        }
     }
 
     /** Crea el reproductor de preview bajo demanda cuando el panel Live está visible. */
@@ -4696,21 +4623,15 @@ class MainActivity : BaseLocaleActivity() {
             }
             return miniExoPlayer != null
         }
-        if (miniVlcPlayer != null) return true
-        val videoLayout = miniVlcView ?: return ensureExoPreviewFallback()
-        if (!videoLayout.isAttachedToWindow) return false
-        if (videoLayout.width <= 0 || videoLayout.height <= 0) return false
-        try {
-            recreateMiniVlcPlayer()
-        } catch (_: Exception) {
-            miniVlcPlayer = null
-            return ensureExoPreviewFallback()
+        if (miniVlcPlayer == null) {
+            initMiniVlcPreview()
         }
-        return miniVlcPlayer != null
+        if (miniVlcPlayer != null) return true
+        return ensureExoPreviewFallback()
     }
 
     private fun ensureExoPreviewFallback(): Boolean {
-        if (DeviceUi.isTvUi(this) || miniExoView == null) return false
+        if (miniExoView == null) return false
         previewUsesExo = true
         miniVlcView?.visibility = View.GONE
         miniExoView?.visibility = View.VISIBLE

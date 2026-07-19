@@ -14,8 +14,21 @@ object LiveStreamUrls {
     fun candidates(api: XtreamApi, profile: Profile, channel: LiveChannel): List<String> =
         buildCandidates(api, profile, channel, tvSafe = false)
 
-    fun tvCandidates(api: XtreamApi, profile: Profile, channel: LiveChannel): List<String> =
-        buildCandidates(api, profile, channel, tvSafe = true)
+    fun tvCandidates(api: XtreamApi, profile: Profile, channel: LiveChannel): List<String> {
+        val urls = linkedSetOf<String>()
+        urls.add(api.liveStreamUrlDirect(profile, channel.streamId))
+        urls.add(api.liveStreamUrlDirect(profile, channel.streamId, "m3u8"))
+        urls.add(api.liveStreamUrlDirect(profile, channel.streamId, "ts"))
+        val ext = channel.extension.ifBlank { "ts" }.lowercase()
+        if (ext.isNotEmpty() && ext !in setOf("ts", "m3u8")) {
+            urls.add(api.liveStreamUrlDirect(profile, channel.streamId, ext))
+        }
+        val direct = channel.directSource.trim()
+        if (direct.isNotEmpty() && direct.startsWith("http")) {
+            urls.add(com.gadir.tv.util.NetworkUrlResolver.resolveUrl(direct))
+        }
+        return urls.filter { it.isNotBlank() }.distinct()
+    }
 
     private fun buildCandidates(
         api: XtreamApi,

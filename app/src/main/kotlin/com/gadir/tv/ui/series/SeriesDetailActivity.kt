@@ -110,10 +110,13 @@ class SeriesDetailActivity : BaseLocaleActivity() {
 
     private fun loadSeriesDetail() {
         val token = ++loadToken
-        loadingView.visibility = View.VISIBLE
-        episodeList.visibility = View.GONE
-        seasonList.visibility = View.GONE
-        btnSeriesPlay.visibility = View.GONE
+        val hasCached = PlotCache.get("series", seriesId) != null || fallbackCover.isNotEmpty()
+        if (!hasCached) {
+            loadingView.visibility = View.VISIBLE
+            episodeList.visibility = View.GONE
+            seasonList.visibility = View.GONE
+            btnSeriesPlay.visibility = View.GONE
+        }
 
         lifecycleScope.launch {
             val detail = try {

@@ -636,7 +636,9 @@ class XtreamApi(
             runCatching {
                 val uri = java.net.URI(base)
                 uri.host?.let { hostname ->
-                    if (!hostname.matches(Regex("^\\d{1,3}(\\.\\d{1,3}){3}$"))) {
+                    if (!hostname.matches(Regex("^\\d{1,3}(\\.\\d{1,3}){3}$")) &&
+                        hostname.equals(com.gadir.tv.net.PanelHttp.GADIR_HOST, ignoreCase = true)
+                    ) {
                         com.gadir.tv.net.PanelHttp.rememberWorkingIp(hostname, com.gadir.tv.net.PanelHttp.GADIR_IP)
                     }
                 }

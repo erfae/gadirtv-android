@@ -94,8 +94,11 @@ class MovieDetailActivity : BaseLocaleActivity() {
     private fun loadMovieDetail() {
         val profile = PlaylistRepository.profile ?: return
         val token = ++loadToken
-        loadingView.visibility = View.VISIBLE
-        btnMoviePlay.visibility = View.GONE
+        val hasCached = PlotCache.get("movie", streamId) != null || fallbackCover.isNotEmpty()
+        if (!hasCached) {
+            loadingView.visibility = View.VISIBLE
+            btnMoviePlay.visibility = View.GONE
+        }
 
         lifecycleScope.launch {
             val info = try {

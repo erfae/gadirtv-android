@@ -191,6 +191,14 @@ object PanelHttp {
                 if (v4.isNotEmpty()) v4 else resolved
             } catch (e: Exception) {
                 Log.w(TAG, "DNS failed for $hostname: ${e.message}")
+                knownIps[hostname.lowercase()]?.let { ip ->
+                    return listOf(InetAddress.getByName(ip))
+                }
+                virtualHostFor(hostname)?.let { vhost ->
+                    knownIps[vhost]?.let { ip ->
+                        return listOf(InetAddress.getByName(ip))
+                    }
+                }
                 emptyList()
             }
         }

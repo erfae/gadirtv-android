@@ -46,13 +46,37 @@ object BootstrapLoader {
             PlaylistRepository.updateVodCategories(vodCategories.await())
             PlaylistRepository.updateSeriesCategories(seriesCategories.await())
 
-            // NetTV-style: categories first, catalog preload runs in background via ContentPreloader.
+            prefetchInitialCatalog(api, migratedProfile)
+
             PlaylistRepository.markBootstrapReady()
 
             onProgress?.invoke(context.getString(R.string.bootstrap_home))
             val (movies, series) = loadHomeQuick(api, migratedProfile)
             PlaylistRepository.setHomeRecent(movies, series)
         }
+    }
+
+    private suspend fun prefetchInitialCatalog(api: XtreamApi, profile: Profile) = coroutineScope {
+        val vodTargets = PlaylistRepository.vodCategories
+            .filter { !CategorySort.isAdultCategory(it.name) }
+            .take(4)
+        val seriesTargets = PlaylistRepository.seriesCategories
+            .filter { !CategorySort.isAdultCategory(it.name) }
+            .take(4)
+        val jobs = vodTargets.map { category ->
+            async {
+                runCatching { api.vodStreams(profile, category.id) }
+                    .getOrDefault(emptyList())
+                    .also { items -> if (items.isNotEmpty()) PlaylistRepository.cacheVod(category.id, items) }
+            }
+        } + seriesTargets.map { category ->
+            async {
+                runCatching { api.seriesList(profile, category.id) }
+                    .getOrDefault(emptyList())
+                    .also { items -> if (items.isNotEmpty()) PlaylistRepository.cacheSeries(category.id, items) }
+            }
+        }
+        jobs.forEach { runCatching { it.await() } }
     }
 
     private suspend fun loadHomeQuick(

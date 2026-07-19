@@ -33,9 +33,13 @@ object ContentPreloader {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var backgroundJob: Job? = null
+    private var activeProfileKey: String? = null
 
     fun startBackgroundPreload(context: Context, api: XtreamApi, profile: Profile) {
+        val key = "${profile.host}|${profile.username}"
+        if (backgroundJob?.isActive == true && activeProfileKey == key) return
         backgroundJob?.cancel()
+        activeProfileKey = key
         val appContext = context.applicationContext
         backgroundJob = scope.launch {
             preloadInBackground(appContext, api, profile)
@@ -45,6 +49,7 @@ object ContentPreloader {
     fun cancelBackgroundPreload() {
         backgroundJob?.cancel()
         backgroundJob = null
+        activeProfileKey = null
     }
 
     private suspend fun preloadInBackground(
