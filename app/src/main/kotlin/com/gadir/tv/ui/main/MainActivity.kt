@@ -1245,6 +1245,24 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun ensureCatalogTabReady(tab: Tab) {
+        val cats = catalogCategoriesFor(tab)
+        val ready = if (tab == Tab.MOVIES) moviesCatalogReady else seriesCatalogReady
+        val needsSetup = !ready ||
+            catalogGrid.adapter == null ||
+            (cats.isNotEmpty() && catalogCategories.isEmpty())
+        if (needsSetup) {
+            setupCatalogTab(tab)
+        }
+        if (cats.isNotEmpty()) {
+            when (tab) {
+                Tab.MOVIES -> moviesCatalogReady = true
+                Tab.SERIES -> seriesCatalogReady = true
+                else -> Unit
+            }
+        }
+    }
+
     private fun browseCatalogCategory(tab: Tab, cat: Category, enterContent: Boolean) {
         val catId = cat.id
         if (enterContent && catId == catalogBrowsingCategoryId && posterItems.isNotEmpty()) {
@@ -1257,16 +1275,10 @@ class MainActivity : BaseLocaleActivity() {
             catalogBrowsingCategoryId = null
             catalogEnterContentOnLoad = true
             highlightCatalogCategory(tab, catId)
-            TvBrowseNav.allowContentFocus(catalogGrid)
+            applyCatalogPanelFocusMode(tab, inContent = true)
         } else {
             catalogEnterContentOnLoad = false
-            when (tab) {
-                Tab.MOVIES -> moviesGroupLoaded = false
-                Tab.SERIES -> seriesGroupLoaded = false
-                else -> Unit
-            }
-            catalogBrowseLevel = TvBrowseNav.Level.GROUP
-            TvBrowseNav.blockContentFocus(catalogGrid)
+            applyCatalogPanelFocusMode(tab, inContent = false)
         }
         catalogCategoryAdapter?.refreshSelection()
         showCatalogGroupContent(tab, catId)
@@ -1297,15 +1309,28 @@ class MainActivity : BaseLocaleActivity() {
         bindCatalogCategoryAdapter(tab)
         syncCatalogCategoryCounts(tab)
         warmCatalogCategoryCounts(tab)
-        showCatalogSelectPrompt()
+        if (cats.isEmpty()) {
+            catalogLoading.visibility = View.GONE
+            catalogGrid.visibility = View.INVISIBLE
+            catalogEmpty.visibility = View.VISIBLE
+            catalogEmpty.text = getString(R.string.catalog_empty)
+            catalogBrowseLevel = TvBrowseNav.Level.GROUP
+            TvBrowseNav.blockContentFocus(catalogGrid)
+            return
+        }
         catalogBrowseLevel = TvBrowseNav.Level.GROUP
-        TvBrowseNav.blockContentFocus(catalogGrid)
+        applyCatalogPanelFocusMode(tab, inContent = false)
         if (DeviceUi.useDpadFocus(this)) {
             catalogGrid.nextFocusLeftId = View.NO_ID
             catalogCategoryList.nextFocusRightId = R.id.catalogGrid
         }
         (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
         TvBrowseNav.focusGroup(catalogCategoryList, 0)
+        val first = cats.first()
+        catalogCategoryList.post {
+            if (currentTab != tab) return@post
+            browseCatalogCategory(tab, first, enterContent = false)
+        }
     }
 
     private fun catalogAdapterSelectedId(tab: Tab): String? {
@@ -1561,11 +1586,7 @@ class MainActivity : BaseLocaleActivity() {
                 openLiveTabAtFirstGroup()
             }
             Tab.MOVIES, Tab.SERIES -> {
-                val ready = if (tab == Tab.MOVIES) moviesCatalogReady else seriesCatalogReady
-                if (!ready) {
-                    setupCatalogTab(tab)
-                    if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
-                }
+                ensureCatalogTabReady(tab)
                 catalogBrowseLevel = TvBrowseNav.Level.GROUP
                 openCatalogTabAtFirstGroup(tab)
             }
@@ -1636,9 +1657,17 @@ class MainActivity : BaseLocaleActivity() {
                 val switchingBetweenCatalog =
                     (previousTab == Tab.MOVIES || previousTab == Tab.SERIES) && previousTab != tab
                 val ready = if (tab == Tab.MOVIES) moviesCatalogReady else seriesCatalogReady
+                ensureCatalogTabReady(tab)
                 if (!ready || switchingBetweenCatalog) {
                     setupCatalogTab(tab)
-                    if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
+                    if (catalogCategories.isNotEmpty()) {
+                        if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
+                    }
+                    if (DeviceUi.useDpadFocus(this)) {
+                        catalogCategories.firstOrNull()?.let { cat ->
+                            browseCatalogCategory(tab, cat, enterContent = false)
+                        }
+                    }
                 }
                 if (!DeviceUi.useDpadFocus(this) && ready) {
                     restoreCatalogTab(tab)
@@ -3109,6 +3138,7 @@ class MainActivity : BaseLocaleActivity() {
                 val idx = catalogCategories.indexOfFirst { it.id == cat.id }
                 if (idx >= 0) catalogCategoryFocusIndex = idx
                 browseCatalogCategory(tab, cat, enterContent = false)
+                scheduleCatalogPrefetch(tab, cat.id)
             },
             onMoveRight = {
                 val index = focusedCatalogCategoryIndex()
