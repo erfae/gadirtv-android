@@ -14,12 +14,17 @@ class LiveVlcPlayer(
     networkBufferMs: Int,
     private val onError: () -> Unit,
     private val onPlaying: () -> Unit,
+    previewMode: Boolean = false,
 ) {
     private val libVlc: LibVLC
     val mediaPlayer: MediaPlayer
 
     init {
-        val options = VlcAudioOptions.baseOptions(networkBufferMs)
+        val options = if (previewMode) {
+            VlcAudioOptions.previewOptions(networkBufferMs)
+        } else {
+            VlcAudioOptions.baseOptions(networkBufferMs)
+        }
         libVlc = LibVLC(context.applicationContext, options)
         mediaPlayer = MediaPlayer(libVlc).apply {
             attachViews(videoLayout, null, false, false)

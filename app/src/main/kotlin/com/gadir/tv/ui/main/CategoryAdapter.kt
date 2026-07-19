@@ -43,7 +43,8 @@ class CategoryAdapter(
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val item = items[position]
-        val contentSelected = item.id == selectedId()
+        val selectedKey = selectedId()
+        val contentSelected = selectedKey != null && categoryKey(item) == selectedKey
 
         holder.name.text = item.name
         val count = itemCount(item)
@@ -70,7 +71,8 @@ class CategoryAdapter(
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
             val cat = items[pos]
-            applyCategoryVisual(holder, cat.id == selectedId(), hasFocus)
+            val key = selectedId()
+            applyCategoryVisual(holder, key != null && categoryKey(cat) == key, hasFocus)
             if (hasFocus && !navigationLocked()) onFocus?.invoke(cat)
         }
 
@@ -134,6 +136,8 @@ class CategoryAdapter(
         TvNavHelper.requestFocusAt(list, target)
         return true
     }
+
+    private fun categoryKey(item: Category): String = item.id.ifEmpty { "" }
 
     private fun applyCategoryVisual(holder: Holder, contentSelected: Boolean, focused: Boolean) {
         val view = holder.itemView
