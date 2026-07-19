@@ -119,7 +119,7 @@ class MainActivity : BaseLocaleActivity() {
     private var previewToken = 0
     private var selectedLiveCategoryId: String? = null
     private var liveChannelsLoaded = false
-    private var liveEnteringContent = false
+    private var pendingLiveCategoryEnter = false
     private var liveBrowsingCategoryId: String? = null
     private var liveEnterContentOnLoad = false
     private var liveCategoryFocusIndex = 0
@@ -137,7 +137,7 @@ class MainActivity : BaseLocaleActivity() {
     private var seriesCatalogReady = false
     private var moviesGroupLoaded = false
     private var seriesGroupLoaded = false
-    private var catalogEnteringContent = false
+    private var pendingCatalogCategoryEnter = false
     private var catalogCategoryFocusIndex = 0
     private var currentTab = Tab.HOME
     private var previousTab = Tab.HOME
@@ -580,7 +580,7 @@ class MainActivity : BaseLocaleActivity() {
                     selectChannelPreview(channel)
                 }
             },
-            onMoveLeft = { focusCategoryList() },
+            onMoveLeft = null,
             onMoveUp = null,
             onMoveRight = { enterLivePreviewFromChannels() },
             isFavorite = { favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, it.streamId) },
@@ -672,11 +672,6 @@ class MainActivity : BaseLocaleActivity() {
             enterLiveContentFocus()
         } else {
             updateLiveCategoryFocusLock()
-            liveCategoryList.post {
-                if (currentTab == Tab.LIVE) {
-                    TvNavHelper.focusCategoryItem(liveCategoryList, liveCategoryFocusIndex)
-                }
-            }
         }
     }
 
@@ -688,11 +683,14 @@ class MainActivity : BaseLocaleActivity() {
         } else {
             ViewGroup.FOCUS_AFTER_DESCENDANTS
         }
-        liveCategoryList.isFocusable = !inContent
         channelList.descendantFocusability = if (inContent) {
             ViewGroup.FOCUS_AFTER_DESCENDANTS
         } else {
             ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        }
+        if (DeviceUi.useDpadFocus(this)) {
+            channelList.nextFocusLeftId = if (inContent) View.NO_ID else R.id.categoryList
+            liveCategoryList.nextFocusRightId = if (inContent) View.NO_ID else R.id.channelList
         }
     }
 
@@ -707,11 +705,14 @@ class MainActivity : BaseLocaleActivity() {
         } else {
             ViewGroup.FOCUS_AFTER_DESCENDANTS
         }
-        catalogCategoryList.isFocusable = !inContent
         catalogGrid.descendantFocusability = if (inContent) {
             ViewGroup.FOCUS_AFTER_DESCENDANTS
         } else {
             ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        }
+        if (DeviceUi.useDpadFocus(this)) {
+            catalogGrid.nextFocusLeftId = if (inContent) View.NO_ID else R.id.catalogCategoryList
+            catalogCategoryList.nextFocusRightId = if (inContent) View.NO_ID else R.id.catalogGrid
         }
     }
 
@@ -849,23 +850,30 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun liveCategoryAdapterSelectedId(): String? {
         liveBrowsingCategoryId?.let { return it ?: "" }
-        if (!liveChannelsLoaded && !liveEnteringContent) return null
-        return selectedLiveCategoryId ?: ""
+        if (liveChannelsLoaded || pendingLiveCategoryEnter) {
+            return selectedLiveCategoryId ?: ""
+        }
+        return null
     }
 
-    private fun isLiveCategoryNavigationLocked(): Boolean =
-        liveChannelsLoaded && !liveEnteringContent
+    private fun isLiveCategoryNavigationLocked(): Boolean = liveChannelsLoaded
 
     private fun enterLiveContentFocus() {
-        if (channels.isEmpty()) return
-        liveEnteringContent = true
-        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+        if (channels.isEmpty()) {
+            pendingLiveCategoryEnter = false
+            return
+        }
+        pendingLiveCategoryEnter = true
+        channelList.visibility = View.VISIBLE
+        channelList.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+        highlightLiveCategory(selectedLiveCategoryId)
         focusFirstChannel {
-            liveEnteringContent = false
+            pendingLiveCategoryEnter = false
             liveChannelsLoaded = true
+            liveBrowsingCategoryId = null
             updateLiveCategoryFocusLock()
-            (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
             updateHeaderDownFocus()
+            (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
         }
     }
 
@@ -884,7 +892,7 @@ class MainActivity : BaseLocaleActivity() {
         if (liveCategories.isEmpty()) return
         liveCategoryFocusIndex = 0
         liveChannelsLoaded = false
-        liveEnteringContent = false
+        pendingLiveCategoryEnter = false
         liveEnterContentOnLoad = false
         liveBrowsingCategoryId = null
         selectedLiveCategoryId = null
@@ -1006,6 +1014,8 @@ class MainActivity : BaseLocaleActivity() {
             return
         }
         channelList.scrollToPosition(index)
+        liveChannelsLoaded = true
+        updateLiveCategoryFocusLock()
         TvNavHelper.focusItem(channelList, index)
         if (DeviceUi.useDpadFocus(this)) {
             schedulePreviewAfterChannelFocus(index)
@@ -1172,7 +1182,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun focusCategoryList() {
         pauseLivePreviewPlayback()
         liveChannelsLoaded = false
-        liveEnteringContent = false
+        pendingLiveCategoryEnter = false
         liveBrowsingCategoryId = liveCategories.getOrNull(liveCategoryFocusIndex.coerceAtLeast(0))
             ?.let { liveCategoryId(it) }
         updateLiveCategoryFocusLock()
@@ -1245,7 +1255,7 @@ class MainActivity : BaseLocaleActivity() {
             highlightCatalogCategory(tab, catId)
         } else {
             catalogEnterContentOnLoad = false
-            catalogEnteringContent = false
+            pendingCatalogCategoryEnter = false
             when (tab) {
                 Tab.MOVIES -> moviesGroupLoaded = false
                 Tab.SERIES -> seriesGroupLoaded = false
@@ -1266,7 +1276,7 @@ class MainActivity : BaseLocaleActivity() {
         selectedCatalogCategoryId = null
         catalogBrowsingCategoryId = null
         catalogEnterContentOnLoad = false
-        catalogEnteringContent = false
+        pendingCatalogCategoryEnter = false
         when (tab) {
             Tab.MOVIES -> {
                 moviesGroupLoaded = false
@@ -1299,30 +1309,35 @@ class MainActivity : BaseLocaleActivity() {
             Tab.SERIES -> seriesGroupLoaded
             else -> false
         }
-        if (!loaded && !catalogEnteringContent) return null
+        if (!loaded && !pendingCatalogCategoryEnter) return null
         return selectedCatalogCategoryId
     }
 
     private fun isCatalogCategoryNavigationLocked(tab: Tab): Boolean = when (tab) {
-        Tab.MOVIES -> moviesGroupLoaded && !catalogEnteringContent
-        Tab.SERIES -> seriesGroupLoaded && !catalogEnteringContent
+        Tab.MOVIES -> moviesGroupLoaded
+        Tab.SERIES -> seriesGroupLoaded
         else -> false
     }
 
     private fun enterCatalogContentFocus(tab: Tab) {
-        if (posterItems.isEmpty()) return
-        catalogEnteringContent = true
-        catalogCategoryAdapter?.refreshSelection()
+        if (posterItems.isEmpty()) {
+            pendingCatalogCategoryEnter = false
+            return
+        }
+        pendingCatalogCategoryEnter = true
+        catalogGrid.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+        highlightCatalogCategory(tab, selectedCatalogCategoryId.orEmpty())
         focusFirstCatalogItem {
-            catalogEnteringContent = false
+            pendingCatalogCategoryEnter = false
             when (tab) {
                 Tab.MOVIES -> moviesGroupLoaded = true
                 Tab.SERIES -> seriesGroupLoaded = true
                 else -> Unit
             }
+            catalogBrowsingCategoryId = null
             updateCatalogCategoryFocusLock(tab)
-            catalogCategoryAdapter?.refreshSelection()
             updateHeaderDownFocus()
+            catalogCategoryAdapter?.refreshSelection()
         }
     }
 
@@ -1468,7 +1483,7 @@ class MainActivity : BaseLocaleActivity() {
             Tab.SERIES -> seriesGroupLoaded = false
             else -> Unit
         }
-        catalogEnteringContent = false
+        pendingCatalogCategoryEnter = false
         catalogBrowsingCategoryId = catalogCategories.getOrNull(catalogCategoryFocusIndex.coerceAtLeast(0))?.id
         updateCatalogCategoryFocusLock(currentTab)
         (catalogCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
@@ -2979,7 +2994,7 @@ class MainActivity : BaseLocaleActivity() {
                 favoritesStore.toggle(kind, item.id)
             },
             columnCount = catalogGridSpanCount(),
-            onMoveLeft = { focusCatalogCategoryList() },
+            onMoveLeft = null,
             onMoveUp = null,
         )
 
