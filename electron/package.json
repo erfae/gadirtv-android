@@ -1,9 +1,9 @@
 {
-  "name": "gadirtv",
+  "name": "gadir-iptv-player",
   "version": "1.0.0",
-  "description": "GadirTV - IPTV Player Windows Desktop",
+  "description": "Gadir IPTV Player - IPTV Player Windows Desktop",
   "main": "main.js",
-  "author": "GadirTV",
+  "author": "Gadir IPTV",
   "scripts": {
     "start": "electron .",
     "prebuild": "node ./scripts/prepare.js",
@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "com.gadir.tv",
-    "productName": "GadirTV",
+    "productName": "Gadir IPTV Player",
     "directories": {
       "output": "dist"
     },
@@ -42,7 +42,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "GadirTV"
+      "shortcutName": "Gadir IPTV Player"
     }
   }
 }

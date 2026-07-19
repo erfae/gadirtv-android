@@ -1,4 +1,4 @@
-# GadirTV Android APK builder for Windows.
+# Gadir IPTV Player Android APK builder for Windows.
 #
 # Downloads OpenJDK 17, Flutter SDK, Android command-line tools, accepts the
 # SDK licences, installs the required platform/build-tools/NDK, then invokes
@@ -146,7 +146,7 @@ if ($LASTEXITCODE -ne 0) { throw 'flutter build apk fallo' }
 
 $apkDir  = Join-Path $PROJECT 'build\app\outputs\flutter-apk'
 $desktop = [Environment]::GetFolderPath('Desktop')
-$outDir  = Join-Path $desktop 'GadirTV-APKs'
+$outDir  = Join-Path $desktop 'GadirIPTV-APKs'
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 Get-ChildItem "$apkDir\app-*-release.apk" | Copy-Item -Destination $outDir -Force
 Pop-Location

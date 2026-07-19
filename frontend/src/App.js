@@ -109,7 +109,7 @@ function Profiles({ onSelect, onAdd }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#050505]" data-testid="profile-screen">
       <div className="text-center w-full px-8">
-        <img src="./gadir-logo.png" alt="GadirTV" className="mx-auto mb-6 w-72 h-auto drop-shadow-2xl" style={{filter:"drop-shadow(0 0 30px rgba(220,38,38,0.4))"}} onError={e=>e.target.style.display='none'}/>
+        <img src="./gadir-logo.png" alt="Gadir IPTV" className="mx-auto mb-6 w-72 h-auto drop-shadow-2xl" style={{filter:"drop-shadow(0 0 30px rgba(220,38,38,0.4))"}} onError={e=>e.target.style.display='none'}/>
         <p className="text-neutral-500 text-lg mb-12">{manage ? "Toca la papelera para eliminar" : "¿Quién está viendo?"}</p>
         <div className="flex flex-wrap gap-8 justify-center max-w-4xl mx-auto">
           {profiles.map((p, i) => (
@@ -219,7 +219,7 @@ function Login({ onLogin, onCancel }) {
     <div className="min-h-screen flex items-center justify-center bg-[#050505] py-10" style={{backgroundImage:"linear-gradient(rgba(0,0,0,0.75),rgba(5,5,5,1)),url(https://images.unsplash.com/photo-1489599328109-c6b8b7cfd3aa?w=1920)",backgroundSize:"cover"}} data-testid="login-screen">
       <div className="w-full max-w-md p-10 rounded-3xl backdrop-blur-2xl bg-black/60 border border-white/10">
         <button onClick={onCancel} className="text-neutral-500 hover:text-white mb-6 flex items-center gap-2" data-testid="back-btn"><ChevronLeft size={20}/>Volver</button>
-        <img src="./gadir-logo.png" alt="GadirTV" className="w-48 h-auto mb-6 drop-shadow-xl" style={{filter:"drop-shadow(0 0 20px rgba(220,38,38,0.5))"}} onError={e=>e.target.style.display='none'}/>
+        <img src="./gadir-logo.png" alt="Gadir IPTV" className="w-48 h-auto mb-6 drop-shadow-xl" style={{filter:"drop-shadow(0 0 20px rgba(220,38,38,0.5))"}} onError={e=>e.target.style.display='none'}/>
         <form onSubmit={submit} className="space-y-4">
           <input placeholder="Nombre perfil (opcional)" value={name} onChange={e=>setName(e.target.value)} className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-600" data-testid="profile-name-input"/>
           <input placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} required className="w-full px-5 py-4 rounded-full bg-white/5 border border-white/10 text-white focus:outline-none focus:border-red-600" data-testid="username-input"/>
@@ -1258,7 +1258,7 @@ function Main({ profile, onLogout, onSwitch, onPlay, onOpenSeries, onOpenMovie }
       {/* Top-left logo hidden on home for a clean Netflix-style hero */}
       {tab !== "home" && (
       <div className="fixed top-11 left-6 z-30 flex items-center gap-3">
-        <img src="./gadir-logo.png" alt="GadirTV" className="h-9 w-auto drop-shadow-lg" onError={e=>e.target.style.display='none'}/>
+        <img src="./gadir-logo.png" alt="Gadir IPTV" className="h-9 w-auto drop-shadow-lg" onError={e=>e.target.style.display='none'}/>
       </div>
       )}
 

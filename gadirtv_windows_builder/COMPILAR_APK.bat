@@ -1,9 +1,9 @@
 @echo off
-:: GadirTV Android APK builder — auto-installs Flutter + Android SDK and
+:: Gadir IPTV Player Android APK builder — auto-installs Flutter + Android SDK and
 :: compiles the APK on a fresh Windows machine without any prior setup.
 ::
 :: Usage: right-click → "Run as administrator".
-title GadirTV — Compilar APK Android
+title Gadir IPTV Player — Compilar APK Android
 
 :: Ensure UTF-8 output so accented characters render correctly.
 chcp 65001 >nul
@@ -21,7 +21,7 @@ cd /d "%~dp0"
 
 echo.
 echo ===============================================================
-echo   GadirTV Android APK Builder
+echo   Gadir IPTV Player Android APK Builder
 echo   Duracion estimada: 15-20 minutos (descarga inicial ~3 GB)
 echo ===============================================================
 echo.

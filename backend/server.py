@@ -22,7 +22,7 @@ async def xtream_get(action: str, username: str, password: str, extra: dict | No
     if extra:
         params.update(extra)
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-        r = await client.get(f"{XTREAM_HOST}/player_api.php", params=params, headers={"User-Agent": "GadirTV/1.0"})
+        r = await client.get(f"{XTREAM_HOST}/player_api.php", params=params, headers={"User-Agent": "GadirIPTVPlayer/1.0"})
         r.raise_for_status()
         try:
             return r.json()
@@ -31,7 +31,7 @@ async def xtream_get(action: str, username: str, password: str, extra: dict | No
 
 @app.get("/api/")
 async def root():
-    return {"service": "GadirTV proxy", "host": XTREAM_HOST}
+    return {"service": "Gadir IPTV Player proxy", "host": XTREAM_HOST}
 
 
 NO_CACHE_HEADERS = {
@@ -46,7 +46,7 @@ async def download_installer():
     path = "/app/electron/GadirTV-Setup-1.13.exe"
     if not os.path.exists(path):
         raise HTTPException(404, "installer not built yet")
-    return FileResponse(path, filename="GadirTV-Setup-1.13.exe", media_type="application/octet-stream", headers=NO_CACHE_HEADERS)
+    return FileResponse(path, filename="GadirIPTVPlayer-Setup-1.13.exe", media_type="application/octet-stream", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/api/download/installer_zip")
@@ -55,7 +55,7 @@ async def download_installer_zip():
     path = "/app/electron/GadirTV-Installer-v1.13.zip"
     if not os.path.exists(path):
         raise HTTPException(404, "installer zip not built yet")
-    return FileResponse(path, filename="GadirTV-Installer-v1.13.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
+    return FileResponse(path, filename="GadirIPTVPlayer-Installer-v1.13.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/api/download/portable")
@@ -63,7 +63,7 @@ async def download_portable():
     path = "/app/electron/GadirTV-Portable-v1.13.zip"
     if not os.path.exists(path):
         raise HTTPException(404, "portable zip not built yet")
-    return FileResponse(path, filename="GadirTV-Portable-v1.13.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
+    return FileResponse(path, filename="GadirIPTVPlayer-Portable-v1.13.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/api/download/encrypted")
@@ -73,7 +73,7 @@ async def download_encrypted():
     path = "/app/electron/GadirTV-Portable-v1.13-encrypted.zip"
     if not os.path.exists(path):
         raise HTTPException(404, "encrypted zip not built yet")
-    return FileResponse(path, filename="GadirTV-Portable-v1.13-encrypted.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
+    return FileResponse(path, filename="GadirIPTVPlayer-Portable-v1.13-encrypted.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/api/download/source")
@@ -82,7 +82,7 @@ async def download_source():
     path = "/app/electron/GadirTV-SourceCode-v1.13.zip"
     if not os.path.exists(path):
         raise HTTPException(404, "source zip not built yet")
-    return FileResponse(path, filename="GadirTV-SourceCode-v1.13.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
+    return FileResponse(path, filename="GadirIPTVPlayer-SourceCode-v1.13.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/api/download/docs")
@@ -91,7 +91,7 @@ async def download_docs():
     path = "/app/DOCUMENTATION.md"
     if not os.path.exists(path):
         raise HTTPException(404, "docs not found")
-    return FileResponse(path, filename="GadirTV-Documentation.md", media_type="text/markdown", headers=NO_CACHE_HEADERS)
+    return FileResponse(path, filename="GadirIPTVPlayer-Documentation.md", media_type="text/markdown", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/api/download/android-source")
@@ -103,7 +103,7 @@ async def download_android_source():
     path = "/app/electron/GadirTV-Android-Source-v0.1.zip"
     if not os.path.exists(path):
         raise HTTPException(404, "android source zip not built yet")
-    return FileResponse(path, filename="GadirTV-Android-Source-v0.1.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
+    return FileResponse(path, filename="GadirIPTVPlayer-Android-Source-v0.1.zip", media_type="application/zip", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/api/download/android-apk")
@@ -115,7 +115,7 @@ async def download_android_apk():
     path = "/app/electron/GadirTV-debug.apk"
     if not os.path.exists(path):
         raise HTTPException(404, "APK not built in this environment — use the workflow from /api/download/android-source")
-    return FileResponse(path, filename="GadirTV-debug.apk", media_type="application/vnd.android.package-archive", headers=NO_CACHE_HEADERS)
+    return FileResponse(path, filename="GadirIPTVPlayer-debug.apk", media_type="application/vnd.android.package-archive", headers=NO_CACHE_HEADERS)
 
 @app.post("/api/login")
 async def login(body: LoginBody):

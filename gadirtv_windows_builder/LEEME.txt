@@ -1,9 +1,9 @@
 ══════════════════════════════════════════════════════════
-  GadirTV Android — Compilador automatico para Windows
+  Gadir IPTV Player Android — Compilador automatico para Windows
 ══════════════════════════════════════════════════════════
 
 ¿QUE HACE ESTO?
-  Compila el APK de GadirTV Android en tu propio PC Windows,
+  Compila el APK de Gadir IPTV Player en tu propio PC Windows,
   sin necesidad de cuentas, GitHub, ni conocimientos tecnicos.
 
 ¿QUE NECESITAS?
@@ -14,13 +14,13 @@
 
 PASOS:
   1. Descomprime este ZIP en una carpeta con nombre corto,
-     por ejemplo C:\GadirTV\  (evita rutas largas con espacios).
+     por ejemplo C:\GadirIPTV\  (evita rutas largas con espacios).
   2. Haz clic DERECHO sobre "COMPILAR_APK.bat".
   3. Elige "Ejecutar como administrador".
   4. Cuando salga el aviso de Windows, dale a "Si".
   5. Espera. La ventana negra ira mostrando lo que hace.
   6. Al terminar, se abrira sola la carpeta con los APKs
-     en tu Escritorio ("GadirTV-APKs").
+     en tu Escritorio ("GadirIPTV-APKs").
 
 APKs QUE OBTENDRAS:
   app-arm64-v8a-release.apk        <- INSTALA ESTE en tu movil/TV Box moderno

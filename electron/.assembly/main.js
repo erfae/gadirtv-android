@@ -111,7 +111,7 @@ function createWindow() {
     titleBarStyle: 'hidden',
     backgroundColor: '#050505',
     icon: path.join(__dirname, 'icon.png'),
-    title: 'GadirTV',
+    title: 'Gadir IPTV Player',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
