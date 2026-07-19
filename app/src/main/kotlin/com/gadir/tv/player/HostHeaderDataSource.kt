@@ -19,7 +19,13 @@ class HostHeaderDataSource(
     override fun open(dataSpec: DataSpec): Long {
         val resolved = PanelHttp.resolve(dataSpec.uri.toString())
         val headers = LinkedHashMap(dataSpec.httpRequestHeaders)
-        resolved.hostHeader?.let { headers["Host"] = it }
+        val hostHeader = resolved.hostHeader ?: when (resolved.url) {
+            else -> {
+                val host = Uri.parse(resolved.url).host
+                if (host == PanelHttp.GADIR_IP) PanelHttp.GADIR_HOST else null
+            }
+        }
+        hostHeader?.let { headers["Host"] = it }
         val request = DataSpec.Builder()
             .setUri(Uri.parse(resolved.url))
             .setPosition(dataSpec.position)

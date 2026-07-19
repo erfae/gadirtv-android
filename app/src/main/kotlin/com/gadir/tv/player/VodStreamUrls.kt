@@ -22,7 +22,7 @@ object VodStreamUrls {
             }
         }
         urls.add(api.movieStreamUrlWithoutExtension(profile, streamId))
-        return urls.filter { it.isNotBlank() }
+        return urls.filter { it.isNotBlank() }.map { com.gadir.tv.util.NetworkUrlResolver.resolveUrl(it) }
     }
 
     fun seriesCandidates(
@@ -40,6 +40,6 @@ object VodStreamUrls {
             }
         }
         urls.add(api.seriesStreamUrlWithoutExtension(profile, episodeId))
-        return urls.filter { it.isNotBlank() }
+        return urls.filter { it.isNotBlank() }.map { com.gadir.tv.util.NetworkUrlResolver.resolveUrl(it) }
     }
 }

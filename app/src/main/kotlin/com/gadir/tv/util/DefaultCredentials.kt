@@ -5,7 +5,7 @@ import com.gadir.tv.model.Profile
 
 /** Credenciales por defecto para desarrollo / pruebas en TV Box. */
 object DefaultCredentials {
-    const val HOST = "http://gadir.co:80"
+    const val HOST = "http://51.91.120.175"
     const val USERNAME = "seismeses01"
     const val PASSWORD = "3d13zxs5oz"
     const val NAME = "RAFA"

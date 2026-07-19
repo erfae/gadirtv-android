@@ -106,6 +106,14 @@ object PlaylistRepository {
         vodCache.remove(categoryId)
     }
 
+    fun clearVodLoadFailed(categoryId: String) {
+        vodLoadFailed.remove(categoryId)
+    }
+
+    fun clearSeriesLoadFailed(categoryId: String) {
+        seriesLoadFailed.remove(categoryId)
+    }
+
     fun cachedSeries(categoryId: String): List<SeriesItem>? {
         if (categoryId in seriesLoadFailed) return null
         return seriesCache[categoryId]

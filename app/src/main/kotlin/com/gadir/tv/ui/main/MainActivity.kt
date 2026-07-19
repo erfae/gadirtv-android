@@ -3569,6 +3569,11 @@ class MainActivity : BaseLocaleActivity() {
 
         val profile = PlaylistRepository.profile ?: return
         val token = ++catalogLoadToken
+        when (tab) {
+            Tab.MOVIES -> PlaylistRepository.clearVodLoadFailed(categoryId)
+            Tab.SERIES -> PlaylistRepository.clearSeriesLoadFailed(categoryId)
+            else -> Unit
+        }
         val focusInGrid = isFocusInList(catalogGrid)
         catalogLoading.visibility = View.VISIBLE
         catalogEmpty.visibility = View.GONE
@@ -4288,11 +4293,6 @@ class MainActivity : BaseLocaleActivity() {
     private fun startPreviewPlayback(channel: LiveChannel, token: Int, profile: Profile) {
         if (token != previewToken || livePreviewPaused) return
         updatePreviewInfo(channel)
-        if (DeviceUi.isTvUi(this)) {
-            cancelMiniPreviewPlayback()
-            setPreviewVideoVisible(false)
-            return
-        }
         if (!appSettings.autoplayPreview) {
             cancelMiniPreviewPlayback()
             setPreviewVideoVisible(false)
@@ -4663,7 +4663,7 @@ class MainActivity : BaseLocaleActivity() {
         miniExoView = panel.findViewById(R.id.miniExoPlayer)
         miniVlcView = panel.findViewById(R.id.miniVlcPlayer)
         previewUsesExo = when {
-            DeviceUi.isTvUi(this) -> false
+            DeviceUi.isTvUi(this) && miniExoView != null -> true
             DeviceUi.isCompact(this) && miniExoView != null -> true
             miniVlcView != null -> false
             else -> miniExoView != null

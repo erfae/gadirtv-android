@@ -91,37 +91,50 @@ object HomeLoader {
 }
 
 object CatalogPreloader {
-    private const val MAX_PARALLEL = 5
-    private const val MAX_RETRIES = 2
+    private const val MAX_PARALLEL = 4
+    private const val MAX_RETRIES = 3
+    private const val INITIAL_PREFETCH = 16
 
     suspend fun preloadRemaining(
         api: XtreamApi,
         profile: Profile,
         onCategory: ((String) -> Unit)? = null,
     ) = withContext(Dispatchers.IO) {
+        prefetchInitial(api, profile, INITIAL_PREFETCH, onCategory)
+    }
+
+    suspend fun prefetchInitial(
+        api: XtreamApi,
+        profile: Profile,
+        maxCategories: Int = INITIAL_PREFETCH,
+        onCategory: ((String) -> Unit)? = null,
+    ) = withContext(Dispatchers.IO) {
         coroutineScope {
             val semaphore = Semaphore(MAX_PARALLEL)
-            val vodJobs = PlaylistRepository.vodCategories
+            val vodTargets = PlaylistRepository.vodCategories
+                .filter { !CategorySort.isAdultCategory(it.name) }
                 .filter { PlaylistRepository.cachedVod(it.id) == null }
-                .map { category ->
-                    async {
-                        semaphore.withPermit {
-                            onCategory?.invoke(category.name)
-                            loadVodCategory(api, profile, category.id)
-                        }
-                    }
-                }
-            val seriesJobs = PlaylistRepository.seriesCategories
+                .take(maxCategories)
+            val seriesTargets = PlaylistRepository.seriesCategories
+                .filter { !CategorySort.isAdultCategory(it.name) }
                 .filter { PlaylistRepository.cachedSeries(it.id) == null }
-                .map { category ->
-                    async {
-                        semaphore.withPermit {
-                            onCategory?.invoke(category.name)
-                            loadSeriesCategory(api, profile, category.id)
-                        }
+                .take(maxCategories)
+            val jobs = vodTargets.map { category ->
+                async {
+                    semaphore.withPermit {
+                        onCategory?.invoke(category.name)
+                        loadVodCategory(api, profile, category.id)
                     }
                 }
-            awaitAll(*(vodJobs + seriesJobs).toTypedArray())
+            } + seriesTargets.map { category ->
+                async {
+                    semaphore.withPermit {
+                        onCategory?.invoke(category.name)
+                        loadSeriesCategory(api, profile, category.id)
+                    }
+                }
+            }
+            awaitAll(*jobs.toTypedArray())
         }
     }
 
@@ -132,7 +145,7 @@ object CatalogPreloader {
                 PlaylistRepository.cacheVod(categoryId, movies)
                 return
             }
-            if (attempt < MAX_RETRIES - 1) Thread.sleep(600L)
+            if (attempt < MAX_RETRIES - 1) Thread.sleep(800L * (attempt + 1))
         }
     }
 
@@ -143,7 +156,7 @@ object CatalogPreloader {
                 PlaylistRepository.cacheSeries(categoryId, series)
                 return
             }
-            if (attempt < MAX_RETRIES - 1) Thread.sleep(600L)
+            if (attempt < MAX_RETRIES - 1) Thread.sleep(800L * (attempt + 1))
         }
     }
 }

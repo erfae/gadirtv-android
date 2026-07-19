@@ -3,6 +3,7 @@ package com.gadir.tv.data
 import android.content.Context
 import com.gadir.tv.model.LoginDraft
 import com.gadir.tv.model.Profile
+import com.gadir.tv.net.PanelHttp
 import com.gadir.tv.util.DefaultCredentials
 import com.gadir.tv.util.HostUtils
 import com.google.gson.Gson
@@ -122,11 +123,12 @@ class ProfileStore(context: Context) {
 
     private fun migrateHost(host: String): String {
         val normalized = HostUtils.baseUrl(host)
-        return if (normalized.contains("derektv.vip", ignoreCase = true)) {
-            DefaultCredentials.HOST
-        } else {
-            normalized
+        val migrated = when {
+            normalized.contains("derektv.vip", ignoreCase = true) -> DefaultCredentials.HOST
+            normalized.contains(PanelHttp.GADIR_HOST, ignoreCase = true) -> DefaultCredentials.HOST
+            else -> normalized
         }
+        return PanelHttp.migrateProfileHost(migrated)
     }
 
     companion object {

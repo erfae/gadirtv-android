@@ -3,7 +3,9 @@ package com.gadir.tv.net
 import android.util.Log
 import okhttp3.ConnectionSpec
 import okhttp3.Dns
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.URI
@@ -12,18 +14,19 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Shared HTTP layer for panel requests (API, images, streams).
- * Caches working IP per hostname so Glide/Exo/VLC all hit the same target as [NativeHttpClient].
+ * Rewrites panel hostnames to IP so redirects never land on DNS-blocked hostnames on TV boxes.
  */
 object PanelHttp {
     private const val TAG = "GadirIPTV-PanelHttp"
+    private const val MAX_REDIRECTS = 6
 
-    /** Known IP for gadir.co when DNS fails on TV boxes. */
     const val GADIR_IP = "51.91.120.175"
+    const val GADIR_HOST = "gadir.co"
 
     private val knownIps = ConcurrentHashMap<String, String>()
 
     init {
-        knownIps["gadir.co"] = GADIR_IP
+        knownIps[GADIR_HOST] = GADIR_IP
     }
 
     data class Resolved(
@@ -37,10 +40,28 @@ object PanelHttp {
         val label: String,
     )
 
+    fun panelIpFor(hostname: String): String? = knownIps[hostname.lowercase()]
+
     fun rememberWorkingIp(hostname: String, ip: String) {
         if (hostname.isBlank() || ip.isBlank()) return
         knownIps[hostname.lowercase()] = ip
         Log.i(TAG, "Cached IP for $hostname -> $ip")
+    }
+
+    /** Store profile host as direct IP (Host header still sent when needed). */
+    fun migrateProfileHost(host: String): String {
+        val normalized = com.gadir.tv.util.HostUtils.baseUrl(host)
+        return try {
+            val uri = URI(normalized)
+            val hostname = uri.host ?: return normalized
+            if (hostname.matches(Regex("^\\d{1,3}(\\.\\d{1,3}){3}$"))) return normalized
+            val ip = knownIps[hostname.lowercase()] ?: return normalized
+            val scheme = uri.scheme ?: "http"
+            val portSuffix = portSuffix(uri)
+            "$scheme://$ip$portSuffix"
+        } catch (_: Exception) {
+            normalized
+        }
     }
 
     fun resolve(rawUrl: String): Resolved {
@@ -115,16 +136,42 @@ object PanelHttp {
         return ":$port"
     }
 
+    private val resolveInterceptor = Interceptor { chain ->
+        val original = chain.request()
+        val resolved = resolve(original.url.toString())
+        val builder = original.newBuilder().url(resolved.url)
+        resolved.hostHeader?.let { builder.header("Host", it) }
+        chain.proceed(builder.build())
+    }
+
+    private val redirectInterceptor = Interceptor { chain ->
+        var request = chain.request()
+        var response = chain.proceed(request)
+        var hops = 0
+        while (response.code in 301..308 && hops < MAX_REDIRECTS) {
+            val location = response.header("Location")?.trim().orEmpty()
+            if (location.isEmpty()) break
+            val rewritten = resolve(location)
+            response.close()
+            val builder = request.newBuilder().url(rewritten.url)
+            rewritten.hostHeader?.let { builder.header("Host", it) }
+            request = builder.build()
+            response = chain.proceed(request)
+            hops++
+        }
+        response
+    }
+
     private val ipv4PreferredDns = object : Dns {
         override fun lookup(hostname: String): List<InetAddress> {
+            knownIps[hostname.lowercase()]?.let { ip ->
+                return listOf(InetAddress.getByName(ip))
+            }
             return try {
                 val resolved = Dns.SYSTEM.lookup(hostname)
                 val v4 = resolved.filterIsInstance<Inet4Address>()
                 if (v4.isNotEmpty()) v4 else resolved
             } catch (e: Exception) {
-                knownIps[hostname.lowercase()]?.let { ip ->
-                    return listOf(InetAddress.getByName(ip))
-                }
                 Log.w(TAG, "DNS failed for $hostname: ${e.message}")
                 emptyList()
             }
@@ -137,12 +184,14 @@ object PanelHttp {
             .connectTimeout(25, TimeUnit.SECONDS)
             .readTimeout(35, TimeUnit.SECONDS)
             .writeTimeout(25, TimeUnit.SECONDS)
-            .followRedirects(true)
-            .followSslRedirects(true)
+            .followRedirects(false)
+            .followSslRedirects(false)
             .retryOnConnectionFailure(true)
             .connectionSpecs(
                 listOf(ConnectionSpec.CLEARTEXT, ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS),
             )
+            .addInterceptor(resolveInterceptor)
+            .addInterceptor(redirectInterceptor)
             .build()
     }
 }

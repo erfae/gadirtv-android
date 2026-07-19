@@ -376,11 +376,20 @@ class XtreamApi(
     fun streamUrl(profile: Profile, streamId: Int, ext: String = "ts"): String =
         buildStreamUrl(profile, "live", streamId, ext)
 
-    fun streamUrlWithoutExtension(profile: Profile, streamId: Int): String {
+    fun streamUrlWithoutExtension(profile: Profile, streamId: Int): String =
+        liveStreamUrlDirect(profile, streamId)
+
+    /** Short live URL — avoids 301 redirect to gadir.co hostname (breaks on TV DNS). */
+    fun liveStreamUrlDirect(profile: Profile, streamId: Int, ext: String? = null): String {
         val host = HostUtils.baseUrl(profile.host)
         val u = encode(profile.username)
         val pw = encode(profile.password)
-        return NetworkUrlResolver.resolveUrl("$host/live/$u/$pw/$streamId")
+        val path = if (ext.isNullOrBlank()) {
+            "$host/$u/$pw/$streamId"
+        } else {
+            "$host/$u/$pw/$streamId.$ext"
+        }
+        return NetworkUrlResolver.resolveUrl(path)
     }
 
     fun movieStreamUrl(profile: Profile, streamId: Int, ext: String = "mp4"): String =
@@ -540,6 +549,9 @@ class XtreamApi(
     }
 
     private fun buildStreamUrl(profile: Profile, kind: String, streamId: Int, ext: String): String {
+        if (kind == "live") {
+            return liveStreamUrlDirect(profile, streamId, ext)
+        }
         val host = HostUtils.baseUrl(profile.host)
         val u = encode(profile.username)
         val pw = encode(profile.password)
@@ -571,23 +583,34 @@ class XtreamApi(
             }
         }
         val url = "$host/player_api.php?$query"
-        repeat(3) { attempt ->
-            val response = NativeHttpClient.request(url, activeUserAgent)
-            if (response.status == 200 && response.body.isNotBlank()) {
-                return try {
-                    val el = gson.fromJson(response.body, JsonElement::class.java)
-                    when {
-                        el == null || el.isJsonNull -> emptyList()
-                        el.isJsonArray -> el.asJsonArray.mapNotNull { it.asJsonObjectOrNull() }
-                        else -> emptyList()
-                    }
-                } catch (_: Exception) {
-                    emptyList()
+        val agents = linkedSetOf(activeUserAgent)
+        agents.addAll(userAgents)
+        for (ua in agents) {
+            repeat(3) { attempt ->
+                val get = NativeHttpClient.request(url, ua, "GET")
+                parseListBody(get)?.let { return it }
+                if (get.status == 512 || get.status == 403 || get.status == 405) {
+                    val post = NativeHttpClient.request(url, ua, "POST")
+                    parseListBody(post)?.let { return it }
                 }
+                if (attempt < 2) Thread.sleep(700L * (attempt + 1))
             }
-            if (attempt < 2) Thread.sleep(500L * (attempt + 1))
         }
         return emptyList()
+    }
+
+    private fun parseListBody(response: com.gadir.tv.net.HttpResult): List<JsonObject>? {
+        if (response.status != 200 || response.body.isBlank()) return null
+        return try {
+            val el = gson.fromJson(response.body, JsonElement::class.java)
+            when {
+                el == null || el.isJsonNull -> emptyList()
+                el.isJsonArray -> el.asJsonArray.mapNotNull { it.asJsonObjectOrNull() }
+                else -> null
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun loginSuccess(ua: String, body: String): LoginResult {

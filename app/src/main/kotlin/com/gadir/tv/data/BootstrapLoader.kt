@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
 object BootstrapLoader {
-    private const val BOOTSTRAP_HOME_TIMEOUT_MS = 12_000L
+    private const val BOOTSTRAP_HOME_TIMEOUT_MS = 20_000L
     private const val HOME_ITEM_LIMIT = 24
 
     suspend fun load(
@@ -24,36 +24,37 @@ object BootstrapLoader {
     ) = withContext(Dispatchers.IO) {
         coroutineScope {
             ContentPreloader.cancelBackgroundPreload()
-            PlaylistRepository.setProfile(profile)
+            val migratedProfile = profile.copy(host = com.gadir.tv.net.PanelHttp.migrateProfileHost(profile.host))
+            PlaylistRepository.setProfile(migratedProfile)
             PlaylistRepository.clearContentCache()
 
             onProgress?.invoke(context.getString(R.string.loading_playlist))
 
-            val login = api.login(profile)
+            val login = api.login(migratedProfile)
             if (!login.ok) {
                 throw IllegalStateException(login.error ?: context.getString(R.string.connection_failed))
             }
             PlaylistRepository.userAgent = api.activeUserAgent
 
             onProgress?.invoke(context.getString(R.string.bootstrap_live))
-            val liveCategories = async { api.liveCategories(profile) }
-            val liveStreams = async { api.liveStreams(profile) }
-            val vodCategories = async { api.vodCategories(profile) }
-            val seriesCategories = async { api.seriesCategories(profile) }
+            val liveCategories = async { api.liveCategories(migratedProfile) }
+            val liveStreams = async { api.liveStreams(migratedProfile) }
+            val vodCategories = async { api.vodCategories(migratedProfile) }
+            val seriesCategories = async { api.seriesCategories(migratedProfile) }
 
             PlaylistRepository.updateCatalog(liveCategories.await(), liveStreams.await())
             PlaylistRepository.updateVodCategories(vodCategories.await())
             PlaylistRepository.updateSeriesCategories(seriesCategories.await())
 
             onProgress?.invoke(context.getString(R.string.bootstrap_catalog))
-            CatalogPreloader.preloadRemaining(api, profile) { categoryName ->
+            CatalogPreloader.prefetchInitial(api, migratedProfile) { categoryName ->
                 onProgress?.invoke(context.getString(R.string.bootstrap_loading_group, categoryName))
             }
 
             PlaylistRepository.markBootstrapReady()
 
             onProgress?.invoke(context.getString(R.string.bootstrap_home))
-            val (movies, series) = loadHomeQuick(api, profile)
+            val (movies, series) = loadHomeQuick(api, migratedProfile)
             PlaylistRepository.setHomeRecent(movies, series)
         }
     }
@@ -80,25 +81,23 @@ object BootstrapLoader {
     }
 
     private fun loadRecentMovies(api: XtreamApi, profile: Profile): List<VodMovie> {
-        val all = api.vodStreams(profile, null)
-        if (all.isNotEmpty()) return all
-        return PlaylistRepository.vodCategories
-            .filter { !CategorySort.isAdultCategory(it.name) }
-            .flatMap { category ->
-                runCatching { api.vodStreams(profile, category.id) }.getOrDefault(emptyList())
-                    .also { movies -> if (movies.isNotEmpty()) PlaylistRepository.cacheVod(category.id, movies) }
-            }
+        PlaylistRepository.allCachedVod().takeIf { it.isNotEmpty() }?.let { return it }
+        val first = PlaylistRepository.vodCategories
+            .firstOrNull { !CategorySort.isAdultCategory(it.name) }
+            ?: return emptyList()
+        return runCatching { api.vodStreams(profile, first.id) }
+            .getOrDefault(emptyList())
+            .also { movies -> if (movies.isNotEmpty()) PlaylistRepository.cacheVod(first.id, movies) }
     }
 
     private fun loadRecentSeries(api: XtreamApi, profile: Profile): List<SeriesItem> {
-        val all = api.seriesList(profile, null)
-        if (all.isNotEmpty()) return all
-        return PlaylistRepository.seriesCategories
-            .filter { !CategorySort.isAdultCategory(it.name) }
-            .flatMap { category ->
-                runCatching { api.seriesList(profile, category.id) }.getOrDefault(emptyList())
-                    .also { series -> if (series.isNotEmpty()) PlaylistRepository.cacheSeries(category.id, series) }
-            }
+        PlaylistRepository.allCachedSeries().takeIf { it.isNotEmpty() }?.let { return it }
+        val first = PlaylistRepository.seriesCategories
+            .firstOrNull { !CategorySort.isAdultCategory(it.name) }
+            ?: return emptyList()
+        return runCatching { api.seriesList(profile, first.id) }
+            .getOrDefault(emptyList())
+            .also { series -> if (series.isNotEmpty()) PlaylistRepository.cacheSeries(first.id, series) }
     }
 
     private fun filterRecentMovies(movies: List<VodMovie>): List<VodMovie> {
