@@ -8,6 +8,10 @@ object ParentalSession {
         unlocked.add(key)
     }
 
+    fun lock(key: String) {
+        unlocked.remove(key)
+    }
+
     fun isUnlocked(key: String): Boolean = key in unlocked
 
     fun clear() {

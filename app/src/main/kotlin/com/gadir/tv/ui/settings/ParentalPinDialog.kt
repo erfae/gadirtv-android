@@ -18,6 +18,7 @@ object ParentalPinDialog {
         context: Context,
         message: String,
         onVerified: () -> Unit,
+        onCancelled: (() -> Unit)? = null,
     ) {
         val activity = context as? AppCompatActivity
         if (activity != null && (activity.isFinishing || activity.isDestroyed)) return
@@ -31,10 +32,11 @@ object ParentalPinDialog {
         val dialog = MaterialAlertDialogBuilder(context)
             .setTitle(R.string.parental_pin_title)
             .setView(view)
-            .setNegativeButton(R.string.parental_pin_cancel, null)
+            .setNegativeButton(R.string.parental_pin_cancel) { _, _ -> onCancelled?.invoke() }
             .setPositiveButton(R.string.parental_pin_unlock, null)
             .create()
 
+        dialog.setOnCancelListener { onCancelled?.invoke() }
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val pin = input.text?.toString()?.trim().orEmpty()

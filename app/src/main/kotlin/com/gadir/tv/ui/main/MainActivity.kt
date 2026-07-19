@@ -643,7 +643,12 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun applyLiveCategoryClick(cat: Category, enterContent: Boolean = false) {
+        val categoryId = liveCategoryId(cat)
         if (!enterContent) {
+            if (parentalStore.requiresPinForLiveCategory(categoryId)) {
+                showLiveBlockedCategory(cat)
+                return
+            }
             showLiveCategoryChannels(
                 cat,
                 enterContent = false,
@@ -652,7 +657,7 @@ class MainActivity : BaseLocaleActivity() {
             )
             return
         }
-        withLiveCategoryAccess(cat, liveCategoryId(cat)) {
+        withLiveCategoryAccess(cat, categoryId) {
             enterLiveContent(cat)
         }
     }
@@ -712,6 +717,10 @@ class MainActivity : BaseLocaleActivity() {
         refreshCategories: Boolean = true,
     ) {
         val newId = liveCategoryId(cat)
+        if (!enterContent && parentalStore.requiresPinForLiveCategory(newId)) {
+            showLiveBlockedCategory(cat)
+            return
+        }
         val newIndex = liveCategories.indexOfFirst { liveCategoryId(it) == newId }
         if (newIndex >= 0) liveCategoryFocusIndex = newIndex
 
@@ -770,7 +779,15 @@ class MainActivity : BaseLocaleActivity() {
     private fun exitLiveContentToGroup() {
         if (!liveTabReady || liveBrowseLevel != TvBrowseNav.Level.CONTENT) return
         val index = liveCategoryFocusIndex.coerceIn(0, (liveCategories.size - 1).coerceAtLeast(0))
+        val cat = liveCategories.getOrNull(index)
+        val categoryId = selectedLiveCategoryId ?: cat?.let { liveCategoryId(it) }
+        relockLiveCategory(categoryId)
+        selectedLiveCategoryId = null
+        liveChannelsLoaded = false
         applyLivePanelFocusMode(inContent = false)
+        if (cat != null && parentalStore.requiresPinForLiveCategory(categoryId)) {
+            showLiveBlockedCategory(cat)
+        }
         liveCategoryList.post {
             if (currentTab != Tab.LIVE) return@post
             TvBrowseNav.focusGroup(liveCategoryList, index)
@@ -781,7 +798,16 @@ class MainActivity : BaseLocaleActivity() {
     private fun exitCatalogContentToGroup() {
         if (catalogBrowseLevel != TvBrowseNav.Level.CONTENT) return
         val index = catalogCategoryFocusIndex.coerceIn(0, (catalogCategories.size - 1).coerceAtLeast(0))
+        val cat = catalogCategories.getOrNull(index)
+        val categoryId = selectedCatalogCategoryId ?: cat?.id
+        if (cat != null && categoryId != null) {
+            relockCatalogCategory(currentTab, categoryId)
+        }
+        selectedCatalogCategoryId = null
         applyCatalogPanelFocusMode(currentTab, inContent = false)
+        if (cat != null && catalogCategoryRequiresPin(currentTab, cat.id)) {
+            showCatalogBlockedCategory(currentTab, cat)
+        }
         catalogCategoryList.post {
             if (currentTab != Tab.MOVIES && currentTab != Tab.SERIES) return@post
             TvBrowseNav.focusGroup(catalogCategoryList, index)
@@ -1081,6 +1107,10 @@ class MainActivity : BaseLocaleActivity() {
                 val newId = liveCategoryId(cat)
                 val idx = liveCategories.indexOfFirst { liveCategoryId(it) == newId }
                 if (idx >= 0) liveCategoryFocusIndex = idx
+                if (parentalStore.requiresPinForLiveCategory(newId)) {
+                    showLiveBlockedCategory(cat)
+                    return@CategoryAdapter
+                }
                 if (liveBrowsingCategoryId == newId && channels.isNotEmpty()) return@CategoryAdapter
                 showLiveCategoryChannels(
                     cat,
@@ -1392,6 +1422,10 @@ class MainActivity : BaseLocaleActivity() {
             withCatalogCategoryAccess(tab, cat) {
                 enterCatalogContent(tab, cat)
             }
+            return
+        }
+        if (catalogCategoryRequiresPin(tab, cat.id)) {
+            showCatalogBlockedCategory(tab, cat)
             return
         }
         val catId = cat.id
@@ -3281,6 +3315,10 @@ class MainActivity : BaseLocaleActivity() {
                 if (catalogBrowseLevel == TvBrowseNav.Level.CONTENT) return@CategoryAdapter
                 val idx = catalogCategories.indexOfFirst { it.id == cat.id }
                 if (idx >= 0) catalogCategoryFocusIndex = idx
+                if (catalogCategoryRequiresPin(tab, cat.id)) {
+                    showCatalogBlockedCategory(tab, cat)
+                    return@CategoryAdapter
+                }
                 if (catalogBrowsingCategoryId == cat.id && posterItems.isNotEmpty()) return@CategoryAdapter
                 browseCatalogCategory(tab, cat, enterContent = false)
                 scheduleCatalogPrefetch(tab, cat.id)
@@ -3597,6 +3635,78 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun catalogCategoryRequiresPin(tab: Tab, categoryId: String): Boolean = when (tab) {
+        Tab.MOVIES -> parentalStore.requiresPinForVodCategory(categoryId)
+        Tab.SERIES -> parentalStore.requiresPinForSeriesCategory(categoryId)
+        else -> false
+    }
+
+    private fun relockLiveCategory(categoryId: String?) {
+        if (categoryId.isNullOrEmpty()) return
+        if (categoryId == ParentalControlStore.LOCK_CATEGORY_ID) {
+            if (parentalStore.hasLockedChannels()) {
+                ParentalSession.lock(ParentalSession.liveCategoryKey(categoryId))
+            }
+            return
+        }
+        if (parentalStore.isLiveGroupBlocked(categoryId)) {
+            ParentalSession.lock(ParentalSession.liveCategoryKey(categoryId))
+        }
+    }
+
+    private fun relockCatalogCategory(tab: Tab, categoryId: String) {
+        if (categoryId.isBlank()) return
+        val blocked = when (tab) {
+            Tab.MOVIES -> parentalStore.isVodGroupBlocked(categoryId)
+            Tab.SERIES -> parentalStore.isSeriesGroupBlocked(categoryId)
+            else -> false
+        }
+        if (!blocked) return
+        val key = when (tab) {
+            Tab.MOVIES -> ParentalSession.vodCategoryKey(categoryId)
+            Tab.SERIES -> ParentalSession.seriesCategoryKey(categoryId)
+            else -> return
+        }
+        ParentalSession.lock(key)
+    }
+
+    private fun showLiveBlockedCategory(cat: Category) {
+        val newId = liveCategoryId(cat)
+        val previousId = liveBrowsingCategoryId
+        liveBrowsingCategoryId = newId
+        val idx = liveCategories.indexOfFirst { liveCategoryId(it) == newId }
+        if (idx >= 0) liveCategoryFocusIndex = idx
+        refreshLiveCategoryHighlight(previousId, newId)
+        clearLiveGroupPreview()
+        previewTitle.text = getString(R.string.parental_pin_message, cat.name)
+    }
+
+    private fun clearLiveGroupPreview() {
+        channels.clear()
+        channelAdapter?.notifyDataSetChanged()
+        channelList.visibility = View.INVISIBLE
+        pauseLivePreviewPlayback()
+        epgNow.text = ""
+        epgNext.visibility = View.GONE
+        previewLogo.visibility = View.GONE
+        setPreviewVideoVisible(false)
+    }
+
+    private fun showCatalogBlockedCategory(tab: Tab, cat: Category) {
+        val previousId = catalogBrowsingCategoryId
+        catalogBrowsingCategoryId = cat.id
+        selectedCatalogCategoryId = null
+        catalogEnterContentOnLoad = false
+        refreshCatalogCategoryHighlight(previousId, cat.id)
+        applyCatalogPanelFocusMode(tab, inContent = false)
+        posterItems.clear()
+        catalogGrid.adapter?.notifyDataSetChanged()
+        catalogGrid.visibility = View.INVISIBLE
+        catalogLoading.visibility = View.GONE
+        catalogEmpty.visibility = View.VISIBLE
+        catalogEmpty.text = getString(R.string.parental_pin_message, cat.name)
+    }
+
     private fun withLiveCategoryAccess(category: Category, categoryId: String?, action: () -> Unit) {
         if (!parentalStore.requiresPinForLiveCategory(categoryId)) {
             action()
@@ -3609,6 +3719,9 @@ class MainActivity : BaseLocaleActivity() {
             onVerified = {
                 if (catKey.isNotEmpty()) ParentalSession.unlock(catKey)
                 action()
+            },
+            onCancelled = {
+                showLiveBlockedCategory(category)
             },
         )
     }
@@ -3694,6 +3807,9 @@ class MainActivity : BaseLocaleActivity() {
             onVerified = {
                 ParentalSession.unlock(key)
                 action()
+            },
+            onCancelled = {
+                showCatalogBlockedCategory(tab, category)
             },
         )
     }
