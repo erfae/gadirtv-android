@@ -479,8 +479,9 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun configureHeroLayout() {
         val metrics = resources.displayMetrics
+        val tvUi = DeviceUi.isTvUi(this)
         val heroHeight = when {
-            DeviceUi.useDpadFocus(this) ->
+            tvUi ->
                 (metrics.heightPixels * 0.28f).toInt().coerceIn(dp(165), dp(220))
             DeviceUi.isCompact(this) ->
                 (metrics.heightPixels * 0.40f).toInt().coerceIn(dp(220), dp(320))
@@ -492,17 +493,31 @@ class MainActivity : BaseLocaleActivity() {
         heroImage.layoutParams = heroImage.layoutParams.apply {
             height = ViewGroup.LayoutParams.MATCH_PARENT
         }
-        if (!DeviceUi.useDpadFocus(this)) {
+        if (!tvUi) {
             headerDate.visibility = View.GONE
         } else {
             configureHeroPosterLayout()
             configureHomeRailsForTv()
-            heroPlay.minHeight = dp(52)
-            heroPlay.minimumHeight = dp(52)
-            heroPlay.minWidth = dp(200)
-            heroPlay.setPadding(dp(28), heroPlay.paddingTop, dp(28), heroPlay.paddingBottom)
-            heroPlay.textSize = 16f
-            heroPlay.elevation = dp(4).toFloat()
+            styleHeroPlayButton()
+        }
+    }
+
+    private fun styleHeroPlayButton() {
+        heroPlay.setBackgroundResource(R.drawable.btn_play_hero)
+        heroPlay.setTextColor(androidx.core.content.ContextCompat.getColorStateList(this, R.color.hero_play_text))
+        val height = dp(56)
+        heroPlay.minHeight = height
+        heroPlay.minimumHeight = height
+        heroPlay.minWidth = dp(220)
+        heroPlay.setPadding(dp(32), dp(14), dp(32), dp(14))
+        heroPlay.textSize = 17f
+        heroPlay.elevation = dp(6).toFloat()
+        heroPlay.letterSpacing = 0.05f
+        heroPlay.layoutParams = heroPlay.layoutParams.apply {
+            this.height = height
+            if (this is ViewGroup.MarginLayoutParams) {
+                width = ViewGroup.LayoutParams.WRAP_CONTENT
+            }
         }
     }
 
@@ -630,20 +645,27 @@ class MainActivity : BaseLocaleActivity() {
         if (enterContent && newId == liveBrowsingCategoryId && channels.isNotEmpty()) {
             selectedLiveCategoryId = newId
             liveBrowsingCategoryId = null
-            prepareLiveContentFocusState()
             enterLiveContentFocus()
             return
         }
         showLiveCategoryChannels(cat, enterContent)
     }
 
-    /** Must run before channel list layout/notify so OK does not jump to the header (lupa). */
-    private fun prepareLiveContentFocusState() {
+    /** Header off + channel list ready. Category list stays focusable until a channel is focused. */
+    private fun beginLiveContentTransition() {
         setHeaderButtonsFocusable(false)
-        liveChannelsLoaded = true
         channelList.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+    }
+
+    private fun finalizeLiveContentTransition() {
+        liveChannelsLoaded = true
+        liveBrowsingCategoryId = null
         liveCategoryList.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         updateLiveCategoryFocusLock()
+        highlightLiveCategory(selectedLiveCategoryId)
+        setHeaderButtonsFocusable(true)
+        updateHeaderDownFocus()
+        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
     }
 
     private fun showLiveCategoryChannels(cat: Category, enterContent: Boolean) {
@@ -667,7 +689,7 @@ class MainActivity : BaseLocaleActivity() {
             selectedLiveCategoryId = newId
             liveBrowsingCategoryId = null
             liveEnterContentOnLoad = false
-            prepareLiveContentFocusState()
+            beginLiveContentTransition()
         } else {
             channelList.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             liveCategoryList.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
@@ -897,16 +919,13 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun enterLiveContentFocus() {
         if (channels.isEmpty()) return
-        prepareLiveContentFocusState()
-        liveBrowsingCategoryId = null
+        beginLiveContentTransition()
+        clearLiveCategoryFocusRing()
         channelList.visibility = View.VISIBLE
         channelList.post {
             channelList.scrollToPosition(0)
             TvNavHelper.focusContentItem(channelList, 0) {
-                highlightLiveCategory(selectedLiveCategoryId)
-                setHeaderButtonsFocusable(true)
-                updateHeaderDownFocus()
-                (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
+                finalizeLiveContentTransition()
             }
         }
     }
@@ -1110,7 +1129,6 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun clearLiveCategoryFocusRing() {
         liveCategoryList.focusedChild?.clearFocus()
-        (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
     }
 
     private fun focusedLiveCategoryIndex(): Int {
@@ -1350,28 +1368,36 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun enterCatalogContentFocus(tab: Tab) {
         if (posterItems.isEmpty()) return
-        prepareCatalogContentFocusState(tab)
-        catalogBrowsingCategoryId = null
+        beginCatalogContentTransition(tab)
+        catalogCategoryList.focusedChild?.clearFocus()
         catalogGrid.post {
             TvNavHelper.focusContentItem(catalogGrid, 0) {
-                highlightCatalogCategory(tab, selectedCatalogCategoryId.orEmpty())
-                setHeaderButtonsFocusable(true)
-                updateHeaderDownFocus()
-                catalogCategoryAdapter?.refreshSelection()
+                finalizeCatalogContentTransition(tab)
             }
         }
     }
 
-    private fun prepareCatalogContentFocusState(tab: Tab) {
+    private fun beginCatalogContentTransition(tab: Tab) {
         setHeaderButtonsFocusable(false)
+        catalogGrid.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+        if (!isCatalogCategoryNavigationLocked(tab)) {
+            catalogCategoryList.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+        }
+    }
+
+    private fun finalizeCatalogContentTransition(tab: Tab) {
         when (tab) {
             Tab.MOVIES -> moviesGroupLoaded = true
             Tab.SERIES -> seriesGroupLoaded = true
             else -> Unit
         }
-        catalogGrid.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+        catalogBrowsingCategoryId = null
         catalogCategoryList.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         updateCatalogCategoryFocusLock(tab)
+        highlightCatalogCategory(tab, selectedCatalogCategoryId.orEmpty())
+        setHeaderButtonsFocusable(true)
+        updateHeaderDownFocus()
+        catalogCategoryAdapter?.refreshSelection()
     }
 
     private fun selectCatalogGroup(tab: Tab, cat: Category, enterContent: Boolean) {
@@ -1403,39 +1429,31 @@ class MainActivity : BaseLocaleActivity() {
 
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
-            val pending = catalogCategories.filter { cat ->
-                cat.id != ResumeStore.RESUME_CATEGORY_ID && !catalogCategoryCounts.containsKey(cat.id)
-            }
-            if (pending.isEmpty()) return@launch
-
-            val semaphore = Semaphore(6)
-            coroutineScope {
-                pending.map { cat ->
-                    async(Dispatchers.IO) {
-                        semaphore.withPermit {
-                            try {
-                                val size = when (tab) {
-                                    Tab.MOVIES -> {
-                                        val movies = api.vodStreams(profile, cat.id)
-                                        PlaylistRepository.cacheVod(cat.id, movies)
-                                        movies.size
-                                    }
-                                    Tab.SERIES -> {
-                                        val series = api.seriesList(profile, cat.id)
-                                        PlaylistRepository.cacheSeries(cat.id, series)
-                                        series.size
-                                    }
-                                    else -> 0
-                                }
-                                cat.id to size
-                            } catch (_: Exception) {
-                                null
+            val counts = withContext(Dispatchers.IO) {
+                try {
+                    when (tab) {
+                        Tab.MOVIES -> {
+                            val movies = api.vodStreams(profile, categoryId = null)
+                            movies.groupBy { it.categoryId }.forEach { (catId, items) ->
+                                PlaylistRepository.cacheVod(catId, items)
                             }
+                            movies.groupBy { it.categoryId }.mapValues { it.value.size }
                         }
+                        Tab.SERIES -> {
+                            val series = api.seriesList(profile, categoryId = null)
+                            series.groupBy { it.categoryId }.forEach { (catId, items) ->
+                                PlaylistRepository.cacheSeries(catId, items)
+                            }
+                            series.groupBy { it.categoryId }.mapValues { it.value.size }
+                        }
+                        else -> emptyMap()
                     }
-                }.awaitAll().filterNotNull().forEach { (catId, size) ->
-                    catalogCategoryCounts[catId] = size
+                } catch (_: Exception) {
+                    emptyMap()
                 }
+            }
+            counts.forEach { (catId, size) ->
+                if (catId.isNotBlank()) catalogCategoryCounts[catId] = size
             }
             if (currentTab == tab) catalogCategoryAdapter?.refreshSelection()
         }
@@ -2754,6 +2772,7 @@ class MainActivity : BaseLocaleActivity() {
     ) {
         heroType.text = badge.uppercase()
         heroPlay.text = playLabel
+        if (DeviceUi.isTvUi(this)) styleHeroPlayButton()
         val heroBackdrop = backdrop.ifBlank { poster }
         loadHeroImage(heroImage, heroBackdrop, contentId, kind)
         if (poster.isNotBlank()) {
@@ -3328,7 +3347,7 @@ class MainActivity : BaseLocaleActivity() {
             )
         }
         if (catalogEnterContentOnLoad && posterItems.isNotEmpty()) {
-            prepareCatalogContentFocusState(Tab.MOVIES)
+            beginCatalogContentTransition(currentTab)
         }
         updateCatalogGrid()
         if (DeviceUi.useDpadFocus(this)) maybeEnterCatalogContent()
@@ -3351,7 +3370,7 @@ class MainActivity : BaseLocaleActivity() {
             )
         }
         if (catalogEnterContentOnLoad && posterItems.isNotEmpty()) {
-            prepareCatalogContentFocusState(Tab.SERIES)
+            beginCatalogContentTransition(currentTab)
         }
         updateCatalogGrid()
         if (DeviceUi.useDpadFocus(this)) maybeEnterCatalogContent()

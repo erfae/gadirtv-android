@@ -163,7 +163,7 @@ class ChannelAdapter(
         holder.itemView.isSelected = holder.itemView.hasFocus()
         holder.number.isSelected = holder.itemView.hasFocus()
         if (position == 0) {
-            holder.itemView.nextFocusUpId = View.NO_ID
+            holder.itemView.nextFocusUpId = holder.itemView.id
         }
     }
 
