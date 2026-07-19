@@ -7,7 +7,7 @@
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/categoryList"
-        android:layout_width="200dp"
+        android:layout_width="228dp"
         android:layout_height="match_parent"
         android:clipToPadding="false"
         android:descendantFocusability="afterDescendants"
