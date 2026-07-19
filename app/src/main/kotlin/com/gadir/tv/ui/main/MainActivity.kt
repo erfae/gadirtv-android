@@ -456,6 +456,7 @@ class MainActivity : BaseLocaleActivity() {
         setupHeaderFocusChain()
         configureHeroLayout()
 
+        startContentPreload()
         showTab(Tab.HOME)
         if (DeviceUi.useDpadFocus(this)) {
             tabHome.post { tabHome.requestFocus() }
@@ -1663,7 +1664,7 @@ class MainActivity : BaseLocaleActivity() {
                 Tab.SERIES -> seriesGroupLoaded = true
                 else -> Unit
             }
-        } else if (catalogBrowseLevel == TvBrowseNav.Level.GROUP) {
+        } else if (catalogBrowseLevel == TvBrowseNav.Level.TAB) {
             when (tab) {
                 Tab.MOVIES -> moviesGroupLoaded = false
                 Tab.SERIES -> seriesGroupLoaded = false
@@ -1906,8 +1907,14 @@ class MainActivity : BaseLocaleActivity() {
             }
             Tab.MOVIES, Tab.SERIES -> {
                 ensureCatalogTabReady(tab)
-                catalogBrowseLevel = TvBrowseNav.Level.GROUP
-                panelCatalog.post { openCatalogTabAtFirstGroup(tab) }
+                when (catalogBrowseLevel) {
+                    TvBrowseNav.Level.TAB -> {
+                        catalogBrowseLevel = TvBrowseNav.Level.GROUP
+                        panelCatalog.post { openCatalogTabAtFirstGroup(tab) }
+                    }
+                    TvBrowseNav.Level.GROUP -> focusCatalogCategoryList()
+                    TvBrowseNav.Level.CONTENT -> exitCatalogContentToGroup()
+                }
             }
         }
     }
@@ -1994,6 +2001,8 @@ class MainActivity : BaseLocaleActivity() {
                             browseCatalogCategory(tab, cat, enterContent = false)
                         }
                     }
+                } else if (DeviceUi.useDpadFocus(this)) {
+                    restoreCatalogTab(tab)
                 }
                 if (!DeviceUi.useDpadFocus(this) && ready) {
                     restoreCatalogTab(tab)

@@ -52,12 +52,15 @@ object ContentPreloader {
         api: XtreamApi,
         profile: Profile,
     ) = withContext(Dispatchers.IO) {
-        preloadHomeAssets(context, api, profile)
-        preloadPrioritizedChannelIcons(context)
-        preloadEpg(api, profile, prioritizedChannels(context))
-        preloadRemainingChannelIcons(context)
-        CatalogPreloader.preloadRemaining(api, profile)
-        preloadCatalogPosters(context)
+        coroutineScope {
+            val catalogJob = async { CatalogPreloader.preloadRemaining(api, profile) }
+            preloadHomeAssets(context, api, profile)
+            preloadPrioritizedChannelIcons(context)
+            catalogJob.await()
+            preloadEpg(api, profile, prioritizedChannels(context))
+            preloadRemainingChannelIcons(context)
+            preloadCatalogPosters(context)
+        }
     }
 
     private suspend fun preloadHomeAssets(

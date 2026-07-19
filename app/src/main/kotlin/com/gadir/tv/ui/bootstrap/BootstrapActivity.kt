@@ -8,6 +8,7 @@ import com.gadir.tv.ui.BaseLocaleActivity
 import androidx.lifecycle.lifecycleScope
 import com.gadir.tv.R
 import com.gadir.tv.data.BootstrapLoader
+import com.gadir.tv.data.ContentPreloader
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ProfileStore
 import com.gadir.tv.data.XtreamApi
@@ -76,6 +77,7 @@ class BootstrapActivity : BaseLocaleActivity() {
             }
 
             result.onSuccess {
+                ContentPreloader.startBackgroundPreload(this@BootstrapActivity, api, profile)
                 startActivity(Intent(this@BootstrapActivity, MainActivity::class.java))
                 finish()
             }.onFailure { e ->

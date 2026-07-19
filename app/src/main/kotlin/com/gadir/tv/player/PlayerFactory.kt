@@ -8,6 +8,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.PlaylistRepository
 
@@ -69,15 +70,33 @@ object PlayerFactory {
 
     fun createForLivePreview(context: Context): ExoPlayer {
         val bufferMs = AppSettings(context).networkBufferMs
-        return build(
-            context = context,
-            minBuffer = (bufferMs * 8).coerceIn(8_000, 25_000),
-            maxBuffer = (bufferMs * 20).coerceIn(30_000, 90_000),
-            playbackBuffer = (bufferMs * 3).coerceIn(3_000, 12_000),
-            rebuffer = (bufferMs * 6).coerceIn(6_000, 18_000),
-            audioAttributes = liveAudioAttributes(),
-            handleAudioFocus = false,
-        )
+        val renderersFactory = DefaultRenderersFactory(context)
+            .setEnableDecoderFallback(true)
+        val trackSelector = DefaultTrackSelector(context).apply {
+            setParameters(
+                buildUponParameters()
+                    .setMaxVideoSize(1280, 720)
+                    .setMaxVideoBitrate(2_500_000)
+                    .build(),
+            )
+        }
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                (bufferMs * 8).coerceIn(8_000, 25_000),
+                (bufferMs * 20).coerceIn(30_000, 90_000),
+                (bufferMs * 3).coerceIn(3_000, 12_000),
+                (bufferMs * 6).coerceIn(6_000, 18_000),
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+        return ExoPlayer.Builder(context, renderersFactory)
+            .setTrackSelector(trackSelector)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory()))
+            .setAudioAttributes(liveAudioAttributes(), false)
+            .setHandleAudioBecomingNoisy(true)
+            .setLoadControl(loadControl)
+            .build()
+            .apply { volume = 1f }
     }
 
     fun createForLive(context: Context): ExoPlayer {
