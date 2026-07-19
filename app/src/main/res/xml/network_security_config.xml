@@ -6,6 +6,7 @@
         </trust-anchors>
     </base-config>
     <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">derektv.vip</domain>
         <domain includeSubdomains="true">gadir.co</domain>
         <domain includeSubdomains="true">51.91.120.175</domain>
         <domain includeSubdomains="true">localhost</domain>

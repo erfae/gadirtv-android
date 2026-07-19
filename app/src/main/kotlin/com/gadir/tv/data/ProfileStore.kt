@@ -3,6 +3,7 @@ package com.gadir.tv.data
 import android.content.Context
 import com.gadir.tv.model.LoginDraft
 import com.gadir.tv.model.Profile
+import com.gadir.tv.util.DefaultCredentials
 import com.gadir.tv.util.HostUtils
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -15,7 +16,12 @@ class ProfileStore(context: Context) {
         val raw = prefs.getString(KEY_PROFILES, null) ?: return emptyList()
         return try {
             val type = object : TypeToken<List<Profile>>() {}.type
-            (gson.fromJson<List<Profile>>(raw, type) ?: emptyList()).map { normalizeProfile(it) }
+            val original = gson.fromJson<List<Profile>>(raw, type) ?: emptyList()
+            val migrated = original.map { normalizeProfile(it) }
+            if (original.any { it.host.contains("gadir.co", ignoreCase = true) }) {
+                saveAll(migrated)
+            }
+            migrated
         } catch (_: Exception) {
             emptyList()
         }
@@ -87,7 +93,12 @@ class ProfileStore(context: Context) {
     fun loadDraft(): LoginDraft {
         val raw = prefs.getString(KEY_DRAFT, null) ?: return LoginDraft()
         return try {
-            gson.fromJson(raw, LoginDraft::class.java) ?: LoginDraft()
+            val draft = gson.fromJson(raw, LoginDraft::class.java) ?: LoginDraft()
+            val migrated = migrateDraft(draft)
+            if (migrated.host != draft.host) {
+                saveDraft(migrated)
+            }
+            migrated
         } catch (_: Exception) {
             LoginDraft()
         }
@@ -104,7 +115,19 @@ class ProfileStore(context: Context) {
     }
 
     private fun normalizeProfile(p: Profile): Profile =
-        p.copy(host = HostUtils.baseUrl(p.host))
+        p.copy(host = migrateHost(p.host))
+
+    private fun migrateDraft(draft: LoginDraft): LoginDraft =
+        draft.copy(host = migrateHost(draft.host))
+
+    private fun migrateHost(host: String): String {
+        val normalized = HostUtils.baseUrl(host)
+        return if (normalized.contains("gadir.co", ignoreCase = true)) {
+            DefaultCredentials.HOST
+        } else {
+            normalized
+        }
+    }
 
     companion object {
         private const val PREFS = "gadirtv_prefs"
