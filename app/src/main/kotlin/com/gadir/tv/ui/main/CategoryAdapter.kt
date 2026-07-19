@@ -116,24 +116,18 @@ class CategoryAdapter(
         val pos = holder.bindingAdapterPosition
         if (pos == RecyclerView.NO_POSITION) return false
 
-        if (direction < 0) {
-            if (pos == 0) {
-                onMoveUp?.invoke()
-                return true
-            }
-        } else if (pos >= items.lastIndex) {
+        if (direction < 0 && pos == 0) {
+            onMoveUp?.invoke()
+            return onMoveUp != null
+        }
+        if (direction > 0 && pos >= items.lastIndex) {
             onMoveDown?.invoke()
-            return true
+            return onMoveDown != null
         }
 
         val list = holder.itemView.parent as? RecyclerView ?: return false
-        val target = pos + direction
-        if (list.findViewHolderForAdapterPosition(target) != null) {
-            return false
-        }
-
-        TvNavHelper.scrollCategoryStep(list, direction)
-        TvNavHelper.requestFocusAt(list, target)
+        val target = (pos + direction).coerceIn(0, items.lastIndex)
+        TvNavHelper.focusCategoryItem(list, target)
         return true
     }
 
@@ -141,7 +135,7 @@ class CategoryAdapter(
 
     private fun applyCategoryVisual(holder: Holder, contentSelected: Boolean, focused: Boolean) {
         val view = holder.itemView
-        view.isSelected = focused
+        view.isSelected = contentSelected
         view.isActivated = focused
         val context = holder.name.context
         holder.name.setTextColor(
