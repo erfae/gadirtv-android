@@ -19,8 +19,10 @@ import com.gadir.tv.player.VodStreamUrls
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.TvFocusHelper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 class MovieDetailActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
@@ -74,7 +76,13 @@ class MovieDetailActivity : BaseLocaleActivity() {
         btnMoviePlay.visibility = View.GONE
 
         lifecycleScope.launch {
-            val info = withContext(Dispatchers.IO) { api.vodInfo(profile, streamId) }
+            val info = try {
+                withContext(Dispatchers.IO) {
+                    withTimeout(18_000L) { api.vodInfo(profile, streamId) }
+                }
+            } catch (_: TimeoutCancellationException) {
+                null
+            }
             if (token != loadToken) return@launch
             loadingView.visibility = View.GONE
             if (info == null) {
@@ -83,7 +91,6 @@ class MovieDetailActivity : BaseLocaleActivity() {
                 btnMoviePlay.requestFocus()
                 return@launch
             }
-
             findViewById<TextView>(R.id.movieTitle).text = info.name.ifEmpty { movieName }
             val meta = buildList {
                 if (info.releaseDate.isNotEmpty()) add(info.releaseDate.take(4))

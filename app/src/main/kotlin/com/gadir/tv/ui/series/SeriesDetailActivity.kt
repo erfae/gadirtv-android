@@ -27,8 +27,10 @@ import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.RecyclerViewUtil
 import com.gadir.tv.util.TvFocusHelper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 class SeriesDetailActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
@@ -92,16 +94,23 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         btnSeriesPlay.visibility = View.GONE
 
         lifecycleScope.launch {
-            val detail = withContext(Dispatchers.IO) {
-                api.seriesInfo(PlaylistRepository.profile!!, seriesId)
+            val detail = try {
+                withContext(Dispatchers.IO) {
+                    withTimeout(20_000L) {
+                        api.seriesInfo(PlaylistRepository.profile!!, seriesId)
+                    }
+                }
+            } catch (_: TimeoutCancellationException) {
+                null
             }
             if (token != loadToken) return@launch
             loadingView.visibility = View.GONE
             if (detail == null) {
                 seriesPlot.text = getString(R.string.series_load_failed)
+                btnSeriesPlay.visibility = View.VISIBLE
+                btnSeriesPlay.requestFocus()
                 seasonList.visibility = View.GONE
                 episodeList.visibility = View.GONE
-                btnSeriesPlay.visibility = View.GONE
                 return@launch
             }
             bindDetail(detail)

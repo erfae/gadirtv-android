@@ -3586,18 +3586,20 @@ class MainActivity : BaseLocaleActivity() {
         lifecycleScope.launch {
             try {
                 val items = withContext(Dispatchers.IO) {
-                    when (tab) {
-                        Tab.MOVIES -> {
-                            val movies = api.vodStreams(profile, categoryId)
-                            PlaylistRepository.cacheVod(categoryId, movies)
-                            movies
+                    kotlinx.coroutines.withTimeout(25_000L) {
+                        when (tab) {
+                            Tab.MOVIES -> {
+                                val movies = api.vodStreams(profile, categoryId)
+                                PlaylistRepository.cacheVod(categoryId, movies)
+                                movies
+                            }
+                            Tab.SERIES -> {
+                                val series = api.seriesList(profile, categoryId)
+                                PlaylistRepository.cacheSeries(categoryId, series)
+                                series
+                            }
+                            Tab.LIVE, Tab.HOME -> emptyList<Any>()
                         }
-                        Tab.SERIES -> {
-                            val series = api.seriesList(profile, categoryId)
-                            PlaylistRepository.cacheSeries(categoryId, series)
-                            series
-                        }
-                        Tab.LIVE, Tab.HOME -> emptyList<Any>()
                     }
                 }
 
@@ -4293,6 +4295,11 @@ class MainActivity : BaseLocaleActivity() {
     private fun startPreviewPlayback(channel: LiveChannel, token: Int, profile: Profile) {
         if (token != previewToken || livePreviewPaused) return
         updatePreviewInfo(channel)
+        if (DeviceUi.isTvUi(this)) {
+            cancelMiniPreviewPlayback()
+            setPreviewVideoVisible(false)
+            return
+        }
         if (!appSettings.autoplayPreview) {
             cancelMiniPreviewPlayback()
             setPreviewVideoVisible(false)

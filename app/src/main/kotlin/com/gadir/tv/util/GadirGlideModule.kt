@@ -10,14 +10,13 @@ import com.bumptech.glide.module.AppGlideModule
 import com.gadir.tv.net.PanelHttp
 import java.io.InputStream
 
-/** Glide uses the same OkHttp client as API/streams (IPv4 + IP fallback DNS). */
 @GlideModule
 class GadirGlideModule : AppGlideModule() {
     override fun registerComponents(context: Context, glide: Glide, registry: Registry) {
         registry.replace(
             GlideUrl::class.java,
             InputStream::class.java,
-            OkHttpUrlLoader.Factory(PanelHttp.okHttpClient),
+            OkHttpUrlLoader.Factory(PanelHttp.imageOkHttpClient),
         )
     }
 

@@ -226,11 +226,9 @@ class XtreamApi(
             append("&action=get_series_info")
             append("&series_id=").append(seriesId)
         }
-        val url = "$host/player_api.php?$query"
-        val response = NativeHttpClient.request(url, activeUserAgent)
-        if (response.status != 200 || response.body.isBlank()) return null
+        val body = fetchDetailBody("$host/player_api.php?$query") ?: return null
         return try {
-            val root = gson.fromJson(response.body, JsonObject::class.java) ?: return null
+            val root = gson.fromJson(body, JsonObject::class.java) ?: return null
             val info = root.getAsJsonObject("info")
             val seasons = linkedMapOf<String, MutableList<SeriesEpisode>>()
             val episodesEl = root.get("episodes")
@@ -340,11 +338,9 @@ class XtreamApi(
             append("&action=get_vod_info")
             append("&vod_id=").append(vodId)
         }
-        val url = "$host/player_api.php?$query"
-        val response = NativeHttpClient.request(url, activeUserAgent)
-        if (response.status != 200 || response.body.isBlank()) return null
+        val body = fetchDetailBody("$host/player_api.php?$query") ?: return null
         return try {
-            val root = gson.fromJson(response.body, JsonObject::class.java) ?: return null
+            val root = gson.fromJson(body, JsonObject::class.java) ?: return null
             val info = root.getAsJsonObject("info")
             val movieData = root.getAsJsonObject("movie_data")
             val name = info?.get("name")?.asStringOrNull()
@@ -567,6 +563,25 @@ class XtreamApi(
             )
         }.filter { it.id.isNotEmpty() }
             .sortedBy { it.order }
+
+    private fun fetchDetailBody(url: String): String? {
+        val agents = linkedSetOf(activeUserAgent)
+        agents.addAll(userAgents)
+        for (ua in agents) {
+            repeat(2) { attempt ->
+                val get = NativeHttpClient.request(url, ua, "GET")
+                val body = get.body.trim()
+                if (get.status == 200 && body.isNotBlank() && body != "[]") return body
+                if (get.status == 512 || get.status == 403 || get.status == 405) {
+                    val post = NativeHttpClient.request(url, ua, "POST")
+                    val postBody = post.body.trim()
+                    if (post.status == 200 && postBody.isNotBlank() && postBody != "[]") return postBody
+                }
+                if (attempt < 1) Thread.sleep(350L)
+            }
+        }
+        return null
+    }
 
     private fun fetchList(
         profile: Profile,

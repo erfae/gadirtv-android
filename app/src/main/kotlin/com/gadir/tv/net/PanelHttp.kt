@@ -5,7 +5,6 @@ import okhttp3.ConnectionSpec
 import okhttp3.Dns
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.URI
@@ -42,13 +41,17 @@ object PanelHttp {
 
     fun panelIpFor(hostname: String): String? = knownIps[hostname.lowercase()]
 
+    fun virtualHostFor(hostname: String): String? {
+        if (hostname.equals(GADIR_IP, ignoreCase = true)) return GADIR_HOST
+        return knownIps.entries.firstOrNull { it.value.equals(hostname, ignoreCase = true) }?.key
+    }
+
     fun rememberWorkingIp(hostname: String, ip: String) {
         if (hostname.isBlank() || ip.isBlank()) return
         knownIps[hostname.lowercase()] = ip
         Log.i(TAG, "Cached IP for $hostname -> $ip")
     }
 
-    /** Store profile host as direct IP (Host header still sent when needed). */
     fun migrateProfileHost(host: String): String {
         val normalized = com.gadir.tv.util.HostUtils.baseUrl(host)
         return try {
@@ -87,15 +90,19 @@ object PanelHttp {
         val scheme = uri.scheme ?: "http"
         val portSuffix = portSuffix(uri)
 
-        val targets = mutableListOf<RequestTarget>()
-        targets.add(RequestTarget(normalized, null, "host:$hostname"))
+        virtualHostFor(hostname)?.let { vhost ->
+            return listOf(RequestTarget(normalized, vhost, "panel:$hostname"))
+        }
 
         val ip = knownIps[hostname.lowercase()]
         if (!ip.isNullOrBlank() && !hostname.equals(ip, ignoreCase = true)) {
             val ipUrl = "$scheme://$ip$portSuffix$pathAndQuery"
-            targets.add(RequestTarget(ipUrl, hostname, "ip:$ip"))
+            return listOf(
+                RequestTarget(ipUrl, hostname, "ip:$ip"),
+                RequestTarget(normalized, null, "host:$hostname"),
+            )
         }
-        return targets
+        return listOf(RequestTarget(normalized, null, "host:$hostname"))
     }
 
     private fun rewrite(url: String): Resolved {
@@ -103,7 +110,8 @@ object PanelHttp {
             val uri = URI(url)
             val hostname = uri.host ?: return Resolved(url)
             if (hostname.matches(Regex("^\\d{1,3}(\\.\\d{1,3}){3}$"))) {
-                return Resolved(url)
+                val vhost = virtualHostFor(hostname)
+                return if (vhost != null) Resolved(url, vhost) else Resolved(url)
             }
             val ip = knownIps[hostname.lowercase()] ?: return Resolved(url)
             val scheme = uri.scheme ?: "http"
@@ -140,9 +148,13 @@ object PanelHttp {
         val original = chain.request()
         val resolved = resolve(original.url.toString())
         val builder = original.newBuilder().url(resolved.url)
-        resolved.hostHeader?.let { builder.header("Host", it) }
+        val host = resolved.hostHeader ?: UriHost(resolved.url)?.let { virtualHostFor(it) }
+        host?.let { builder.header("Host", it) }
         chain.proceed(builder.build())
     }
+
+    private fun UriHost(url: String): String? =
+        runCatching { URI(url).host }.getOrNull()
 
     private val redirectInterceptor = Interceptor { chain ->
         var request = chain.request()
@@ -154,7 +166,8 @@ object PanelHttp {
             val rewritten = resolve(location)
             response.close()
             val builder = request.newBuilder().url(rewritten.url)
-            rewritten.hostHeader?.let { builder.header("Host", it) }
+            val host = rewritten.hostHeader ?: UriHost(rewritten.url)?.let { virtualHostFor(it) }
+            host?.let { builder.header("Host", it) }
             request = builder.build()
             response = chain.proceed(request)
             hops++
@@ -167,6 +180,11 @@ object PanelHttp {
             knownIps[hostname.lowercase()]?.let { ip ->
                 return listOf(InetAddress.getByName(ip))
             }
+            virtualHostFor(hostname)?.let { vhost ->
+                knownIps[vhost]?.let { ip ->
+                    return listOf(InetAddress.getByName(ip))
+                }
+            }
             return try {
                 val resolved = Dns.SYSTEM.lookup(hostname)
                 val v4 = resolved.filterIsInstance<Inet4Address>()
@@ -178,12 +196,9 @@ object PanelHttp {
         }
     }
 
-    val okHttpClient: OkHttpClient by lazy {
+    private fun baseClientBuilder(): OkHttpClient.Builder =
         OkHttpClient.Builder()
             .dns(ipv4PreferredDns)
-            .connectTimeout(25, TimeUnit.SECONDS)
-            .readTimeout(35, TimeUnit.SECONDS)
-            .writeTimeout(25, TimeUnit.SECONDS)
             .followRedirects(false)
             .followSslRedirects(false)
             .retryOnConnectionFailure(true)
@@ -192,6 +207,21 @@ object PanelHttp {
             )
             .addInterceptor(resolveInterceptor)
             .addInterceptor(redirectInterceptor)
+
+    val okHttpClient: OkHttpClient by lazy {
+        baseClientBuilder()
+            .connectTimeout(12, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .writeTimeout(12, TimeUnit.SECONDS)
+            .build()
+    }
+
+    /** Fast-fail client for channel icons / posters. */
+    val imageOkHttpClient: OkHttpClient by lazy {
+        baseClientBuilder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(8, TimeUnit.SECONDS)
+            .writeTimeout(5, TimeUnit.SECONDS)
             .build()
     }
 }
