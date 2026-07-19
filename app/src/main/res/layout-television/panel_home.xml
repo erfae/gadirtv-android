@@ -94,30 +94,24 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:elevation="16dp">
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:layout_gravity="center"
-                        android:background="@drawable/hero_play_backing" />
+                    android:elevation="24dp">
 
                     <TextView
                         android:id="@+id/heroPlay"
                         android:layout_width="wrap_content"
                         android:layout_height="64dp"
                         android:layout_gravity="center"
-                        android:background="@drawable/btn_play_hero"
+                        android:background="@drawable/btn_hero_play_solid"
                         android:focusable="true"
                         android:focusableInTouchMode="true"
                         android:gravity="center"
-                        android:minWidth="260dp"
-                        android:paddingHorizontal="40dp"
+                        android:minWidth="280dp"
+                        android:paddingHorizontal="44dp"
                         android:paddingVertical="18dp"
                         android:text="@string/hero_play"
                         android:textAllCaps="true"
-                        android:textColor="@color/hero_play_text"
-                        android:textSize="19sp"
+                        android:textColor="@android:color/white"
+                        android:textSize="20sp"
                         android:textStyle="bold" />
                 </FrameLayout>
             </LinearLayout>
