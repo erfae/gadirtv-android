@@ -14,7 +14,7 @@ object VlcAudioOptions {
         "--live-caching=$networkBufferMs",
         "--file-caching=${networkBufferMs.coerceIn(2_000, 8_000)}",
         "--no-video-title-show",
-        "--avcodec-hw=mediacodec_ndk",
+        "--avcodec-hw=any",
         "--http-reconnect",
     )
 
