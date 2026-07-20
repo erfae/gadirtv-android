@@ -97,7 +97,7 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_ROTATE_FIRST_MS = 4000L
         private const val CHANNEL_PREVIEW_DELAY_MS = 0L
         private const val PREVIEW_TIMEOUT_MS = 10_000L
-        private const val CATALOG_PREFETCH_DELAY_MS = 280L
+        private const val CATALOG_PREFETCH_DELAY_MS = 0L
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -113,6 +113,7 @@ class MainActivity : BaseLocaleActivity() {
     private var channelAdapter: ChannelAdapter? = null
     private var currentPreviewChannel: LiveChannel? = null
     private var previewingStreamId: Int? = null
+    private var previewLogoStreamId = 0
     private var previewUrls = listOf<String>()
     private var previewUrlIndex = 0
     private var previewWorkingUrl: String? = null
@@ -1549,49 +1550,69 @@ class MainActivity : BaseLocaleActivity() {
     private fun browseCatalogCategory(tab: Tab, cat: Category, enterContent: Boolean) {
         if (enterContent) {
             withCatalogCategoryAccess(tab, cat) {
-                enterCatalogContent(tab, cat)
+                showCatalogCategoryContent(tab, cat, enterContent = true)
             }
             return
         }
-        highlightCatalogGroup(tab, cat)
+        showCatalogCategoryContent(tab, cat, enterContent = false)
     }
 
-    /** Solo resalta el grupo; no carga el grid hasta pulsar OK. */
-    private fun highlightCatalogGroup(tab: Tab, cat: Category) {
-        if (catalogCategoryRequiresPin(tab, cat.id)) {
+    /** Mismo patrón que showLiveCategoryChannels: al mover categoría se carga el grid al instante. */
+    private fun showCatalogCategoryContent(tab: Tab, cat: Category, enterContent: Boolean) {
+        if (!enterContent && catalogCategoryRequiresPin(tab, cat.id)) {
             showCatalogBlockedCategory(tab, cat)
             return
         }
         val catId = cat.id
-        val previousId = catalogBrowsingCategoryId
-        catalogBrowsingCategoryId = catId
-        catalogEnterContentOnLoad = false
-        if (previousId != catId) {
-            refreshCatalogCategoryHighlight(previousId, catId)
+        val idx = catalogCategories.indexOfFirst { it.id == catId }
+        if (idx >= 0) catalogCategoryFocusIndex = idx
+
+        val previousBrowsingId = catalogBrowsingCategoryId
+        if (enterContent) {
+            catalogBrowsingCategoryId = null
+            selectedCatalogCategoryId = catId
+            catalogEnterContentOnLoad = true
+            refreshCatalogCategoryHighlight(previousBrowsingId, catId)
+            highlightCatalogCategory(tab, catId)
+        } else {
+            catalogBrowsingCategoryId = catId
+            selectedCatalogCategoryId = null
+            catalogEnterContentOnLoad = false
+            if (previousBrowsingId != catId) {
+                refreshCatalogCategoryHighlight(previousBrowsingId, catId)
+            }
         }
-        scheduleCatalogPrefetch(tab, catId)
-        if (DeviceUi.useDpadFocus(this)) {
-            showCatalogGroupContent(tab, catId)
-            catalogGrid.visibility = View.VISIBLE
-            catalogEmpty.visibility = View.GONE
+
+        prefetchCatalogGroup(tab, catId)
+        showCatalogGroupContent(tab, catId)
+        catalogGrid.visibility = View.VISIBLE
+        catalogEmpty.visibility = View.GONE
+        catalogGrid.scrollToPosition(0)
+
+        if (enterContent) {
+            applyCatalogPanelFocusMode(tab, inContent = true)
+            if (posterItems.isNotEmpty()) {
+                focusCatalogPosterGridNow(tab)
+            }
+        } else {
+            catalogBrowseLevel = TvBrowseNav.Level.GROUP
+            applyCatalogPanelFocusMode(tab, inContent = false)
+            catalogCategoryList.post {
+                if (currentTab != tab || catalogBrowseLevel != TvBrowseNav.Level.GROUP) return@post
+                if (catalogCategoryList.focusedChild == null) {
+                    TvBrowseNav.focusGroup(catalogCategoryList, catalogCategoryFocusIndex)
+                }
+            }
         }
     }
 
+    /** @deprecated use [showCatalogCategoryContent] */
+    private fun highlightCatalogGroup(tab: Tab, cat: Category) {
+        showCatalogCategoryContent(tab, cat, enterContent = false)
+    }
+
     private fun enterCatalogContent(tab: Tab, cat: Category) {
-        val catId = cat.id
-        val idx = catalogCategories.indexOfFirst { it.id == catId }
-        if (idx >= 0) catalogCategoryFocusIndex = idx
-        val previousBrowsingId = catalogBrowsingCategoryId
-        catalogBrowsingCategoryId = null
-        selectedCatalogCategoryId = catId
-        catalogEnterContentOnLoad = true
-        refreshCatalogCategoryHighlight(previousBrowsingId, catId)
-        highlightCatalogCategory(tab, catId)
-        applyCatalogPanelFocusMode(tab, inContent = true)
-        showCatalogGroupContent(tab, catId)
-        if (posterItems.isNotEmpty()) {
-            focusCatalogPosterGridNow(tab)
-        }
+        showCatalogCategoryContent(tab, cat, enterContent = true)
     }
 
     private fun focusCatalogPosterGridNow(tab: Tab) {
@@ -1764,6 +1785,11 @@ class MainActivity : BaseLocaleActivity() {
                 }
                 catalogCategoryCounts[catId] = size.size
                 catalogCategoryAdapter?.refreshSelection()
+                if (catalogBrowsingCategoryId == catId && currentTab == tab &&
+                    catalogBrowseLevel == TvBrowseNav.Level.GROUP
+                ) {
+                    runOnUiThread { showCatalogGroupContent(tab, catId) }
+                }
             } catch (_: Exception) {
             }
         }
@@ -2904,9 +2930,6 @@ class MainActivity : BaseLocaleActivity() {
         heroTitle.text = item.title
         heroSubtitle.text = ""
         heroPlot.text = ""
-        if (DeviceUi.isTvUi(this)) {
-            heroPlot.maxLines = 1
-        }
 
         when (item) {
             is HeroItem.Movie -> {
@@ -4121,10 +4144,12 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun schedulePreview(channel: LiveChannel) {
         if (currentTab != Tab.LIVE) return
-        if (liveBrowseLevel != TvBrowseNav.Level.CONTENT) {
-            val browseId = liveBrowsingCategoryId ?: selectedLiveCategoryId
-            if (parentalStore.requiresPinForLiveCategory(browseId)) return
+        if (liveBrowseLevel == TvBrowseNav.Level.TAB) return
+        val browseId = when {
+            liveBrowseLevel == TvBrowseNav.Level.CONTENT -> selectedLiveCategoryId
+            else -> liveBrowsingCategoryId ?: selectedLiveCategoryId
         }
+        if (parentalStore.requiresPinForLiveCategory(browseId)) return
         livePreviewPaused = false
         updatePreviewInfo(channel)
         if (reloadingChannels) return
@@ -4133,10 +4158,12 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun schedulePreviewPlayback(channel: LiveChannel) {
         if (currentTab != Tab.LIVE || reloadingChannels) return
-        if (liveBrowseLevel != TvBrowseNav.Level.CONTENT) {
-            val browseId = liveBrowsingCategoryId ?: selectedLiveCategoryId
-            if (parentalStore.requiresPinForLiveCategory(browseId)) return
+        if (liveBrowseLevel == TvBrowseNav.Level.TAB) return
+        val browseId = when {
+            liveBrowseLevel == TvBrowseNav.Level.CONTENT -> selectedLiveCategoryId
+            else -> liveBrowsingCategoryId ?: selectedLiveCategoryId
         }
+        if (parentalStore.requiresPinForLiveCategory(browseId)) return
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val channelChanged = previewingStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) return
@@ -4151,8 +4178,9 @@ class MainActivity : BaseLocaleActivity() {
             ensurePreviewPlayer()
         } else if (channelChanged) {
             cancelPreviewTimeout()
-            miniVlcPlayer?.stop()
-            miniExoPlayer?.stop()
+            if (!usesExoPreview()) {
+                miniVlcPlayer?.stop()
+            }
             setPreviewVideoVisible(false)
             hideNoSignal()
             previewUrlIndex = 0
@@ -4218,12 +4246,15 @@ class MainActivity : BaseLocaleActivity() {
     private fun updatePreviewInfo(channel: LiveChannel) {
         currentPreviewChannel = channel
         liveChannelStore.lastStreamId = channel.streamId
-        liveChannelStore.lastCategoryId = selectedLiveCategoryId ?: ""
+        liveChannelStore.lastCategoryId = selectedLiveCategoryId ?: liveBrowsingCategoryId ?: ""
         previewTitle.text = channel.name
         previewLogo.visibility = View.VISIBLE
-        val logoSize = (64 * resources.displayMetrics.density).toInt().coerceAtLeast(128)
-        ChannelIconFallback.load(previewLogo, channel.name, logoSize)
-        ChannelIconHelper.loadPanelIcon(previewLogo, channel)
+        if (previewLogoStreamId != channel.streamId) {
+            previewLogoStreamId = channel.streamId
+            val logoSize = (64 * resources.displayMetrics.density).toInt().coerceAtLeast(128)
+            ChannelIconFallback.load(previewLogo, channel.name, logoSize)
+            ChannelIconHelper.loadPanelIcon(previewLogo, channel)
+        }
         updatePreviewLockButton(channel)
         EpgCache.get(channel.streamId)?.takeIf { it.isNotEmpty() }?.let { applyEpg(channel, it) } ?: run {
             epgNow.text = getString(R.string.epg_loading)
@@ -4286,16 +4317,18 @@ class MainActivity : BaseLocaleActivity() {
             showNoSignal()
             return
         }
-        playMiniPreviewUrl(url, token)
+        playMiniPreviewUrl(url, token, hideVideo = channelChanged)
     }
 
     private var previewPlaybackToken = 0
     private var previewTimeoutRunnable: Runnable? = null
 
-    private fun playMiniPreviewUrl(url: String, token: Int) {
+    private fun playMiniPreviewUrl(url: String, token: Int, hideVideo: Boolean = false) {
         if (token != previewToken || url.isBlank()) return
         previewPlaybackToken = token
-        setPreviewVideoVisible(false)
+        if (hideVideo) {
+            setPreviewVideoVisible(false)
+        }
         hideNoSignal()
         val volume = if (appSettings.previewSound) {
             LiveVlcPlayer.VOLUME_PREVIEW

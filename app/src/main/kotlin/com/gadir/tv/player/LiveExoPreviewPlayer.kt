@@ -7,7 +7,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 
-/** Preview live en móvil con ExoPlayer (más estable que libVLC en pantalla pequeña). */
+/** Preview live con ExoPlayer — reutiliza el player al zapar para evitar frames congelados. */
 class LiveExoPreviewPlayer(
     context: Context,
     playerView: PlayerView,
@@ -18,18 +18,18 @@ class LiveExoPreviewPlayer(
 
     init {
         playerView.useController = false
-        playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+        playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
         playerView.player = player
         player.addListener(
             object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_READY && player.isPlaying) {
-                        onPlaying()
-                    }
+                override fun onRenderedFirstFrame() {
+                    onPlaying()
                 }
 
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    if (isPlaying) onPlaying()
+                    if (isPlaying && player.playbackState == Player.STATE_READY) {
+                        onPlaying()
+                    }
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
@@ -40,8 +40,12 @@ class LiveExoPreviewPlayer(
     }
 
     fun play(url: String, volume: Int) {
-        player.stop()
-        player.setMediaItem(LiveStreamUrls.mediaItem(url))
+        val item = LiveStreamUrls.mediaItem(url)
+        if (player.mediaItemCount > 0) {
+            player.replaceMediaItem(0, item)
+        } else {
+            player.setMediaItem(item)
+        }
         player.prepare()
         player.volume = (volume / 100f).coerceIn(0f, 0.22f)
         player.playWhenReady = true
@@ -60,7 +64,9 @@ class LiveExoPreviewPlayer(
     }
 
     fun stop() {
-        teardown()
+        player.playWhenReady = false
+        player.pause()
+        player.volume = 0f
     }
 
     fun pause() {

@@ -124,7 +124,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         lifecycleScope.launch {
             val detail = try {
                 withContext(Dispatchers.IO) {
-                    withTimeout(10_000L) {
+                    withTimeout(8_000L) {
                         api.seriesInfo(PlaylistRepository.profile!!, seriesId)
                     }
                 }
