@@ -89,6 +89,7 @@ class PosterAdapter(
                     val pos = holder.bindingAdapterPosition
                     if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
                     if (pos < columnCount) {
+                        onMoveUp?.invoke()
                         true
                     } else {
                         val list = holder.itemView.parent as? RecyclerView

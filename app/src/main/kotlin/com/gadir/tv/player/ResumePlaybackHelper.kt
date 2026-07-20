@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.appcompat.app.AlertDialog
 import com.gadir.tv.R
 import com.gadir.tv.data.ResumeStore
+import com.gadir.tv.util.DeviceUi
 
 object ResumePlaybackHelper {
     private const val MIN_RESUME_MS = 15_000L
@@ -16,6 +17,14 @@ object ResumePlaybackHelper {
         val record = resumeStore.get(request.kind, request.contentId)
         if (record == null || record.positionMs < MIN_RESUME_MS) {
             PlaybackLauncher.play(context, request)
+            return
+        }
+        // AlertDialog often fails to receive focus on Android TV; resume from saved position.
+        if (DeviceUi.isTvUi(context)) {
+            PlaybackLauncher.play(
+                context,
+                request.copy(positionMs = record.positionMs),
+            )
             return
         }
         AlertDialog.Builder(context)

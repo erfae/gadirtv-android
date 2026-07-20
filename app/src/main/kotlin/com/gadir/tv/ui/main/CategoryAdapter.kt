@@ -24,6 +24,7 @@ class CategoryAdapter(
     private val onMoveUp: (() -> Unit)? = null,
     private val onMoveDown: (() -> Unit)? = null,
     private val upFocusViewId: Int = View.NO_ID,
+    private val leftFocusViewId: Int = View.NO_ID,
     private val navigationLocked: () -> Boolean = { false },
 ) : RecyclerView.Adapter<CategoryAdapter.Holder>() {
 
@@ -74,6 +75,11 @@ class CategoryAdapter(
             }
         } else {
             holder.itemView.nextFocusUpId = View.NO_ID
+        }
+        holder.itemView.nextFocusLeftId = if (leftFocusViewId != View.NO_ID) {
+            leftFocusViewId
+        } else {
+            View.NO_ID
         }
 
         holder.itemView.setOnFocusChangeListener { _, hasFocus ->
