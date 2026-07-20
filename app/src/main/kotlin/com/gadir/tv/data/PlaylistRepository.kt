@@ -152,6 +152,7 @@ object PlaylistRepository {
         bootstrapReady = false
         PlotCache.clear()
         EpgCache.clear()
+        com.gadir.tv.util.ChannelIconCache.clear()
     }
 
     fun clear() {
@@ -171,5 +172,6 @@ object PlaylistRepository {
         userAgent = "XCIPTV"
         PlotCache.clear()
         EpgCache.clear()
+        com.gadir.tv.util.ChannelIconCache.clear()
     }
 }

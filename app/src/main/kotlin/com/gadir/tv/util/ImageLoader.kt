@@ -54,21 +54,28 @@ object ImageLoader {
         sizePx: Int = 0,
         loadTag: Any? = null,
         maxFallbacks: Int = Int.MAX_VALUE,
+        channelName: String = "",
     ) {
         val size = sizePx.coerceAtLeast(96)
+        val streamId = (loadTag as? Int) ?: 0
         val candidates = buildList {
+            if (streamId > 0) ChannelIconCache.get(streamId)?.let { add(it) }
             val primary = ImageUrlResolver.resolve(url)
             if (primary.isNotEmpty()) add(primary)
             fallbacks.forEach { candidate ->
                 val resolved = ImageUrlResolver.resolve(candidate)
                 if (resolved.isNotEmpty() && resolved !in this) add(resolved)
             }
-        }.take(maxFallbacks.coerceAtLeast(1))
+        }.distinct().take(maxFallbacks.coerceAtLeast(1))
         if (loadTag != null) {
             target.setTag(R.id.image_load_tag, loadTag)
         }
         if (candidates.isEmpty()) {
-            target.setImageResource(R.drawable.gadir_logo)
+            if (channelName.isNotBlank()) {
+                ChannelIconFallback.load(target, channelName, size)
+            } else {
+                target.setImageResource(R.drawable.gadir_logo)
+            }
             return
         }
         loadWithFallback(
@@ -77,7 +84,9 @@ object ImageLoader {
             index = 0,
             options = channelOptions(size),
             loadTag = loadTag,
-            errorDrawable = R.drawable.gadir_logo,
+            sizePx = size,
+            channelName = channelName,
+            streamId = streamId,
         )
     }
 
@@ -153,12 +162,19 @@ object ImageLoader {
         options: RequestOptions,
         loadTag: Any? = null,
         errorDrawable: Int = R.drawable.gadir_logo,
+        sizePx: Int = 96,
+        channelName: String = "",
+        streamId: Int = 0,
     ) {
         if (!canLoadInto(target)) return
         if (loadTag != null && target.getTag(R.id.image_load_tag) != loadTag) return
         if (index >= urls.size) {
             if (loadTag == null || target.getTag(R.id.image_load_tag) == loadTag) {
-                target.setImageResource(errorDrawable)
+                if (channelName.isNotBlank()) {
+                    ChannelIconFallback.load(target, channelName, sizePx)
+                } else {
+                    target.setImageResource(errorDrawable)
+                }
             }
             return
         }
@@ -173,7 +189,10 @@ object ImageLoader {
                         targetView: Target<Drawable>,
                         isFirstResource: Boolean,
                     ): Boolean {
-                        loadWithFallback(target, urls, index + 1, options, loadTag, errorDrawable)
+                        loadWithFallback(
+                            target, urls, index + 1, options, loadTag, errorDrawable,
+                            sizePx, channelName, streamId,
+                        )
                         return true
                     }
 
@@ -187,13 +206,20 @@ object ImageLoader {
                         if (loadTag != null && target.getTag(R.id.image_load_tag) != loadTag) {
                             return true
                         }
+                        if (streamId > 0) {
+                            ChannelIconCache.put(streamId, urls[index])
+                        }
                         return false
                     }
                 })
                 .into(target)
         } catch (_: Throwable) {
             if (loadTag == null || target.getTag(R.id.image_load_tag) == loadTag) {
-                target.setImageResource(errorDrawable)
+                if (channelName.isNotBlank()) {
+                    ChannelIconFallback.load(target, channelName, sizePx)
+                } else {
+                    target.setImageResource(errorDrawable)
+                }
             }
         }
     }

@@ -565,23 +565,32 @@ class XtreamApi(
             .sortedBy { it.order }
 
     private fun fetchDetailBody(url: String): String? {
+        val resolvedUrl = runCatching {
+            val uri = java.net.URI(url)
+            val host = uri.host ?: return@runCatching url
+            val migrated = com.gadir.tv.net.PanelHttp.migrateProfileHost(
+                "${uri.scheme ?: "http"}://$host",
+            )
+            val path = uri.rawPath.orEmpty()
+            val query = uri.rawQuery?.let { "?$it" }.orEmpty()
+            val port = uri.port
+            val portSuffix = if (port > 0 && port != 80 && port != 443) ":$port" else ""
+            "$migrated$portSuffix$path$query"
+        }.getOrDefault(url)
         val agents = linkedSetOf(activeUserAgent)
         agents.addAll(userAgents)
         for (ua in agents) {
-            repeat(2) { attempt ->
-                val get = NativeHttpClient.request(url, ua, "GET")
-                val body = get.body.trim()
-                if (get.status == 200 && body.isNotBlank() && body != "[]" && !body.contains("\"info\":[]")) {
-                    return body
+            val get = NativeHttpClient.request(resolvedUrl, ua, "GET")
+            val body = get.body.trim()
+            if (get.status == 200 && body.isNotBlank() && body != "[]" && !body.contains("\"info\":[]")) {
+                return body
+            }
+            if (get.status == 512 || get.status == 403 || get.status == 405 || body.isBlank()) {
+                val post = NativeHttpClient.request(resolvedUrl, ua, "POST")
+                val postBody = post.body.trim()
+                if (post.status == 200 && postBody.isNotBlank() && postBody != "[]" && !postBody.contains("\"info\":[]")) {
+                    return postBody
                 }
-                if (get.status == 512 || get.status == 403 || get.status == 405) {
-                    val post = NativeHttpClient.request(url, ua, "POST")
-                    val postBody = post.body.trim()
-                    if (post.status == 200 && postBody.isNotBlank() && postBody != "[]" && !postBody.contains("\"info\":[]")) {
-                        return postBody
-                    }
-                }
-                if (attempt < 1) Thread.sleep(250L)
             }
         }
         return null
@@ -592,7 +601,7 @@ class XtreamApi(
         action: String,
         extra: Map<String, String> = emptyMap(),
     ): List<JsonObject> {
-        val host = HostUtils.baseUrl(profile.host)
+        val host = HostUtils.baseUrl(com.gadir.tv.net.PanelHttp.migrateProfileHost(profile.host))
         val query = buildString {
             append("username=").append(encode(profile.username))
             append("&password=").append(encode(profile.password))
@@ -605,14 +614,11 @@ class XtreamApi(
         val agents = linkedSetOf(activeUserAgent)
         agents.addAll(userAgents)
         for (ua in agents) {
-            repeat(3) { attempt ->
-                val get = NativeHttpClient.request(url, ua, "GET")
-                parseListBody(get)?.let { return it }
-                if (get.status == 512 || get.status == 403 || get.status == 405) {
-                    val post = NativeHttpClient.request(url, ua, "POST")
-                    parseListBody(post)?.let { return it }
-                }
-                if (attempt < 2) Thread.sleep(700L * (attempt + 1))
+            val get = NativeHttpClient.request(url, ua, "GET")
+            parseListBody(get)?.let { return it }
+            if (get.status == 512 || get.status == 403 || get.status == 405 || get.body.isBlank()) {
+                val post = NativeHttpClient.request(url, ua, "POST")
+                parseListBody(post)?.let { return it }
             }
         }
         return emptyList()

@@ -10,22 +10,22 @@ import com.gadir.tv.util.NetworkUrlResolver
 import java.net.URLEncoder
 
 object ChannelIconHelper {
-    private const val LIST_ICON_MAX_FALLBACKS = 12
+    private const val LIST_ICON_MAX_FALLBACKS = 32
 
     fun loadListIcon(target: ImageView, channel: LiveChannel) {
         val density = target.resources.displayMetrics.density
         val size = (44 * density).toInt().coerceAtLeast(96)
-        val primary = ImageUrlResolver.resolve(channel.icon)
+        val cached = ChannelIconCache.get(channel.streamId)
+        val primary = cached ?: ImageUrlResolver.resolve(channel.icon)
         val fallbacks = panelFallbackUrls(PlaylistRepository.profile, channel)
             .filter { it != primary && ImageUrlResolver.resolve(it) != primary }
-            .take(LIST_ICON_MAX_FALLBACKS)
         ImageLoader.loadChannelIcon(
             target = target,
             url = primary,
             fallbacks = fallbacks,
             sizePx = size,
             loadTag = channel.streamId,
-            maxFallbacks = LIST_ICON_MAX_FALLBACKS,
+            channelName = channel.name,
         )
     }
 
@@ -49,6 +49,7 @@ object ChannelIconHelper {
             fallbacks = fallbacks,
             sizePx = size,
             loadTag = "panel:${channel.streamId}",
+            channelName = channel.name,
         )
     }
 
