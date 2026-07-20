@@ -94,6 +94,11 @@ class PlayerActivity : BaseLocaleActivity() {
         override fun onPlayerError(error: PlaybackException) {
             if (isLive && tryNextLiveUrl()) return
             if (!isLive && tryNextVodUrl()) return
+            android.widget.Toast.makeText(
+                this@PlayerActivity,
+                R.string.series_playback_failed,
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
         }
     }
 

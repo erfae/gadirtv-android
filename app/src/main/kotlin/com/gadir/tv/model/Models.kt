@@ -94,6 +94,13 @@ data class VodInfo(
     val trailerUrl: String = "",
     val cast: String = "",
     val director: String = "",
+    val extension: String = "mp4",
+    val directSource: String = "",
+)
+
+data class VodPlaybackMeta(
+    val extension: String = "mp4",
+    val directSource: String = "",
 )
 
 data class EpgEntry(

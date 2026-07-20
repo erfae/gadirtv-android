@@ -175,25 +175,41 @@ class MovieDetailActivity : BaseLocaleActivity() {
         val profile = PlaylistRepository.profile ?: return
         val title = findViewById<TextView>(R.id.movieTitle).text.toString()
         val cover = fallbackCover
-        val urls = VodStreamUrls.movieCandidates(api, profile, streamId, extension)
-        val url = urls.firstOrNull().orEmpty()
-        if (url.isBlank()) {
-            android.widget.Toast.makeText(this, R.string.series_playback_failed, android.widget.Toast.LENGTH_SHORT).show()
-            return
+        lifecycleScope.launch {
+            val meta = withContext(Dispatchers.IO) {
+                runCatching { api.vodPlaybackMeta(profile, streamId) }.getOrNull()
+            }
+            val ext = meta?.extension?.ifBlank { extension } ?: extension
+            val urls = VodStreamUrls.movieCandidates(
+                api = api,
+                profile = profile,
+                streamId = streamId,
+                extension = ext,
+                directSource = meta?.directSource.orEmpty(),
+            )
+            val url = urls.firstOrNull().orEmpty()
+            if (url.isBlank()) {
+                android.widget.Toast.makeText(
+                    this@MovieDetailActivity,
+                    R.string.series_playback_failed,
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+                return@launch
+            }
+            ResumePlaybackHelper.play(
+                context = this@MovieDetailActivity,
+                resumeStore = resumeStore,
+                request = PlaybackRequest(
+                    title = title,
+                    url = url,
+                    kind = ResumeStore.KIND_MOVIE,
+                    contentId = streamId.toString(),
+                    imageUrl = cover,
+                    extension = ext,
+                    alternateUrls = urls.drop(1),
+                ),
+            )
         }
-        ResumePlaybackHelper.play(
-            context = this,
-            resumeStore = resumeStore,
-            request = PlaybackRequest(
-                title = title,
-                url = url,
-                kind = ResumeStore.KIND_MOVIE,
-                contentId = streamId.toString(),
-                imageUrl = cover,
-                extension = extension,
-                alternateUrls = urls.drop(1),
-            ),
-        )
     }
 
     companion object {

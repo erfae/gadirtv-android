@@ -59,9 +59,13 @@ object ImageLoader {
         val size = sizePx.coerceAtLeast(96)
         val streamId = (loadTag as? Int) ?: 0
         val candidates = buildList {
-            if (streamId > 0) ChannelIconCache.get(streamId)?.let { add(it) }
             val primary = ImageUrlResolver.resolve(url)
             if (primary.isNotEmpty()) add(primary)
+            if (streamId > 0) {
+                ChannelIconCache.get(streamId)?.let { cached ->
+                    if (cached != primary) add(cached)
+                }
+            }
             fallbacks.forEach { candidate ->
                 val resolved = ImageUrlResolver.resolve(candidate)
                 if (resolved.isNotEmpty() && resolved !in this) add(resolved)
@@ -227,16 +231,32 @@ object ImageLoader {
     private fun glideUrl(url: String): Any = glideModel(url)
 
     fun glideModel(url: String): Any {
-        val resolved = com.gadir.tv.util.NetworkUrlResolver.resolve(url)
-        if (!resolved.url.startsWith("http")) return resolved.url
+        val trimmed = url.trim()
+        if (!trimmed.startsWith("http", ignoreCase = true)) return trimmed
+
+        val panelUrl = isPanelMediaUrl(trimmed)
+        val resolved = if (panelUrl) {
+            com.gadir.tv.util.NetworkUrlResolver.resolve(trimmed)
+        } else {
+            com.gadir.tv.util.NetworkUrlResolver.Resolved(trimmed)
+        }
         val headers = LazyHeaders.Builder()
             .addHeader("User-Agent", PlaylistRepository.userAgent)
             .addHeader("Accept", "image/*,*/*")
-        // Host header only for panel URLs (IP rewrite); external picons break with wrong Host.
         resolved.hostHeader?.let { headers.addHeader("Host", it) }
-        PlaylistRepository.profile?.host?.let { host ->
-            headers.addHeader("Referer", HostUtils.baseUrl(host) + "/")
+        if (panelUrl) {
+            PlaylistRepository.profile?.host?.let { host ->
+                headers.addHeader("Referer", HostUtils.baseUrl(host) + "/")
+            }
         }
         return GlideUrl(resolved.url, headers.build())
+    }
+
+    private fun isPanelMediaUrl(url: String): Boolean {
+        val lower = url.lowercase()
+        return lower.contains(com.gadir.tv.net.PanelHttp.GADIR_IP) ||
+            lower.contains(com.gadir.tv.net.PanelHttp.GADIR_HOST) ||
+            lower.contains("51.91.120.175") ||
+            (lower.contains("/images/") && lower.contains("/streaming/"))
     }
 }

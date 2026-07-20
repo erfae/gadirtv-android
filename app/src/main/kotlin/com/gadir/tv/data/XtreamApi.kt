@@ -11,6 +11,7 @@ import com.gadir.tv.model.SeriesEpisode
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodInfo
 import com.gadir.tv.model.VodMovie
+import com.gadir.tv.model.VodPlaybackMeta
 import com.gadir.tv.net.NativeHttpClient
 import com.gadir.tv.util.HostUtils
 import com.gadir.tv.util.ImageUrlResolver
@@ -151,7 +152,7 @@ class XtreamApi(
         val extra = if (!categoryId.isNullOrEmpty()) mapOf("category_id" to categoryId) else emptyMap()
         return fetchList(profile, "get_live_streams", extra).mapIndexed { index, row ->
             val streamId = row.get("stream_id")?.asIntOrZero() ?: 0
-            val rawIcon = imageUrl(
+            val rawIcon = MetaExtractor.imageFrom(
                 row,
                 "stream_icon",
                 "logo",
@@ -163,12 +164,10 @@ class XtreamApi(
                 "logo_url",
                 "tv_archive_icon",
             )
-            val icon = ImageUrlResolver.resolve(rawIcon).ifBlank {
-                if (rawIcon.isNotBlank() && !looksLikeStreamUrl(rawIcon)) {
-                    ImageUrlResolver.resolve(rawIcon)
-                } else {
-                    fallbackLiveIcon(profile, streamId)
-                }
+            val icon = when {
+                rawIcon.startsWith("http", ignoreCase = true) -> rawIcon
+                rawIcon.isNotBlank() -> ImageUrlResolver.resolve(rawIcon)
+                else -> ""
             }.ifBlank { fallbackLiveIcon(profile, streamId) }
             LiveChannel(
                 streamId = streamId,
@@ -363,10 +362,26 @@ class XtreamApi(
                 trailerUrl = MetaExtractor.trailerFrom(name, info, movieData, root).orEmpty(),
                 cast = MetaExtractor.castFrom(info, movieData),
                 director = MetaExtractor.directorFrom(info, movieData),
+                extension = movieData?.get("container_extension")?.asStringOrNull()
+                    ?.ifBlank { info?.get("container_extension")?.asStringOrNull().orEmpty() }
+                    ?.ifBlank { "mp4" }
+                    ?: "mp4",
+                directSource = info?.get("direct_source")?.asStringOrNull()
+                    ?.ifBlank { movieData?.get("direct_source")?.asStringOrNull().orEmpty() }
+                    .orEmpty()
+                    .trim(),
             )
         } catch (_: Exception) {
             null
         }
+    }
+
+    fun vodPlaybackMeta(profile: Profile, vodId: Int): VodPlaybackMeta? {
+        val info = vodInfo(profile, vodId) ?: return null
+        return VodPlaybackMeta(
+            extension = info.extension.ifBlank { "mp4" },
+            directSource = info.directSource,
+        )
     }
 
     fun streamUrl(profile: Profile, streamId: Int, ext: String = "ts"): String =
@@ -377,7 +392,7 @@ class XtreamApi(
 
     /** Short live URL — avoids 301 redirect to gadir.co hostname (breaks on TV DNS). */
     fun liveStreamUrlDirect(profile: Profile, streamId: Int, ext: String? = null): String {
-        val host = HostUtils.baseUrl(profile.host)
+        val host = panelHost(profile)
         val u = encode(profile.username)
         val pw = encode(profile.password)
         val path = if (ext.isNullOrBlank()) {
@@ -392,20 +407,40 @@ class XtreamApi(
         buildStreamUrl(profile, "movie", streamId, ext)
 
     fun movieStreamUrlWithoutExtension(profile: Profile, streamId: Int): String {
-        val host = HostUtils.baseUrl(profile.host)
+        val host = panelHost(profile)
         val u = encode(profile.username)
         val pw = encode(profile.password)
-        return "$host/movie/$u/$pw/$streamId"
+        return NetworkUrlResolver.resolveUrl("$host/movie/$u/$pw/$streamId")
+    }
+
+    fun movieStreamPhp(profile: Profile, streamId: Int, ext: String = "mp4"): String {
+        val host = panelHost(profile)
+        val u = encode(profile.username)
+        val pw = encode(profile.password)
+        val e = encode(ext.ifBlank { "mp4" })
+        return NetworkUrlResolver.resolveUrl(
+            "$host/streaming/movies.php?username=$u&password=$pw&stream=$streamId&extension=$e",
+        )
     }
 
     fun seriesStreamUrl(profile: Profile, episodeId: Int, ext: String = "mp4"): String =
         buildStreamUrl(profile, "series", episodeId, ext)
 
     fun seriesStreamUrlWithoutExtension(profile: Profile, episodeId: Int): String {
-        val host = HostUtils.baseUrl(profile.host)
+        val host = panelHost(profile)
         val u = encode(profile.username)
         val pw = encode(profile.password)
-        return "$host/series/$u/$pw/$episodeId"
+        return NetworkUrlResolver.resolveUrl("$host/series/$u/$pw/$episodeId")
+    }
+
+    fun seriesStreamPhp(profile: Profile, episodeId: Int, ext: String = "mp4"): String {
+        val host = panelHost(profile)
+        val u = encode(profile.username)
+        val pw = encode(profile.password)
+        val e = encode(ext.ifBlank { "mp4" })
+        return NetworkUrlResolver.resolveUrl(
+            "$host/streaming/series.php?username=$u&password=$pw&stream=$episodeId&extension=$e",
+        )
     }
 
     fun shortEpg(
@@ -548,11 +583,14 @@ class XtreamApi(
         if (kind == "live") {
             return liveStreamUrlDirect(profile, streamId, ext)
         }
-        val host = HostUtils.baseUrl(profile.host)
+        val host = panelHost(profile)
         val u = encode(profile.username)
         val pw = encode(profile.password)
         return NetworkUrlResolver.resolveUrl("$host/$kind/$u/$pw/$streamId.$ext")
     }
+
+    private fun panelHost(profile: Profile): String =
+        HostUtils.baseUrl(com.gadir.tv.net.PanelHttp.migrateProfileHost(profile.host))
 
     private fun fetchCategories(profile: Profile, action: String): List<Category> =
         fetchList(profile, action).mapIndexed { index, row ->
@@ -694,7 +732,7 @@ class XtreamApi(
 
     private fun fallbackLiveIcon(profile: Profile, streamId: Int): String {
         if (streamId <= 0) return ""
-        val base = HostUtils.baseUrl(profile.host)
+        val base = panelHost(profile)
         return NetworkUrlResolver.resolveUrl("$base/images/$streamId.png")
     }
 
