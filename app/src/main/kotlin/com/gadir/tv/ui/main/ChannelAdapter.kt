@@ -155,6 +155,7 @@ class ChannelAdapter(
         holder.number.text = (position + 1).toString()
         holder.name.text = item.name
         val iconSize = (44 * holder.icon.resources.displayMetrics.density).toInt().coerceAtLeast(96)
+        ImageLoader.clear(holder.icon)
         ChannelIconFallback.load(holder.icon, item.name, iconSize)
         ChannelIconHelper.loadListIcon(holder.icon, item)
         holder.favorite.setImageResource(
