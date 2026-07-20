@@ -21,10 +21,14 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
+import com.gadir.tv.data.LiveChannelStore
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
+import com.gadir.tv.model.LiveChannel
+import com.gadir.tv.player.LiveChannelNavigator
 import com.gadir.tv.player.LiveStreamUrls
+import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.player.PlayerFactory
 import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.TimeFormat
@@ -427,11 +431,39 @@ class PlayerActivity : BaseLocaleActivity() {
         hideHandler.postDelayed(hideControlsRunnable, CONTROLS_HIDE_MS)
     }
 
+    private fun zapLiveChannel(delta: Int) {
+        if (!isLive || liveStreamId <= 0) return
+        val channel = LiveChannelNavigator.neighbor(this, liveStreamId, delta) ?: return
+        switchToLiveChannel(channel)
+    }
+
+    private fun switchToLiveChannel(channel: LiveChannel) {
+        val profile = PlaylistRepository.profile ?: return
+        liveStreamId = channel.streamId
+        LiveChannelStore(this).lastStreamId = channel.streamId
+        findViewById<TextView>(R.id.playerChannelTitle).text = channel.name
+        epgLoaded = false
+        loadFullscreenEpg(channel.streamId)
+        val urls = if (DeviceUi.isTvUi(this)) {
+            LiveStreamUrls.tvCandidates(api, profile, channel)
+        } else {
+            LiveStreamUrls.candidates(api, profile, channel)
+        }
+        pendingLiveUrls.clear()
+        pendingLiveUrls.addAll(urls.filter { it.isNotBlank() }.distinct())
+        val next = pendingLiveUrls.firstOrNull() ?: return
+        val exo = player ?: return
+        liveUrlSettled = false
+        playbackMonitor?.reset()
+        exo.setMediaItem(LiveStreamUrls.mediaItem(next))
+        exo.prepare()
+        exo.playWhenReady = true
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN && isLive) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
-                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
                 KeyEvent.KEYCODE_MENU,
                 -> {
                     if (!liveOverlaysVisible) {
@@ -439,6 +471,14 @@ class PlayerActivity : BaseLocaleActivity() {
                         return true
                     }
                     scheduleHideLiveOverlays()
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    zapLiveChannel(-1)
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    zapLiveChannel(1)
+                    return true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     if (!liveOverlaysVisible) {
