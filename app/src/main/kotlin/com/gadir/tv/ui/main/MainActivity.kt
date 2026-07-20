@@ -725,12 +725,21 @@ class MainActivity : BaseLocaleActivity() {
     private fun enterLiveTabFromTabBar() {
         liveCategoryHandler.removeCallbacksAndMessages(null)
         if (liveCategories.isEmpty()) return
-        liveCategoryFocusIndex = 0
         syncLiveCategoryCounts()
         warmLiveCategoryPrefetch()
-        liveCategories.firstOrNull()?.let { cat ->
-            withLiveCategoryAccess(cat, liveCategoryId(cat)) {
-                enterLiveContent(cat)
+        val savedId = liveChannelStore.lastCategoryId?.takeIf { it.isNotEmpty() }
+            ?: liveBrowsingCategoryId
+        val savedIndex = savedId?.let { id ->
+            liveCategories.indexOfFirst { liveCategoryId(it) == id }
+        }?.takeIf { it >= 0 }
+            ?: liveCategoryFocusIndex.coerceIn(0, (liveCategories.size - 1).coerceAtLeast(0))
+        liveCategoryFocusIndex = savedIndex
+        val cat = liveCategories.getOrNull(savedIndex) ?: return
+        withLiveCategoryAccess(cat, liveCategoryId(cat)) {
+            previewLiveCategoryGroup(cat)
+            liveCategoryList.post {
+                if (currentTab != Tab.LIVE || liveBrowseLevel != TvBrowseNav.Level.GROUP) return@post
+                TvBrowseNav.focusGroup(liveCategoryList, savedIndex)
             }
         }
     }
@@ -1581,27 +1590,39 @@ class MainActivity : BaseLocaleActivity() {
             openCatalogTabAtFirstGroup(tab)
             return
         }
-        val first = cats.firstOrNull { !catalogCategoryRequiresPin(tab, it.id) } ?: cats.first()
+        val lastId = when (tab) {
+            Tab.MOVIES -> movieCategoryId
+            Tab.SERIES -> seriesCategoryId
+            else -> null
+        }?.takeIf { id -> cats.any { it.id == id } }
+        val target = lastId?.let { id -> cats.find { it.id == id } }
+            ?: cats.firstOrNull { !catalogCategoryRequiresPin(tab, it.id) }
+            ?: cats.first()
+        val targetIndex = cats.indexOfFirst { it.id == target.id }.coerceAtLeast(0)
         val cachedReady = when (tab) {
-            Tab.MOVIES -> first.id == ResumeStore.RESUME_CATEGORY_ID ||
-                !PlaylistRepository.cachedVod(first.id).isNullOrEmpty()
-            Tab.SERIES -> first.id == ResumeStore.RESUME_CATEGORY_ID ||
-                !PlaylistRepository.cachedSeries(first.id).isNullOrEmpty()
+            Tab.MOVIES -> target.id == ResumeStore.RESUME_CATEGORY_ID ||
+                !PlaylistRepository.cachedVod(target.id).isNullOrEmpty()
+            Tab.SERIES -> target.id == ResumeStore.RESUME_CATEGORY_ID ||
+                !PlaylistRepository.cachedSeries(target.id).isNullOrEmpty()
             else -> false
         }
         if (!cachedReady) {
-            warmFirstCatalogGroup(tab)
+            prefetchCatalogGroup(tab, target.id)
         }
-        if (catalogCategories.isEmpty() || catalogCategories.firstOrNull()?.id != cats.first().id) {
+        if (catalogCategories.isEmpty() || catalogCategories.size != cats.size) {
             catalogCategories.clear()
             catalogCategories.addAll(cats)
-            catalogCategoryFocusIndex = 0
             bindCatalogCategoryAdapter(tab)
             syncCatalogCategoryCounts(tab)
             warmCatalogCategoryCounts(tab)
         }
-        withCatalogCategoryAccess(tab, first) {
-            enterCatalogContent(tab, first)
+        catalogCategoryFocusIndex = targetIndex
+        withCatalogCategoryAccess(tab, target) {
+            previewCatalogGroup(tab, target)
+            catalogCategoryList.post {
+                if (currentTab != tab || catalogBrowseLevel != TvBrowseNav.Level.GROUP) return@post
+                TvBrowseNav.focusGroup(catalogCategoryList, targetIndex)
+            }
         }
     }
 
@@ -1987,13 +2008,13 @@ class MainActivity : BaseLocaleActivity() {
                         }
                     }
                     KeyEvent.KEYCODE_DPAD_LEFT -> {
-                        if (currentTab == tab) {
+                        if (currentTab == tab && isBrowseTabLocked(tab)) {
                             focusAdjacentTab(tab, -1)
                             return@setOnKeyListener true
                         }
                     }
                     KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                        if (currentTab == tab) {
+                        if (currentTab == tab && isBrowseTabLocked(tab)) {
                             focusAdjacentTab(tab, +1)
                             return@setOnKeyListener true
                         }
@@ -3889,7 +3910,16 @@ class MainActivity : BaseLocaleActivity() {
         val categoryId = selectedCatalogCategoryId.orEmpty()
         when (tab) {
             Tab.MOVIES -> {
-                if (item.resumePositionMs > 0L) {
+                if (DeviceUi.useDpadFocus(this)) {
+                    playMovie(
+                        title = item.title,
+                        streamId = item.id,
+                        extension = item.extension,
+                        imageUrl = item.imageUrl,
+                        positionMs = item.resumePositionMs,
+                        categoryId = categoryId,
+                    )
+                } else if (item.resumePositionMs > 0L) {
                     playMovie(
                         title = item.title,
                         streamId = item.id,
@@ -3908,7 +3938,14 @@ class MainActivity : BaseLocaleActivity() {
                 }
             }
             Tab.SERIES -> {
-                if (item.resumePositionMs > 0L) {
+                if (DeviceUi.useDpadFocus(this)) {
+                    playSeriesFirstEpisode(
+                        seriesId = item.id,
+                        title = item.title,
+                        imageUrl = item.imageUrl,
+                        categoryId = categoryId,
+                    )
+                } else if (item.resumePositionMs > 0L) {
                     playSeriesEpisode(
                         title = item.title,
                         episodeId = item.id,
@@ -4629,8 +4666,12 @@ class MainActivity : BaseLocaleActivity() {
     private fun handleTvBack(): Boolean {
         return when (currentTab) {
             Tab.HOME -> {
-                logoutUser()
-                true
+                if (DeviceUi.useDpadFocus(this) && isFocusInBottomNav()) {
+                    true
+                } else {
+                    logoutUser()
+                    true
+                }
             }
             Tab.LIVE -> handleLiveBack()
             Tab.MOVIES, Tab.SERIES -> handleCatalogBack()
@@ -4678,6 +4719,12 @@ class MainActivity : BaseLocaleActivity() {
 
     /** Tab focus first so Back/Left from group never escapes the activity. */
     private fun returnToLiveTab() {
+        val index = focusedLiveCategoryIndex()
+        if (index >= 0) liveCategoryFocusIndex = index
+        liveCategories.getOrNull(liveCategoryFocusIndex)?.let { cat ->
+            liveBrowsingCategoryId = liveCategoryId(cat)
+            liveChannelStore.lastCategoryId = liveBrowsingCategoryId
+        }
         liveBrowseLevel = TvBrowseNav.Level.TAB
         applyLiveBrowseLevel()
         TvBrowseNav.focusTab(tabLive)
@@ -4689,6 +4736,16 @@ class MainActivity : BaseLocaleActivity() {
             Tab.MOVIES -> tabMovies
             Tab.SERIES -> tabSeries
             else -> return
+        }
+        val index = focusedCatalogCategoryIndex()
+        catalogCategoryFocusIndex = index
+        catalogCategories.getOrNull(index)?.id?.let { id ->
+            catalogBrowsingCategoryId = id
+            when (tab) {
+                Tab.MOVIES -> movieCategoryId = id
+                Tab.SERIES -> seriesCategoryId = id
+                else -> Unit
+            }
         }
         catalogBrowseLevel = TvBrowseNav.Level.TAB
         applyCatalogBrowseLevel(tab)
@@ -4719,6 +4776,18 @@ class MainActivity : BaseLocaleActivity() {
             parent = parent.parent
         }
         return false
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (DeviceUi.useDpadFocus(this) && event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
+                    handleTvBack()
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onStop() {
@@ -4830,7 +4899,7 @@ class MainActivity : BaseLocaleActivity() {
         miniExoView = panel.findViewById(R.id.miniExoPlayer)
         miniVlcView = panel.findViewById(R.id.miniVlcPlayer)
         previewUsesExo = when {
-            DeviceUi.isTvUi(this) && miniExoView != null -> true
+            DeviceUi.isTvUi(this) && miniVlcView != null -> false
             DeviceUi.isCompact(this) && miniExoView != null -> true
             miniVlcView != null -> false
             else -> miniExoView != null

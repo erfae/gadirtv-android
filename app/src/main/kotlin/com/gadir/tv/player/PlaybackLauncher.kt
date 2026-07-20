@@ -39,9 +39,11 @@ object PlaybackLauncher {
         }
     }
 
-    /** TV boxes (Amlogic): VLC for all fullscreen playback; Exo stays on live preview only. */
-    private fun useVlcOnTv(context: Context, request: PlaybackRequest): Boolean =
-        DeviceUi.isTvUi(context)
+    /** TV: VLC solo para live en pantalla completa; películas/series con Exo+FFmpeg. */
+    private fun useVlcOnTv(context: Context, request: PlaybackRequest): Boolean {
+        if (!DeviceUi.isTvUi(context)) return false
+        return request.kind == ResumeStore.KIND_LIVE
+    }
 
     private fun vodFallback(context: Context, request: PlaybackRequest) {
         if (useVlcOnTv(context, request)) launchVlc(context, request) else launchExo(context, request)

@@ -258,7 +258,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     }
 
     private fun tryNextUrl(): Boolean {
-        if (pendingUrls.size <= 1) return false
+        if (pendingUrls.isEmpty()) return false
         pendingUrls.removeFirst()
         val next = pendingUrls.firstOrNull() ?: return false
         playUrl(next)
@@ -340,7 +340,11 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         findViewById<TextView>(R.id.playerChannelTitle).text = channel.name
         epgLoaded = false
         loadFullscreenEpg(channel.streamId, channel.epgChannelId)
-        val urls = LiveStreamUrls.candidates(api, profile, channel)
+        val urls = if (com.gadir.tv.util.DeviceUi.isTvUi(this)) {
+            LiveStreamUrls.tvCandidates(api, profile, channel)
+        } else {
+            LiveStreamUrls.candidates(api, profile, channel)
+        }
         pendingUrls.clear()
         pendingUrls.addAll(urls)
         playUrl(urls.first())
