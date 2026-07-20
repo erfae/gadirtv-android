@@ -39,14 +39,9 @@ object PlaybackLauncher {
         }
     }
 
-    /**
-     * Amlogic TV boxes: libVLC for VOD (proven on your hardware), Exo for live/preview.
-     * Matches PLUME4KV2 + IBO Pro fallback pattern (native VLC, Exo optional).
-     */
-    private fun useVlcOnTv(context: Context, request: PlaybackRequest): Boolean {
-        if (!DeviceUi.isTvUi(context)) return false
-        return request.kind != ResumeStore.KIND_LIVE
-    }
+    /** TV boxes (Amlogic): VLC for all fullscreen playback; Exo stays on live preview only. */
+    private fun useVlcOnTv(context: Context, request: PlaybackRequest): Boolean =
+        DeviceUi.isTvUi(context)
 
     private fun vodFallback(context: Context, request: PlaybackRequest) {
         if (useVlcOnTv(context, request)) launchVlc(context, request) else launchExo(context, request)
