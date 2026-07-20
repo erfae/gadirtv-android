@@ -20,15 +20,18 @@ object LiveStreamUrls {
         if (direct.isNotEmpty() && direct.startsWith("http")) {
             urls.add(com.gadir.tv.util.NetworkUrlResolver.resolveUrl(direct))
         }
-        urls.add(api.liveStreamUrlDirect(profile, channel.streamId))
-        urls.add(api.liveStreamUrlDirect(profile, channel.streamId, "ts"))
         val ext = channel.extension.ifBlank { "ts" }.lowercase()
+        urls.add(api.liveStreamUrlDirect(profile, channel.streamId, "ts"))
+        urls.add(api.liveStreamUrlDirect(profile, channel.streamId))
         if (ext.isNotEmpty() && ext !in setOf("ts", "m3u8")) {
             urls.add(api.liveStreamUrlDirect(profile, channel.streamId, ext))
         }
         urls.add(api.liveStreamUrlDirect(profile, channel.streamId, "m3u8"))
         urls.add(api.streamUrl(profile, channel.streamId, "ts"))
         urls.add(api.streamUrl(profile, channel.streamId, "m3u8"))
+        if (ext.isNotEmpty() && ext !in setOf("ts", "m3u8")) {
+            urls.add(api.streamUrl(profile, channel.streamId, ext))
+        }
         return urls.filter { it.isNotBlank() }.distinct()
     }
 
