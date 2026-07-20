@@ -15,7 +15,11 @@ object PlaybackLauncher {
             when {
                 settings.playerMode == AppSettings.PLAYER_EXTERNAL ->
                     launchExternal(context, request, settings)
-                settings.playerMode == AppSettings.PLAYER_VLC && !preferExoOnTv(context) ->
+                settings.playerMode == AppSettings.PLAYER_VLC ->
+                    launchVlc(context, request)
+                settings.playerMode == AppSettings.PLAYER_COMPAT ->
+                    launchExo(context, request)
+                useVlcOnTv(context, request) ->
                     launchVlc(context, request)
                 else -> launchExo(context, request)
             }
@@ -28,8 +32,14 @@ object PlaybackLauncher {
         }
     }
 
-    /** TV: ExoPlayer (HW decode) is far more stable than libVLC on Xiaomi/Amlogic boxes. */
-    private fun preferExoOnTv(context: Context): Boolean = DeviceUi.isTvUi(context)
+    /**
+     * PLUME default: Exo for live, VLC for movies/series (w0==VLC, w1==Exo).
+     * VlcPlayerActivity falls back to Exo on error.
+     */
+    private fun useVlcOnTv(context: Context, request: PlaybackRequest): Boolean {
+        if (!DeviceUi.isTvUi(context)) return false
+        return request.kind != com.gadir.tv.data.ResumeStore.KIND_LIVE
+    }
 
     private fun launchExternal(context: Context, request: PlaybackRequest, settings: AppSettings) {
         val players = ExternalPlayerHelper.findInstalledPlayers(context)
