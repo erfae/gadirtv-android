@@ -97,7 +97,7 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
         private const val CHANNEL_PREVIEW_DELAY_MS = 0L
-        private const val PREVIEW_TIMEOUT_MS = 10_000L
+        private const val PREVIEW_TIMEOUT_MS = 8_000L
         private const val CATALOG_PREFETCH_DELAY_MS = 0L
     }
     private val api = XtreamApi()
@@ -259,7 +259,10 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun usesExoPreview(): Boolean = previewUsesExo
 
-    private fun livePanel(): View = checkNotNull(panelLive) { "Live panel not ready" }
+    private fun livePanel(): View {
+        ensureLiveTabReady()
+        return inflateLivePanelIfNeeded()
+    }
 
     private fun inflateLivePanelIfNeeded(): View {
         panelLive?.let { return it }
@@ -1582,16 +1585,27 @@ class MainActivity : BaseLocaleActivity() {
             openCatalogTabAtFirstGroup(tab)
             return
         }
-        catalogCategories.clear()
-        catalogCategories.addAll(cats)
-        catalogCategoryFocusIndex = 0
-        bindCatalogCategoryAdapter(tab)
-        syncCatalogCategoryCounts(tab)
-        warmCatalogCategoryCounts(tab)
-        cats.firstOrNull()?.let { cat ->
-            withCatalogCategoryAccess(tab, cat) {
-                enterCatalogContent(tab, cat)
-            }
+        val first = cats.firstOrNull { !catalogCategoryRequiresPin(tab, it.id) } ?: cats.first()
+        val cachedReady = when (tab) {
+            Tab.MOVIES -> first.id == ResumeStore.RESUME_CATEGORY_ID ||
+                !PlaylistRepository.cachedVod(first.id).isNullOrEmpty()
+            Tab.SERIES -> first.id == ResumeStore.RESUME_CATEGORY_ID ||
+                !PlaylistRepository.cachedSeries(first.id).isNullOrEmpty()
+            else -> false
+        }
+        if (!cachedReady) {
+            warmFirstCatalogGroup(tab)
+        }
+        if (catalogCategories.isEmpty() || catalogCategories.firstOrNull()?.id != cats.first().id) {
+            catalogCategories.clear()
+            catalogCategories.addAll(cats)
+            catalogCategoryFocusIndex = 0
+            bindCatalogCategoryAdapter(tab)
+            syncCatalogCategoryCounts(tab)
+            warmCatalogCategoryCounts(tab)
+        }
+        withCatalogCategoryAccess(tab, first) {
+            enterCatalogContent(tab, first)
         }
     }
 
@@ -1789,6 +1803,84 @@ class MainActivity : BaseLocaleActivity() {
                 }
                 catalogCategoryCounts[catId] = size.size
                 catalogCategoryAdapter?.refreshSelection()
+                if (
+                    catalogEnterContentOnLoad &&
+                    selectedCatalogCategoryId == catId &&
+                    posterItems.isEmpty()
+                ) {
+                    when (tab) {
+                        Tab.MOVIES -> bindMovies(size as List<VodMovie>)
+                        Tab.SERIES -> bindSeries(size as List<SeriesItem>)
+                        else -> Unit
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun warmFirstCatalogGroup(tab: Tab) {
+        val firstId = catalogCategoriesFor(tab)
+            .firstOrNull { !catalogCategoryRequiresPin(tab, it.id) }
+            ?.id
+            ?: return
+        prefetchCatalogGroup(tab, firstId)
+    }
+
+    private fun prefetchCatalogDetail(tab: Tab, item: PosterAdapter.PosterItem) {
+        val kind = when (tab) {
+            Tab.MOVIES -> "movie"
+            Tab.SERIES -> "series"
+            else -> return
+        }
+        if (PlotCache.get(kind, item.id) != null) return
+        val profile = PlaylistRepository.profile ?: return
+        val emptyPlot = getString(R.string.hero_plot_empty)
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    when (tab) {
+                        Tab.MOVIES -> {
+                            val info = api.vodInfo(profile, item.id) ?: return@withContext
+                            val backdrop = info.backdrop.ifBlank { info.cover }
+                            PlotCache.put(
+                                kind,
+                                item.id,
+                                PlotCache.Entry(
+                                    plot = info.plot.ifBlank { emptyPlot },
+                                    subtitle = listOf(info.genre, info.releaseDate, info.rating)
+                                        .filter { it.isNotBlank() }
+                                        .joinToString(" · "),
+                                    backdrop = backdrop,
+                                    poster = info.cover,
+                                    title = info.name,
+                                ),
+                            )
+                        }
+                        Tab.SERIES -> {
+                            val detail = api.seriesInfo(profile, item.id) ?: return@withContext
+                            val backdrop = detail.backdrop.ifBlank { detail.cover }
+                            val seasons = detail.seasons.keys
+                                .sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
+                                .joinToString(" · ") { season -> "S$season" }
+                            PlotCache.put(
+                                kind,
+                                item.id,
+                                PlotCache.Entry(
+                                    plot = detail.plot.ifBlank { emptyPlot },
+                                    subtitle = listOf(detail.genre, detail.releaseDate, detail.rating)
+                                        .filter { it.isNotBlank() }
+                                        .joinToString(" · "),
+                                    backdrop = backdrop,
+                                    poster = detail.cover,
+                                    title = detail.name,
+                                    seasonsSummary = seasons,
+                                ),
+                            )
+                        }
+                        else -> Unit
+                    }
+                }
             } catch (_: Exception) {
             }
         }
@@ -1862,12 +1954,14 @@ class MainActivity : BaseLocaleActivity() {
         bindNavTab(tabMovies, Tab.MOVIES)
         bindNavTab(tabSeries, Tab.SERIES)
         if (DeviceUi.useDpadFocus(this)) {
+            tabHome.nextFocusLeftId = R.id.tabSeries
             tabHome.nextFocusRightId = R.id.tabLive
             tabLive.nextFocusLeftId = R.id.tabHome
             tabLive.nextFocusRightId = R.id.tabMovies
             tabMovies.nextFocusLeftId = R.id.tabLive
             tabMovies.nextFocusRightId = R.id.tabSeries
             tabSeries.nextFocusLeftId = R.id.tabMovies
+            tabSeries.nextFocusRightId = R.id.tabHome
             heroPlay.nextFocusRightId = R.id.tabLive
             updateTabDownFocus()
         }
@@ -1879,8 +1973,12 @@ class MainActivity : BaseLocaleActivity() {
         }
         if (DeviceUi.useDpadFocus(this)) {
             view.setOnFocusChangeListener { _, hasFocus ->
-                if (hasFocus && currentTab != tab) {
+                if (!hasFocus) return@setOnFocusChangeListener
+                if (currentTab != tab) {
                     openTab(tab)
+                }
+                if (tab == Tab.MOVIES || tab == Tab.SERIES) {
+                    warmFirstCatalogGroup(tab)
                 }
             }
             view.setOnKeyListener { _, keyCode, event ->
@@ -1889,6 +1987,18 @@ class MainActivity : BaseLocaleActivity() {
                     KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                         if (currentTab == tab) {
                             enterTabPanel(tab)
+                            return@setOnKeyListener true
+                        }
+                    }
+                    KeyEvent.KEYCODE_DPAD_LEFT -> {
+                        if (currentTab == tab) {
+                            focusAdjacentTab(tab, -1)
+                            return@setOnKeyListener true
+                        }
+                    }
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        if (currentTab == tab) {
+                            focusAdjacentTab(tab, +1)
                             return@setOnKeyListener true
                         }
                     }
@@ -1994,6 +2104,7 @@ class MainActivity : BaseLocaleActivity() {
                 if (DeviceUi.useDpadFocus(this)) {
                     catalogBrowseLevel = TvBrowseNav.Level.TAB
                     panelCatalog.post { applyCatalogBrowseLevel(tab) }
+                    warmFirstCatalogGroup(tab)
                 }
                 val switchingBetweenCatalog =
                     (previousTab == Tab.MOVIES || previousTab == Tab.SERIES) && previousTab != tab
@@ -3365,6 +3476,11 @@ class MainActivity : BaseLocaleActivity() {
         catalogGrid.adapter = PosterAdapter(
             items = posterItems,
             onClick = { item -> onPosterClick(tab, item) },
+            onFocus = if (DeviceUi.useDpadFocus(this)) {
+                { item -> prefetchCatalogDetail(tab, item) }
+            } else {
+                null
+            },
             kind = when (tab) {
                 Tab.MOVIES -> FavoritesStore.KIND_MOVIE
                 Tab.SERIES -> FavoritesStore.KIND_SERIES
@@ -4299,7 +4415,6 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun startPreviewPlayback(channel: LiveChannel, token: Int, profile: Profile) {
         if (token != previewToken || livePreviewPaused) return
-        updatePreviewInfo(channel)
         if (!appSettings.autoplayPreview) {
             cancelMiniPreviewPlayback()
             setPreviewVideoVisible(false)
@@ -4307,7 +4422,7 @@ class MainActivity : BaseLocaleActivity() {
         }
         val channelChanged = previewingStreamId != channel.streamId
         if (channelChanged || previewUrls.isEmpty()) {
-            previewUrls = LivePreviewStreamUrls.candidates(api, profile, channel)
+            previewUrls = orderPreviewUrls(LivePreviewStreamUrls.candidates(api, profile, channel))
             previewUrlIndex = 0
             previewWorkingUrl = null
             previewingStreamId = channel.streamId
@@ -4318,6 +4433,11 @@ class MainActivity : BaseLocaleActivity() {
             return
         }
         playMiniPreviewUrl(url, token, hideVideo = channelChanged)
+    }
+
+    private fun orderPreviewUrls(urls: List<String>): List<String> {
+        val working = previewWorkingUrl?.takeIf { it.isNotBlank() && it in urls } ?: return urls
+        return listOf(working) + urls.filter { it != working }
     }
 
     private var previewPlaybackToken = 0
@@ -4553,11 +4673,28 @@ class MainActivity : BaseLocaleActivity() {
         return true
     }
 
+    private fun focusAdjacentTab(tab: Tab, direction: Int) {
+        val tabs = listOf(Tab.HOME, Tab.LIVE, Tab.MOVIES, Tab.SERIES)
+        val index = tabs.indexOf(tab)
+        if (index < 0) return
+        val next = tabs[(index + direction + tabs.size) % tabs.size]
+        val tabView = when (next) {
+            Tab.HOME -> tabHome
+            Tab.LIVE -> tabLive
+            Tab.MOVIES -> tabMovies
+            Tab.SERIES -> tabSeries
+        }
+        tabView.requestFocus()
+    }
+
     /** Tab focus first so Back/Left from group never escapes the activity. */
     private fun returnToLiveTab() {
         liveBrowseLevel = TvBrowseNav.Level.TAB
         tabLive.requestFocus()
-        tabLive.post { applyLiveBrowseLevel() }
+        tabLive.post {
+            if (currentTab != Tab.LIVE) return@post
+            applyLiveBrowseLevel()
+        }
     }
 
     /** Tab focus first so Back/Left from group never escapes the activity. */
@@ -4569,7 +4706,10 @@ class MainActivity : BaseLocaleActivity() {
         }
         catalogBrowseLevel = TvBrowseNav.Level.TAB
         tabView.requestFocus()
-        tabView.post { applyCatalogBrowseLevel(tab) }
+        tabView.post {
+            if (currentTab != tab) return@post
+            applyCatalogBrowseLevel(tab)
+        }
     }
 
     private fun isFocusInBottomNav(): Boolean {
