@@ -33,6 +33,14 @@ object PlayerFactory {
         .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
         .build()
 
+  private fun renderersFactory(
+        context: Context,
+        extensionRendererMode: Int,
+    ): DefaultRenderersFactory =
+        DefaultRenderersFactory(context)
+            .setExtensionRendererMode(extensionRendererMode)
+            .setEnableDecoderFallback(true)
+
     private fun build(
         context: Context,
         minBuffer: Int,
@@ -41,9 +49,9 @@ object PlayerFactory {
         rebuffer: Int,
         audioAttributes: AudioAttributes,
         handleAudioFocus: Boolean,
+        extensionRendererMode: Int = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON,
     ): ExoPlayer {
-        val renderersFactory = DefaultRenderersFactory(context)
-            .setEnableDecoderFallback(true)
+        val renderersFactory = renderersFactory(context, extensionRendererMode)
 
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(minBuffer, maxBuffer, playbackBuffer, rebuffer)
@@ -69,13 +77,16 @@ object PlayerFactory {
             rebuffer = bufferMs * 4,
             audioAttributes = vodAudioAttributes(),
             handleAudioFocus = true,
+            extensionRendererMode = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER,
         )
     }
 
     fun createForLivePreview(context: Context): ExoPlayer {
         val bufferMs = AppSettings(context).networkBufferMs
-        val renderersFactory = DefaultRenderersFactory(context)
-            .setEnableDecoderFallback(true)
+        val renderersFactory = renderersFactory(
+            context,
+            DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON,
+        )
         val trackSelector = DefaultTrackSelector(context).apply {
             setParameters(
                 buildUponParameters()

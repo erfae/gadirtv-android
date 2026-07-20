@@ -5,8 +5,6 @@ import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.ui.player.PlayerActivity
 import com.gadir.tv.ui.player.VlcPlayerActivity
-import com.gadir.tv.util.DeviceUi
-
 object PlaybackLauncher {
     fun play(context: Context, request: PlaybackRequest) {
         if (request.url.isBlank()) return
@@ -19,8 +17,6 @@ object PlaybackLauncher {
                     launchVlc(context, request)
                 settings.playerMode == AppSettings.PLAYER_COMPAT ->
                     launchExo(context, request)
-                useVlcOnTv(context, request) ->
-                    launchVlc(context, request)
                 else -> launchExo(context, request)
             }
         } catch (_: Throwable) {
@@ -30,15 +26,6 @@ object PlaybackLauncher {
                 android.widget.Toast.LENGTH_LONG,
             ).show()
         }
-    }
-
-    /**
-     * PLUME default: Exo for live, VLC for movies/series (w0==VLC, w1==Exo).
-     * VlcPlayerActivity falls back to Exo on error.
-     */
-    private fun useVlcOnTv(context: Context, request: PlaybackRequest): Boolean {
-        if (!DeviceUi.isTvUi(context)) return false
-        return request.kind != com.gadir.tv.data.ResumeStore.KIND_LIVE
     }
 
     private fun launchExternal(context: Context, request: PlaybackRequest, settings: AppSettings) {

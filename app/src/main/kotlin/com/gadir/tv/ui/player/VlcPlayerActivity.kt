@@ -67,6 +67,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private var epgLoaded = false
     private var vodDurationMs = 0L
     private var exoFallbackLaunched = false
+    private var allowExoFallback = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,6 +80,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val url = intent.getStringExtra(EXTRA_URL).orEmpty()
+        allowExoFallback = !intent.getBooleanExtra(EXTRA_DISABLE_EXO_FALLBACK, false)
         pendingUrls.add(url)
         intent.getStringArrayListExtra(EXTRA_ALTERNATE_URLS)?.forEach { alt ->
             if (alt.isNotBlank() && alt !in pendingUrls) pendingUrls.add(alt)
@@ -264,7 +266,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     }
 
     private fun fallbackToExoPlayer() {
-        if (exoFallbackLaunched) return
+        if (!allowExoFallback || exoFallbackLaunched) return
         exoFallbackLaunched = true
         val url = pendingUrls.firstOrNull().orEmpty()
         if (url.isBlank()) return
@@ -281,6 +283,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                 positionMs = resumePositionMs,
                 streamId = currentStreamId,
                 alternateUrls = pendingUrls.drop(1).toList(),
+                disableVlcFallback = true,
             ),
         )
         finish()
@@ -489,6 +492,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_CONTENT_ID = "content_id"
         private const val EXTRA_IMAGE_URL = "image_url"
         private const val EXTRA_EXTENSION = "extension"
+        private const val EXTRA_DISABLE_EXO_FALLBACK = "disable_exo_fallback"
         private const val VLC_VOLUME = com.gadir.tv.player.VlcAudioOptions.VOLUME_FULLSCREEN
         private const val SEEK_STEP_MS = 10_000L
         private const val CONTROLS_HIDE_MS = 5_000L
@@ -505,6 +509,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             contentId: String = "",
             imageUrl: String = "",
             extension: String = "mkv",
+            disableExoFallback: Boolean = false,
         ): Intent = Intent(context, VlcPlayerActivity::class.java)
             .putExtra(EXTRA_TITLE, title)
             .putExtra(EXTRA_URL, url)
@@ -516,5 +521,6 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             .putExtra(EXTRA_IMAGE_URL, imageUrl)
             .putExtra(EXTRA_EXTENSION, extension)
             .putStringArrayListExtra(EXTRA_ALTERNATE_URLS, ArrayList(alternateUrls))
+            .putExtra(EXTRA_DISABLE_EXO_FALLBACK, disableExoFallback)
     }
 }

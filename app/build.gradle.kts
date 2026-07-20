@@ -22,9 +22,9 @@ android {
         minSdk = 21
         targetSdk = 33
         // Must exceed Flutter v2.5.8 (versionCode 84) so native can replace it.
-        // TV release track (android-native). v1.39.0 PLUME-style VLC VOD + icons/preview.
-        versionCode = 270
-        versionName = "1.39.0"
+        // TV release track (android-native). v1.40.0 Exo+FFmpeg VOD (PLUME8K style).
+        versionCode = 271
+        versionName = "1.40.0"
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
@@ -96,13 +96,15 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.11.0")
 
-    implementation("androidx.media3:media3-exoplayer:1.4.1")
-    implementation("androidx.media3:media3-ui:1.4.1")
-        implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
+    val media3 = "1.5.0"
+    implementation("androidx.media3:media3-exoplayer:$media3")
+    implementation("androidx.media3:media3-ui:$media3")
+    implementation("androidx.media3:media3-exoplayer-hls:$media3")
+    implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1")
 
-        implementation("org.videolan.android:libvlc-all:3.6.0")
+    implementation("org.videolan.android:libvlc-all:3.6.0")
 
-        implementation("com.github.bumptech.glide:glide:4.16.0")
-        kapt("com.github.bumptech.glide:compiler:4.16.0")
-        implementation("com.github.bumptech.glide:okhttp3-integration:4.16.0")
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    kapt("com.github.bumptech.glide:compiler:4.16.0")
+    implementation("com.github.bumptech.glide:okhttp3-integration:4.16.0")
 }
