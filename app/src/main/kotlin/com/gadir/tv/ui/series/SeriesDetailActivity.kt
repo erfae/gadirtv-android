@@ -238,7 +238,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
     private fun playEpisode(ep: SeriesEpisode) {
         val profile = PlaylistRepository.profile ?: return
         val title = "${seriesName.ifBlank { ep.title }} — ${ep.season}x${ep.episodeNum}"
-        val urls = VodStreamUrls.seriesCandidates(api, profile, ep.id, ep.extension)
+        val urls = VodStreamUrls.seriesCandidates(api, profile, ep.id, ep.extension, ep.directSource)
         val url = urls.firstOrNull().orEmpty()
         if (url.isBlank()) return
         val image = ep.image.ifEmpty { fallbackCover }

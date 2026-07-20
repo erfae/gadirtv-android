@@ -83,6 +83,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 class MainActivity : BaseLocaleActivity() {
 
@@ -2767,27 +2768,34 @@ class MainActivity : BaseLocaleActivity() {
         positionMs: Long = 0L,
     ) {
         val profile = PlaylistRepository.profile ?: return
-        val urls = VodStreamUrls.movieCandidates(api, profile, streamId, extension)
-        val url = urls.firstOrNull().orEmpty()
-        if (url.isBlank()) {
-            Toast.makeText(this, R.string.series_playback_failed, Toast.LENGTH_SHORT).show()
-            openMovieDetail(streamId, title, imageUrl, extension)
-            return
+        lifecycleScope.launch {
+            val meta = withContext(Dispatchers.IO) {
+                runCatching { api.vodPlaybackMeta(profile, streamId) }.getOrNull()
+            }
+            val ext = meta?.extension?.ifBlank { extension } ?: extension
+            val direct = meta?.directSource.orEmpty()
+            val urls = VodStreamUrls.movieCandidates(api, profile, streamId, ext, direct)
+            val url = urls.firstOrNull().orEmpty()
+            if (url.isBlank()) {
+                Toast.makeText(this@MainActivity, R.string.series_playback_failed, Toast.LENGTH_SHORT).show()
+                openMovieDetail(streamId, title, imageUrl, ext)
+                return@launch
+            }
+            ResumePlaybackHelper.play(
+                context = this@MainActivity,
+                resumeStore = resumeStore,
+                request = PlaybackRequest(
+                    title = title,
+                    url = url,
+                    kind = ResumeStore.KIND_MOVIE,
+                    contentId = streamId.toString(),
+                    imageUrl = imageUrl,
+                    extension = ext,
+                    positionMs = positionMs,
+                    alternateUrls = urls.drop(1),
+                ),
+            )
         }
-        ResumePlaybackHelper.play(
-            context = this,
-            resumeStore = resumeStore,
-            request = PlaybackRequest(
-                title = title,
-                url = url,
-                kind = ResumeStore.KIND_MOVIE,
-                contentId = streamId.toString(),
-                imageUrl = imageUrl,
-                extension = extension,
-                positionMs = positionMs,
-                alternateUrls = urls.drop(1),
-            ),
-        )
     }
 
     private fun playSeriesEpisode(
@@ -2808,9 +2816,10 @@ class MainActivity : BaseLocaleActivity() {
         extension: String,
         imageUrl: String = "",
         positionMs: Long = 0L,
+        directSource: String = "",
     ) {
         val profile = PlaylistRepository.profile ?: return
-        val urls = VodStreamUrls.seriesCandidates(api, profile, episodeId, extension)
+        val urls = VodStreamUrls.seriesCandidates(api, profile, episodeId, extension, directSource)
         val url = urls.firstOrNull().orEmpty()
         if (url.isBlank()) {
             Toast.makeText(this, R.string.series_playback_failed, Toast.LENGTH_SHORT).show()
@@ -2840,7 +2849,13 @@ class MainActivity : BaseLocaleActivity() {
     ) {
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
-            val detail = withContext(Dispatchers.IO) { api.seriesInfo(profile, seriesId) }
+            val detail = try {
+                withContext(Dispatchers.IO) {
+                    withTimeout(18_000L) { api.seriesInfo(profile, seriesId) }
+                }
+            } catch (_: Exception) {
+                null
+            }
             if (detail == null || detail.seasons.isEmpty()) {
                 Toast.makeText(
                     this@MainActivity,
@@ -2867,11 +2882,12 @@ class MainActivity : BaseLocaleActivity() {
                 return@launch
             }
             val episodeTitle = "$title — ${firstEpisode.season}x${firstEpisode.episodeNum}"
-            playSeriesEpisode(
+            playSeriesEpisodeInternal(
                 title = episodeTitle,
                 episodeId = firstEpisode.id,
                 extension = firstEpisode.extension,
                 imageUrl = firstEpisode.image.ifBlank { imageUrl },
+                directSource = firstEpisode.directSource,
             )
         }
     }
@@ -3731,14 +3747,6 @@ class MainActivity : BaseLocaleActivity() {
                         imageUrl = item.imageUrl,
                         positionMs = item.resumePositionMs,
                     )
-                } else if (DeviceUi.useDpadFocus(this)) {
-                    playMovie(
-                        title = item.title,
-                        streamId = item.id,
-                        extension = item.extension,
-                        imageUrl = item.imageUrl,
-                        categoryId = categoryId,
-                    )
                 } else {
                     openMovieEntry(
                         streamId = item.id,
@@ -3757,13 +3765,6 @@ class MainActivity : BaseLocaleActivity() {
                         extension = item.extension,
                         imageUrl = item.imageUrl,
                         positionMs = item.resumePositionMs,
-                    )
-                } else if (DeviceUi.useDpadFocus(this)) {
-                    playSeriesFirstEpisode(
-                        seriesId = item.id,
-                        title = item.title,
-                        imageUrl = item.imageUrl,
-                        categoryId = categoryId,
                     )
                 } else {
                     openSeriesDetail(
@@ -4118,7 +4119,16 @@ class MainActivity : BaseLocaleActivity() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val channelChanged = previewingStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) return
-        if (channelChanged) {
+        if (!channelChanged && previewHasNoSignal()) {
+            cancelPreviewTimeout()
+            miniVlcPlayer?.stop()
+            miniExoPlayer?.stop()
+            hideNoSignal()
+            previewUrlIndex = 0
+            previewUrls = emptyList()
+            previewWorkingUrl = null
+            ensurePreviewPlayer()
+        } else if (channelChanged) {
             cancelPreviewTimeout()
             miniVlcPlayer?.stop()
             miniExoPlayer?.stop()
@@ -4291,6 +4301,9 @@ class MainActivity : BaseLocaleActivity() {
             miniVlcPlayer?.isPlaying() == true
         }
     }
+
+    private fun previewHasNoSignal(): Boolean =
+        panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility == View.VISIBLE
 
     private fun setPreviewVideoVisible(visible: Boolean) {
         if (usesExoPreview()) {

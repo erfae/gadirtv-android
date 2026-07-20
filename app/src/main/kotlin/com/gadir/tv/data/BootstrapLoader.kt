@@ -6,6 +6,7 @@ import com.gadir.tv.model.Profile
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.util.CategorySort
+import com.gadir.tv.util.ChannelIconCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -15,6 +16,17 @@ import kotlinx.coroutines.withTimeout
 object BootstrapLoader {
     private const val BOOTSTRAP_HOME_TIMEOUT_MS = 20_000L
     private const val HOME_ITEM_LIMIT = 24
+
+    /** Carga instantánea desde disco (sin red). Devuelve true si hay caché válida. */
+    fun tryHydrateFromCache(context: Context, profile: Profile): Boolean {
+        val migratedProfile = profile.copy(host = com.gadir.tv.net.PanelHttp.migrateProfileHost(profile.host))
+        val snapshot = CatalogCacheStore(context).load(migratedProfile.id) ?: return false
+        if (!snapshot.isFresh(CatalogCacheStore.MAX_AGE_MS)) return false
+        PlaylistRepository.setProfile(migratedProfile)
+        PlaylistRepository.hydrateFromSnapshot(snapshot)
+        ChannelIconCache.hydrate(snapshot.channelIconUrls)
+        return true
+    }
 
     suspend fun load(
         context: Context,
@@ -26,7 +38,9 @@ object BootstrapLoader {
             ContentPreloader.cancelBackgroundPreload()
             val migratedProfile = profile.copy(host = com.gadir.tv.net.PanelHttp.migrateProfileHost(profile.host))
             PlaylistRepository.setProfile(migratedProfile)
-            PlaylistRepository.clearContentCache()
+            if (!PlaylistRepository.bootstrapReady) {
+                PlaylistRepository.clearContentCache()
+            }
 
             onProgress?.invoke(context.getString(R.string.loading_playlist))
 
@@ -53,6 +67,11 @@ object BootstrapLoader {
             onProgress?.invoke(context.getString(R.string.bootstrap_home))
             val (movies, series) = loadHomeQuick(api, migratedProfile)
             PlaylistRepository.setHomeRecent(movies, series)
+
+            CatalogCacheStore(context).save(
+                migratedProfile.id,
+                CatalogCacheStore.snapshotFromRepository(),
+            )
         }
     }
 

@@ -316,6 +316,8 @@ class XtreamApi(
             plot = epInfo?.get("plot")?.asStringOrNull()?.trim().orEmpty(),
             image = imageUrl(epInfo, "movie_image", "cover_big", "cover")
                 .ifBlank { imageUrl(ep, "movie_image", "cover_big", "cover") },
+            directSource = ep.get("direct_source")?.asStringOrNull()?.trim()
+                ?: epInfo?.get("direct_source")?.asStringOrNull()?.trim().orEmpty(),
         )
     }
 

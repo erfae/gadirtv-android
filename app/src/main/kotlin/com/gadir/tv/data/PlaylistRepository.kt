@@ -142,6 +142,27 @@ object PlaylistRepository {
 
     fun allCachedSeries(): List<SeriesItem> = seriesCache.values.flatten().distinctBy { it.seriesId }
 
+    fun exportVodCache(): Map<String, List<VodMovie>> = vodCache.toMap()
+
+    fun exportSeriesCache(): Map<String, List<SeriesItem>> = seriesCache.toMap()
+
+    fun hydrateFromSnapshot(snapshot: CatalogSnapshot) {
+        categories = snapshot.categories
+        allChannels = snapshot.allChannels
+        vodCategories = snapshot.vodCategories
+        seriesCategories = snapshot.seriesCategories
+        vodCache.clear()
+        seriesCache.clear()
+        vodLoadFailed.clear()
+        seriesLoadFailed.clear()
+        snapshot.vodByCategory.forEach { (id, items) -> vodCache[id] = items }
+        snapshot.seriesByCategory.forEach { (id, items) -> seriesCache[id] = items }
+        homeRecentMovies = snapshot.homeRecentMovies
+        homeRecentSeries = snapshot.homeRecentSeries
+        userAgent = snapshot.userAgent.ifBlank { userAgent }
+        markBootstrapReady()
+    }
+
     fun clearContentCache() {
         vodCache.clear()
         seriesCache.clear()

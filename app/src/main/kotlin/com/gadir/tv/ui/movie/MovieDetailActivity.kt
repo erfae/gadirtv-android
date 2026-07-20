@@ -30,6 +30,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
     private lateinit var resumeStore: ResumeStore
     private var streamId = 0
     private var extension = "mp4"
+    private var directSource = ""
     private var fallbackCover = ""
     private var movieName = ""
     private var loadToken = 0
@@ -157,6 +158,8 @@ class MovieDetailActivity : BaseLocaleActivity() {
             }
 
             btnMoviePlay.visibility = View.VISIBLE
+            extension = info.extension.ifBlank { extension }
+            directSource = info.directSource
             btnMoviePlay.requestFocus()
             PlotCache.put(
                 "movie",
@@ -175,7 +178,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
         val profile = PlaylistRepository.profile ?: return
         val title = findViewById<TextView>(R.id.movieTitle).text.toString()
         val cover = fallbackCover
-        val urls = VodStreamUrls.movieCandidates(api, profile, streamId, extension)
+        val urls = VodStreamUrls.movieCandidates(api, profile, streamId, extension, directSource)
         val url = urls.firstOrNull().orEmpty()
         if (url.isBlank()) {
             android.widget.Toast.makeText(
