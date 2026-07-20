@@ -59,6 +59,31 @@ class BootstrapActivity : BaseLocaleActivity() {
 
         showLoading()
 
+        if (BootstrapLoader.tryHydrateFromCache(this, profile)) {
+            ContentPreloader.startBackgroundPreload(this, api, profile)
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        BootstrapLoader.load(
+                            context = this@BootstrapActivity,
+                            api = api,
+                            profile = profile,
+                            onProgress = { message ->
+                                runOnUiThread {
+                                    progressView.visibility = View.VISIBLE
+                                    progressView.text = message
+                                }
+                            },
+                        )
+                    }
+                }
+                result.onFailure { /* MainActivity already open; refresh failed silently */ }
+            }
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
+            return
+        }
+
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {

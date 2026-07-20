@@ -4,25 +4,20 @@ import android.widget.ImageView
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.Profile
+import com.gadir.tv.util.ChannelIconCache
 import com.gadir.tv.util.ImagePreloader
 import com.gadir.tv.util.NetworkUrlResolver
 import java.net.URLEncoder
 
 object ChannelIconHelper {
-    private const val LIST_ICON_MAX_FALLBACKS = 20
+    private const val LIST_ICON_MAX_FALLBACKS = 32
+    private const val PANEL_FALLBACK_LIMIT = 10
 
     fun loadListIcon(target: ImageView, channel: LiveChannel) {
         val density = target.resources.displayMetrics.density
         val size = (44 * density).toInt().coerceAtLeast(96)
         val primary = channel.icon.trim()
-        val fallbacks = buildList {
-            addAll(panelFallbackUrls(PlaylistRepository.profile, channel))
-            addAll(PiconUrls.candidates(channel))
-        }
-            .map { ImageUrlResolver.resolve(it) }
-            .filter { it.isNotBlank() && it != primary }
-            .distinct()
-            .take(LIST_ICON_MAX_FALLBACKS)
+        val fallbacks = iconFallbackUrls(channel, primary)
         ImageLoader.loadChannelIcon(
             target = target,
             url = primary,
@@ -36,26 +31,20 @@ object ChannelIconHelper {
 
     suspend fun preloadListIcon(context: android.content.Context, channel: LiveChannel) {
         val urls = buildList {
+            ChannelIconCache.get(channel.streamId)?.let { add(it) }
             if (channel.icon.isNotBlank()) add(channel.icon)
-            addAll(panelFallbackUrls(PlaylistRepository.profile, channel))
             addAll(PiconUrls.candidates(channel))
+            addAll(panelFallbackUrls(PlaylistRepository.profile, channel).take(PANEL_FALLBACK_LIMIT))
         }.distinct().filter { it.isNotBlank() }.take(LIST_ICON_MAX_FALLBACKS)
         if (urls.isEmpty()) return
-        ImagePreloader.preloadUrls(context, urls, 128, 128, 2)
+        ImagePreloader.preloadUrls(context, urls, 128, 128, 4)
     }
 
     fun loadPanelIcon(target: ImageView, channel: LiveChannel) {
         val density = target.resources.displayMetrics.density
         val size = (64 * density).toInt().coerceAtLeast(128)
         val primary = channel.icon.trim()
-        val fallbacks = buildList {
-            addAll(panelFallbackUrls(PlaylistRepository.profile, channel))
-            addAll(PiconUrls.candidates(channel))
-        }
-            .map { ImageUrlResolver.resolve(it) }
-            .filter { it.isNotBlank() && it != primary }
-            .distinct()
-            .take(LIST_ICON_MAX_FALLBACKS)
+        val fallbacks = iconFallbackUrls(channel, primary)
         ImageLoader.loadChannelIcon(
             target = target,
             url = primary,
@@ -66,6 +55,17 @@ object ChannelIconHelper {
             channelName = channel.name,
         )
     }
+
+    private fun iconFallbackUrls(channel: LiveChannel, primary: String): List<String> =
+        buildList {
+            ChannelIconCache.get(channel.streamId)?.let { add(it) }
+            addAll(PiconUrls.candidates(channel))
+            addAll(panelFallbackUrls(PlaylistRepository.profile, channel).take(PANEL_FALLBACK_LIMIT))
+        }
+            .map { ImageUrlResolver.resolve(it) }
+            .filter { it.isNotBlank() && it != primary }
+            .distinct()
+            .take(LIST_ICON_MAX_FALLBACKS)
 
     /** @deprecated Use [loadListIcon] or [loadPanelIcon]. */
     fun load(target: ImageView, channel: LiveChannel) = loadPanelIcon(target, channel)

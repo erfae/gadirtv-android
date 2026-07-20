@@ -68,6 +68,7 @@ data class SeriesEpisode(
     val extension: String,
     val plot: String,
     val image: String,
+    val directSource: String = "",
 )
 
 data class SeriesDetail(

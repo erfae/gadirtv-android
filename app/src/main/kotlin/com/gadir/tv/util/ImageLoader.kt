@@ -59,16 +59,16 @@ object ImageLoader {
         val size = sizePx.coerceAtLeast(96)
         val streamId = (loadTag as? Int) ?: 0
         val candidates = buildList {
+            if (streamId > 0) {
+                ChannelIconCache.get(streamId)?.let { cached ->
+                    if (cached.isNotEmpty()) add(cached)
+                }
+            }
             val primary = ImageUrlResolver.resolve(url)
             if (primary.isNotEmpty()) add(primary)
             fallbacks.forEach { candidate ->
                 val resolved = ImageUrlResolver.resolve(candidate)
                 if (resolved.isNotEmpty() && resolved !in this) add(resolved)
-            }
-            if (streamId > 0) {
-                ChannelIconCache.get(streamId)?.let { cached ->
-                    if (cached !in this) add(cached)
-                }
             }
         }.distinct().take(maxFallbacks.coerceAtLeast(1))
         if (loadTag != null) {
@@ -242,6 +242,10 @@ object ImageLoader {
             .addHeader("User-Agent", PlaylistRepository.userAgent)
             .addHeader("Accept", "image/*,*/*")
             .addHeader("Host", panel.hostHeader)
+        PlaylistRepository.profile?.host?.let { host ->
+            val referer = com.gadir.tv.util.HostUtils.baseUrl(host).trimEnd('/') + "/"
+            headers.addHeader("Referer", referer)
+        }
         return GlideUrl(panel.url, headers.build())
     }
 
