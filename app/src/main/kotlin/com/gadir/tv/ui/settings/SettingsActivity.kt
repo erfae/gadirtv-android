@@ -14,6 +14,7 @@ import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.BootstrapLoader
 import com.gadir.tv.data.PlaylistRepository
+import com.gadir.tv.util.AccountFormat
 import com.gadir.tv.data.ProfileStore
 import com.gadir.tv.data.SearchRepository
 import com.gadir.tv.data.XtreamApi
@@ -187,7 +188,7 @@ class SettingsActivity : BaseLocaleActivity() {
             return
         }
         view.visibility = android.view.View.VISIBLE
-        val exp = if (account.expDate.isNotBlank()) account.expDate else "—"
+        val exp = AccountFormat.formatExpiration(account.expDate)
         val status = if (account.status.isNotBlank()) account.status else "—"
         view.text = listOf(
             getString(R.string.settings_account_label, account.username),

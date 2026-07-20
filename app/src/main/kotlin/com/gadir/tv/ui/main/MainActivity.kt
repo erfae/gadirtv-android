@@ -656,16 +656,7 @@ class MainActivity : BaseLocaleActivity() {
         pendingLiveCategoryPreview = null
         val categoryId = liveCategoryId(cat)
         if (!enterContent) {
-            if (parentalStore.requiresPinForLiveCategory(categoryId)) {
-                showLiveBlockedCategory(cat)
-                return
-            }
-            showLiveCategoryChannels(
-                cat,
-                enterContent = false,
-                refocusGroup = false,
-                refreshCategories = false,
-            )
+            highlightLiveCategoryGroup(cat)
             return
         }
         withLiveCategoryAccess(cat, categoryId) {
@@ -678,16 +669,7 @@ class MainActivity : BaseLocaleActivity() {
         val idx = liveCategories.indexOfFirst { liveCategoryId(it) == newId }
         if (idx >= 0) liveCategoryFocusIndex = idx
 
-        val needsReload = liveBrowsingCategoryId != newId || channels.isEmpty()
-        if (needsReload) {
-            showLiveCategoryChannels(
-                cat,
-                enterContent = false,
-                refocusGroup = false,
-                refreshCategories = false,
-            )
-        }
-
+        loadLiveCategoryChannels(cat, refreshCategories = false)
         if (channels.isEmpty()) return
 
         val previousBrowsingId = liveBrowsingCategoryId
@@ -721,14 +703,59 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun showLiveCategoryChannels(
+    /** Solo resalta la categoría; el listado y el preview se cargan al pulsar OK. */
+    private fun highlightLiveCategoryGroup(
         cat: Category,
-        enterContent: Boolean,
-        refocusGroup: Boolean = true,
+        refreshCategories: Boolean = false,
+    ) {
+        val newId = liveCategoryId(cat)
+        if (parentalStore.requiresPinForLiveCategory(newId)) {
+            showLiveBlockedCategory(cat)
+            return
+        }
+        val newIndex = liveCategories.indexOfFirst { liveCategoryId(it) == newId }
+        if (newIndex >= 0) liveCategoryFocusIndex = newIndex
+
+        val previousId = liveBrowsingCategoryId
+        liveBrowsingCategoryId = newId
+        selectedLiveCategoryId = null
+        liveChannelsLoaded = false
+
+        if (previousId != newId) {
+            pauseLivePreviewPlayback()
+            previewLogoStreamId = 0
+            channels.clear()
+            channelAdapter?.notifyDataSetChanged()
+            channelList.visibility = View.INVISIBLE
+            showLiveSelectPrompt()
+        }
+
+        TvBrowseNav.blockContentFocus(channelList)
+
+        if (refreshCategories) {
+            refreshLiveCategorySelection()
+        } else if (previousId != newId) {
+            refreshLiveCategoryHighlight(previousId, newId)
+        }
+
+        if (liveCategoryPrefetch[newId] == null) {
+            lifecycleScope.launch(Dispatchers.Default) {
+                val loaded = channelsForLiveCategory(newId)
+                liveCategoryPrefetch[newId] = loaded
+                if (newId != null) liveCategoryCounts[newId] = loaded.size
+                if (currentTab == Tab.LIVE && liveBrowsingCategoryId == newId) {
+                    runOnUiThread { refreshLiveCategorySelection() }
+                }
+            }
+        }
+    }
+
+    private fun loadLiveCategoryChannels(
+        cat: Category,
         refreshCategories: Boolean = true,
     ) {
         val newId = liveCategoryId(cat)
-        if (!enterContent && parentalStore.requiresPinForLiveCategory(newId)) {
+        if (parentalStore.requiresPinForLiveCategory(newId)) {
             showLiveBlockedCategory(cat)
             return
         }
@@ -748,11 +775,7 @@ class MainActivity : BaseLocaleActivity() {
         channels.clear()
         channels.addAll(loaded)
         channelList.stopScroll()
-        if (enterContent) {
-            TvBrowseNav.allowContentFocus(channelList)
-        } else {
-            TvBrowseNav.blockContentFocus(channelList)
-        }
+        TvBrowseNav.allowContentFocus(channelList)
         if (listChanged) {
             channelAdapter?.notifyDataSetChanged()
         }
@@ -774,17 +797,23 @@ class MainActivity : BaseLocaleActivity() {
         if (!parentalStore.requiresPinForLiveCategory(newId)) {
             loaded.firstOrNull()?.let { schedulePreview(it) }
         }
-        channelList.post {
-            val end = channels.size.coerceAtMost(40)
-            if (end > 0) channelAdapter?.notifyItemRangeChanged(0, end)
-        }
+    }
 
-        if (enterContent) {
-            enterLiveContent(cat)
-        } else if (refocusGroup) {
-            liveBrowseLevel = TvBrowseNav.Level.GROUP
-            TvBrowseNav.focusGroup(liveCategoryList, liveCategoryFocusIndex)
+    private fun showLiveCategoryChannels(
+        cat: Category,
+        enterContent: Boolean,
+        refocusGroup: Boolean = true,
+        refreshCategories: Boolean = true,
+    ) {
+        if (!enterContent) {
+            highlightLiveCategoryGroup(cat, refreshCategories)
+            if (refocusGroup) {
+                liveBrowseLevel = TvBrowseNav.Level.GROUP
+                TvBrowseNav.focusGroup(liveCategoryList, liveCategoryFocusIndex)
+            }
+            return
         }
+        enterLiveContent(cat)
     }
 
     private fun focusFirstChannel(onFocused: (() -> Unit)? = null) {
@@ -807,12 +836,7 @@ class MainActivity : BaseLocaleActivity() {
         if (cat != null && parentalStore.requiresPinForLiveCategory(categoryId)) {
             showLiveBlockedCategory(cat)
         } else if (cat != null) {
-            showLiveCategoryChannels(
-                cat,
-                enterContent = false,
-                refocusGroup = false,
-                refreshCategories = false,
-            )
+            highlightLiveCategoryGroup(cat, refreshCategories = false)
         }
         liveCategoryList.post {
             if (currentTab != Tab.LIVE || liveBrowseLevel != TvBrowseNav.Level.GROUP) return@post
@@ -874,7 +898,7 @@ class MainActivity : BaseLocaleActivity() {
                 liveChannelsLoaded = false
             }
             TvBrowseNav.Level.CONTENT -> {
-                TvBrowseNav.allowContentFocus(liveCategoryList)
+                TvBrowseNav.blockContentFocus(liveCategoryList)
                 TvBrowseNav.allowContentFocus(channelList)
                 liveChannelsLoaded = true
             }
@@ -1188,15 +1212,7 @@ class MainActivity : BaseLocaleActivity() {
             onNavigate = { cat, idx ->
                 if (liveBrowseLevel != TvBrowseNav.Level.GROUP) return@CategoryAdapter
                 liveCategoryFocusIndex = idx
-                val newId = liveCategoryId(cat)
-                if (parentalStore.requiresPinForLiveCategory(newId)) return@CategoryAdapter
-                if (liveBrowsingCategoryId == newId) return@CategoryAdapter
-                showLiveCategoryChannels(
-                    cat,
-                    enterContent = false,
-                    refocusGroup = false,
-                    refreshCategories = false,
-                )
+                highlightLiveCategoryGroup(cat)
             },
             onFocus = { cat ->
                 if (liveBrowseLevel == TvBrowseNav.Level.CONTENT) return@CategoryAdapter
@@ -1211,18 +1227,9 @@ class MainActivity : BaseLocaleActivity() {
                     refreshLiveCategoryHighlight(null, newId)
                     return@CategoryAdapter
                 }
-                showLiveCategoryChannels(
-                    cat,
-                    enterContent = false,
-                    refocusGroup = false,
-                    refreshCategories = false,
-                )
+                highlightLiveCategoryGroup(cat)
             },
-            onMoveRight = {
-                val index = focusedLiveCategoryIndex()
-                val cat = liveCategories.getOrNull(index) ?: return@CategoryAdapter
-                applyLiveCategoryClick(cat, enterContent = true)
-            },
+            onMoveRight = null,
             onMoveLeft = if (DeviceUi.useDpadFocus(this)) {
                 { focusBottomTab(Tab.LIVE) }
             } else {
@@ -1550,69 +1557,56 @@ class MainActivity : BaseLocaleActivity() {
     private fun browseCatalogCategory(tab: Tab, cat: Category, enterContent: Boolean) {
         if (enterContent) {
             withCatalogCategoryAccess(tab, cat) {
-                showCatalogCategoryContent(tab, cat, enterContent = true)
+                enterCatalogContent(tab, cat)
             }
             return
         }
-        showCatalogCategoryContent(tab, cat, enterContent = false)
+        highlightCatalogGroup(tab, cat)
     }
 
-    /** Mismo patrón que showLiveCategoryChannels: al mover categoría se carga el grid al instante. */
-    private fun showCatalogCategoryContent(tab: Tab, cat: Category, enterContent: Boolean) {
-        if (!enterContent && catalogCategoryRequiresPin(tab, cat.id)) {
+    /** Solo resalta el grupo; no carga el grid hasta pulsar OK. */
+    private fun highlightCatalogGroup(tab: Tab, cat: Category) {
+        if (catalogCategoryRequiresPin(tab, cat.id)) {
             showCatalogBlockedCategory(tab, cat)
             return
         }
         val catId = cat.id
         val idx = catalogCategories.indexOfFirst { it.id == catId }
         if (idx >= 0) catalogCategoryFocusIndex = idx
-
-        val previousBrowsingId = catalogBrowsingCategoryId
-        if (enterContent) {
-            catalogBrowsingCategoryId = null
-            selectedCatalogCategoryId = catId
-            catalogEnterContentOnLoad = true
-            refreshCatalogCategoryHighlight(previousBrowsingId, catId)
-            highlightCatalogCategory(tab, catId)
-        } else {
-            catalogBrowsingCategoryId = catId
-            selectedCatalogCategoryId = null
-            catalogEnterContentOnLoad = false
-            if (previousBrowsingId != catId) {
-                refreshCatalogCategoryHighlight(previousBrowsingId, catId)
-            }
+        val previousId = catalogBrowsingCategoryId
+        catalogBrowsingCategoryId = catId
+        selectedCatalogCategoryId = null
+        catalogEnterContentOnLoad = false
+        if (previousId != catId) {
+            refreshCatalogCategoryHighlight(previousId, catId)
+            showCatalogSelectPrompt()
+            catalogGrid.visibility = View.INVISIBLE
         }
+        scheduleCatalogPrefetch(tab, catId)
+    }
 
-        prefetchCatalogGroup(tab, catId)
+    private fun enterCatalogContent(tab: Tab, cat: Category) {
+        if (catalogCategoryRequiresPin(tab, cat.id)) {
+            showCatalogBlockedCategory(tab, cat)
+            return
+        }
+        val catId = cat.id
+        val idx = catalogCategories.indexOfFirst { it.id == catId }
+        if (idx >= 0) catalogCategoryFocusIndex = idx
+        val previousBrowsingId = catalogBrowsingCategoryId
+        catalogBrowsingCategoryId = null
+        selectedCatalogCategoryId = catId
+        catalogEnterContentOnLoad = true
+        refreshCatalogCategoryHighlight(previousBrowsingId, catId)
+        highlightCatalogCategory(tab, catId)
+        applyCatalogPanelFocusMode(tab, inContent = true)
         showCatalogGroupContent(tab, catId)
         catalogGrid.visibility = View.VISIBLE
         catalogEmpty.visibility = View.GONE
         catalogGrid.scrollToPosition(0)
-
-        if (enterContent) {
-            applyCatalogPanelFocusMode(tab, inContent = true)
-            if (posterItems.isNotEmpty()) {
-                focusCatalogPosterGridNow(tab)
-            }
-        } else {
-            catalogBrowseLevel = TvBrowseNav.Level.GROUP
-            applyCatalogPanelFocusMode(tab, inContent = false)
-            catalogCategoryList.post {
-                if (currentTab != tab || catalogBrowseLevel != TvBrowseNav.Level.GROUP) return@post
-                if (catalogCategoryList.focusedChild == null) {
-                    TvBrowseNav.focusGroup(catalogCategoryList, catalogCategoryFocusIndex)
-                }
-            }
+        if (posterItems.isNotEmpty()) {
+            focusCatalogPosterGridNow(tab)
         }
-    }
-
-    /** @deprecated use [showCatalogCategoryContent] */
-    private fun highlightCatalogGroup(tab: Tab, cat: Category) {
-        showCatalogCategoryContent(tab, cat, enterContent = false)
-    }
-
-    private fun enterCatalogContent(tab: Tab, cat: Category) {
-        showCatalogCategoryContent(tab, cat, enterContent = true)
     }
 
     private fun focusCatalogPosterGridNow(tab: Tab) {
@@ -1785,11 +1779,6 @@ class MainActivity : BaseLocaleActivity() {
                 }
                 catalogCategoryCounts[catId] = size.size
                 catalogCategoryAdapter?.refreshSelection()
-                if (catalogBrowsingCategoryId == catId && currentTab == tab &&
-                    catalogBrowseLevel == TvBrowseNav.Level.GROUP
-                ) {
-                    runOnUiThread { showCatalogGroupContent(tab, catId) }
-                }
             } catch (_: Exception) {
             }
         }
@@ -4144,7 +4133,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun schedulePreview(channel: LiveChannel) {
         if (currentTab != Tab.LIVE) return
-        if (liveBrowseLevel == TvBrowseNav.Level.TAB) return
+        if (liveBrowseLevel != TvBrowseNav.Level.CONTENT) return
         val browseId = when {
             liveBrowseLevel == TvBrowseNav.Level.CONTENT -> selectedLiveCategoryId
             else -> liveBrowsingCategoryId ?: selectedLiveCategoryId
@@ -4158,7 +4147,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun schedulePreviewPlayback(channel: LiveChannel) {
         if (currentTab != Tab.LIVE || reloadingChannels) return
-        if (liveBrowseLevel == TvBrowseNav.Level.TAB) return
+        if (liveBrowseLevel != TvBrowseNav.Level.CONTENT) return
         val browseId = when {
             liveBrowseLevel == TvBrowseNav.Level.CONTENT -> selectedLiveCategoryId
             else -> liveBrowsingCategoryId ?: selectedLiveCategoryId
