@@ -177,7 +177,10 @@ class MovieDetailActivity : BaseLocaleActivity() {
         val cover = fallbackCover
         val urls = VodStreamUrls.movieCandidates(api, profile, streamId, extension)
         val url = urls.firstOrNull().orEmpty()
-        if (url.isBlank()) return
+        if (url.isBlank()) {
+            android.widget.Toast.makeText(this, R.string.series_playback_failed, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
         ResumePlaybackHelper.play(
             context = this,
             resumeStore = resumeStore,

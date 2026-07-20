@@ -13,15 +13,14 @@ object PlaybackLauncher {
         when {
             settings.playerMode == AppSettings.PLAYER_EXTERNAL ->
                 launchExternal(context, request, settings)
-            settings.playerMode == AppSettings.PLAYER_VLC && !preferExoForLiveOnTv(context, request) ->
+            settings.playerMode == AppSettings.PLAYER_VLC && !preferExoOnTv(context) ->
                 launchVlc(context, request)
             else -> launchExo(context, request)
         }
     }
 
-    /** TV live: ExoPlayer (HW decode) is far more stable than libVLC on Xiaomi/Amlogic boxes. */
-    private fun preferExoForLiveOnTv(context: Context, request: PlaybackRequest): Boolean =
-        DeviceUi.isTvUi(context) && request.kind == ResumeStore.KIND_LIVE
+    /** TV: ExoPlayer (HW decode) is far more stable than libVLC on Xiaomi/Amlogic boxes. */
+    private fun preferExoOnTv(context: Context): Boolean = DeviceUi.isTvUi(context)
 
     private fun launchExternal(context: Context, request: PlaybackRequest, settings: AppSettings) {
         val players = ExternalPlayerHelper.findInstalledPlayers(context)

@@ -899,7 +899,7 @@ class MainActivity : BaseLocaleActivity() {
                 TvBrowseNav.blockContentFocus(catalogGrid)
             }
             TvBrowseNav.Level.CONTENT -> {
-                TvBrowseNav.allowContentFocus(catalogCategoryList)
+                TvBrowseNav.blockContentFocus(catalogCategoryList)
                 TvBrowseNav.allowContentFocus(catalogGrid)
             }
         }
@@ -1043,9 +1043,9 @@ class MainActivity : BaseLocaleActivity() {
                     }
                 }
                 if (currentTab == Tab.LIVE && channels.isNotEmpty()) {
-                    val count = channels.size
+                    val end = channels.size.coerceAtMost(40)
                     channelList.post {
-                        channelAdapter?.notifyItemRangeChanged(0, count)
+                        channelAdapter?.notifyItemRangeChanged(0, end)
                     }
                 }
             }
@@ -1191,16 +1191,35 @@ class MainActivity : BaseLocaleActivity() {
             onNavigate = { cat, idx ->
                 if (liveBrowseLevel != TvBrowseNav.Level.GROUP) return@CategoryAdapter
                 liveCategoryFocusIndex = idx
-                highlightLiveCategoryGroup(cat)
-                scheduleLiveCategoryPreview(cat)
+                val newId = liveCategoryId(cat)
+                if (parentalStore.requiresPinForLiveCategory(newId)) return@CategoryAdapter
+                if (liveBrowsingCategoryId == newId) return@CategoryAdapter
+                showLiveCategoryChannels(
+                    cat,
+                    enterContent = false,
+                    refocusGroup = false,
+                    refreshCategories = false,
+                )
             },
             onFocus = { cat ->
                 if (liveBrowseLevel == TvBrowseNav.Level.CONTENT) return@CategoryAdapter
                 val newId = liveCategoryId(cat)
                 val idx = liveCategories.indexOfFirst { liveCategoryId(it) == newId }
                 if (idx >= 0) liveCategoryFocusIndex = idx
-                highlightLiveCategoryGroup(cat)
-                scheduleLiveCategoryPreview(cat)
+                if (parentalStore.requiresPinForLiveCategory(newId)) {
+                    showLiveBlockedCategory(cat)
+                    return@CategoryAdapter
+                }
+                if (liveBrowsingCategoryId == newId) {
+                    refreshLiveCategoryHighlight(null, newId)
+                    return@CategoryAdapter
+                }
+                showLiveCategoryChannels(
+                    cat,
+                    enterContent = false,
+                    refocusGroup = false,
+                    refreshCategories = false,
+                )
             },
             onMoveRight = {
                 val index = focusedLiveCategoryIndex()
@@ -1208,12 +1227,13 @@ class MainActivity : BaseLocaleActivity() {
                 applyLiveCategoryClick(cat, enterContent = true)
             },
             onMoveLeft = if (DeviceUi.useDpadFocus(this)) {
-                { /* consumir ← en grupo */ }
+                { focusBottomTab(Tab.LIVE) }
             } else {
                 null
             },
             onMoveUp = null,
             upFocusViewId = View.NO_ID,
+            leftFocusViewId = R.id.tabLive,
             navigationLocked = { liveBrowseLevel != TvBrowseNav.Level.GROUP },
         )
         liveCategoryList.nextFocusUpId = View.NO_ID
@@ -1222,38 +1242,6 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-
-    private fun highlightLiveCategoryGroup(cat: Category) {
-        val newId = liveCategoryId(cat)
-        if (parentalStore.requiresPinForLiveCategory(newId)) {
-            showLiveBlockedCategory(cat)
-            return
-        }
-        val previousId = liveBrowsingCategoryId
-        liveBrowsingCategoryId = newId
-        if (previousId != newId) {
-            refreshLiveCategoryHighlight(previousId, newId)
-        }
-    }
-
-    private fun scheduleLiveCategoryPreview(cat: Category) {
-        if (liveBrowseLevel != TvBrowseNav.Level.GROUP) return
-        val newId = liveCategoryId(cat)
-        if (parentalStore.requiresPinForLiveCategory(newId)) return
-        pendingLiveCategoryPreview?.let { liveCategoryHandler.removeCallbacks(it) }
-        val task = Runnable {
-            if (currentTab != Tab.LIVE || liveBrowseLevel != TvBrowseNav.Level.GROUP) return@Runnable
-            if (liveBrowsingCategoryId != newId) return@Runnable
-            showLiveCategoryChannels(
-                cat,
-                enterContent = false,
-                refocusGroup = false,
-                refreshCategories = false,
-            )
-        }
-        pendingLiveCategoryPreview = task
-        liveCategoryHandler.postDelayed(task, 400L)
-    }
 
     private fun startHeaderClock() {
         clockHandler.removeCallbacks(clockRunnable)
@@ -1969,12 +1957,8 @@ class MainActivity : BaseLocaleActivity() {
                 livePanel().post {
                     if (currentTab != Tab.LIVE) return@post
                     if (DeviceUi.useDpadFocus(this)) {
-                        if (liveBrowseLevel == TvBrowseNav.Level.TAB) {
-                            openLiveTabAtFirstGroup()
-                        } else {
-                            ensurePreviewPlayer()
-                            applyLiveBrowseLevel()
-                        }
+                        ensurePreviewPlayer()
+                        applyLiveBrowseLevel()
                     } else {
                         ensurePreviewPlayer()
                         restoreLiveTabSession()
@@ -1999,9 +1983,6 @@ class MainActivity : BaseLocaleActivity() {
                     setupCatalogTab(tab)
                     if (catalogCategories.isNotEmpty()) {
                         if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
-                    }
-                    if (DeviceUi.useDpadFocus(this)) {
-                        panelCatalog.post { openCatalogTabAtFirstGroup(tab) }
                     }
                 } else if (DeviceUi.useDpadFocus(this)) {
                     restoreCatalogTab(tab)
@@ -2837,7 +2818,10 @@ class MainActivity : BaseLocaleActivity() {
         val profile = PlaylistRepository.profile ?: return
         val urls = VodStreamUrls.seriesCandidates(api, profile, episodeId, extension)
         val url = urls.firstOrNull().orEmpty()
-        if (url.isBlank()) return
+        if (url.isBlank()) {
+            Toast.makeText(this, R.string.series_playback_failed, Toast.LENGTH_SHORT).show()
+            return
+        }
         ResumePlaybackHelper.play(
             context = this,
             resumeStore = resumeStore,
@@ -3361,7 +3345,11 @@ class MainActivity : BaseLocaleActivity() {
             } else {
                 null
             },
-            onMoveUp = null,
+            onMoveUp = if (DeviceUi.useDpadFocus(this)) {
+                { exitCatalogContentToGroup() }
+            } else {
+                null
+            },
         )
 
         if (catalogCategories.isEmpty()) {
@@ -3398,17 +3386,27 @@ class MainActivity : BaseLocaleActivity() {
         }?.takeIf { id -> cats.any { it.id == id } }
         bindCatalogCategoryAdapter(tab)
         if (DeviceUi.useDpadFocus(this)) {
-            val loaded = when (tab) {
-                Tab.MOVIES -> moviesGroupLoaded
-                Tab.SERIES -> seriesGroupLoaded
-                else -> false
-            }
             val selectedId = selectedCatalogCategoryId
-            if (loaded && selectedId != null) {
-                showCachedCatalogItems(tab, selectedId)
-                catalogGrid.post {
-                    applyCatalogPanelFocusMode(tab, inContent = true)
-                    focusFirstCatalogItem()
+            if (selectedId != null) {
+                val idx = catalogCategories.indexOfFirst { it.id == selectedId }
+                if (idx >= 0) catalogCategoryFocusIndex = idx
+                catalogBrowseLevel = TvBrowseNav.Level.GROUP
+                when (tab) {
+                    Tab.MOVIES -> moviesGroupLoaded = false
+                    Tab.SERIES -> seriesGroupLoaded = false
+                    else -> Unit
+                }
+                catalogEnterContentOnLoad = false
+                selectedCatalogCategoryId = null
+                posterItems.clear()
+                catalogGrid.adapter?.notifyDataSetChanged()
+                applyCatalogPanelFocusMode(tab, inContent = false)
+                catalogCategories.getOrNull(catalogCategoryFocusIndex)?.let { cat ->
+                    highlightCatalogGroup(tab, cat)
+                }
+                catalogCategoryList.post {
+                    if (currentTab != tab || catalogBrowseLevel != TvBrowseNav.Level.GROUP) return@post
+                    TvBrowseNav.focusGroup(catalogCategoryList, catalogCategoryFocusIndex)
                 }
             } else {
                 openCatalogTabAtFirstGroup(tab)
@@ -3458,18 +3456,19 @@ class MainActivity : BaseLocaleActivity() {
                 if (idx >= 0) catalogCategoryFocusIndex = idx
                 highlightCatalogGroup(tab, cat)
             },
-            onMoveRight = {
-                val index = focusedCatalogCategoryIndex()
-                val cat = catalogCategories.getOrNull(index) ?: return@CategoryAdapter
-                selectCatalogGroup(tab, cat, enterContent = true)
-            },
+            onMoveRight = null,
             onMoveLeft = if (DeviceUi.useDpadFocus(this)) {
-                { /* consumir ← en grupo */ }
+                { focusBottomTab(tab) }
             } else {
                 null
             },
             onMoveUp = null,
             upFocusViewId = View.NO_ID,
+            leftFocusViewId = when (tab) {
+                Tab.MOVIES -> R.id.tabMovies
+                Tab.SERIES -> R.id.tabSeries
+                else -> View.NO_ID
+            },
             navigationLocked = { catalogBrowseLevel != TvBrowseNav.Level.GROUP },
         )
         catalogCategoryList.adapter = catalogCategoryAdapter
@@ -3739,11 +3738,11 @@ class MainActivity : BaseLocaleActivity() {
                         positionMs = item.resumePositionMs,
                     )
                 } else if (DeviceUi.useDpadFocus(this)) {
-                    openMovieEntry(
-                        streamId = item.id,
+                    playMovie(
                         title = item.title,
-                        cover = item.imageUrl,
+                        streamId = item.id,
                         extension = item.extension,
+                        imageUrl = item.imageUrl,
                         categoryId = categoryId,
                     )
                 } else {
@@ -3766,10 +3765,10 @@ class MainActivity : BaseLocaleActivity() {
                         positionMs = item.resumePositionMs,
                     )
                 } else if (DeviceUi.useDpadFocus(this)) {
-                    openSeriesDetail(
+                    playSeriesFirstEpisode(
                         seriesId = item.id,
                         title = item.title,
-                        cover = item.imageUrl,
+                        imageUrl = item.imageUrl,
                         categoryId = categoryId,
                     )
                 } else {
