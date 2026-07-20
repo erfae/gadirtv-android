@@ -82,7 +82,6 @@ object PlayerFactory {
     }
 
     fun createForLivePreview(context: Context): ExoPlayer {
-        val bufferMs = AppSettings(context).networkBufferMs
         val renderersFactory = renderersFactory(
             context,
             DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON,
@@ -97,10 +96,10 @@ object PlayerFactory {
         }
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                (bufferMs * 8).coerceIn(8_000, 25_000),
-                (bufferMs * 20).coerceIn(30_000, 90_000),
-                (bufferMs * 3).coerceIn(3_000, 12_000),
-                (bufferMs * 6).coerceIn(6_000, 18_000),
+                1_500,
+                8_000,
+                500,
+                1_000,
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
