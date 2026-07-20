@@ -868,14 +868,12 @@ class MainActivity : BaseLocaleActivity() {
             TvBrowseNav.Level.TAB -> {
                 TvBrowseNav.blockContentFocus(liveCategoryList)
                 TvBrowseNav.blockContentFocus(channelList)
-                liveCategoryList.focusedChild?.clearFocus()
-                channelList.focusedChild?.clearFocus()
                 liveChannelsLoaded = false
                 pauseLivePreviewPlayback()
-                channels.clear()
-                channelAdapter?.notifyDataSetChanged()
                 channelList.visibility = View.INVISIBLE
-                showLiveSelectPrompt()
+                if (channels.isEmpty()) {
+                    showLiveSelectPrompt()
+                }
             }
             TvBrowseNav.Level.GROUP -> {
                 TvBrowseNav.allowContentFocus(liveCategoryList)
@@ -903,8 +901,6 @@ class MainActivity : BaseLocaleActivity() {
             TvBrowseNav.Level.TAB -> {
                 TvBrowseNav.blockContentFocus(catalogCategoryList)
                 TvBrowseNav.blockContentFocus(catalogGrid)
-                catalogCategoryList.focusedChild?.clearFocus()
-                catalogGrid.focusedChild?.clearFocus()
             }
             TvBrowseNav.Level.GROUP -> {
                 TvBrowseNav.allowContentFocus(catalogCategoryList)
@@ -1227,7 +1223,7 @@ class MainActivity : BaseLocaleActivity() {
             },
             onMoveUp = null,
             upFocusViewId = View.NO_ID,
-            leftFocusViewId = R.id.tabLive,
+            leftFocusViewId = View.NO_ID,
             navigationLocked = { liveBrowseLevel != TvBrowseNav.Level.GROUP },
         )
         liveCategoryList.nextFocusUpId = View.NO_ID
@@ -3632,11 +3628,7 @@ class MainActivity : BaseLocaleActivity() {
             },
             onMoveUp = null,
             upFocusViewId = View.NO_ID,
-            leftFocusViewId = when (tab) {
-                Tab.MOVIES -> R.id.tabMovies
-                Tab.SERIES -> R.id.tabSeries
-                else -> View.NO_ID
-            },
+            leftFocusViewId = View.NO_ID,
             navigationLocked = { catalogBrowseLevel != TvBrowseNav.Level.GROUP },
         )
         catalogCategoryList.adapter = catalogCategoryAdapter
@@ -4628,10 +4620,7 @@ class MainActivity : BaseLocaleActivity() {
             this,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    if (!handleTvBack()) {
-                        isEnabled = false
-                        onBackPressedDispatcher.onBackPressed()
-                    }
+                    handleTvBack()
                 }
             },
         )
@@ -4690,11 +4679,8 @@ class MainActivity : BaseLocaleActivity() {
     /** Tab focus first so Back/Left from group never escapes the activity. */
     private fun returnToLiveTab() {
         liveBrowseLevel = TvBrowseNav.Level.TAB
-        tabLive.requestFocus()
-        tabLive.post {
-            if (currentTab != Tab.LIVE) return@post
-            applyLiveBrowseLevel()
-        }
+        applyLiveBrowseLevel()
+        TvBrowseNav.focusTab(tabLive)
     }
 
     /** Tab focus first so Back/Left from group never escapes the activity. */
@@ -4705,11 +4691,8 @@ class MainActivity : BaseLocaleActivity() {
             else -> return
         }
         catalogBrowseLevel = TvBrowseNav.Level.TAB
-        tabView.requestFocus()
-        tabView.post {
-            if (currentTab != tab) return@post
-            applyCatalogBrowseLevel(tab)
-        }
+        applyCatalogBrowseLevel(tab)
+        TvBrowseNav.focusTab(tabView)
     }
 
     private fun isFocusInBottomNav(): Boolean {
