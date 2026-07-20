@@ -22,9 +22,9 @@ android {
         minSdk = 21
         targetSdk = 33
         // Must exceed Flutter v2.5.8 (versionCode 84) so native can replace it.
-        // TV release track (android-native). v1.38.0 stable icons + VOD playback.
-        versionCode = 269
-        versionName = "1.38.0"
+        // TV release track (android-native). v1.39.0 PLUME-style VLC VOD + icons/preview.
+        versionCode = 270
+        versionName = "1.39.0"
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }

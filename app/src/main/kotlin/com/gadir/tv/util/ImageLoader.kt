@@ -232,21 +232,16 @@ object ImageLoader {
         val resolved = ImageUrlResolver.resolve(url)
         if (!resolved.startsWith("http", ignoreCase = true)) return resolved
 
-        val referer = PlaylistRepository.profile?.host
-            ?.let { HostUtils.baseUrl(it) + "/" }
-            ?: resolved
+        // PLUME: icon URLs load as-is (no Referer/Host). Works for picons + CDN hosts.
+        if (!isPanelImageHost(resolved)) return resolved
+
+        val panel = NetworkUrlResolver.resolve(resolved)
+        if (panel.hostHeader == null) return resolved
+
         val headers = LazyHeaders.Builder()
             .addHeader("User-Agent", PlaylistRepository.userAgent)
             .addHeader("Accept", "image/*,*/*")
-            .addHeader("Referer", referer)
-
-        // External picons (51.158.x, etc.): load URL directly — NetTV never rewrote these.
-        if (!isPanelImageHost(resolved)) {
-            return GlideUrl(resolved, headers.build())
-        }
-
-        val panel = NetworkUrlResolver.resolve(resolved)
-        panel.hostHeader?.let { headers.addHeader("Host", it) }
+            .addHeader("Host", panel.hostHeader)
         return GlideUrl(panel.url, headers.build())
     }
 

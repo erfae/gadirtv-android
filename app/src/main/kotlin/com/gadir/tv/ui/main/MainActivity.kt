@@ -93,7 +93,7 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_LIMIT_TV = 8
         private const val HERO_ROTATE_MS = 8000L
         private const val HERO_ROTATE_FIRST_MS = 4000L
-        private const val CHANNEL_PREVIEW_DELAY_MS = 400L
+        private const val CHANNEL_PREVIEW_DELAY_MS = 0L
         private const val PREVIEW_TIMEOUT_MS = 10_000L
         private const val CATALOG_PREFETCH_DELAY_MS = 280L
     }
@@ -4119,12 +4119,15 @@ class MainActivity : BaseLocaleActivity() {
         val channelChanged = previewingStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) return
         if (channelChanged) {
-            teardownLivePreviewPlayback()
-            ensurePreviewPlayer()
+            cancelPreviewTimeout()
+            miniVlcPlayer?.stop()
+            miniExoPlayer?.stop()
             setPreviewVideoVisible(false)
             hideNoSignal()
             previewUrlIndex = 0
             previewUrls = emptyList()
+            previewWorkingUrl = null
+            ensurePreviewPlayer()
         } else if (!previewIsSettled()) {
             previewUrlIndex = 0
         }
