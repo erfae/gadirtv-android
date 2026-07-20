@@ -5,9 +5,18 @@ import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.ui.player.PlayerActivity
 import com.gadir.tv.ui.player.VlcPlayerActivity
+import com.gadir.tv.util.DeviceUi
+
 object PlaybackLauncher {
     fun play(context: Context, request: PlaybackRequest) {
-        if (request.url.isBlank()) return
+        if (request.url.isBlank()) {
+            android.widget.Toast.makeText(
+                context,
+                com.gadir.tv.R.string.series_playback_failed,
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
         val settings = AppSettings(context)
         try {
             when {
@@ -17,6 +26,8 @@ object PlaybackLauncher {
                     launchVlc(context, request)
                 settings.playerMode == AppSettings.PLAYER_COMPAT ->
                     launchExo(context, request)
+                useVlcOnTv(context, request) ->
+                    launchVlc(context, request)
                 else -> launchExo(context, request)
             }
         } catch (_: Throwable) {
@@ -28,11 +39,24 @@ object PlaybackLauncher {
         }
     }
 
+    /**
+     * Amlogic TV boxes: libVLC for VOD (proven on your hardware), Exo for live/preview.
+     * Matches PLUME4KV2 + IBO Pro fallback pattern (native VLC, Exo optional).
+     */
+    private fun useVlcOnTv(context: Context, request: PlaybackRequest): Boolean {
+        if (!DeviceUi.isTvUi(context)) return false
+        return request.kind != ResumeStore.KIND_LIVE
+    }
+
+    private fun vodFallback(context: Context, request: PlaybackRequest) {
+        if (useVlcOnTv(context, request)) launchVlc(context, request) else launchExo(context, request)
+    }
+
     private fun launchExternal(context: Context, request: PlaybackRequest, settings: AppSettings) {
         val players = ExternalPlayerHelper.findInstalledPlayers(context)
         if (players.isEmpty()) {
             android.widget.Toast.makeText(context, com.gadir.tv.R.string.settings_no_external_player, android.widget.Toast.LENGTH_LONG).show()
-            launchExo(context, request)
+            vodFallback(context, request)
             return
         }
 
@@ -43,7 +67,7 @@ object PlaybackLauncher {
                 settings.externalPlayerPackage = packageName
             } else {
                 android.widget.Toast.makeText(context, com.gadir.tv.R.string.settings_pick_external_player, android.widget.Toast.LENGTH_LONG).show()
-                launchExo(context, request)
+                vodFallback(context, request)
                 return
             }
         }
@@ -56,7 +80,7 @@ object PlaybackLauncher {
         )
         if (!launched) {
             android.widget.Toast.makeText(context, com.gadir.tv.R.string.settings_external_player_failed, android.widget.Toast.LENGTH_LONG).show()
-            launchExo(context, request)
+            vodFallback(context, request)
         }
     }
 

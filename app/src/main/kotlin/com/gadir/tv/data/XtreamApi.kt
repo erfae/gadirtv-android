@@ -290,8 +290,10 @@ class XtreamApi(
         val epInfo = ep.getAsJsonObject("info")
         val id = ep.get("id")?.asIntOrZero()
             ?: ep.get("episode_id")?.asIntOrZero()
+            ?: ep.get("stream_id")?.asIntOrZero()
             ?: epInfo?.get("id")?.asIntOrZero()
             ?: epInfo?.get("episode_id")?.asIntOrZero()
+            ?: epInfo?.get("stream_id")?.asIntOrZero()
             ?: 0
         if (id <= 0) return null
         val season = normalizeSeasonKey(

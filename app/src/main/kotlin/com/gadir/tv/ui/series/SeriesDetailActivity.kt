@@ -113,18 +113,18 @@ class SeriesDetailActivity : BaseLocaleActivity() {
 
     private fun loadSeriesDetail() {
         val token = ++loadToken
-        val hasCached = PlotCache.get("series", seriesId) != null || fallbackCover.isNotEmpty()
-        if (!hasCached) {
+        val hasCachedPlot = PlotCache.get("series", seriesId) != null
+        if (!hasCachedPlot && fallbackCover.isEmpty()) {
             loadingView.visibility = View.VISIBLE
-            episodeList.visibility = View.GONE
-            seasonList.visibility = View.GONE
-            btnSeriesPlay.visibility = View.GONE
         }
+        episodeList.visibility = View.VISIBLE
+        seasonList.visibility = View.VISIBLE
+        btnSeriesPlay.visibility = View.VISIBLE
 
         lifecycleScope.launch {
             val detail = try {
                 withContext(Dispatchers.IO) {
-                    withTimeout(20_000L) {
+                    withTimeout(10_000L) {
                         api.seriesInfo(PlaylistRepository.profile!!, seriesId)
                     }
                 }
@@ -137,10 +137,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
                 if (PlotCache.get("series", seriesId) == null) {
                     seriesPlot.text = getString(R.string.series_load_failed)
                 }
-                btnSeriesPlay.visibility = View.VISIBLE
                 btnSeriesPlay.requestFocus()
-                seasonList.visibility = View.GONE
-                episodeList.visibility = View.GONE
                 return@launch
             }
             bindDetail(detail)
@@ -236,11 +233,18 @@ class SeriesDetailActivity : BaseLocaleActivity() {
     }
 
     private fun playEpisode(ep: SeriesEpisode) {
-        val profile = PlaylistRepository.profile ?: return
+        val profile = PlaylistRepository.profile
+        if (profile == null) {
+            android.widget.Toast.makeText(this, R.string.series_playback_failed, android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
         val title = "${seriesName.ifBlank { ep.title }} — ${ep.season}x${ep.episodeNum}"
         val urls = VodStreamUrls.seriesCandidates(api, profile, ep.id, ep.extension, ep.directSource)
         val url = urls.firstOrNull().orEmpty()
-        if (url.isBlank()) return
+        if (url.isBlank()) {
+            android.widget.Toast.makeText(this, R.string.series_playback_failed, android.widget.Toast.LENGTH_LONG).show()
+            return
+        }
         val image = ep.image.ifEmpty { fallbackCover }
         ResumePlaybackHelper.play(
             context = this,

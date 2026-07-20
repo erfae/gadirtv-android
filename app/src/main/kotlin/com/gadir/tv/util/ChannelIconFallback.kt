@@ -12,6 +12,7 @@ import kotlin.math.max
 
 /** Miniatura local con iniciales del canal cuando no hay icono remoto. */
 object ChannelIconFallback {
+    private val bitmapCache = java.util.concurrent.ConcurrentHashMap<String, Bitmap>()
     private val palette = intArrayOf(
         0xFF1E3A5F.toInt(),
         0xFF2E5C8A.toInt(),
@@ -25,6 +26,12 @@ object ChannelIconFallback {
 
     fun load(target: ImageView, channelName: String, sizePx: Int) {
         val size = max(sizePx, 96)
+        val key = "${initials(channelName)}:$size"
+        val cached = bitmapCache[key]
+        if (cached != null && !cached.isRecycled) {
+            target.setImageBitmap(cached)
+            return
+        }
         val initials = initials(channelName)
         val color = palette[(channelName.hashCode() and Int.MAX_VALUE) % palette.size]
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -38,7 +45,12 @@ object ChannelIconFallback {
         paint.textSize = size * if (initials.length > 2) 0.28f else 0.38f
         val y = size / 2f - (paint.descent() + paint.ascent()) / 2f
         canvas.drawText(initials, size / 2f, y, paint)
+        bitmapCache[key] = bitmap
         target.setImageBitmap(bitmap)
+    }
+
+    fun clearCache() {
+        bitmapCache.clear()
     }
 
     private fun initials(name: String): String {

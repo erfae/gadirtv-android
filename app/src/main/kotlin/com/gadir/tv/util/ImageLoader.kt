@@ -75,11 +75,7 @@ object ImageLoader {
             target.setTag(R.id.image_load_tag, loadTag)
         }
         if (candidates.isEmpty()) {
-            if (channelName.isNotBlank()) {
-                ChannelIconFallback.load(target, channelName, size)
-            } else {
-                target.setImageResource(R.drawable.channel_icon_placeholder)
-            }
+            ChannelIconFallback.load(target, channelName.ifBlank { "TV" }, size)
             return
         }
         loadWithFallback(
@@ -174,11 +170,7 @@ object ImageLoader {
         if (loadTag != null && target.getTag(R.id.image_load_tag) != loadTag) return
         if (index >= urls.size) {
             if (loadTag == null || target.getTag(R.id.image_load_tag) == loadTag) {
-                if (channelName.isNotBlank()) {
-                    ChannelIconFallback.load(target, channelName, sizePx)
-                } else {
-                    target.setImageResource(errorDrawable)
-                }
+                ChannelIconFallback.load(target, channelName.ifBlank { "TV" }, sizePx)
             }
             return
         }
@@ -219,11 +211,7 @@ object ImageLoader {
                 .into(target)
         } catch (_: Throwable) {
             if (loadTag == null || target.getTag(R.id.image_load_tag) == loadTag) {
-                if (channelName.isNotBlank()) {
-                    ChannelIconFallback.load(target, channelName, sizePx)
-                } else {
-                    target.setImageResource(errorDrawable)
-                }
+                ChannelIconFallback.load(target, channelName.ifBlank { "TV" }, sizePx)
             }
         }
     }
