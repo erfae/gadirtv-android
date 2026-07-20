@@ -72,6 +72,8 @@ class PlayerActivity : BaseLocaleActivity() {
     }
 
     private var liveUrlSettled = false
+    private var vlcFallbackLaunched = false
+    private var allowVlcFallback = true
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -94,6 +96,7 @@ class PlayerActivity : BaseLocaleActivity() {
         override fun onPlayerError(error: PlaybackException) {
             if (isLive && tryNextLiveUrl()) return
             if (!isLive && tryNextVodUrl()) return
+            if (!isLive && fallbackToVlcPlayer()) return
             android.widget.Toast.makeText(
                 this@PlayerActivity,
                 R.string.series_playback_failed,
@@ -112,6 +115,7 @@ class PlayerActivity : BaseLocaleActivity() {
         val kind = intent.getStringExtra(EXTRA_KIND).orEmpty()
         val streamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
         val channelTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+        allowVlcFallback = !intent.getBooleanExtra(EXTRA_DISABLE_VLC_FALLBACK, false)
         isLive = kind == ResumeStore.KIND_LIVE
         liveStreamId = streamId
         if (isLive) {
@@ -230,6 +234,29 @@ class PlayerActivity : BaseLocaleActivity() {
         exo.setMediaItem(MediaItem.fromUri(Uri.parse(next)))
         exo.prepare()
         exo.playWhenReady = true
+        return true
+    }
+
+    private fun fallbackToVlcPlayer(): Boolean {
+        if (isLive || !allowVlcFallback || vlcFallbackLaunched) return false
+        vlcFallbackLaunched = true
+        val url = pendingVodUrls.firstOrNull().orEmpty()
+        if (url.isBlank()) return false
+        startActivity(
+            com.gadir.tv.ui.player.VlcPlayerActivity.intent(
+                context = this,
+                title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
+                url = url,
+                alternateUrls = pendingVodUrls.drop(1).toList(),
+                positionMs = intent.getLongExtra(EXTRA_POSITION_MS, 0L),
+                kind = intent.getStringExtra(EXTRA_KIND).orEmpty(),
+                contentId = intent.getStringExtra(EXTRA_CONTENT_ID).orEmpty(),
+                imageUrl = intent.getStringExtra(EXTRA_IMAGE_URL).orEmpty(),
+                extension = intent.getStringExtra(EXTRA_EXTENSION).orEmpty().ifBlank { "mkv" },
+                disableExoFallback = true,
+            ),
+        )
+        finish()
         return true
     }
 
@@ -613,6 +640,7 @@ class PlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_POSITION_MS = "position_ms"
         private const val EXTRA_STREAM_ID = "stream_id"
         private const val EXTRA_ALTERNATE_URLS = "alternate_urls"
+        private const val EXTRA_DISABLE_VLC_FALLBACK = "disable_vlc_fallback"
         private const val SEEK_STEP_MS = 10_000L
         private const val CONTROLS_HIDE_MS = 4_000L
 
@@ -627,6 +655,7 @@ class PlayerActivity : BaseLocaleActivity() {
             positionMs: Long = 0L,
             streamId: Int = 0,
             alternateUrls: List<String> = emptyList(),
+            disableVlcFallback: Boolean = false,
         ): Intent = Intent(context, PlayerActivity::class.java)
             .putExtra(EXTRA_TITLE, title)
             .putExtra(EXTRA_URL, url)
@@ -637,5 +666,6 @@ class PlayerActivity : BaseLocaleActivity() {
             .putExtra(EXTRA_POSITION_MS, positionMs)
             .putExtra(EXTRA_STREAM_ID, streamId)
             .putStringArrayListExtra(EXTRA_ALTERNATE_URLS, ArrayList(alternateUrls))
+            .putExtra(EXTRA_DISABLE_VLC_FALLBACK, disableVlcFallback)
     }
 }
