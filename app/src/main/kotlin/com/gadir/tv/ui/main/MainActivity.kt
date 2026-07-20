@@ -61,6 +61,7 @@ import com.gadir.tv.ui.series.SeriesDetailActivity
 import com.gadir.tv.ui.settings.ParentalPinDialog
 import com.gadir.tv.ui.settings.SettingsActivity
 import com.gadir.tv.util.AccountFormat
+import com.gadir.tv.util.ChannelIconFallback
 import com.gadir.tv.util.ChannelIconHelper
 import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.EpgFormatter
@@ -351,7 +352,7 @@ class MainActivity : BaseLocaleActivity() {
         )
         updateHeaderAccountInfo()
         startHeaderClock()
-        findViewById<TextView>(R.id.appVersionLabel)?.text = BuildConfig.VERSION_NAME
+        findViewById<TextView>(R.id.appVersionLabel)?.text = "v${BuildConfig.VERSION_NAME}"
         findViewById<TextView>(R.id.btnSearch).also { btnSearch = it }
         TvFocusHelper.bindButton(btnSearch) {
             startActivity(Intent(this, SearchActivity::class.java))
@@ -1569,6 +1570,11 @@ class MainActivity : BaseLocaleActivity() {
             refreshCatalogCategoryHighlight(previousId, catId)
         }
         scheduleCatalogPrefetch(tab, catId)
+        if (DeviceUi.useDpadFocus(this)) {
+            showCatalogGroupContent(tab, catId)
+            catalogGrid.visibility = View.VISIBLE
+            catalogEmpty.visibility = View.GONE
+        }
     }
 
     private fun enterCatalogContent(tab: Tab, cat: Category) {
@@ -2897,7 +2903,10 @@ class MainActivity : BaseLocaleActivity() {
 
         heroTitle.text = item.title
         heroSubtitle.text = ""
-        heroPlot.text = getString(R.string.hero_plot_loading)
+        heroPlot.text = ""
+        if (DeviceUi.isTvUi(this)) {
+            heroPlot.maxLines = 1
+        }
 
         when (item) {
             is HeroItem.Movie -> {
@@ -2910,11 +2919,14 @@ class MainActivity : BaseLocaleActivity() {
                     kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
                     backdropRequestId = backdropRequestId,
                 )
-                applyCachedHeroPlot(
+                if (!applyCachedHeroPlot(
                     kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE,
                     id = item.movie.streamId,
                     backdropRequestId = backdropRequestId,
-                ) ?: loadMoviePlot(item.movie.streamId, backdropRequestId)
+                )) {
+                    heroPlot.text = getString(R.string.hero_plot_loading)
+                    loadMoviePlot(item.movie.streamId, backdropRequestId)
+                }
             }
             is HeroItem.Series -> {
                 applyHeroMeta(
@@ -2926,11 +2938,14 @@ class MainActivity : BaseLocaleActivity() {
                     kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
                     backdropRequestId = backdropRequestId,
                 )
-                applyCachedHeroPlot(
+                if (!applyCachedHeroPlot(
                     kind = HomeRailAdapter.HomeRailItem.KIND_SERIES,
                     id = item.series.seriesId,
                     backdropRequestId = backdropRequestId,
-                ) ?: loadSeriesPlot(item.series.seriesId, backdropRequestId)
+                )) {
+                    heroPlot.text = getString(R.string.hero_plot_loading)
+                    loadSeriesPlot(item.series.seriesId, backdropRequestId)
+                }
             }
             is HeroItem.Rail -> {
                 applyHeroMeta(
@@ -2952,17 +2967,23 @@ class MainActivity : BaseLocaleActivity() {
                 heroSubtitle.text = item.item.subtitle
                 when (item.item.kind) {
                     HomeRailAdapter.HomeRailItem.KIND_MOVIE ->
-                        applyCachedHeroPlot(
+                        if (!applyCachedHeroPlot(
                             kind = item.item.kind,
                             id = item.item.id,
                             backdropRequestId = backdropRequestId,
-                        ) ?: loadMoviePlot(item.item.id, backdropRequestId)
+                        )) {
+                            heroPlot.text = getString(R.string.hero_plot_loading)
+                            loadMoviePlot(item.item.id, backdropRequestId)
+                        }
                     HomeRailAdapter.HomeRailItem.KIND_SERIES ->
-                        applyCachedHeroPlot(
+                        if (!applyCachedHeroPlot(
                             kind = item.item.kind,
                             id = item.item.id,
                             backdropRequestId = backdropRequestId,
-                        ) ?: loadSeriesPlot(item.item.id, backdropRequestId)
+                        )) {
+                            heroPlot.text = getString(R.string.hero_plot_loading)
+                            loadSeriesPlot(item.item.id, backdropRequestId)
+                        }
                     HomeRailAdapter.HomeRailItem.KIND_LIVE ->
                         heroPlot.text = getString(R.string.hero_plot_empty)
                 }
@@ -4200,6 +4221,8 @@ class MainActivity : BaseLocaleActivity() {
         liveChannelStore.lastCategoryId = selectedLiveCategoryId ?: ""
         previewTitle.text = channel.name
         previewLogo.visibility = View.VISIBLE
+        val logoSize = (64 * resources.displayMetrics.density).toInt().coerceAtLeast(128)
+        ChannelIconFallback.load(previewLogo, channel.name, logoSize)
         ChannelIconHelper.loadPanelIcon(previewLogo, channel)
         updatePreviewLockButton(channel)
         EpgCache.get(channel.streamId)?.takeIf { it.isNotEmpty() }?.let { applyEpg(channel, it) } ?: run {

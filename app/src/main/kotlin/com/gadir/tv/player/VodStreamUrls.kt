@@ -22,9 +22,11 @@ object VodStreamUrls {
         }
         val primary = extension.ifBlank { "mkv" }.lowercase()
         urls.add(api.movieStreamUrl(profile, streamId, primary))
+        urls.add(api.movieStreamPhp(profile, streamId, primary))
         EXTENSIONS.forEach { ext ->
             if (ext != primary) {
                 urls.add(api.movieStreamUrl(profile, streamId, ext))
+                urls.add(api.movieStreamPhp(profile, streamId, ext))
             }
         }
         urls.add(api.movieStreamUrlWithoutExtension(profile, streamId))
@@ -47,9 +49,11 @@ object VodStreamUrls {
         }
         val primary = extension.ifBlank { "mkv" }.lowercase()
         urls.add(api.seriesStreamUrl(profile, episodeId, primary))
+        urls.add(api.seriesStreamPhp(profile, episodeId, primary))
         EXTENSIONS.forEach { ext ->
             if (ext != primary) {
                 urls.add(api.seriesStreamUrl(profile, episodeId, ext))
+                urls.add(api.seriesStreamPhp(profile, episodeId, ext))
             }
         }
         urls.add(api.seriesStreamUrlWithoutExtension(profile, episodeId))

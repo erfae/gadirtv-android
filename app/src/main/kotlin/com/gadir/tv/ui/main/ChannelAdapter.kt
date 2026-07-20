@@ -8,6 +8,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
+import com.gadir.tv.util.ChannelIconFallback
 import com.gadir.tv.util.ChannelIconHelper
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.TvNavHelper
@@ -153,6 +154,8 @@ class ChannelAdapter(
         val item = itemAt(position) ?: return
         holder.number.text = (position + 1).toString()
         holder.name.text = item.name
+        val iconSize = (44 * holder.icon.resources.displayMetrics.density).toInt().coerceAtLeast(96)
+        ChannelIconFallback.load(holder.icon, item.name, iconSize)
         ChannelIconHelper.loadListIcon(holder.icon, item)
         holder.favorite.setImageResource(
             if (isFavorite(item)) R.drawable.ic_favorite_on else R.drawable.ic_favorite_off,

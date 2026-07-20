@@ -98,16 +98,16 @@ class MovieDetailActivity : BaseLocaleActivity() {
     private fun loadMovieDetail() {
         val profile = PlaylistRepository.profile ?: return
         val token = ++loadToken
-        val hasCached = PlotCache.get("movie", streamId) != null || fallbackCover.isNotEmpty()
-        if (!hasCached) {
+        val hasCached = PlotCache.get("movie", streamId) != null
+        if (!hasCached && fallbackCover.isEmpty()) {
             loadingView.visibility = View.VISIBLE
-            btnMoviePlay.visibility = View.GONE
         }
+        btnMoviePlay.visibility = View.VISIBLE
 
         lifecycleScope.launch {
             val info = try {
                 withContext(Dispatchers.IO) {
-                    withTimeout(18_000L) { api.vodInfo(profile, streamId) }
+                    withTimeout(10_000L) { api.vodInfo(profile, streamId) }
                 }
             } catch (_: Exception) {
                 null
