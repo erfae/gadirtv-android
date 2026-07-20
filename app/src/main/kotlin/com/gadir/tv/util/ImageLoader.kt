@@ -14,6 +14,8 @@ import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.Target
 import com.gadir.tv.R
 import com.gadir.tv.data.PlaylistRepository
+import com.gadir.tv.net.PanelHttp
+import java.net.URI
 
 object ImageLoader {
     private fun canLoadInto(target: ImageView): Boolean {
@@ -26,9 +28,9 @@ object ImageLoader {
         RequestOptions()
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .override(sizePx, sizePx)
-            .fitCenter()
-            .placeholder(R.drawable.gadir_logo)
-            .error(R.drawable.gadir_logo)
+            .centerInside()
+            .placeholder(R.drawable.channel_icon_placeholder)
+            .error(R.drawable.channel_icon_placeholder)
 
     private val posterOptions = RequestOptions()
         .diskCacheStrategy(DiskCacheStrategy.ALL)
@@ -41,10 +43,8 @@ object ImageLoader {
                 Glide.with(target).clear(target)
             }
         } catch (_: Throwable) {
-            // Glide may throw if the activity is tearing down.
         }
         target.setTag(R.id.image_load_tag, null)
-        target.setImageResource(R.drawable.gadir_logo)
     }
 
     fun loadChannelIcon(
@@ -53,7 +53,7 @@ object ImageLoader {
         fallbacks: List<String> = emptyList(),
         sizePx: Int = 0,
         loadTag: Any? = null,
-        maxFallbacks: Int = Int.MAX_VALUE,
+        maxFallbacks: Int = 20,
         channelName: String = "",
     ) {
         val size = sizePx.coerceAtLeast(96)
@@ -61,14 +61,14 @@ object ImageLoader {
         val candidates = buildList {
             val primary = ImageUrlResolver.resolve(url)
             if (primary.isNotEmpty()) add(primary)
-            if (streamId > 0) {
-                ChannelIconCache.get(streamId)?.let { cached ->
-                    if (cached != primary) add(cached)
-                }
-            }
             fallbacks.forEach { candidate ->
                 val resolved = ImageUrlResolver.resolve(candidate)
                 if (resolved.isNotEmpty() && resolved !in this) add(resolved)
+            }
+            if (streamId > 0) {
+                ChannelIconCache.get(streamId)?.let { cached ->
+                    if (cached !in this) add(cached)
+                }
             }
         }.distinct().take(maxFallbacks.coerceAtLeast(1))
         if (loadTag != null) {
@@ -78,7 +78,7 @@ object ImageLoader {
             if (channelName.isNotBlank()) {
                 ChannelIconFallback.load(target, channelName, size)
             } else {
-                target.setImageResource(R.drawable.gadir_logo)
+                target.setImageResource(R.drawable.channel_icon_placeholder)
             }
             return
         }
@@ -149,7 +149,7 @@ object ImageLoader {
             return
         }
         try {
-            var request = Glide.with(target).load(glideUrl(resolved)).apply(options)
+            var request = Glide.with(target).load(glideModel(resolved)).apply(options)
             if (width > 0 && height > 0) {
                 request = request.override(width, height)
             }
@@ -165,7 +165,7 @@ object ImageLoader {
         index: Int,
         options: RequestOptions,
         loadTag: Any? = null,
-        errorDrawable: Int = R.drawable.gadir_logo,
+        errorDrawable: Int = R.drawable.channel_icon_placeholder,
         sizePx: Int = 96,
         channelName: String = "",
         streamId: Int = 0,
@@ -184,7 +184,7 @@ object ImageLoader {
         }
         try {
             Glide.with(target)
-                .load(glideUrl(urls[index]))
+                .load(glideModel(urls[index]))
                 .apply(options)
                 .listener(object : RequestListener<Drawable> {
                     override fun onLoadFailed(
@@ -228,35 +228,34 @@ object ImageLoader {
         }
     }
 
-    private fun glideUrl(url: String): Any = glideModel(url)
-
     fun glideModel(url: String): Any {
-        val trimmed = url.trim()
-        if (!trimmed.startsWith("http", ignoreCase = true)) return trimmed
+        val resolved = ImageUrlResolver.resolve(url)
+        if (!resolved.startsWith("http", ignoreCase = true)) return resolved
 
-        val panelUrl = isPanelMediaUrl(trimmed)
-        val resolved = if (panelUrl) {
-            com.gadir.tv.util.NetworkUrlResolver.resolve(trimmed)
-        } else {
-            com.gadir.tv.util.NetworkUrlResolver.Resolved(trimmed)
-        }
+        val referer = PlaylistRepository.profile?.host
+            ?.let { HostUtils.baseUrl(it) + "/" }
+            ?: resolved
         val headers = LazyHeaders.Builder()
             .addHeader("User-Agent", PlaylistRepository.userAgent)
             .addHeader("Accept", "image/*,*/*")
-        resolved.hostHeader?.let { headers.addHeader("Host", it) }
-        if (panelUrl) {
-            PlaylistRepository.profile?.host?.let { host ->
-                headers.addHeader("Referer", HostUtils.baseUrl(host) + "/")
-            }
+            .addHeader("Referer", referer)
+
+        // External picons (51.158.x, etc.): load URL directly — NetTV never rewrote these.
+        if (!isPanelImageHost(resolved)) {
+            return GlideUrl(resolved, headers.build())
         }
-        return GlideUrl(resolved.url, headers.build())
+
+        val panel = NetworkUrlResolver.resolve(resolved)
+        panel.hostHeader?.let { headers.addHeader("Host", it) }
+        return GlideUrl(panel.url, headers.build())
     }
 
-    private fun isPanelMediaUrl(url: String): Boolean {
-        val lower = url.lowercase()
-        return lower.contains(com.gadir.tv.net.PanelHttp.GADIR_IP) ||
-            lower.contains(com.gadir.tv.net.PanelHttp.GADIR_HOST) ||
-            lower.contains("51.91.120.175") ||
-            (lower.contains("/images/") && lower.contains("/streaming/"))
+    private fun isPanelImageHost(url: String): Boolean {
+        val host = runCatching { URI(url).host?.lowercase() }.getOrNull() ?: return false
+        if (host == PanelHttp.GADIR_HOST.lowercase() || host == PanelHttp.GADIR_IP) return true
+        val profileHost = PlaylistRepository.profile?.host?.let { raw ->
+            runCatching { URI(HostUtils.baseUrl(raw)).host?.lowercase() }.getOrNull()
+        }
+        return host == profileHost
     }
 }
