@@ -12,6 +12,7 @@ import android.widget.ImageButton
 import android.widget.SeekBar
 import android.widget.TextView
 import com.gadir.tv.ui.BaseLocaleActivity
+import com.gadir.tv.ui.settings.SettingsActivity
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
@@ -30,7 +31,7 @@ import com.gadir.tv.player.LiveChannelNavigator
 import com.gadir.tv.player.LiveStreamUrls
 import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.player.PlayerFactory
-import com.gadir.tv.ui.settings.SettingsActivity
+import com.gadir.tv.ui.player.VlcPlayerActivity
 import com.gadir.tv.util.TimeFormat
 import com.gadir.tv.util.VolumeHelper
 import kotlinx.coroutines.Dispatchers
@@ -99,6 +100,7 @@ class PlayerActivity : BaseLocaleActivity() {
 
         override fun onPlayerError(error: PlaybackException) {
             if (isLive && tryNextLiveUrl()) return
+            if (isLive && fallbackToVlcLivePlayer()) return
             if (!isLive && tryNextVodUrl()) return
             if (!isLive && fallbackToVlcPlayer()) return
             android.widget.Toast.makeText(
@@ -190,9 +192,11 @@ class PlayerActivity : BaseLocaleActivity() {
                     player = exo,
                     overlay = noSignal,
                     timeoutMs = 25_000L,
-                    bufferingFallbackMs = 30_000L,
+                    bufferingFallbackMs = 35_000L,
                     shouldHoldStream = { liveUrlSettled },
-                    onBeforeNoSignal = { tryNextLiveUrl() },
+                    onBeforeNoSignal = {
+                        tryNextLiveUrl() || fallbackToVlcLivePlayer()
+                    },
                 ).also { it.start() }
             } else {
                 exo.addListener(object : Player.Listener {
@@ -257,6 +261,33 @@ class PlayerActivity : BaseLocaleActivity() {
                 contentId = intent.getStringExtra(EXTRA_CONTENT_ID).orEmpty(),
                 imageUrl = intent.getStringExtra(EXTRA_IMAGE_URL).orEmpty(),
                 extension = intent.getStringExtra(EXTRA_EXTENSION).orEmpty().ifBlank { "mkv" },
+                disableExoFallback = true,
+            ),
+        )
+        finish()
+        return true
+    }
+
+    private fun fallbackToVlcLivePlayer(): Boolean {
+        if (!isLive || vlcFallbackLaunched) return false
+        vlcFallbackLaunched = true
+        val urls = buildList {
+            add(intent.getStringExtra(EXTRA_URL).orEmpty())
+            addAll(intent.getStringArrayListExtra(EXTRA_ALTERNATE_URLS).orEmpty())
+        }.filter { it.isNotBlank() }.distinct()
+        val url = urls.firstOrNull().orEmpty()
+        if (url.isBlank()) return false
+        startActivity(
+            VlcPlayerActivity.intent(
+                context = this,
+                title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
+                url = url,
+                alternateUrls = urls.drop(1),
+                streamId = liveStreamId,
+                kind = ResumeStore.KIND_LIVE,
+                contentId = intent.getStringExtra(EXTRA_CONTENT_ID).orEmpty(),
+                imageUrl = intent.getStringExtra(EXTRA_IMAGE_URL).orEmpty(),
+                extension = intent.getStringExtra(EXTRA_EXTENSION).orEmpty().ifBlank { "ts" },
                 disableExoFallback = true,
             ),
         )

@@ -21,6 +21,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.activity.OnBackPressedCallback
 import com.gadir.tv.BuildConfig
 import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
@@ -442,6 +443,7 @@ class MainActivity : BaseLocaleActivity() {
         }
 
         setupTabNavigation()
+        installTvBackHandler()
         heroPlay.setOnClickListener { openHeroContent() }
         tabHome.nextFocusUpId = R.id.btnSettings
         tabLive.nextFocusUpId = R.id.btnSettings
@@ -1216,7 +1218,7 @@ class MainActivity : BaseLocaleActivity() {
                 }
             },
             onMoveLeft = if (DeviceUi.useDpadFocus(this)) {
-                { focusBottomTab(Tab.LIVE) }
+                { returnToLiveTab() }
             } else {
                 null
             },
@@ -3508,7 +3510,7 @@ class MainActivity : BaseLocaleActivity() {
                 }
             },
             onMoveLeft = if (DeviceUi.useDpadFocus(this)) {
-                { focusBottomTab(tab) }
+                { returnToCatalogTab(tab) }
             } else {
                 null
             },
@@ -4501,29 +4503,73 @@ class MainActivity : BaseLocaleActivity() {
             focused.id == R.id.btnFullscreen
     }
 
-    override fun onBackPressed() {
-        when (currentTab) {
-            Tab.HOME -> logoutUser()
-            Tab.LIVE -> {
-                when {
-                    isFocusInPreviewPanel() -> focusChannelAt(currentPreviewChannel)
-                    liveBrowseLevel == TvBrowseNav.Level.CONTENT -> exitLiveContentToGroup()
-                    liveBrowseLevel == TvBrowseNav.Level.GROUP -> focusBottomTab(Tab.LIVE)
-                    isFocusInList(channelList) -> exitLiveContentToGroup()
-                    isFocusInList(liveCategoryList) -> focusBottomTab(Tab.LIVE)
-                    else -> focusCategoryList()
+    private fun installTvBackHandler() {
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (!handleTvBack()) {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
                 }
+            },
+        )
+    }
+
+    private fun handleTvBack(): Boolean {
+        return when (currentTab) {
+            Tab.HOME -> {
+                logoutUser()
+                true
             }
-            Tab.MOVIES, Tab.SERIES -> {
-                when {
-                    catalogBrowseLevel == TvBrowseNav.Level.CONTENT -> exitCatalogContentToGroup()
-                    catalogBrowseLevel == TvBrowseNav.Level.GROUP -> focusBottomTab(currentTab)
-                    isFocusInList(catalogGrid) -> exitCatalogContentToGroup()
-                    isFocusInList(catalogCategoryList) -> focusBottomTab(currentTab)
-                    else -> focusCatalogCategoryList()
-                }
-            }
+            Tab.LIVE -> handleLiveBack()
+            Tab.MOVIES, Tab.SERIES -> handleCatalogBack()
         }
+    }
+
+    private fun handleLiveBack(): Boolean {
+        when {
+            isFocusInPreviewPanel() -> focusChannelAt(currentPreviewChannel)
+            liveBrowseLevel == TvBrowseNav.Level.CONTENT -> exitLiveContentToGroup()
+            liveBrowseLevel == TvBrowseNav.Level.GROUP -> returnToLiveTab()
+            isFocusInList(channelList) -> exitLiveContentToGroup()
+            isFocusInList(liveCategoryList) -> returnToLiveTab()
+            liveBrowseLevel == TvBrowseNav.Level.TAB && isFocusInBottomNav() -> Unit
+            else -> focusCategoryList()
+        }
+        return true
+    }
+
+    private fun handleCatalogBack(): Boolean {
+        when {
+            catalogBrowseLevel == TvBrowseNav.Level.CONTENT -> exitCatalogContentToGroup()
+            catalogBrowseLevel == TvBrowseNav.Level.GROUP -> returnToCatalogTab(currentTab)
+            isFocusInList(catalogGrid) -> exitCatalogContentToGroup()
+            isFocusInList(catalogCategoryList) -> returnToCatalogTab(currentTab)
+            catalogBrowseLevel == TvBrowseNav.Level.TAB && isFocusInBottomNav() -> Unit
+            else -> returnToCatalogTab(currentTab)
+        }
+        return true
+    }
+
+    /** Tab focus first so Back/Left from group never escapes the activity. */
+    private fun returnToLiveTab() {
+        liveBrowseLevel = TvBrowseNav.Level.TAB
+        tabLive.requestFocus()
+        tabLive.post { applyLiveBrowseLevel() }
+    }
+
+    /** Tab focus first so Back/Left from group never escapes the activity. */
+    private fun returnToCatalogTab(tab: Tab) {
+        val tabView = when (tab) {
+            Tab.MOVIES -> tabMovies
+            Tab.SERIES -> tabSeries
+            else -> return
+        }
+        catalogBrowseLevel = TvBrowseNav.Level.TAB
+        tabView.requestFocus()
+        tabView.post { applyCatalogBrowseLevel(tab) }
     }
 
     private fun isFocusInBottomNav(): Boolean {
@@ -4536,21 +4582,8 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun focusBottomTab(tab: Tab) {
         when (tab) {
-            Tab.LIVE -> {
-                liveBrowseLevel = TvBrowseNav.Level.TAB
-                applyLiveBrowseLevel()
-                tabLive.requestFocus()
-            }
-            Tab.MOVIES -> {
-                catalogBrowseLevel = TvBrowseNav.Level.TAB
-                applyCatalogBrowseLevel(Tab.MOVIES)
-                tabMovies.requestFocus()
-            }
-            Tab.SERIES -> {
-                catalogBrowseLevel = TvBrowseNav.Level.TAB
-                applyCatalogBrowseLevel(Tab.SERIES)
-                tabSeries.requestFocus()
-            }
+            Tab.LIVE -> returnToLiveTab()
+            Tab.MOVIES, Tab.SERIES -> returnToCatalogTab(tab)
             Tab.HOME -> tabHome.requestFocus()
         }
     }
