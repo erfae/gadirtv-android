@@ -1042,12 +1042,6 @@ class MainActivity : BaseLocaleActivity() {
                         }.awaitAll()
                     }
                 }
-                if (currentTab == Tab.LIVE && channels.isNotEmpty()) {
-                    val end = channels.size.coerceAtMost(40)
-                    channelList.post {
-                        channelAdapter?.notifyItemRangeChanged(0, end)
-                    }
-                }
             }
         }
     }
@@ -2773,27 +2767,39 @@ class MainActivity : BaseLocaleActivity() {
         positionMs: Long = 0L,
     ) {
         val profile = PlaylistRepository.profile ?: return
-        val urls = VodStreamUrls.movieCandidates(api, profile, streamId, extension)
-        val url = urls.firstOrNull().orEmpty()
-        if (url.isBlank()) {
-            Toast.makeText(this, R.string.series_playback_failed, Toast.LENGTH_SHORT).show()
-            openMovieDetail(streamId, title, imageUrl, extension)
-            return
+        lifecycleScope.launch {
+            val meta = withContext(Dispatchers.IO) {
+                runCatching { api.vodPlaybackMeta(profile, streamId) }.getOrNull()
+            }
+            val ext = meta?.extension?.ifBlank { extension } ?: extension
+            val urls = VodStreamUrls.movieCandidates(
+                api = api,
+                profile = profile,
+                streamId = streamId,
+                extension = ext,
+                directSource = meta?.directSource.orEmpty(),
+            )
+            val url = urls.firstOrNull().orEmpty()
+            if (url.isBlank()) {
+                Toast.makeText(this@MainActivity, R.string.series_playback_failed, Toast.LENGTH_SHORT).show()
+                openMovieDetail(streamId, title, imageUrl, ext)
+                return@launch
+            }
+            ResumePlaybackHelper.play(
+                context = this@MainActivity,
+                resumeStore = resumeStore,
+                request = PlaybackRequest(
+                    title = title,
+                    url = url,
+                    kind = ResumeStore.KIND_MOVIE,
+                    contentId = streamId.toString(),
+                    imageUrl = imageUrl,
+                    extension = ext,
+                    positionMs = positionMs,
+                    alternateUrls = urls.drop(1),
+                ),
+            )
         }
-        ResumePlaybackHelper.play(
-            context = this,
-            resumeStore = resumeStore,
-            request = PlaybackRequest(
-                title = title,
-                url = url,
-                kind = ResumeStore.KIND_MOVIE,
-                contentId = streamId.toString(),
-                imageUrl = imageUrl,
-                extension = extension,
-                positionMs = positionMs,
-                alternateUrls = urls.drop(1),
-            ),
-        )
     }
 
     private fun playSeriesEpisode(

@@ -224,12 +224,20 @@ object PanelHttp {
             .build()
     }
 
-    /** Fast-fail client for channel icons / posters. */
+    /** Glide client: follow redirects (TMDB/CDN) and rewrite panel host → IP. */
     val imageOkHttpClient: OkHttpClient by lazy {
-        baseClientBuilder()
-            .connectTimeout(5, TimeUnit.SECONDS)
-            .readTimeout(8, TimeUnit.SECONDS)
-            .writeTimeout(5, TimeUnit.SECONDS)
+        OkHttpClient.Builder()
+            .dns(ipv4PreferredDns)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .retryOnConnectionFailure(true)
+            .connectionSpecs(
+                listOf(ConnectionSpec.CLEARTEXT, ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS),
+            )
+            .addInterceptor(resolveInterceptor)
+            .connectTimeout(6, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(6, TimeUnit.SECONDS)
             .build()
     }
 }

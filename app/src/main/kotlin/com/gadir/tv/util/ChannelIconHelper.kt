@@ -17,6 +17,7 @@ object ChannelIconHelper {
         val size = (44 * density).toInt().coerceAtLeast(96)
         val primary = ImageUrlResolver.resolve(channel.icon)
         val fallbacks = buildList {
+            addAll(PiconUrls.candidates(channel))
             ChannelIconCache.get(channel.streamId)?.let { add(it) }
             addAll(
                 panelFallbackUrls(PlaylistRepository.profile, channel)
@@ -35,11 +36,10 @@ object ChannelIconHelper {
     }
 
     suspend fun preloadListIcon(context: android.content.Context, channel: LiveChannel) {
-        val fallbacks = panelFallbackUrls(PlaylistRepository.profile, channel)
         val urls = buildList {
-            if (channel.icon.isNotBlank()) add(channel.icon)
-            addAll(fallbacks.take(LIST_ICON_MAX_FALLBACKS))
-        }.distinct().filter { it.isNotBlank() }
+            addAll(PiconUrls.candidates(channel))
+            addAll(panelFallbackUrls(PlaylistRepository.profile, channel))
+        }.distinct().filter { it.isNotBlank() }.take(LIST_ICON_MAX_FALLBACKS)
         if (urls.isEmpty()) return
         ImagePreloader.preloadUrls(context, urls, 128, 128, 2)
     }
@@ -47,6 +47,7 @@ object ChannelIconHelper {
     fun loadPanelIcon(target: ImageView, channel: LiveChannel) {
         val primary = ImageUrlResolver.resolve(channel.icon)
         val fallbacks = buildList {
+            addAll(PiconUrls.candidates(channel))
             ChannelIconCache.get(channel.streamId)?.let { add(it) }
             addAll(
                 panelFallbackUrls(PlaylistRepository.profile, channel)
@@ -94,7 +95,9 @@ object ChannelIconHelper {
         channelName: String = "",
     ): List<String> {
         if (profile == null || streamId <= 0) return emptyList()
-        val base = HostUtils.baseUrl(profile.host).trimEnd('/')
+        val base = HostUtils.baseUrl(
+            com.gadir.tv.net.PanelHttp.migrateProfileHost(profile.host),
+        ).trimEnd('/')
         val user = encode(profile.username)
         val pass = encode(profile.password)
         val slug = slugify(channelName)
