@@ -9,13 +9,22 @@ import com.gadir.tv.util.DeviceUi
 
 object PlaybackLauncher {
     fun play(context: Context, request: PlaybackRequest) {
+        if (request.url.isBlank()) return
         val settings = AppSettings(context)
-        when {
-            settings.playerMode == AppSettings.PLAYER_EXTERNAL ->
-                launchExternal(context, request, settings)
-            settings.playerMode == AppSettings.PLAYER_VLC && !preferExoOnTv(context) ->
-                launchVlc(context, request)
-            else -> launchExo(context, request)
+        try {
+            when {
+                settings.playerMode == AppSettings.PLAYER_EXTERNAL ->
+                    launchExternal(context, request, settings)
+                settings.playerMode == AppSettings.PLAYER_VLC && !preferExoOnTv(context) ->
+                    launchVlc(context, request)
+                else -> launchExo(context, request)
+            }
+        } catch (_: Throwable) {
+            android.widget.Toast.makeText(
+                context,
+                com.gadir.tv.R.string.series_playback_failed,
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
         }
     }
 

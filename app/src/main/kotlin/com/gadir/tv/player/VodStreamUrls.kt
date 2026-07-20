@@ -5,7 +5,8 @@ import com.gadir.tv.model.Profile
 import com.gadir.tv.util.NetworkUrlResolver
 
 object VodStreamUrls {
-    private val EXTENSIONS = listOf("mkv", "mp4", "ts", "avi", "m3u8")
+    /** mkv/ts primero: mejor compatibilidad en FHD/4K y HEVC (v1.34.1 estable). */
+    private val EXTENSIONS = listOf("mkv", "ts", "mp4", "avi", "m3u8")
 
     fun movieCandidates(
         api: XtreamApi,
@@ -19,17 +20,17 @@ object VodStreamUrls {
         if (direct.startsWith("http")) {
             urls.add(NetworkUrlResolver.resolveUrl(direct))
         }
-        val primary = extension.ifBlank { "mp4" }.lowercase()
-        urls.add(api.movieStreamUrlWithoutExtension(profile, streamId))
+        val primary = extension.ifBlank { "mkv" }.lowercase()
         urls.add(api.movieStreamUrl(profile, streamId, primary))
-        urls.add(api.movieStreamPhp(profile, streamId, primary))
         EXTENSIONS.forEach { ext ->
             if (ext != primary) {
                 urls.add(api.movieStreamUrl(profile, streamId, ext))
-                urls.add(api.movieStreamPhp(profile, streamId, ext))
             }
         }
-        return urls.filter { it.isNotBlank() }.distinct()
+        urls.add(api.movieStreamUrlWithoutExtension(profile, streamId))
+        return urls.filter { it.isNotBlank() }
+            .map { NetworkUrlResolver.resolveUrl(it) }
+            .distinct()
     }
 
     fun seriesCandidates(
@@ -44,16 +45,16 @@ object VodStreamUrls {
         if (direct.startsWith("http")) {
             urls.add(NetworkUrlResolver.resolveUrl(direct))
         }
-        val primary = extension.ifBlank { "mp4" }.lowercase()
-        urls.add(api.seriesStreamUrlWithoutExtension(profile, episodeId))
+        val primary = extension.ifBlank { "mkv" }.lowercase()
         urls.add(api.seriesStreamUrl(profile, episodeId, primary))
-        urls.add(api.seriesStreamPhp(profile, episodeId, primary))
         EXTENSIONS.forEach { ext ->
             if (ext != primary) {
                 urls.add(api.seriesStreamUrl(profile, episodeId, ext))
-                urls.add(api.seriesStreamPhp(profile, episodeId, ext))
             }
         }
-        return urls.filter { it.isNotBlank() }.distinct()
+        urls.add(api.seriesStreamUrlWithoutExtension(profile, episodeId))
+        return urls.filter { it.isNotBlank() }
+            .map { NetworkUrlResolver.resolveUrl(it) }
+            .distinct()
     }
 }
