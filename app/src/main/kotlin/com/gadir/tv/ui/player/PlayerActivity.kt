@@ -29,6 +29,7 @@ import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.player.LiveChannelNavigator
 import com.gadir.tv.player.LiveStreamUrls
+import com.gadir.tv.player.VodStreamUrls
 import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.player.PlayerFactory
 import com.gadir.tv.ui.player.VlcPlayerActivity
@@ -79,6 +80,7 @@ class PlayerActivity : BaseLocaleActivity() {
     private var liveUrlSettled = false
     private var vlcFallbackLaunched = false
     private var allowVlcFallback = true
+    private var vodExtension = "mkv"
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -122,6 +124,7 @@ class PlayerActivity : BaseLocaleActivity() {
         val streamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
         val channelTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         allowVlcFallback = !intent.getBooleanExtra(EXTRA_DISABLE_VLC_FALLBACK, false)
+        vodExtension = intent.getStringExtra(EXTRA_EXTENSION).orEmpty().ifBlank { "mkv" }
         isLive = kind == ResumeStore.KIND_LIVE
         liveStreamId = streamId
         if (isLive) {
@@ -212,7 +215,11 @@ class PlayerActivity : BaseLocaleActivity() {
     }
 
     private fun startPlayback(exo: ExoPlayer, url: String, positionMs: Long) {
-        val item = if (isLive) LiveStreamUrls.mediaItem(url) else MediaItem.fromUri(Uri.parse(url))
+        val item = if (isLive) {
+            LiveStreamUrls.mediaItem(url)
+        } else {
+            VodStreamUrls.mediaItem(url, vodExtension)
+        }
         exo.setMediaItem(item)
         exo.prepare()
         if (positionMs > 0L) {
@@ -239,7 +246,7 @@ class PlayerActivity : BaseLocaleActivity() {
         pendingVodUrls.removeFirst()
         val next = pendingVodUrls.firstOrNull() ?: return false
         val exo = player ?: return false
-        exo.setMediaItem(MediaItem.fromUri(Uri.parse(next)))
+        exo.setMediaItem(VodStreamUrls.mediaItem(next, vodExtension))
         exo.prepare()
         exo.playWhenReady = true
         return true

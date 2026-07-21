@@ -1,5 +1,7 @@
 package com.gadir.tv.player
 
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.Profile
 import com.gadir.tv.util.NetworkUrlResolver
@@ -60,5 +62,25 @@ object VodStreamUrls {
         return urls.filter { it.isNotBlank() }
             .map { NetworkUrlResolver.resolveUrl(it) }
             .distinct()
+    }
+
+    fun mediaItem(url: String, extension: String = ""): MediaItem {
+        val builder = MediaItem.Builder().setUri(url)
+        val ext = extension.lowercase().ifBlank {
+            url.substringAfterLast('.', "").substringBefore('?').lowercase()
+        }
+        when {
+            ext == "m3u8" || url.contains(".m3u8", ignoreCase = true) ->
+                builder.setMimeType(MimeTypes.APPLICATION_M3U8)
+            ext == "ts" || url.contains(".ts", ignoreCase = true) ->
+                builder.setMimeType(MimeTypes.VIDEO_MP2T)
+            ext == "mkv" ->
+                builder.setMimeType(MimeTypes.VIDEO_MATROSKA)
+            ext == "mp4" ->
+                builder.setMimeType(MimeTypes.VIDEO_MP4)
+            ext == "avi" ->
+                builder.setMimeType(MimeTypes.VIDEO_AVI)
+        }
+        return builder.build()
     }
 }
