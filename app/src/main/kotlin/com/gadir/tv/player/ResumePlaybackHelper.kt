@@ -19,12 +19,8 @@ object ResumePlaybackHelper {
             PlaybackLauncher.play(context, request)
             return
         }
-        // AlertDialog often fails to receive focus on Android TV; resume from saved position.
         if (DeviceUi.isTvUi(context)) {
-            PlaybackLauncher.play(
-                context,
-                request.copy(positionMs = record.positionMs),
-            )
+            PlaybackLauncher.play(context, request)
             return
         }
         AlertDialog.Builder(context)
