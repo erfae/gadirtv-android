@@ -96,9 +96,10 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_LIMIT_TV = 8
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
-        private const val CHANNEL_PREVIEW_DELAY_MS = 80L
-        private const val PREVIEW_TIMEOUT_MS = 6_000L
-        private const val CATALOG_PREFETCH_DELAY_MS = 150L
+        private const val CHANNEL_PREVIEW_DELAY_MS = 120L
+        private const val PREVIEW_TIMEOUT_MS = 7_000L
+        private const val CATALOG_PREFETCH_DELAY_MS = 400L
+        private const val EPG_FOCUS_DELAY_MS = 450L
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -233,6 +234,8 @@ class MainActivity : BaseLocaleActivity() {
     private var channelsLoadToken = 0
     private var livePreviewPaused = false
     private var epgLoadToken = 0
+    private var pendingEpg: Runnable? = null
+    private var epgFocusStreamId = 0
     private var liveTabReady = false
     private var miniPreviewControls: View? = null
     private var previewContainer: View? = null
@@ -639,13 +642,15 @@ class MainActivity : BaseLocaleActivity() {
             onToggleLock = { channel -> toggleChannelLock(channel) },
         )
         channelList.adapter = channelAdapter
-        channelList.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-                if (newState == RecyclerView.SCROLL_STATE_IDLE) return
-                pendingPreview?.let { previewHandler.removeCallbacks(it) }
-                pendingPreview = null
-            }
-        })
+        if (!DeviceUi.useDpadFocus(this)) {
+            channelList.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                    if (newState == RecyclerView.SCROLL_STATE_IDLE) return
+                    pendingPreview?.let { previewHandler.removeCallbacks(it) }
+                    pendingPreview = null
+                }
+            })
+        }
         if (DeviceUi.useDpadFocus(this)) {
             liveChannelsLoaded = false
             selectedLiveCategoryId = null
@@ -3975,7 +3980,7 @@ class MainActivity : BaseLocaleActivity() {
         val categoryId = activeCatalogCategoryId().orEmpty()
         when (tab) {
             Tab.MOVIES -> {
-                if (DeviceUi.useDpadFocus(this) && item.resumePositionMs > 0L) {
+                if (item.resumePositionMs > 0L) {
                     playMovie(
                         title = item.title,
                         streamId = item.id,
@@ -3984,13 +3989,13 @@ class MainActivity : BaseLocaleActivity() {
                         positionMs = item.resumePositionMs,
                         categoryId = categoryId,
                     )
-                } else if (!DeviceUi.useDpadFocus(this) && item.resumePositionMs > 0L) {
+                } else if (DeviceUi.useDpadFocus(this)) {
                     playMovie(
                         title = item.title,
                         streamId = item.id,
                         extension = item.extension,
                         imageUrl = item.imageUrl,
-                        positionMs = item.resumePositionMs,
+                        categoryId = categoryId,
                     )
                 } else {
                     openMovieEntry(
@@ -4003,15 +4008,7 @@ class MainActivity : BaseLocaleActivity() {
                 }
             }
             Tab.SERIES -> {
-                if (DeviceUi.useDpadFocus(this) && item.resumePositionMs > 0L) {
-                    playSeriesEpisode(
-                        title = item.title,
-                        episodeId = item.id,
-                        extension = item.extension,
-                        imageUrl = item.imageUrl,
-                        positionMs = item.resumePositionMs,
-                    )
-                } else if (!DeviceUi.useDpadFocus(this) && item.resumePositionMs > 0L) {
+                if (item.resumePositionMs > 0L) {
                     playSeriesEpisode(
                         title = item.title,
                         episodeId = item.id,
@@ -4313,7 +4310,7 @@ class MainActivity : BaseLocaleActivity() {
         previewWorkingUrl = null
     }
 
-    /** Libera el mini-player antes de pantalla completa (evita dos instancias LibVLC en TV). */
+    /** Libera el mini-player antes de pantalla completa (evita dos ExoPlayer/LibVLC en TV). */
     private fun releaseMiniPreviewForFullscreen() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
@@ -4321,7 +4318,7 @@ class MainActivity : BaseLocaleActivity() {
         cancelPreviewTimeout()
         miniVlcPlayer?.release()
         miniVlcPlayer = null
-        miniExoPlayer?.stop()
+        releaseExoPreview()
         previewingStreamId = null
         previewWorkingUrl = null
         setPreviewVideoVisible(false)
@@ -4485,24 +4482,37 @@ class MainActivity : BaseLocaleActivity() {
             epgNow.text = getString(R.string.epg_loading)
             epgNext.visibility = View.GONE
         }
-        val profile = PlaylistRepository.profile ?: return
-        val token = ++epgLoadToken
-        lifecycleScope.launch {
-            val epg = withContext(Dispatchers.IO) {
-                api.shortEpg(
-                    profile,
-                    streamId = channel.streamId,
-                    epgChannelId = channel.epgChannelId,
-                    limit = 8,
-                )
+        scheduleEpgLoad(channel)
+    }
+
+    private fun scheduleEpgLoad(channel: LiveChannel) {
+        if (epgFocusStreamId == channel.streamId && EpgCache.get(channel.streamId) != null) return
+        epgFocusStreamId = channel.streamId
+        pendingEpg?.let { previewHandler.removeCallbacks(it) }
+        val streamId = channel.streamId
+        val task = Runnable {
+            if (currentPreviewChannel?.streamId != streamId) return@Runnable
+            val profile = PlaylistRepository.profile ?: return@Runnable
+            val token = ++epgLoadToken
+            lifecycleScope.launch {
+                val epg = withContext(Dispatchers.IO) {
+                    api.shortEpg(
+                        profile,
+                        streamId = streamId,
+                        epgChannelId = channel.epgChannelId,
+                        limit = 8,
+                    )
+                }
+                if (token != epgLoadToken) return@launch
+                if (currentPreviewChannel?.streamId != streamId) return@launch
+                if (epg.isNotEmpty()) {
+                    EpgCache.put(streamId, epg)
+                }
+                applyEpg(channel, epg)
             }
-            if (token != epgLoadToken) return@launch
-            if (currentPreviewChannel?.streamId != channel.streamId) return@launch
-            if (epg.isNotEmpty()) {
-                EpgCache.put(channel.streamId, epg)
-            }
-            applyEpg(channel, epg)
         }
+        pendingEpg = task
+        previewHandler.postDelayed(task, EPG_FOCUS_DELAY_MS)
     }
 
     private fun cancelMiniPreviewPlayback() {
@@ -4661,9 +4671,10 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun openFullscreenInternal(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
+        val previewStreamId = previewingStreamId
         val handedOffUrl = previewWorkingUrl
-            ?.takeIf { previewingStreamId == channel.streamId && it.isNotBlank() }
-        val previewUrlSnapshot = if (previewingStreamId == channel.streamId) {
+            ?.takeIf { previewStreamId == channel.streamId && it.isNotBlank() }
+        val previewUrlSnapshot = if (previewStreamId == channel.streamId) {
             previewUrls.toList()
         } else {
             emptyList()
@@ -4677,17 +4688,24 @@ class MainActivity : BaseLocaleActivity() {
         livePreviewPaused = true
         releaseMiniPreviewForFullscreen()
         val previewCandidates = LivePreviewStreamUrls.candidates(api, profile, channel)
-        val tvCandidates = if (DeviceUi.isTvUi(this)) {
+        val fallbackCandidates = if (DeviceUi.isTvUi(this)) {
             LiveStreamUrls.tvCandidates(api, profile, channel)
         } else {
             LiveStreamUrls.candidates(api, profile, channel)
         }
-        val urls = buildList {
-            handedOffUrl?.let { add(it) }
-            addAll(previewUrlSnapshot)
-            addAll(previewCandidates)
-            addAll(tvCandidates)
-        }.filter { it.isNotBlank() }.distinct()
+        val urls = if (handedOffUrl != null) {
+            buildList {
+                add(handedOffUrl)
+                addAll(previewUrlSnapshot)
+                addAll(previewCandidates)
+            }.filter { it.isNotBlank() }.distinct()
+        } else {
+            buildList {
+                addAll(previewUrlSnapshot)
+                addAll(previewCandidates)
+                addAll(fallbackCandidates)
+            }.filter { it.isNotBlank() }.distinct()
+        }
         if (urls.isEmpty()) {
             Toast.makeText(this, R.string.connection_failed, Toast.LENGTH_SHORT).show()
             livePreviewPaused = false
@@ -4722,14 +4740,25 @@ class MainActivity : BaseLocaleActivity() {
             previewHandler.postDelayed({
                 if (waitToken != fullscreenWaitToken || currentTab != Tab.LIVE) return@postDelayed
                 if (currentPreviewChannel?.streamId != channel.streamId) return@postDelayed
-                if (previewIsSettled() || remaining <= 0) {
-                    openFullscreen(channel)
-                } else {
-                    attempt(remaining - 1)
+                when {
+                    previewIsSettled() -> openFullscreen(channel)
+                    previewHasNoSignal() -> {
+                        Toast.makeText(
+                            this@MainActivity,
+                            R.string.connection_failed,
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                    remaining > 0 -> attempt(remaining - 1)
+                    else -> Toast.makeText(
+                        this@MainActivity,
+                        R.string.connection_failed,
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
-            }, 100L)
+            }, 200L)
         }
-        attempt(6)
+        attempt(15)
     }
 
     private fun logoutUser() {

@@ -59,7 +59,10 @@ class PosterAdapter(
         holder.itemView.isSelected = holder.itemView.hasFocus()
         holder.itemView.setOnFocusChangeListener { view, hasFocus ->
             view.isSelected = hasFocus
-            if (hasFocus) onFocus?.invoke(item)
+            if (!hasFocus) return@setOnFocusChangeListener
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
+            onFocus?.invoke(items[pos])
         }
 
         holder.itemView.setOnClickListener { onClick(item) }

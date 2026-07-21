@@ -124,7 +124,7 @@ class ChannelAdapter(
                         onMoveRight.invoke()
                         true
                     } else {
-                        true
+                        false
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
