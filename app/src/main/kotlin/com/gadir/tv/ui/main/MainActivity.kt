@@ -96,9 +96,9 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_LIMIT_TV = 8
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
-        private const val CHANNEL_PREVIEW_DELAY_MS = 0L
+        private const val CHANNEL_PREVIEW_DELAY_MS = 200L
         private const val PREVIEW_TIMEOUT_MS = 8_000L
-        private const val CATALOG_PREFETCH_DELAY_MS = 0L
+        private const val CATALOG_PREFETCH_DELAY_MS = 350L
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -225,6 +225,7 @@ class MainActivity : BaseLocaleActivity() {
     private var catalogLoadToken = 0
     private var inFlightCatalogCategory: String? = null
     private val catalogCategoryHandler = Handler(Looper.getMainLooper())
+    private var catalogPrefetchToken = 0
     private val liveCategoryHandler = Handler(Looper.getMainLooper())
     private var pendingLiveCategoryPreview: Runnable? = null
     private var reloadingChannels = false
@@ -762,7 +763,18 @@ class MainActivity : BaseLocaleActivity() {
         }
 
         val previousId = liveBrowsingCategoryId
+        val sameGroup = previousId == newId &&
+            channels.size == loaded.size &&
+            channels.map { it.streamId } == loaded.map { it.streamId }
         liveBrowsingCategoryId = newId
+        if (sameGroup) {
+            if (refreshCategories) {
+                refreshLiveCategorySelection()
+            } else {
+                refreshLiveCategoryHighlight(null, newId)
+            }
+            return
+        }
         ++channelsLoadToken
         reloadingChannels = false
         val listChanged = previousId != newId || channels.size != loaded.size
@@ -1568,6 +1580,13 @@ class MainActivity : BaseLocaleActivity() {
         val catId = cat.id
         val idx = catalogCategories.indexOfFirst { it.id == catId }
         if (idx >= 0) catalogCategoryFocusIndex = idx
+        if (
+            catalogBrowsingCategoryId == catId &&
+            catalogBrowseLevel == TvBrowseNav.Level.GROUP
+        ) {
+            refreshCatalogCategoryHighlight(null, catId)
+            return
+        }
         val previousId = catalogBrowsingCategoryId
         catalogBrowsingCategoryId = catId
         selectedCatalogCategoryId = null
@@ -1783,8 +1802,11 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun scheduleCatalogPrefetch(tab: Tab, catId: String) {
-        catalogCategoryHandler.removeCallbacksAndMessages(null)
-        val task = Runnable { prefetchCatalogGroup(tab, catId) }
+        val token = ++catalogPrefetchToken
+        val task = Runnable {
+            if (token != catalogPrefetchToken) return@Runnable
+            prefetchCatalogGroup(tab, catId)
+        }
         catalogCategoryHandler.postDelayed(task, CATALOG_PREFETCH_DELAY_MS)
     }
 
@@ -3634,6 +3656,10 @@ class MainActivity : BaseLocaleActivity() {
                 if (catalogBrowseLevel == TvBrowseNav.Level.CONTENT) return@CategoryAdapter
                 val idx = catalogCategories.indexOfFirst { it.id == cat.id }
                 if (idx >= 0) catalogCategoryFocusIndex = idx
+                if (catalogBrowsingCategoryId == cat.id) {
+                    refreshCatalogCategoryHighlight(null, cat.id)
+                    return@CategoryAdapter
+                }
                 previewCatalogGroup(tab, cat)
             },
             onMoveRight = {
@@ -4247,6 +4273,20 @@ class MainActivity : BaseLocaleActivity() {
         previewWorkingUrl = null
     }
 
+    /** Libera el mini-player antes de pantalla completa (evita dos instancias LibVLC en TV). */
+    private fun releaseMiniPreviewForFullscreen() {
+        pendingPreview?.let { previewHandler.removeCallbacks(it) }
+        pendingPreview = null
+        previewToken++
+        cancelPreviewTimeout()
+        miniVlcPlayer?.release()
+        miniVlcPlayer = null
+        miniExoPlayer?.stop()
+        previewingStreamId = null
+        previewWorkingUrl = null
+        setPreviewVideoVisible(false)
+    }
+
     private fun releaseExoPreview() {
         val view = miniExoView
         miniExoPlayer?.let { player ->
@@ -4581,6 +4621,8 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun openFullscreenInternal(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
+        val handedOffUrl = previewWorkingUrl
+            ?.takeIf { previewingStreamId == channel.streamId && it.isNotBlank() }
         LiveChannelNavigator.setPlaybackContext(
             this,
             channel,
@@ -4588,16 +4630,14 @@ class MainActivity : BaseLocaleActivity() {
         )
         VolumeHelper.boostOnPlaybackStart(this)
         livePreviewPaused = true
-        teardownLivePreviewPlayback()
+        releaseMiniPreviewForFullscreen()
         val candidates = if (DeviceUi.isTvUi(this)) {
             LiveStreamUrls.tvCandidates(api, profile, channel)
         } else {
             LiveStreamUrls.candidates(api, profile, channel)
         }
         val urls = buildList {
-            if (previewingStreamId == channel.streamId) {
-                previewWorkingUrl?.let { add(it) }
-            }
+            handedOffUrl?.let { add(it) }
             addAll(candidates)
         }.filter { it.isNotBlank() }.distinct()
         if (urls.isEmpty()) {
@@ -4899,10 +4939,9 @@ class MainActivity : BaseLocaleActivity() {
         miniExoView = panel.findViewById(R.id.miniExoPlayer)
         miniVlcView = panel.findViewById(R.id.miniVlcPlayer)
         previewUsesExo = when {
-            DeviceUi.isTvUi(this) && miniVlcView != null -> false
-            DeviceUi.isCompact(this) && miniExoView != null -> true
+            miniExoView != null -> true
             miniVlcView != null -> false
-            else -> miniExoView != null
+            else -> false
         }
         if (previewUsesExo) {
             miniVlcView?.visibility = View.GONE
@@ -4949,6 +4988,8 @@ class MainActivity : BaseLocaleActivity() {
     private fun ensureExoPreviewFallback(): Boolean {
         if (miniExoView == null) return false
         previewUsesExo = true
+        miniVlcPlayer?.release()
+        miniVlcPlayer = null
         miniVlcView?.visibility = View.GONE
         miniExoView?.visibility = View.VISIBLE
         if (miniExoPlayer == null) createMiniExoPlayer()
