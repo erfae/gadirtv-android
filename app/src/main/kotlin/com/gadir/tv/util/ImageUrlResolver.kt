@@ -7,8 +7,16 @@ object ImageUrlResolver {
         "^/w\\d+/[\\w.-]+\\.(jpg|jpeg|png|webp)$",
         RegexOption.IGNORE_CASE,
     )
+    private val tmdbSizedBare = Regex(
+        "^w\\d+/[\\w.-]+\\.(jpg|jpeg|png|webp)$",
+        RegexOption.IGNORE_CASE,
+    )
     private val tmdbFilePath = Regex(
         "^/[\\w.-]+\\.(jpg|jpeg|png|webp)$",
+        RegexOption.IGNORE_CASE,
+    )
+    private val tmdbBareFile = Regex(
+        "^[\\w.-]+\\.(jpg|jpeg|png|webp)$",
         RegexOption.IGNORE_CASE,
     )
     private val panelPathPrefixes = listOf(
@@ -30,6 +38,13 @@ object ImageUrlResolver {
 
         if (url.startsWith("http://") || url.startsWith("https://")) {
             return url
+        }
+
+        if (tmdbSizedBare.matches(url)) {
+            return "https://image.tmdb.org/t/p/$url"
+        }
+        if (tmdbBareFile.matches(url)) {
+            return "https://image.tmdb.org/t/p/w185/$url"
         }
 
         if (url.startsWith("/")) {

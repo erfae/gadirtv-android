@@ -5,8 +5,8 @@ import com.gadir.tv.data.PlaylistRepository
 /** Opciones libVLC compartidas: sin ganancia extra para evitar distorsión en TV/Fire TV. */
 object VlcAudioOptions {
     const val VOLUME_FULLSCREEN = 92
-    /** Preview TV: volumen bajo para evitar saturación/distorsión con ExoPlayer. */
-    const val VOLUME_PREVIEW = 28
+    /** Preview TV: audible but below fullscreen level. */
+    const val VOLUME_PREVIEW = 42
 
     fun baseOptions(networkBufferMs: Int): ArrayList<String> = arrayListOf(
         "--http-user-agent=${PlaylistRepository.userAgent}",

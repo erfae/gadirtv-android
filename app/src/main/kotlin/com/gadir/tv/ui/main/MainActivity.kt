@@ -67,6 +67,7 @@ import com.gadir.tv.util.ChannelIconHelper
 import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.EpgFormatter
 import com.gadir.tv.util.ImageLoader
+import com.gadir.tv.util.ImageUrlResolver
 import com.gadir.tv.util.MetaExtractor
 import com.gadir.tv.util.ProfileAvatarHelper
 import com.gadir.tv.util.TvFocusHelper
@@ -308,6 +309,7 @@ class MainActivity : BaseLocaleActivity() {
             channelList.nextFocusUpId = View.NO_ID
             liveCategoryList.nextFocusRightId = R.id.channelList
             liveCategoryList.nextFocusUpId = View.NO_ID
+            wireCategoryListLeftKey(liveCategoryList) { returnToLiveTab() }
             btnPreviewFavorite?.nextFocusLeftId = R.id.channelList
             btnCatchUp?.nextFocusLeftId = R.id.channelList
             btnPreviewFavorite?.nextFocusRightId = R.id.btnCatchUp
@@ -3373,19 +3375,18 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun heroImageFallbacks(primary: String, contentId: Int, kind: String): List<String> {
-        val profile = PlaylistRepository.profile ?: return listOf(primary).filter { it.isNotBlank() }
-        val base = HostUtils.baseUrl(profile.host).trimEnd('/')
+        val profile = PlaylistRepository.profile ?: return listOf(ImageUrlResolver.resolve(primary)).filter { it.isNotBlank() }
+        val base = HostUtils.baseUrl(
+            com.gadir.tv.net.PanelHttp.migrateProfileHost(profile.host),
+        ).trimEnd('/')
         return buildList {
-            if (primary.isNotBlank()) add(primary)
+            val resolved = ImageUrlResolver.resolve(primary)
+            if (resolved.isNotBlank()) add(resolved)
             if (contentId <= 0) return@buildList
             when (kind) {
-                HomeRailAdapter.HomeRailItem.KIND_MOVIE -> {
-                    add("$base/images/${contentId}.jpg")
-                    add("$base/images/${contentId}.png")
-                }
-                HomeRailAdapter.HomeRailItem.KIND_SERIES -> {
-                    add("$base/images/${contentId}.jpg")
-                    add("$base/images/${contentId}.png")
+                HomeRailAdapter.HomeRailItem.KIND_MOVIE, HomeRailAdapter.HomeRailItem.KIND_SERIES -> {
+                    add(com.gadir.tv.util.NetworkUrlResolver.resolveUrl("$base/images/$contentId.jpg"))
+                    add(com.gadir.tv.util.NetworkUrlResolver.resolveUrl("$base/images/$contentId.png"))
                 }
             }
         }.distinct().filter { it.isNotBlank() }
@@ -3753,6 +3754,21 @@ class MainActivity : BaseLocaleActivity() {
         )
         catalogCategoryList.adapter = catalogCategoryAdapter
         catalogCategoryList.nextFocusUpId = View.NO_ID
+        if (DeviceUi.useDpadFocus(this)) {
+            wireCategoryListLeftKey(catalogCategoryList) { returnToCatalogTab(tab) }
+        }
+    }
+
+    private fun wireCategoryListLeftKey(list: RecyclerView, onLeft: () -> Unit) {
+        list.setOnKeyListener { _, keyCode, event ->
+            if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT) {
+                onLeft()
+                true
+            } else {
+                false
+            }
+        }
     }
 
     private fun configureCatalogGrid() {
@@ -4600,8 +4616,7 @@ class MainActivity : BaseLocaleActivity() {
         updatePreviewLockButton(channel)
         updatePreviewActions(channel)
         EpgCache.get(channel.streamId)?.takeIf { it.isNotEmpty() }?.let { applyEpg(channel, it) } ?: run {
-            epgNow.text = getString(R.string.epg_loading)
-            epgNext.visibility = View.GONE
+            epgPreviewAdapter?.submit(emptyList())
         }
         scheduleEpgLoad(channel)
     }
@@ -4770,23 +4785,21 @@ class MainActivity : BaseLocaleActivity() {
         if (currentPreviewChannel?.streamId != channel.streamId) return
         currentPreviewEpg = epg
         updatePreviewActions(channel)
+        epgNow.visibility = View.GONE
+        epgNext.visibility = View.GONE
         if (epg.isEmpty()) {
             epgPreviewAdapter?.submit(emptyList())
             epgNow.text = getString(R.string.epg_unavailable)
-            epgNext.visibility = View.GONE
             return
         }
-        epgPreviewAdapter?.submit(epg)
-        val currentIndex = EpgFormatter.currentIndex(epg)
-        val current = epg[currentIndex]
-        epgNow.text = EpgFormatter.formatNowLine(this, current)
-        epgNow.visibility = View.VISIBLE
-        val next = epg.getOrNull(currentIndex + 1)
-        if (next != null) {
-            epgNext.text = EpgFormatter.formatNextLine(this, next)
-            epgNext.visibility = View.VISIBLE
-        } else {
-            epgNext.visibility = View.GONE
+        epgPreviewAdapter?.submit(dedupeEpgPreview(epg).take(4))
+    }
+
+    private fun dedupeEpgPreview(epg: List<EpgEntry>): List<EpgEntry> {
+        val seen = LinkedHashSet<String>()
+        return epg.filter { entry ->
+            val key = "${entry.start}:${entry.end}:${entry.title.trim()}"
+            seen.add(key)
         }
     }
 
@@ -5066,21 +5079,31 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun handleTvDpadLeft(): Boolean {
-        when (currentTab) {
-            Tab.LIVE -> if (liveBrowseLevel == TvBrowseNav.Level.GROUP && isFocusInList(liveCategoryList)) {
-                returnToLiveTab()
-                return true
+        return when (currentTab) {
+            Tab.LIVE -> when {
+                liveBrowseLevel == TvBrowseNav.Level.CONTENT && isFocusInList(channelList) -> {
+                    exitLiveContentToGroup()
+                    true
+                }
+                liveBrowseLevel == TvBrowseNav.Level.GROUP && isFocusInList(liveCategoryList) -> {
+                    returnToLiveTab()
+                    true
+                }
+                else -> false
             }
-            Tab.MOVIES, Tab.SERIES -> if (
-                catalogBrowseLevel == TvBrowseNav.Level.GROUP &&
-                isFocusInList(catalogCategoryList)
-            ) {
-                returnToCatalogTab(currentTab)
-                return true
+            Tab.MOVIES, Tab.SERIES -> when {
+                catalogBrowseLevel == TvBrowseNav.Level.CONTENT && isFocusInList(catalogGrid) -> {
+                    exitCatalogContentToGroup()
+                    true
+                }
+                catalogBrowseLevel == TvBrowseNav.Level.GROUP && isFocusInList(catalogCategoryList) -> {
+                    returnToCatalogTab(currentTab)
+                    true
+                }
+                else -> false
             }
-            else -> Unit
+            else -> false
         }
-        return false
     }
 
     override fun onStop() {

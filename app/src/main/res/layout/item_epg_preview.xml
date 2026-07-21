@@ -5,6 +5,6 @@
     android:layout_height="wrap_content"
     android:ellipsize="end"
     android:maxLines="1"
-    android:paddingVertical="4dp"
+    android:paddingVertical="2dp"
     android:textColor="@color/gtv_text_dim"
-    android:textSize="12sp" />
+    android:textSize="11sp" />

@@ -46,7 +46,7 @@ class LiveExoPreviewPlayer(
         player.clearMediaItems()
         player.setMediaItem(item)
         player.prepare()
-        player.volume = (volume / 100f).coerceIn(0f, 0.22f)
+        player.volume = (volume / 100f).coerceIn(0f, 0.38f)
         player.playWhenReady = true
     }
 

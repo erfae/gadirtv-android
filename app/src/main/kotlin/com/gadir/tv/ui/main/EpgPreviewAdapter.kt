@@ -36,6 +36,7 @@ class EpgPreviewAdapter(
         val entry = items[position]
         val isCurrent = position == currentIndex
         holder.line.text = EpgFormatter.formatPreviewLine(holder.itemView.context, entry)
+        holder.line.textSize = if (isCurrent) 13f else 11f
         holder.line.setTextColor(
             ContextCompat.getColor(
                 holder.itemView.context,

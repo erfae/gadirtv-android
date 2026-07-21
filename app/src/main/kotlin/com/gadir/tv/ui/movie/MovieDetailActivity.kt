@@ -161,7 +161,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
         lifecycleScope.launch {
             val info = try {
                 withContext(Dispatchers.IO) {
-                    withTimeout(8_000L) { api.vodInfo(profile, streamId) }
+                    withTimeout(5_000L) { api.vodInfo(profile, streamId) }
                 }
             } catch (_: Exception) {
                 null

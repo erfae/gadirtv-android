@@ -179,6 +179,8 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         val hasCachedPlot = PlotCache.get("series", seriesId) != null
         if (!hasCachedPlot && fallbackCover.isEmpty()) {
             loadingView.visibility = View.VISIBLE
+        } else {
+            loadingView.visibility = View.GONE
         }
         episodeList.visibility = View.VISIBLE
         seasonList.visibility = View.VISIBLE
@@ -187,7 +189,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         lifecycleScope.launch {
             val detail = try {
                 withContext(Dispatchers.IO) {
-                    withTimeout(12_000L) {
+                    withTimeout(6_000L) {
                         api.seriesInfo(profile, seriesId)
                     }
                 }

@@ -1,6 +1,7 @@
 package com.gadir.tv.ui.player
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -25,6 +26,7 @@ import androidx.media3.ui.PlayerView
 import com.gadir.tv.R
 import com.gadir.tv.player.PlayerFactory
 import com.gadir.tv.ui.BaseLocaleActivity
+import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.MetaExtractor
 import androidx.lifecycle.lifecycleScope
 import com.gadir.tv.util.TrailerStreamResolver
@@ -39,6 +41,7 @@ class TrailerActivity : BaseLocaleActivity() {
     private lateinit var webView: WebView
     private lateinit var playerView: PlayerView
     private lateinit var statusView: TextView
+    private lateinit var trailerHeader: View
     private lateinit var btnBack: TextView
     private lateinit var btnRetry: TextView
     private var exoPlayer: ExoPlayer? = null
@@ -65,6 +68,7 @@ class TrailerActivity : BaseLocaleActivity() {
         findViewById<TextView>(R.id.trailerTitle).text = title
         statusView = findViewById(R.id.trailerStatus)
         btnBack = findViewById(R.id.btnTrailerBack)
+        trailerHeader = findViewById(R.id.trailerHeader)
         btnRetry = findViewById(R.id.btnTrailerRetry)
         playerView = findViewById(R.id.trailerPlayerView)
         webView = findViewById(R.id.trailerWebView)
@@ -203,6 +207,12 @@ class TrailerActivity : BaseLocaleActivity() {
 
     private fun playDirectVideo(url: String) {
         hideWebView()
+        if (DeviceUi.isTvUi(this)) {
+            trailerHeader.visibility = View.GONE
+            playerView.useController = true
+            playerView.controllerShowTimeoutMs = 0
+            playerView.controllerHideOnTouch = false
+        }
         playerView.visibility = View.VISIBLE
         releasePlayer()
         exoPlayer = PlayerFactory.create(this).also { player ->
@@ -222,10 +232,29 @@ class TrailerActivity : BaseLocaleActivity() {
             player.prepare()
             player.playWhenReady = true
         }
+        enterImmersiveMode()
+        if (DeviceUi.isTvUi(this)) {
+            playerView.post { playerView.requestFocus() }
+        }
     }
 
     private fun playYoutube(videoId: String) {
         currentYoutubeId = videoId
+        if (DeviceUi.isTvUi(this)) {
+            youtubeStreamTried = true
+            lifecycleScope.launch {
+                val direct = withContext(Dispatchers.IO) {
+                    TrailerStreamResolver.directPlayUrl(videoId)
+                }
+                if (isFinishing) return@launch
+                if (direct != null) {
+                    playDirectVideo(direct)
+                } else {
+                    playYoutubeEmbed(videoId)
+                }
+            }
+            return
+        }
         if (!youtubeStreamTried) {
             youtubeStreamTried = true
             lifecycleScope.launch {
@@ -370,6 +399,32 @@ class TrailerActivity : BaseLocaleActivity() {
         cancelLoadTimeout()
         statusView.visibility = View.GONE
         btnRetry.visibility = View.GONE
+        if (DeviceUi.isTvUi(this) && playerView.visibility == View.VISIBLE) {
+            trailerHeader.visibility = View.GONE
+            enterImmersiveMode()
+        }
+    }
+
+    private fun openYoutubeExternal(videoId: String): Boolean {
+        val uri = Uri.parse("https://www.youtube.com/watch?v=$videoId")
+        val packages = listOf(
+            "com.google.android.youtube.tv",
+            "com.google.android.youtube",
+        )
+        for (pkg in packages) {
+            val intent = Intent(Intent.ACTION_VIEW, uri).setPackage(pkg)
+            if (intent.resolveActivity(packageManager) != null) {
+                startActivity(intent)
+                return true
+            }
+        }
+        val generic = Intent(Intent.ACTION_VIEW, uri)
+        return if (generic.resolveActivity(packageManager) != null) {
+            startActivity(generic)
+            true
+        } else {
+            false
+        }
     }
 
     private fun showFailed() {

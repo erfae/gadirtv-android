@@ -199,34 +199,13 @@
                         android:textColor="#D9FFFFFF"
                         android:textSize="14sp" />
 
-                    <TextView
-                        android:id="@+id/seriesCast"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:visibility="gone" />
-                </LinearLayout>
-            </LinearLayout>
-
             <TextView
-                android:id="@+id/seriesCastLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:paddingHorizontal="40dp"
-                android:text="@string/detail_cast_label"
-                android:textColor="@android:color/white"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/seriesCastList"
+                android:id="@+id/seriesCast"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:clipToPadding="false"
-                android:paddingHorizontal="32dp"
                 android:visibility="gone" />
+                </LinearLayout>
+            </LinearLayout>
 
             <TextView
                 android:layout_width="wrap_content"
@@ -247,6 +226,27 @@
                 android:nestedScrollingEnabled="false"
                 android:paddingHorizontal="32dp"
                 android:paddingBottom="8dp" />
+
+            <TextView
+                android:id="@+id/seriesCastLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:paddingHorizontal="40dp"
+                android:text="@string/detail_cast_label"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/seriesCastList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:clipToPadding="false"
+                android:paddingHorizontal="32dp"
+                android:visibility="gone" />
 
             <TextView
                 android:layout_width="wrap_content"
