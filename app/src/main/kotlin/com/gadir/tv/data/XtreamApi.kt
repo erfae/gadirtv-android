@@ -505,7 +505,7 @@ class XtreamApi(
         limit: Int,
         actionOverride: String = "get_short_epg",
     ): List<EpgEntry> {
-        val host = HostUtils.baseUrl(profile.host)
+        val host = panelHost(profile)
         val action = actionOverride
         val query = buildString {
             append("username=").append(encode(profile.username))

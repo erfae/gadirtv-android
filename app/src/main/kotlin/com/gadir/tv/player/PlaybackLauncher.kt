@@ -28,6 +28,8 @@ object PlaybackLauncher {
                     launchExo(context, request)
                 request.kind == ResumeStore.KIND_LIVE && DeviceUi.isTvUi(context) ->
                     launchExo(context, request)
+                DeviceUi.isTvUi(context) ->
+                    launchVlc(context, request)
                 else -> launchExo(context, request)
             }
         } catch (_: Throwable) {
@@ -40,12 +42,7 @@ object PlaybackLauncher {
     }
 
     private fun vodFallback(context: Context, request: PlaybackRequest) {
-        if (settingsPlayerPrefersVlc(context)) launchVlc(context, request) else launchExo(context, request)
-    }
-
-    /** Solo VLC automático si el usuario eligió VLC en ajustes. Exo hace fallback a VLC si falla. */
-    private fun settingsPlayerPrefersVlc(context: Context): Boolean {
-        return AppSettings(context).playerMode == AppSettings.PLAYER_VLC
+        if (DeviceUi.isTvUi(context)) launchVlc(context, request) else launchExo(context, request)
     }
 
     private fun launchExternal(context: Context, request: PlaybackRequest, settings: AppSettings) {

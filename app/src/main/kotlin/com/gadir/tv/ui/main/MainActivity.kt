@@ -934,8 +934,14 @@ class MainActivity : BaseLocaleActivity() {
         }
         if (DeviceUi.useDpadFocus(this)) {
             channelList.nextFocusLeftId = R.id.categoryList
-            liveCategoryList.nextFocusRightId = View.NO_ID
-            channelList.nextFocusRightId = View.NO_ID
+            liveCategoryList.nextFocusRightId = when (liveBrowseLevel) {
+                TvBrowseNav.Level.GROUP -> R.id.channelList
+                else -> View.NO_ID
+            }
+            channelList.nextFocusRightId = when (liveBrowseLevel) {
+                TvBrowseNav.Level.CONTENT -> R.id.btnPreviewFavorite
+                else -> View.NO_ID
+            }
             channelList.nextFocusDownId = View.NO_ID
             updateTabDownFocus()
             updateHeaderDownFocus()
@@ -5024,9 +5030,30 @@ class MainActivity : BaseLocaleActivity() {
                     handleTvBack()
                     return true
                 }
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (handleTvDpadLeft()) return true
+                }
             }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun handleTvDpadLeft(): Boolean {
+        when (currentTab) {
+            Tab.LIVE -> if (liveBrowseLevel == TvBrowseNav.Level.GROUP && isFocusInList(liveCategoryList)) {
+                returnToLiveTab()
+                return true
+            }
+            Tab.MOVIES, Tab.SERIES -> if (
+                catalogBrowseLevel == TvBrowseNav.Level.GROUP &&
+                isFocusInList(catalogCategoryList)
+            ) {
+                returnToCatalogTab(currentTab)
+                return true
+            }
+            else -> Unit
+        }
+        return false
     }
 
     override fun onStop() {

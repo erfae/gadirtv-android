@@ -217,32 +217,41 @@ object ImageLoader {
     }
 
     fun glideModel(url: String): Any {
-        val resolved = ImageUrlResolver.resolve(url)
-        if (!resolved.startsWith("http", ignoreCase = true)) return resolved
+        val trimmed = url.trim()
+        if (!trimmed.startsWith("http", ignoreCase = true)) return trimmed
 
-        // PLUME: icon URLs load as-is (no Referer/Host). Works for picons + CDN hosts.
-        if (!isPanelImageHost(resolved)) return resolved
-
-        val panel = NetworkUrlResolver.resolve(resolved)
-        if (panel.hostHeader == null) return resolved
-
+        val panelUrl = isPanelMediaUrl(trimmed)
+        val resolved = if (panelUrl) {
+            NetworkUrlResolver.resolve(trimmed)
+        } else {
+            NetworkUrlResolver.Resolved(trimmed)
+        }
         val headers = LazyHeaders.Builder()
             .addHeader("User-Agent", PlaylistRepository.userAgent)
             .addHeader("Accept", "image/*,*/*")
-            .addHeader("Host", panel.hostHeader)
-        PlaylistRepository.profile?.host?.let { host ->
-            val referer = com.gadir.tv.util.HostUtils.baseUrl(host).trimEnd('/') + "/"
-            headers.addHeader("Referer", referer)
+        resolved.hostHeader?.let { headers.addHeader("Host", it) }
+        if (panelUrl) {
+            PlaylistRepository.profile?.host?.let { host ->
+                headers.addHeader("Referer", HostUtils.baseUrl(host).trimEnd('/') + "/")
+            }
         }
-        return GlideUrl(panel.url, headers.build())
+        return GlideUrl(resolved.url, headers.build())
     }
 
-    private fun isPanelImageHost(url: String): Boolean {
-        val host = runCatching { URI(url).host?.lowercase() }.getOrNull() ?: return false
-        if (host == PanelHttp.GADIR_HOST.lowercase() || host == PanelHttp.GADIR_IP) return true
+    private fun isPanelMediaUrl(url: String): Boolean {
+        val lower = url.lowercase()
+        if (lower.contains(PanelHttp.GADIR_IP) || lower.contains(PanelHttp.GADIR_HOST)) return true
         val profileHost = PlaylistRepository.profile?.host?.let { raw ->
             runCatching { URI(HostUtils.baseUrl(raw)).host?.lowercase() }.getOrNull()
         }
-        return host == profileHost
+        val urlHost = runCatching { URI(url).host?.lowercase() }.getOrNull()
+        if (profileHost != null && urlHost == profileHost) return true
+        return lower.contains("/images/") ||
+            lower.contains("/imgs/") ||
+            lower.contains("/logo/") ||
+            lower.contains("/logos/") ||
+            lower.contains("/streaming/") ||
+            lower.contains("/movie/") ||
+            lower.contains("/series/")
     }
 }

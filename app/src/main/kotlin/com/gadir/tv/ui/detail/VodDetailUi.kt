@@ -1,6 +1,7 @@
 package com.gadir.tv.ui.detail
 
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -103,6 +104,8 @@ object VodDetailUi {
         listView.visibility = View.VISIBLE
         listView.layoutManager = LinearLayoutManager(listView.context, LinearLayoutManager.HORIZONTAL, false)
         listView.adapter = CastMemberAdapter(members)
+        listView.isFocusable = false
+        listView.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         RecyclerViewUtil.expandHorizontalList(listView)
     }
 
