@@ -113,11 +113,13 @@ object PlayerFactory {
             .apply { volume = 1f }
     }
 
-    fun createForLive(context: Context): ExoPlayer {
-        val bufferMs = AppSettings(context).networkBufferMs
+    fun createForLive(context: Context): ExoPlayer = createForLiveFullscreen(context)
+
+    /** Fullscreen live: mismo arranque rápido que el preview, sin tope 720p. */
+    fun createForLiveFullscreen(context: Context): ExoPlayer {
         val renderersFactory = renderersFactory(
             context,
-            DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER,
+            DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON,
         )
         val trackSelector = DefaultTrackSelector(context).apply {
             setParameters(
@@ -129,17 +131,17 @@ object PlayerFactory {
         }
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                (bufferMs * 8).coerceIn(10_000, 30_000),
-                (bufferMs * 24).coerceIn(35_000, 90_000),
-                (bufferMs * 4).coerceIn(3_000, 12_000),
-                (bufferMs * 6).coerceIn(6_000, 20_000),
+                2_000,
+                12_000,
+                750,
+                2_000,
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
         return ExoPlayer.Builder(context, renderersFactory)
             .setTrackSelector(trackSelector)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory()))
-            .setAudioAttributes(liveAudioAttributes(), true)
+            .setAudioAttributes(liveAudioAttributes(), false)
             .setHandleAudioBecomingNoisy(true)
             .setLoadControl(loadControl)
             .build()

@@ -191,8 +191,8 @@ class PlayerActivity : BaseLocaleActivity() {
                 playbackMonitor = LivePlaybackMonitor(
                     player = exo,
                     overlay = noSignal,
-                    timeoutMs = 25_000L,
-                    bufferingFallbackMs = 35_000L,
+                    timeoutMs = 12_000L,
+                    bufferingFallbackMs = 15_000L,
                     shouldHoldStream = { liveUrlSettled },
                     onBeforeNoSignal = {
                         tryNextLiveUrl() || fallbackToVlcLivePlayer()

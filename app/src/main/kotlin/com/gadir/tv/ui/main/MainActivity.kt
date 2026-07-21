@@ -96,9 +96,9 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_LIMIT_TV = 8
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
-        private const val CHANNEL_PREVIEW_DELAY_MS = 200L
-        private const val PREVIEW_TIMEOUT_MS = 8_000L
-        private const val CATALOG_PREFETCH_DELAY_MS = 350L
+        private const val CHANNEL_PREVIEW_DELAY_MS = 80L
+        private const val PREVIEW_TIMEOUT_MS = 6_000L
+        private const val CATALOG_PREFETCH_DELAY_MS = 150L
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -604,7 +604,12 @@ class MainActivity : BaseLocaleActivity() {
             },
             onOpen = { channel ->
                 if (DeviceUi.useDpadFocus(this)) {
-                    openFullscreen(channel)
+                    if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
+                        openFullscreen(channel)
+                    } else {
+                        schedulePreview(channel)
+                        openFullscreenWhenPreviewReady(channel)
+                    }
                 } else if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
                     openFullscreen(channel)
                 } else {
@@ -1212,11 +1217,6 @@ class MainActivity : BaseLocaleActivity() {
             selectedId = { liveCategoryAdapterSelectedId() },
             itemCount = { cat -> liveCategoryCount(cat) },
             onClick = { cat -> applyLiveCategoryClick(cat, enterContent = true) },
-            onNavigate = { cat, idx ->
-                if (liveBrowseLevel != TvBrowseNav.Level.GROUP) return@CategoryAdapter
-                liveCategoryFocusIndex = idx
-                previewLiveCategoryGroup(cat)
-            },
             onFocus = { cat ->
                 if (liveBrowseLevel == TvBrowseNav.Level.CONTENT) return@CategoryAdapter
                 val newId = liveCategoryId(cat)
@@ -1597,10 +1597,24 @@ class MainActivity : BaseLocaleActivity() {
             refreshCatalogCategoryHighlight(previousId, catId)
         }
         applyCatalogPanelFocusMode(tab, inContent = false)
-        showCatalogGroupContent(tab, catId)
-        catalogGrid.visibility = View.VISIBLE
-        catalogEmpty.visibility = if (posterItems.isEmpty()) View.VISIBLE else View.GONE
+        previewCatalogGroupHero(tab, catId)
         scheduleCatalogPrefetch(tab, catId)
+    }
+
+    /** Vista ligera al navegar grupos: solo cabecera, sin cargar el grid completo. */
+    private fun previewCatalogGroupHero(tab: Tab, catId: String) {
+        val catName = catalogCategories.find { it.id == catId }?.name.orEmpty()
+        val cover = when (tab) {
+            Tab.MOVIES -> PlaylistRepository.cachedVod(catId)
+                ?.firstOrNull { it.icon.isNotBlank() }?.icon
+            Tab.SERIES -> PlaylistRepository.cachedSeries(catId)
+                ?.firstOrNull { it.cover.isNotBlank() }?.cover
+            else -> null
+        }.orEmpty()
+        bindCatalogHero(tab, catName, cover)
+        catalogGrid.visibility = View.INVISIBLE
+        catalogEmpty.visibility = View.GONE
+        catalogLoading.visibility = View.GONE
     }
 
     private fun enterCatalogTabFromTabBar(tab: Tab) {
@@ -2908,6 +2922,7 @@ class MainActivity : BaseLocaleActivity() {
         categoryId: String = "",
     ) {
         val open = {
+            prefetchSeriesDetail(seriesId, title, cover)
             startActivity(
                 SeriesDetailActivity.intent(
                     context = this,
@@ -2921,6 +2936,28 @@ class MainActivity : BaseLocaleActivity() {
             )
         }
         withSeriesAccess(title, categoryId, open)
+    }
+
+    private fun prefetchSeriesDetail(seriesId: Int, title: String, cover: String) {
+        if (PlotCache.get("series", seriesId) != null) return
+        val profile = PlaylistRepository.profile ?: return
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                api.seriesInfo(profile, seriesId)?.let { detail ->
+                    PlotCache.put(
+                        "series",
+                        seriesId,
+                        PlotCache.Entry(
+                            plot = detail.plot,
+                            backdrop = detail.backdrop.ifBlank { detail.cover },
+                            poster = detail.cover.ifBlank { cover },
+                            title = detail.name.ifBlank { title },
+                        ),
+                    )
+                }
+            } catch (_: Exception) {
+            }
+        }
     }
 
     private fun playMovie(
@@ -3647,11 +3684,6 @@ class MainActivity : BaseLocaleActivity() {
             itemCount = { cat -> catalogCategoryCount(tab, cat) },
             onClick = { cat ->
                 selectCatalogGroup(tab, cat, enterContent = true)
-            },
-            onNavigate = { cat, idx ->
-                if (catalogBrowseLevel != TvBrowseNav.Level.GROUP) return@CategoryAdapter
-                catalogCategoryFocusIndex = idx
-                previewCatalogGroup(tab, cat)
             },
             onFocus = { cat ->
                 if (catalogBrowseLevel == TvBrowseNav.Level.CONTENT) return@CategoryAdapter
@@ -4631,6 +4663,11 @@ class MainActivity : BaseLocaleActivity() {
         val profile = PlaylistRepository.profile ?: return
         val handedOffUrl = previewWorkingUrl
             ?.takeIf { previewingStreamId == channel.streamId && it.isNotBlank() }
+        val previewUrlSnapshot = if (previewingStreamId == channel.streamId) {
+            previewUrls.toList()
+        } else {
+            emptyList()
+        }
         LiveChannelNavigator.setPlaybackContext(
             this,
             channel,
@@ -4639,14 +4676,17 @@ class MainActivity : BaseLocaleActivity() {
         VolumeHelper.boostOnPlaybackStart(this)
         livePreviewPaused = true
         releaseMiniPreviewForFullscreen()
-        val candidates = if (DeviceUi.isTvUi(this)) {
+        val previewCandidates = LivePreviewStreamUrls.candidates(api, profile, channel)
+        val tvCandidates = if (DeviceUi.isTvUi(this)) {
             LiveStreamUrls.tvCandidates(api, profile, channel)
         } else {
             LiveStreamUrls.candidates(api, profile, channel)
         }
         val urls = buildList {
             handedOffUrl?.let { add(it) }
-            addAll(candidates)
+            addAll(previewUrlSnapshot)
+            addAll(previewCandidates)
+            addAll(tvCandidates)
         }.filter { it.isNotBlank() }.distinct()
         if (urls.isEmpty()) {
             Toast.makeText(this, R.string.connection_failed, Toast.LENGTH_SHORT).show()
@@ -4672,6 +4712,24 @@ class MainActivity : BaseLocaleActivity() {
             livePreviewPaused = false
             Toast.makeText(this, R.string.connection_failed, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private var fullscreenWaitToken = 0
+
+    private fun openFullscreenWhenPreviewReady(channel: LiveChannel) {
+        val waitToken = ++fullscreenWaitToken
+        fun attempt(remaining: Int) {
+            previewHandler.postDelayed({
+                if (waitToken != fullscreenWaitToken || currentTab != Tab.LIVE) return@postDelayed
+                if (currentPreviewChannel?.streamId != channel.streamId) return@postDelayed
+                if (previewIsSettled() || remaining <= 0) {
+                    openFullscreen(channel)
+                } else {
+                    attempt(remaining - 1)
+                }
+            }, 100L)
+        }
+        attempt(6)
     }
 
     private fun logoutUser() {
