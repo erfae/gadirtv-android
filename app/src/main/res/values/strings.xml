@@ -160,6 +160,9 @@
     <string name="detail_cast_label">Reparto:</string>
     <string name="detail_genre_label">Género : %1$s</string>
     <string name="detail_added_label">Fecha de adición : %1$s</string>
+    <string name="live_catch_up">Ponerse al día</string>
+    <string name="live_add_favorite">Agregar a favoritos</string>
+    <string name="live_remove_favorite">Quitar de favoritos</string>
     <string name="epg_guide">Guía de programación</string>
     <string name="epg_live_badge">EN VIVO</string>
     <string name="epg_loading">Cargando EPG…</string>

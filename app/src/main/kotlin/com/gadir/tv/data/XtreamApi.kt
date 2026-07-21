@@ -22,6 +22,9 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import java.net.URLEncoder
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class XtreamApi(
     initialUserAgent: String = PlaylistRepository.userAgent,
@@ -180,6 +183,8 @@ class XtreamApi(
                 epgChannelId = row.get("epg_channel_id")?.asStringOrNull()
                     ?: row.get("channel_id")?.asStringOrNull()
                     ?: "",
+                tvArchive = row.get("tv_archive")?.asIntOrZero() ?: 0,
+                tvArchiveDuration = row.get("tv_archive_duration")?.asIntOrZero() ?: 0,
             )
         }.filter { it.streamId > 0 }
     }
@@ -407,6 +412,24 @@ class XtreamApi(
             "$host/$u/$pw/$streamId.$ext"
         }
         return NetworkUrlResolver.resolveUrl(path)
+    }
+
+    fun timeshiftStreamUrl(
+        profile: Profile,
+        streamId: Int,
+        startSec: Long,
+        durationSec: Int,
+        ext: String = "ts",
+    ): String {
+        val host = panelHost(profile)
+        val u = encode(profile.username)
+        val pw = encode(profile.password)
+        val extension = ext.ifBlank { "ts" }
+        val durationHours = ((durationSec + 3599) / 3600).coerceAtLeast(1)
+        val start = SimpleDateFormat("yyyy-MM-dd:HH-mm", Locale.US).format(Date(startSec * 1000L))
+        return NetworkUrlResolver.resolveUrl(
+            "$host/timeshift/$u/$pw/$durationHours/$start/$streamId.$extension",
+        )
     }
 
     fun movieStreamUrl(profile: Profile, streamId: Int, ext: String = "mp4"): String =

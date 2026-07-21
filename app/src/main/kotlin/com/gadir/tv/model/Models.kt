@@ -41,6 +41,8 @@ data class LiveChannel(
     val extension: String = "ts",
     val directSource: String = "",
     val epgChannelId: String = "",
+    val tvArchive: Int = 0,
+    val tvArchiveDuration: Int = 0,
 )
 
 data class VodMovie(

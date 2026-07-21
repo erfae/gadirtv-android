@@ -12,6 +12,25 @@ object EpgFormatter {
     private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault()).apply {
         timeZone = TimeZone.getDefault()
     }
+    private val timeFormat12 = SimpleDateFormat("hh:mm a", Locale.getDefault()).apply {
+        timeZone = TimeZone.getDefault()
+    }
+
+    fun formatTimeRange12(startSec: Long, endSec: Long): String {
+        if (startSec <= 0L || endSec <= 0L) return ""
+        val start = timeFormat12.format(Date(startSec * 1000L))
+        val end = timeFormat12.format(Date(endSec * 1000L))
+        return "$start - $end"
+    }
+
+    fun formatPreviewLine(context: Context, entry: EpgEntry): String {
+        val range = formatTimeRange12(entry.start, entry.end)
+        return if (range.isBlank()) {
+            entry.title
+        } else {
+            "$range  ${entry.title}"
+        }
+    }
 
     fun formatTimeRange(startSec: Long, endSec: Long): String {
         if (startSec <= 0L || endSec <= 0L) return ""
