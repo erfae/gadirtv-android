@@ -2,8 +2,10 @@ package com.gadir.tv.player
 
 import android.content.Context
 import com.gadir.tv.data.AppSettings
+import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.ui.player.PlayerActivity
 import com.gadir.tv.ui.player.VlcPlayerActivity
+import com.gadir.tv.util.DeviceUi
 
 object PlaybackLauncher {
     fun play(context: Context, request: PlaybackRequest) {
@@ -23,6 +25,8 @@ object PlaybackLauncher {
                 settings.playerMode == AppSettings.PLAYER_VLC ->
                     launchVlc(context, request)
                 settings.playerMode == AppSettings.PLAYER_COMPAT ->
+                    launchExo(context, request)
+                request.kind == ResumeStore.KIND_LIVE && DeviceUi.isTvUi(context) ->
                     launchExo(context, request)
                 else -> launchExo(context, request)
             }

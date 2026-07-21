@@ -112,6 +112,12 @@ class SeriesDetailActivity : BaseLocaleActivity() {
     }
 
     private fun loadSeriesDetail() {
+        val profile = PlaylistRepository.profile
+        if (profile == null || seriesId <= 0) {
+            seriesPlot.text = getString(R.string.series_load_failed)
+            btnSeriesPlay.requestFocus()
+            return
+        }
         val token = ++loadToken
         val hasCachedPlot = PlotCache.get("series", seriesId) != null
         if (!hasCachedPlot && fallbackCover.isEmpty()) {
@@ -124,8 +130,8 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         lifecycleScope.launch {
             val detail = try {
                 withContext(Dispatchers.IO) {
-                    withTimeout(8_000L) {
-                        api.seriesInfo(PlaylistRepository.profile!!, seriesId)
+                    withTimeout(12_000L) {
+                        api.seriesInfo(profile, seriesId)
                     }
                 }
             } catch (_: Exception) {
@@ -227,8 +233,10 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         episodeList.adapter = EpisodeAdapter(eps, fallbackCover) { ep ->
             playEpisode(ep)
         }
-        if (findViewById<View?>(R.id.seriesScroll) != null) {
+        if (findViewById<View?>(R.id.seriesScroll) != null && DeviceUi.isCompact(this)) {
             RecyclerViewUtil.expandInScrollView(episodeList)
+        } else {
+            episodeList.isNestedScrollingEnabled = true
         }
     }
 

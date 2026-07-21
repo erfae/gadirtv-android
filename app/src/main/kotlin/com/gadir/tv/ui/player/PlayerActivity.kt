@@ -84,7 +84,7 @@ class PlayerActivity : BaseLocaleActivity() {
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_READY) {
                 updateVodProgress()
-                if (isLive && player?.isPlaying == true && (player?.currentPosition ?: 0L) > 5_000L) {
+                if (isLive && player?.isPlaying == true && (player?.currentPosition ?: 0L) > 1_500L) {
                     liveUrlSettled = true
                 }
             }
@@ -93,7 +93,7 @@ class PlayerActivity : BaseLocaleActivity() {
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             updatePlayPauseIcon()
-            if (isLive && isPlaying && (player?.currentPosition ?: 0L) > 5_000L) {
+            if (isLive && isPlaying && (player?.currentPosition ?: 0L) > 1_500L) {
                 liveUrlSettled = true
             }
         }
@@ -191,8 +191,8 @@ class PlayerActivity : BaseLocaleActivity() {
                 playbackMonitor = LivePlaybackMonitor(
                     player = exo,
                     overlay = noSignal,
-                    timeoutMs = 12_000L,
-                    bufferingFallbackMs = 15_000L,
+                    timeoutMs = 20_000L,
+                    bufferingFallbackMs = 25_000L,
                     shouldHoldStream = { liveUrlSettled },
                     onBeforeNoSignal = {
                         tryNextLiveUrl() || fallbackToVlcLivePlayer()

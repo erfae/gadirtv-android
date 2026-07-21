@@ -113,10 +113,16 @@ object PlayerFactory {
             .apply { volume = 1f }
     }
 
-    fun createForLive(context: Context): ExoPlayer = createForLiveFullscreen(context)
+    fun createForLive(context: Context): ExoPlayer =
+        if (com.gadir.tv.util.DeviceUi.isTvUi(context)) {
+            createForLivePreview(context)
+        } else {
+            createForLiveFullscreen(context)
+        }
 
-    /** Fullscreen live: mismo arranque rápido que el preview, sin tope 720p. */
+    /** Fullscreen live (phone/tablet): buffers equilibrados. */
     fun createForLiveFullscreen(context: Context): ExoPlayer {
+        val bufferMs = AppSettings(context).networkBufferMs.coerceIn(1_500, 5_000)
         val renderersFactory = renderersFactory(
             context,
             DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON,
@@ -131,10 +137,10 @@ object PlayerFactory {
         }
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                2_000,
-                12_000,
-                750,
-                2_000,
+                (bufferMs * 2).coerceIn(4_000, 8_000),
+                (bufferMs * 6).coerceIn(15_000, 30_000),
+                bufferMs.coerceIn(1_000, 2_500),
+                (bufferMs * 2).coerceIn(3_000, 6_000),
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
