@@ -97,8 +97,8 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_LIMIT_TV = 8
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
-        private const val CHANNEL_PREVIEW_DELAY_MS = 120L
-        private const val PREVIEW_TIMEOUT_MS = 7_000L
+        private const val CHANNEL_PREVIEW_DELAY_MS = 60L
+        private const val PREVIEW_TIMEOUT_MS = 4_500L
         private const val CATALOG_PREFETCH_DELAY_MS = 400L
         private const val EPG_FOCUS_DELAY_MS = 450L
     }
@@ -309,7 +309,6 @@ class MainActivity : BaseLocaleActivity() {
             channelList.nextFocusUpId = View.NO_ID
             liveCategoryList.nextFocusRightId = R.id.channelList
             liveCategoryList.nextFocusUpId = View.NO_ID
-            wireCategoryListLeftKey(liveCategoryList) { returnToLiveTab() }
             btnPreviewFavorite?.nextFocusLeftId = R.id.channelList
             btnCatchUp?.nextFocusLeftId = R.id.channelList
             btnPreviewFavorite?.nextFocusRightId = R.id.btnCatchUp
@@ -1265,11 +1264,7 @@ class MainActivity : BaseLocaleActivity() {
                     enterLiveContent(cat)
                 }
             },
-            onMoveLeft = if (DeviceUi.useDpadFocus(this)) {
-                { returnToLiveTab() }
-            } else {
-                null
-            },
+            onMoveLeft = null,
             onMoveUp = null,
             upFocusViewId = View.NO_ID,
             leftFocusViewId = View.NO_ID,
@@ -3742,11 +3737,7 @@ class MainActivity : BaseLocaleActivity() {
                     enterCatalogContent(tab, cat)
                 }
             },
-            onMoveLeft = if (DeviceUi.useDpadFocus(this)) {
-                { returnToCatalogTab(tab) }
-            } else {
-                null
-            },
+            onMoveLeft = null,
             onMoveUp = null,
             upFocusViewId = View.NO_ID,
             leftFocusViewId = View.NO_ID,
@@ -3754,21 +3745,6 @@ class MainActivity : BaseLocaleActivity() {
         )
         catalogCategoryList.adapter = catalogCategoryAdapter
         catalogCategoryList.nextFocusUpId = View.NO_ID
-        if (DeviceUi.useDpadFocus(this)) {
-            wireCategoryListLeftKey(catalogCategoryList) { returnToCatalogTab(tab) }
-        }
-    }
-
-    private fun wireCategoryListLeftKey(list: RecyclerView, onLeft: () -> Unit) {
-        list.setOnKeyListener { _, keyCode, event ->
-            if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
-            if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT) {
-                onLeft()
-                true
-            } else {
-                false
-            }
-        }
     }
 
     private fun configureCatalogGrid() {
@@ -4504,13 +4480,21 @@ class MainActivity : BaseLocaleActivity() {
             else -> null
         }
         if (parentalStore.requiresPinForLiveCategory(browseId)) return
-        if (previewingStreamId != null && previewingStreamId != channel.streamId) {
-            abortPreviewPlayback()
-        }
         livePreviewPaused = false
         updatePreviewInfo(channel)
         if (reloadingChannels) return
         schedulePreviewPlayback(channel)
+    }
+
+    /** Stops preview A/V without tearing down the player instance. */
+    private fun stopPreviewForZap() {
+        cancelPreviewTimeout()
+        pendingPreview?.let { previewHandler.removeCallbacks(it) }
+        pendingPreview = null
+        miniVlcPlayer?.stop()
+        miniExoPlayer?.stop()
+        previewWorkingUrl = null
+        setPreviewVideoVisible(false)
     }
 
     /** Stops preview A/V immediately and invalidates in-flight callbacks. */
@@ -4539,10 +4523,16 @@ class MainActivity : BaseLocaleActivity() {
         }
         if (parentalStore.requiresPinForLiveCategory(browseId)) return
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
-        val channelChanged = previewingStreamId != channel.streamId
+        val previousStreamId = previewingStreamId
+        val channelChanged = previousStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) return
         if (channelChanged || !previewIsSettled() || previewHasNoSignal()) {
-            abortPreviewPlayback()
+            if (channelChanged) {
+                previewToken++
+                stopPreviewForZap()
+            } else {
+                stopPreviewForZap()
+            }
             previewUrlIndex = 0
             previewUrls = emptyList()
             ensurePreviewPlayer()
@@ -5080,28 +5070,15 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun handleTvDpadLeft(): Boolean {
         return when (currentTab) {
-            Tab.LIVE -> when {
-                liveBrowseLevel == TvBrowseNav.Level.CONTENT && isFocusInList(channelList) -> {
-                    exitLiveContentToGroup()
-                    true
-                }
-                liveBrowseLevel == TvBrowseNav.Level.GROUP && isFocusInList(liveCategoryList) -> {
-                    returnToLiveTab()
-                    true
-                }
-                else -> false
+            Tab.LIVE -> liveBrowseLevel == TvBrowseNav.Level.CONTENT && isFocusInList(channelList) && run {
+                exitLiveContentToGroup()
+                true
             }
-            Tab.MOVIES, Tab.SERIES -> when {
-                catalogBrowseLevel == TvBrowseNav.Level.CONTENT && isFocusInList(catalogGrid) -> {
+            Tab.MOVIES, Tab.SERIES -> catalogBrowseLevel == TvBrowseNav.Level.CONTENT &&
+                isFocusInList(catalogGrid) && run {
                     exitCatalogContentToGroup()
                     true
                 }
-                catalogBrowseLevel == TvBrowseNav.Level.GROUP && isFocusInList(catalogCategoryList) -> {
-                    returnToCatalogTab(currentTab)
-                    true
-                }
-                else -> false
-            }
             else -> false
         }
     }

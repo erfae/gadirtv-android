@@ -102,8 +102,12 @@ class CategoryAdapter(
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     if (navigationLocked()) return@setOnKeyListener true
-                    onMoveLeft?.invoke()
-                    onMoveLeft != null
+                    if (onMoveLeft != null) {
+                        onMoveLeft.invoke()
+                        true
+                    } else {
+                        true
+                    }
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     onMoveRight?.invoke()

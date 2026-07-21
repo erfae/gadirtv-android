@@ -111,12 +111,19 @@ object MetaExtractor {
     }
 
     fun castMembersFrom(vararg sources: JsonObject?): List<CastMember> {
-        val keys = listOf("cast", "actors", "starring", "actor", "actor_list")
+        val keys = listOf(
+            "cast", "actors", "starring", "actor", "actor_list",
+            "credits", "crew",
+        )
         for (source in sources) {
             if (source == null) continue
             for (key in keys) {
                 val element = source.get(key) ?: continue
                 when {
+                    element.isJsonObject -> {
+                        val members = castMembersFrom(element.asJsonObject)
+                        if (members.isNotEmpty()) return members
+                    }
                     element.isJsonArray -> {
                         val members = element.asJsonArray.mapNotNull { parseCastElement(it) }
                         if (members.isNotEmpty()) return members
@@ -124,8 +131,8 @@ object MetaExtractor {
                     element.isJsonPrimitive -> {
                         val text = stripHtml(element.asStringOrNull())
                         if (text.isNotBlank()) {
-                            return text.split(",", "/", "|", ";")
-                                .map { CastMember(it.trim()) }
+                            return text.split(",")
+                                .mapNotNull { parseCastNameToken(it.trim()) }
                                 .filter { it.name.isNotBlank() }
                         }
                     }
@@ -133,6 +140,17 @@ object MetaExtractor {
             }
         }
         return emptyList()
+    }
+
+    private fun parseCastNameToken(token: String): CastMember? {
+        if (token.isBlank()) return null
+        val pipeParts = token.split("|", limit = 2)
+        if (pipeParts.size == 2) {
+            val name = pipeParts[0].trim()
+            val image = ImageUrlResolver.resolve(pipeParts[1].trim())
+            if (name.isNotBlank()) return CastMember(name, image)
+        }
+        return CastMember(token)
     }
 
     private fun parseCastElement(element: JsonElement): CastMember? {
@@ -152,10 +170,15 @@ object MetaExtractor {
         val image = imageFrom(
             obj,
             "profile_path",
+            "profile",
             "image",
             "photo",
             "avatar",
             "cast_image",
+            "actor_image",
+            "star_image",
+            "thumb",
+            "portrait",
             "url",
             "cover",
         )

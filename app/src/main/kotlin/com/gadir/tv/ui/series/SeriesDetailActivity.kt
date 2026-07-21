@@ -25,11 +25,13 @@ import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.player.VodStreamUrls
 import com.gadir.tv.ui.detail.VodDetailUi
+import com.gadir.tv.ui.detail.DetailTvNav
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.RecyclerViewUtil
 import com.gadir.tv.util.TrailerLauncher
 import com.gadir.tv.util.TvFocusHelper
+import com.gadir.tv.util.TvNavHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
@@ -77,8 +79,12 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         btnSeriesFavorite = findViewById(R.id.btnSeriesFavorite)
         castList = findViewById(R.id.seriesCastList)
         btnSeriesPlay.setOnClickListener { playFirstEpisode() }
-        TvFocusHelper.bindButton(btnSeriesPlay) { playFirstEpisode() }
-        TvFocusHelper.bindButton(btnSeriesTrailer) { openTrailer() }
+        TvFocusHelper.bindButton(btnSeriesPlay, onActivate = { playFirstEpisode() }, onMoveDown = {
+            if (DeviceUi.useDpadFocus(this)) focusCastList()
+        })
+        TvFocusHelper.bindButton(btnSeriesTrailer, onActivate = { openTrailer() }, onMoveDown = {
+            if (DeviceUi.useDpadFocus(this)) focusCastList()
+        })
         bindFavoriteButton()
         findViewById<ImageView>(R.id.btnSeriesBack).apply {
             setOnClickListener { finish() }
@@ -227,6 +233,8 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             listView = castList,
             castMembers = detail.castMembers,
             fallbackCast = detail.cast,
+            onCastMoveUp = { btnSeriesPlay.requestFocus() },
+            onCastMoveDown = { focusSeasonList() },
         )
 
         val backdrop = detail.backdrop.ifBlank { detail.cover.ifBlank { fallbackCover } }
@@ -270,11 +278,17 @@ class SeriesDetailActivity : BaseLocaleActivity() {
 
         seasonList.visibility = View.VISIBLE
         episodeList.visibility = View.VISIBLE
-        seasonAdapter = SeasonAdapter(keys, selectedSeason) { season ->
-            selectedSeason = season
-            seasonAdapter?.setSelectedSeason(season)
-            reloadEpisodes()
-        }.also { adapter ->
+        seasonAdapter = SeasonAdapter(
+            seasons = keys,
+            selectedSeason = selectedSeason,
+            onClick = { season ->
+                selectedSeason = season
+                seasonAdapter?.setSelectedSeason(season)
+                reloadEpisodes()
+            },
+            onMoveUp = { focusCastList() },
+            onMoveDown = { focusEpisodeList() },
+        ).also { adapter ->
             seasonList.adapter = adapter
             RecyclerViewUtil.expandHorizontalList(seasonList)
         }
@@ -292,12 +306,38 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun focusCastList() {
+        if (castList.visibility == View.VISIBLE && (castList.adapter?.itemCount ?: 0) > 0) {
+            DetailTvNav.focusFirst(castList)
+        } else {
+            btnSeriesPlay.requestFocus()
+        }
+    }
+
+    private fun focusSeasonList() {
+        if (seasonList.visibility == View.VISIBLE && (seasonList.adapter?.itemCount ?: 0) > 0) {
+            val index = seasonAdapter?.selectedIndex() ?: 0
+            TvNavHelper.focusItem(seasonList, index)
+        } else {
+            focusEpisodeList()
+        }
+    }
+
+    private fun focusEpisodeList() {
+        if (episodeList.visibility == View.VISIBLE && (episodeList.adapter?.itemCount ?: 0) > 0) {
+            DetailTvNav.focusFirst(episodeList)
+        }
+    }
+
     private fun reloadEpisodes() {
         val season = selectedSeason ?: return
         val eps = seasons[season].orEmpty()
-        episodeList.adapter = EpisodeAdapter(eps, fallbackCover) { ep ->
-            playEpisode(ep)
-        }
+        episodeList.adapter = EpisodeAdapter(
+            items = eps,
+            fallbackCover = fallbackCover,
+            onClick = { ep -> playEpisode(ep) },
+            onMoveUp = { focusSeasonList() },
+        )
         RecyclerViewUtil.expandInScrollView(episodeList)
     }
 
@@ -334,8 +374,12 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         private val seasons: List<String>,
         selectedSeason: String?,
         private val onClick: (String) -> Unit,
+        private val onMoveUp: (() -> Unit)? = null,
+        private val onMoveDown: (() -> Unit)? = null,
     ) : RecyclerView.Adapter<SeasonAdapter.Holder>() {
         private var selected = seasons.indexOf(selectedSeason).coerceAtLeast(0)
+
+        fun selectedIndex(): Int = selected
 
         inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
             val label: TextView = view.findViewById(R.id.seasonLabel)
@@ -369,6 +413,17 @@ class SeriesDetailActivity : BaseLocaleActivity() {
                 notifyItemChanged(selected)
                 onClick(seasons[pos])
             }
+            val list = holder.itemView.parent as? RecyclerView
+            if (list != null) {
+                DetailTvNav.wireHorizontalItem(
+                    itemView = holder.itemView,
+                    list = list,
+                    position = position,
+                    itemCount = seasons.size,
+                    onUp = onMoveUp,
+                    onDown = onMoveDown,
+                )
+            }
         }
 
         override fun getItemCount(): Int = seasons.size
@@ -378,6 +433,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         private val items: List<SeriesEpisode>,
         private val fallbackCover: String,
         private val onClick: (SeriesEpisode) -> Unit,
+        private val onMoveUp: (() -> Unit)? = null,
     ) : RecyclerView.Adapter<EpisodeAdapter.Holder>() {
 
         inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
@@ -408,6 +464,16 @@ class SeriesDetailActivity : BaseLocaleActivity() {
                 holder.thumb.setImageResource(R.drawable.tv_banner)
             }
             holder.itemView.setOnClickListener { onClick(item) }
+            val list = holder.itemView.parent as? RecyclerView
+            if (list != null) {
+                DetailTvNav.wireVerticalItem(
+                    itemView = holder.itemView,
+                    list = list,
+                    position = position,
+                    itemCount = items.size,
+                    onUp = onMoveUp,
+                )
+            }
         }
 
         override fun getItemCount(): Int = items.size

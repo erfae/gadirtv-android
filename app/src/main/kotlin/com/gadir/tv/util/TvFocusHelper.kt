@@ -7,6 +7,10 @@ import android.widget.TextView
 
 object TvFocusHelper {
     fun bindButton(view: TextView, onActivate: () -> Unit) {
+        bindButton(view, onActivate, null)
+    }
+
+    fun bindButton(view: TextView, onActivate: () -> Unit, onMoveDown: (() -> Unit)?) {
         view.setOnFocusChangeListener { v, hasFocus ->
             v.isSelected = hasFocus
             if (hasFocus) {
@@ -15,16 +19,22 @@ object TvFocusHelper {
         }
         view.setOnClickListener { onActivate() }
         view.setOnKeyListener { _, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN &&
-                (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
-            ) {
-                onActivate()
-                true
-            } else {
-                false
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                    onActivate()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    onMoveDown?.invoke()
+                    onMoveDown != null
+                }
+                else -> false
             }
         }
     }
+
+    fun scrollToParent(view: View) = scrollParentTo(view)
 
     private fun scrollParentTo(view: View) {
         var parent = view.parent

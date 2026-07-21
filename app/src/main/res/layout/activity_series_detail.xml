@@ -208,26 +208,6 @@
             </LinearLayout>
 
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:paddingHorizontal="40dp"
-                android:text="@string/seasons_label"
-                android:textColor="@color/gtv_text_dim"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/seasonList"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:clipToPadding="false"
-                android:minHeight="40dp"
-                android:nestedScrollingEnabled="false"
-                android:paddingHorizontal="32dp"
-                android:paddingBottom="8dp" />
-
-            <TextView
                 android:id="@+id/seriesCastLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -247,6 +227,26 @@
                 android:clipToPadding="false"
                 android:paddingHorizontal="32dp"
                 android:visibility="gone" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:paddingHorizontal="40dp"
+                android:text="@string/seasons_label"
+                android:textColor="@color/gtv_text_dim"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/seasonList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clipToPadding="false"
+                android:minHeight="40dp"
+                android:nestedScrollingEnabled="false"
+                android:paddingHorizontal="32dp"
+                android:paddingBottom="8dp" />
 
             <TextView
                 android:layout_width="wrap_content"

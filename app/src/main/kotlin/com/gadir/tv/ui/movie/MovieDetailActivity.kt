@@ -19,6 +19,7 @@ import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.player.VodStreamUrls
 import com.gadir.tv.ui.BaseLocaleActivity
+import com.gadir.tv.ui.detail.DetailTvNav
 import com.gadir.tv.ui.detail.VodDetailUi
 import com.gadir.tv.util.TrailerLauncher
 import com.gadir.tv.util.TvFocusHelper
@@ -69,8 +70,22 @@ class MovieDetailActivity : BaseLocaleActivity() {
         castList = findViewById(R.id.movieCastList)
 
         btnMoviePlay.setOnClickListener { playMovie() }
-        TvFocusHelper.bindButton(btnMoviePlay) { playMovie() }
-        TvFocusHelper.bindButton(btnMovieTrailer) { openTrailer() }
+        TvFocusHelper.bindButton(btnMoviePlay, onActivate = { playMovie() }, onMoveDown = {
+            if (com.gadir.tv.util.DeviceUi.useDpadFocus(this) &&
+                castList.visibility == View.VISIBLE &&
+                (castList.adapter?.itemCount ?: 0) > 0
+            ) {
+                DetailTvNav.focusFirst(castList)
+            }
+        })
+        TvFocusHelper.bindButton(btnMovieTrailer, onActivate = { openTrailer() }, onMoveDown = {
+            if (com.gadir.tv.util.DeviceUi.useDpadFocus(this) &&
+                castList.visibility == View.VISIBLE &&
+                (castList.adapter?.itemCount ?: 0) > 0
+            ) {
+                DetailTvNav.focusFirst(castList)
+            }
+        })
         bindFavoriteButton()
         findViewById<ImageView>(R.id.btnMovieBack).apply {
             setOnClickListener { finish() }
@@ -205,6 +220,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
             listView = castList,
             castMembers = info.castMembers,
             fallbackCast = info.cast,
+            onCastMoveUp = { btnMoviePlay.requestFocus() },
         )
 
         val backdrop = info.backdrop.ifBlank { info.cover.ifBlank { fallbackCover } }

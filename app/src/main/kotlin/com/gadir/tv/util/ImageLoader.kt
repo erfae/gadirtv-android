@@ -94,6 +94,38 @@ object ImageLoader {
         loadPoster(target, url, width, height, posterOptions)
     }
 
+    fun loadCastAvatar(target: ImageView, rawUrl: String, sizePx: Int = 144) {
+        if (!canLoadInto(target)) return
+        val candidates = buildList {
+            val resolved = ImageUrlResolver.resolve(rawUrl)
+            if (resolved.isNotEmpty()) add(resolved)
+            val trimmed = rawUrl.trim().removePrefix("/")
+            if (trimmed.isNotEmpty() && !trimmed.startsWith("http", ignoreCase = true)) {
+                add("https://image.tmdb.org/t/p/w185/$trimmed")
+                add("https://image.tmdb.org/t/p/w342/$trimmed")
+            }
+        }.distinct()
+        if (candidates.isEmpty()) {
+            target.setImageResource(R.drawable.ic_user)
+            return
+        }
+        val size = sizePx.coerceAtLeast(72)
+        val options = RequestOptions()
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .override(size, size)
+            .circleCrop()
+            .placeholder(R.drawable.ic_user)
+            .error(R.drawable.ic_user)
+        loadWithFallback(
+            target = target,
+            urls = candidates,
+            index = 0,
+            options = options,
+            errorDrawable = R.drawable.ic_user,
+            sizePx = size,
+        )
+    }
+
     private val heroBackdropOptions = RequestOptions()
         .diskCacheStrategy(DiskCacheStrategy.ALL)
         .placeholder(R.drawable.hero_placeholder_bg)
