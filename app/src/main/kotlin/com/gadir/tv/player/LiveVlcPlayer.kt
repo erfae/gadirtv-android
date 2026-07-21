@@ -46,12 +46,14 @@ class LiveVlcPlayer(
     fun play(url: String, volume: Int) {
         try {
             mediaPlayer.stop()
+            mediaPlayer.volume = 0
             val resolved = NetworkUrlResolver.resolve(url)
             val media = Media(libVlc, Uri.parse(resolved.url))
             resolved.hostHeader?.let { media.addOption(":http-host=$it") }
             PlaylistRepository.profile?.host?.let { host ->
                 media.addOption(":http-referrer=${HostUtils.baseUrl(host)}/")
             }
+            media.addOption(":http-user-agent=${PlaylistRepository.userAgent}")
             mediaPlayer.media = media
             media.release()
             mediaPlayer.volume = volume
@@ -65,6 +67,7 @@ class LiveVlcPlayer(
         try {
             mediaPlayer.stop()
             mediaPlayer.volume = 0
+            mediaPlayer.media = null
         } catch (_: Throwable) {
             // libVLC may throw if the surface was detached during teardown.
         }

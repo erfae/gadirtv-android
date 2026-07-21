@@ -1624,6 +1624,20 @@ class MainActivity : BaseLocaleActivity() {
         applyCatalogPanelFocusMode(tab, inContent = false)
         previewCatalogGroupHero(tab, catId)
         scheduleCatalogPrefetch(tab, catId)
+        warmCatalogCategoryContent(tab, catId)
+    }
+
+    /** Prefetch poster grid while browsing groups so OK/→ opens content faster. */
+    private fun warmCatalogCategoryContent(tab: Tab, catId: String) {
+        if (catId == ResumeStore.RESUME_CATEGORY_ID) return
+        val hasCache = when (tab) {
+            Tab.MOVIES -> !PlaylistRepository.cachedVod(catId).isNullOrEmpty()
+            Tab.SERIES -> !PlaylistRepository.cachedSeries(catId).isNullOrEmpty()
+            else -> true
+        }
+        if (!hasCache && inFlightCatalogCategory != catId) {
+            loadCatalogItems(tab, catId, showLoadingIndicator = false)
+        }
     }
 
     /** Vista ligera al navegar grupos: solo cabecera, sin cargar el grid completo. */
@@ -3749,7 +3763,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun catalogGridSpanCount(): Int =
         (catalogGrid.layoutManager as? GridLayoutManager)?.spanCount ?: 5
 
-    private fun loadCatalogItems(tab: Tab, categoryId: String) {
+    private fun loadCatalogItems(tab: Tab, categoryId: String, showLoadingIndicator: Boolean = true) {
         when (tab) {
             Tab.MOVIES -> when (categoryId) {
                 ResumeStore.RESUME_CATEGORY_ID -> {
@@ -3783,7 +3797,7 @@ class MainActivity : BaseLocaleActivity() {
             Tab.SERIES -> PlaylistRepository.clearSeriesLoadFailed(categoryId)
             else -> Unit
         }
-        catalogLoading.visibility = View.VISIBLE
+        catalogLoading.visibility = if (showLoadingIndicator) View.VISIBLE else View.GONE
         catalogEmpty.visibility = View.GONE
         catalogGrid.visibility = View.VISIBLE
         catalogGrid.alpha = 1f
@@ -4474,10 +4488,29 @@ class MainActivity : BaseLocaleActivity() {
             else -> null
         }
         if (parentalStore.requiresPinForLiveCategory(browseId)) return
+        if (previewingStreamId != null && previewingStreamId != channel.streamId) {
+            abortPreviewPlayback()
+        }
         livePreviewPaused = false
         updatePreviewInfo(channel)
         if (reloadingChannels) return
         schedulePreviewPlayback(channel)
+    }
+
+    /** Stops preview A/V immediately and invalidates in-flight callbacks. */
+    private fun abortPreviewPlayback() {
+        previewToken++
+        cancelPreviewTimeout()
+        pendingPreview?.let { previewHandler.removeCallbacks(it) }
+        pendingPreview = null
+        miniVlcPlayer?.stop()
+        miniExoPlayer?.stop()
+        previewWorkingUrl = null
+        previewingStreamId = null
+        setPreviewVideoVisible(false)
+        miniExoView?.alpha = 0f
+        miniVlcView?.alpha = 0f
+        hideNoSignal()
     }
 
     private fun schedulePreviewPlayback(channel: LiveChannel) {
@@ -4493,17 +4526,9 @@ class MainActivity : BaseLocaleActivity() {
         val channelChanged = previewingStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) return
         if (channelChanged || !previewIsSettled() || previewHasNoSignal()) {
-            cancelPreviewTimeout()
-            if (!usesExoPreview()) {
-                miniVlcPlayer?.stop()
-            } else {
-                miniExoPlayer?.stop()
-            }
-            setPreviewVideoVisible(false)
-            hideNoSignal()
+            abortPreviewPlayback()
             previewUrlIndex = 0
             previewUrls = emptyList()
-            previewWorkingUrl = null
             ensurePreviewPlayer()
         }
         val token = previewToken
@@ -4699,8 +4724,10 @@ class MainActivity : BaseLocaleActivity() {
     private fun setPreviewVideoVisible(visible: Boolean) {
         if (usesExoPreview()) {
             miniExoView?.alpha = if (visible) 1f else 0f
+            miniVlcView?.alpha = 0f
         } else {
             miniVlcView?.alpha = if (visible) 1f else 0f
+            miniExoView?.alpha = 0f
         }
         if (!visible) {
             previewLogo.visibility = View.VISIBLE
@@ -5250,6 +5277,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun createMiniExoPlayer() {
         if (miniExoPlayer != null) return
         val playerView = miniExoView ?: return
+        playerView.setKeepContentOnPlayerReset(false)
         val noSignal = livePanel().findViewById<View>(R.id.miniNoSignal)
         miniExoPlayer = LiveExoPreviewPlayer(
             context = this,

@@ -245,12 +245,15 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun playUrl(url: String) {
         val vlc = libVlc ?: return
         val player = mediaPlayer ?: return
+        player.stop()
+        player.volume = 0
         val resolved = com.gadir.tv.util.NetworkUrlResolver.resolve(url)
         val media = Media(vlc, Uri.parse(resolved.url))
         resolved.hostHeader?.let { media.addOption(":http-host=$it") }
         PlaylistRepository.profile?.host?.let { host ->
             media.addOption(":http-referrer=${com.gadir.tv.util.HostUtils.baseUrl(host)}/")
         }
+        media.addOption(":http-user-agent=${PlaylistRepository.userAgent}")
         player.media = media
         media.release()
         player.volume = VLC_VOLUME

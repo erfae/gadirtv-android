@@ -240,6 +240,7 @@ object ImageLoader {
 
     private fun isPanelMediaUrl(url: String): Boolean {
         val lower = url.lowercase()
+        if (lower.contains("image.tmdb.org") || lower.contains("themoviedb.org")) return false
         if (lower.contains(PanelHttp.GADIR_IP) || lower.contains(PanelHttp.GADIR_HOST)) return true
         val profileHost = PlaylistRepository.profile?.host?.let { raw ->
             runCatching { URI(HostUtils.baseUrl(raw)).host?.lowercase() }.getOrNull()

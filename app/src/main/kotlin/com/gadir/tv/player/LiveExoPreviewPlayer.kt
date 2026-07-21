@@ -41,11 +41,10 @@ class LiveExoPreviewPlayer(
 
     fun play(url: String, volume: Int) {
         val item = LiveStreamUrls.mediaItem(url)
-        if (player.mediaItemCount > 0) {
-            player.replaceMediaItem(0, item)
-        } else {
-            player.setMediaItem(item)
-        }
+        player.playWhenReady = false
+        player.stop()
+        player.clearMediaItems()
+        player.setMediaItem(item)
         player.prepare()
         player.volume = (volume / 100f).coerceIn(0f, 0.22f)
         player.playWhenReady = true
@@ -65,7 +64,8 @@ class LiveExoPreviewPlayer(
 
     fun stop() {
         player.playWhenReady = false
-        player.pause()
+        player.stop()
+        player.clearMediaItems()
         player.volume = 0f
     }
 

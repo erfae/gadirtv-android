@@ -3,6 +3,19 @@ package com.gadir.tv.util
 import com.gadir.tv.data.PlaylistRepository
 
 object ImageUrlResolver {
+    private val tmdbSizedPath = Regex(
+        "^/w\\d+/[\\w.-]+\\.(jpg|jpeg|png|webp)$",
+        RegexOption.IGNORE_CASE,
+    )
+    private val tmdbFilePath = Regex(
+        "^/[\\w.-]+\\.(jpg|jpeg|png|webp)$",
+        RegexOption.IGNORE_CASE,
+    )
+    private val panelPathPrefixes = listOf(
+        "/images/", "/imgs/", "/logo", "/logos/", "/live/", "/streaming/",
+        "/movie/", "/series/", "/static/", "/media/",
+    )
+
     fun resolve(raw: String?, host: String? = PlaylistRepository.profile?.host): String {
         var url = raw?.trim().orEmpty()
         if (url.isEmpty()) return ""
@@ -12,11 +25,24 @@ object ImageUrlResolver {
             .replace("\\/", "/")
 
         if (url.startsWith("//")) {
-            url = "http:$url"
+            url = "https:$url"
         }
 
         if (url.startsWith("http://") || url.startsWith("https://")) {
             return url
+        }
+
+        if (url.startsWith("/")) {
+            if (panelPathPrefixes.any { prefix -> url.startsWith(prefix, ignoreCase = true) }) {
+                val base = host?.let { HostUtils.baseUrl(it) }.orEmpty()
+                return if (base.isEmpty()) url else "$base$url"
+            }
+            if (tmdbSizedPath.matches(url)) {
+                return "https://image.tmdb.org/t/p$url"
+            }
+            if (tmdbFilePath.matches(url)) {
+                return "https://image.tmdb.org/t/p/w500$url"
+            }
         }
 
         val base = host?.let { HostUtils.baseUrl(it) }.orEmpty()

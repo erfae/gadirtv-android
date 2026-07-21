@@ -10,6 +10,7 @@ import com.gadir.tv.R
 import com.gadir.tv.model.CastMember
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.RecyclerViewUtil
+import com.gadir.tv.util.TvNavHelper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -107,6 +108,11 @@ object VodDetailUi {
         listView.isFocusable = false
         listView.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         RecyclerViewUtil.expandHorizontalList(listView)
+        listView.post {
+            if (members.isNotEmpty()) {
+                TvNavHelper.focusItem(listView, 0)
+            }
+        }
     }
 
     fun bindImages(posterView: ImageView, backdropView: ImageView, poster: String, backdrop: String) {
