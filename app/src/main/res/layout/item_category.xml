@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/category_item_bg"
+    android:background="@drawable/live_category_focus"
     android:focusable="true"
     android:focusableInTouchMode="true"
     android:gravity="center_vertical"

@@ -160,6 +160,11 @@ class MainActivity : BaseLocaleActivity() {
     private lateinit var previewLogo: ImageView
     private lateinit var epgNow: TextView
     private lateinit var epgNext: TextView
+    private lateinit var epgPreviewList: RecyclerView
+    private var epgPreviewAdapter: EpgPreviewAdapter? = null
+    private var btnCatchUp: TextView? = null
+    private var btnPreviewFavorite: TextView? = null
+    private var currentPreviewEpg: List<EpgEntry> = emptyList()
 
     private lateinit var catalogCategoryList: RecyclerView
     private lateinit var catalogGrid: RecyclerView
@@ -285,16 +290,28 @@ class MainActivity : BaseLocaleActivity() {
         previewLogo = panel.findViewById(R.id.previewLogo)
         epgNow = panel.findViewById(R.id.epgNow)
         epgNext = panel.findViewById(R.id.epgNext)
+        epgPreviewList = panel.findViewById(R.id.epgPreviewList)
+        epgPreviewAdapter = EpgPreviewAdapter().also { adapter ->
+            epgPreviewList.layoutManager = LinearLayoutManager(this)
+            epgPreviewList.adapter = adapter
+            epgPreviewList.isNestedScrollingEnabled = false
+        }
+        btnCatchUp = panel.findViewById(R.id.btnCatchUp)
+        btnPreviewFavorite = panel.findViewById(R.id.btnPreviewFavorite)
         previewContainer = panel.findViewById(R.id.previewContainer)
         if (DeviceUi.useDpadFocus(this)) {
             previewContainer?.isFocusable = false
             previewContainer?.isFocusableInTouchMode = false
             channelList.nextFocusLeftId = R.id.categoryList
-            channelList.nextFocusRightId = View.NO_ID
+            channelList.nextFocusRightId = R.id.btnPreviewFavorite
             channelList.nextFocusDownId = View.NO_ID
             channelList.nextFocusUpId = View.NO_ID
-            liveCategoryList.nextFocusRightId = View.NO_ID
+            liveCategoryList.nextFocusRightId = R.id.channelList
             liveCategoryList.nextFocusUpId = View.NO_ID
+            btnPreviewFavorite?.nextFocusLeftId = R.id.channelList
+            btnCatchUp?.nextFocusLeftId = R.id.channelList
+            btnPreviewFavorite?.nextFocusRightId = R.id.btnCatchUp
+            btnCatchUp?.nextFocusRightId = View.NO_ID
         }
         liveCategoryList.layoutManager = LinearLayoutManager(this)
         channelList.layoutManager = LinearLayoutManager(this)
@@ -4153,11 +4170,81 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun refreshAfterChannelLockToggle(channel: LiveChannel) {
         updatePreviewLockButton(channel)
+        updatePreviewActions(channel)
         if (selectedLiveCategoryId == ParentalControlStore.LOCK_CATEGORY_ID) {
             reloadChannels(keepCategoryFocus = true)
         } else {
             channelAdapter?.notifyDataSetChanged()
         }
+    }
+
+    private fun updatePreviewActions(channel: LiveChannel?) {
+        val target = channel ?: currentPreviewChannel
+        val favoriteBtn = btnPreviewFavorite
+        val catchUpBtn = btnCatchUp
+        if (favoriteBtn == null) return
+        if (target == null) {
+            favoriteBtn.visibility = View.GONE
+            catchUpBtn?.visibility = View.GONE
+            return
+        }
+        favoriteBtn.visibility = View.VISIBLE
+        val isFavorite = favoritesStore.isFavorite(FavoritesStore.KIND_LIVE, target.streamId)
+        favoriteBtn.text = getString(
+            if (isFavorite) R.string.live_remove_favorite else R.string.live_add_favorite,
+        )
+        val canCatchUp = target.tvArchive == 1 &&
+            currentPreviewEpg.isNotEmpty() &&
+            EpgFormatter.currentIndex(currentPreviewEpg) >= 0
+        catchUpBtn?.visibility = if (canCatchUp) View.VISIBLE else View.GONE
+    }
+
+    private fun togglePreviewFavorite() {
+        val channel = currentPreviewChannel ?: return
+        favoritesStore.toggle(FavoritesStore.KIND_LIVE, channel.streamId)
+        updatePreviewActions(channel)
+        if (selectedLiveCategoryId == FavoritesStore.FAVORITES_CATEGORY_ID) {
+            reloadChannels(keepCategoryFocus = true)
+        } else {
+            channelAdapter?.notifyDataSetChanged()
+        }
+    }
+
+    private fun playCatchUp() {
+        val channel = currentPreviewChannel ?: return
+        val profile = PlaylistRepository.profile ?: return
+        if (channel.tvArchive != 1 || currentPreviewEpg.isEmpty()) return
+        val index = EpgFormatter.currentIndex(currentPreviewEpg)
+        val entry = currentPreviewEpg.getOrNull(index) ?: return
+        if (entry.start <= 0L) return
+        val nowSec = System.currentTimeMillis() / 1000L
+        val durationSec = ((entry.end.takeIf { it > entry.start } ?: nowSec) - entry.start)
+            .toInt()
+            .coerceAtLeast(60)
+        val url = api.timeshiftStreamUrl(
+            profile = profile,
+            streamId = channel.streamId,
+            startSec = entry.start,
+            durationSec = durationSec,
+            ext = channel.extension,
+        )
+        if (url.isBlank()) {
+            Toast.makeText(this, R.string.series_playback_failed, Toast.LENGTH_SHORT).show()
+            return
+        }
+        PlaybackLauncher.play(
+            context = this,
+            request = PlaybackRequest(
+                title = "${channel.name} — ${entry.title}",
+                url = url,
+                kind = ResumeStore.KIND_LIVE,
+                contentId = channel.streamId.toString(),
+                imageUrl = channel.icon,
+                streamId = channel.streamId,
+                epgChannelId = channel.epgChannelId,
+                extension = channel.extension,
+            ),
+        )
     }
 
     private fun updatePreviewLockButton(channel: LiveChannel?) {
@@ -4316,6 +4403,8 @@ class MainActivity : BaseLocaleActivity() {
         miniExoPlayer?.stop()
         previewingStreamId = null
         previewWorkingUrl = null
+        currentPreviewEpg = emptyList()
+        epgPreviewAdapter?.submit(emptyList())
     }
 
     /** Libera el mini-player antes de pantalla completa (evita dos ExoPlayer/LibVLC en TV). */
@@ -4478,6 +4567,7 @@ class MainActivity : BaseLocaleActivity() {
             ChannelIconHelper.loadPanelIcon(previewLogo, channel)
         }
         updatePreviewLockButton(channel)
+        updatePreviewActions(channel)
         EpgCache.get(channel.streamId)?.takeIf { it.isNotEmpty() }?.let { applyEpg(channel, it) } ?: run {
             epgNow.text = getString(R.string.epg_loading)
             epgNext.visibility = View.GONE
@@ -4500,7 +4590,7 @@ class MainActivity : BaseLocaleActivity() {
                         profile,
                         streamId = streamId,
                         epgChannelId = channel.epgChannelId,
-                        limit = 8,
+                        limit = 6,
                     )
                 }
                 if (token != epgLoadToken) return@launch
@@ -4645,11 +4735,15 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun applyEpg(channel: LiveChannel, epg: List<EpgEntry>) {
         if (currentPreviewChannel?.streamId != channel.streamId) return
+        currentPreviewEpg = epg
+        updatePreviewActions(channel)
         if (epg.isEmpty()) {
+            epgPreviewAdapter?.submit(emptyList())
             epgNow.text = getString(R.string.epg_unavailable)
             epgNext.visibility = View.GONE
             return
         }
+        epgPreviewAdapter?.submit(epg)
         val currentIndex = EpgFormatter.currentIndex(epg)
         val current = epg[currentIndex]
         epgNow.text = EpgFormatter.formatNowLine(this, current)
@@ -4784,7 +4878,9 @@ class MainActivity : BaseLocaleActivity() {
         return focused.id == R.id.btnVolUp ||
             focused.id == R.id.btnVolDown ||
             focused.id == R.id.btnChannelLock ||
-            focused.id == R.id.btnFullscreen
+            focused.id == R.id.btnFullscreen ||
+            focused.id == R.id.btnCatchUp ||
+            focused.id == R.id.btnPreviewFavorite
     }
 
     private fun installTvBackHandler() {
@@ -5038,6 +5134,12 @@ class MainActivity : BaseLocaleActivity() {
         }
         panel.findViewById<ImageButton>(R.id.btnChannelLock)?.setOnClickListener {
             currentPreviewChannel?.let { toggleChannelLock(it) }
+        }
+        btnPreviewFavorite?.let { btn ->
+            TvFocusHelper.bindButton(btn) { togglePreviewFavorite() }
+        }
+        btnCatchUp?.let { btn ->
+            TvFocusHelper.bindButton(btn) { playCatchUp() }
         }
         miniExoView = panel.findViewById(R.id.miniExoPlayer)
         miniVlcView = panel.findViewById(R.id.miniVlcPlayer)
