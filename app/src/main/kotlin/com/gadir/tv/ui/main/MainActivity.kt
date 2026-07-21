@@ -226,6 +226,7 @@ class MainActivity : BaseLocaleActivity() {
     private var inFlightCatalogCategory: String? = null
     private val catalogCategoryHandler = Handler(Looper.getMainLooper())
     private var catalogPrefetchToken = 0
+    private var suppressTabFocusNavigation = false
     private val liveCategoryHandler = Handler(Looper.getMainLooper())
     private var pendingLiveCategoryPreview: Runnable? = null
     private var reloadingChannels = false
@@ -2013,7 +2014,7 @@ class MainActivity : BaseLocaleActivity() {
         if (DeviceUi.useDpadFocus(this)) {
             view.setOnFocusChangeListener { _, hasFocus ->
                 if (!hasFocus) return@setOnFocusChangeListener
-                if (currentTab != tab) {
+                if (!suppressTabFocusNavigation && currentTab != tab) {
                     openTab(tab)
                 }
                 if (tab == Tab.MOVIES || tab == Tab.SERIES) {
@@ -3872,7 +3873,13 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun activeCatalogCategoryId(): String? =
-        catalogBrowsingCategoryId ?: selectedCatalogCategoryId
+        selectedCatalogCategoryId
+            ?: catalogBrowsingCategoryId
+            ?: when (currentTab) {
+                Tab.MOVIES -> movieCategoryId
+                Tab.SERIES -> seriesCategoryId
+                else -> null
+            }
 
     private fun selectedCatalogCategoryName(): String =
         catalogCategories.firstOrNull { it.id == activeCatalogCategoryId() }?.name.orEmpty()
@@ -3933,10 +3940,10 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun onPosterClick(tab: Tab, item: PosterAdapter.PosterItem) {
-        val categoryId = selectedCatalogCategoryId.orEmpty()
+        val categoryId = activeCatalogCategoryId().orEmpty()
         when (tab) {
             Tab.MOVIES -> {
-                if (DeviceUi.useDpadFocus(this)) {
+                if (DeviceUi.useDpadFocus(this) && item.resumePositionMs > 0L) {
                     playMovie(
                         title = item.title,
                         streamId = item.id,
@@ -3945,7 +3952,7 @@ class MainActivity : BaseLocaleActivity() {
                         positionMs = item.resumePositionMs,
                         categoryId = categoryId,
                     )
-                } else if (item.resumePositionMs > 0L) {
+                } else if (!DeviceUi.useDpadFocus(this) && item.resumePositionMs > 0L) {
                     playMovie(
                         title = item.title,
                         streamId = item.id,
@@ -3964,14 +3971,15 @@ class MainActivity : BaseLocaleActivity() {
                 }
             }
             Tab.SERIES -> {
-                if (DeviceUi.useDpadFocus(this)) {
-                    playSeriesFirstEpisode(
-                        seriesId = item.id,
+                if (DeviceUi.useDpadFocus(this) && item.resumePositionMs > 0L) {
+                    playSeriesEpisode(
                         title = item.title,
+                        episodeId = item.id,
+                        extension = item.extension,
                         imageUrl = item.imageUrl,
-                        categoryId = categoryId,
+                        positionMs = item.resumePositionMs,
                     )
-                } else if (item.resumePositionMs > 0L) {
+                } else if (!DeviceUi.useDpadFocus(this) && item.resumePositionMs > 0L) {
                     playSeriesEpisode(
                         title = item.title,
                         episodeId = item.id,
@@ -4767,7 +4775,11 @@ class MainActivity : BaseLocaleActivity() {
         }
         liveBrowseLevel = TvBrowseNav.Level.TAB
         applyLiveBrowseLevel()
+        suppressTabFocusNavigation = true
+        TvBrowseNav.clearListFocus(liveCategoryList)
+        TvBrowseNav.clearListFocus(channelList)
         TvBrowseNav.focusTab(tabLive)
+        tabLive.post { suppressTabFocusNavigation = false }
     }
 
     /** Tab focus first so Back/Left from group never escapes the activity. */
@@ -4789,7 +4801,11 @@ class MainActivity : BaseLocaleActivity() {
         }
         catalogBrowseLevel = TvBrowseNav.Level.TAB
         applyCatalogBrowseLevel(tab)
+        suppressTabFocusNavigation = true
+        TvBrowseNav.clearListFocus(catalogCategoryList)
+        TvBrowseNav.clearListFocus(catalogGrid)
         TvBrowseNav.focusTab(tabView)
+        tabView.post { suppressTabFocusNavigation = false }
     }
 
     private fun isFocusInBottomNav(): Boolean {
