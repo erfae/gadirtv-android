@@ -10,7 +10,6 @@ import androidx.core.content.res.ResourcesCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.model.Category
-import com.gadir.tv.util.TvNavHelper
 
 class CategoryAdapter(
     private val items: List<Category>,
@@ -37,7 +36,6 @@ class CategoryAdapter(
         val count: TextView = view.findViewById(R.id.categoryCount)
     }
 
-    /** Refresh counts/selection without rebinding listeners or stealing focus. */
     fun refreshSelection() {
         if (items.isEmpty()) return
         notifyItemRangeChanged(0, items.size, PAYLOAD_VISUAL)
@@ -88,7 +86,9 @@ class CategoryAdapter(
             val cat = items[pos]
             val key = selectedId()
             applyCategoryVisual(holder, key != null && categoryKey(cat) == key, hasFocus)
-            if (hasFocus && !navigationLocked()) onFocus?.invoke(cat)
+            if (hasFocus && !navigationLocked()) {
+                onFocus?.invoke(cat)
+            }
         }
 
         holder.itemView.setOnClickListener {
@@ -109,8 +109,26 @@ class CategoryAdapter(
                     onMoveRight?.invoke()
                     onMoveRight != null
                 }
-                KeyEvent.KEYCODE_DPAD_UP -> handleVerticalKey(holder, -1)
-                KeyEvent.KEYCODE_DPAD_DOWN -> handleVerticalKey(holder, +1)
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    if (navigationLocked()) return@setOnKeyListener true
+                    val pos = holder.bindingAdapterPosition
+                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
+                    if (pos == 0) {
+                        onMoveUp?.invoke()
+                        return@setOnKeyListener onMoveUp != null
+                    }
+                    false
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (navigationLocked()) return@setOnKeyListener true
+                    val pos = holder.bindingAdapterPosition
+                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
+                    if (pos >= items.lastIndex) {
+                        onMoveDown?.invoke()
+                        return@setOnKeyListener onMoveDown != null
+                    }
+                    false
+                }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     if (navigationLocked()) return@setOnKeyListener true
                     val pos = holder.bindingAdapterPosition
@@ -137,40 +155,6 @@ class CategoryAdapter(
             holder.count.visibility = View.GONE
         }
         applyCategoryVisual(holder, contentSelected, holder.itemView.hasFocus())
-    }
-
-    /**
-     * NetTV-style group navigation: move one row at a time with a stable focus line.
-     * Stops at the first/last group without jumping the whole list to the top.
-     */
-    private fun handleVerticalKey(holder: Holder, direction: Int): Boolean {
-        if (navigationLocked()) return true
-        val pos = holder.bindingAdapterPosition
-        if (pos == RecyclerView.NO_POSITION) return false
-
-        if (direction < 0 && pos == 0) {
-            onMoveUp?.invoke()
-            return onMoveUp != null
-        }
-        if (direction > 0 && pos >= items.lastIndex) {
-            onMoveDown?.invoke()
-            return onMoveDown != null
-        }
-
-        val list = holder.itemView.parent as? RecyclerView ?: return false
-        val target = (pos + direction).coerceIn(0, items.lastIndex)
-        val cat = items[target]
-        TvNavHelper.bumpFocusGeneration()
-        onNavigate?.invoke(cat, target)
-
-        val focusDir = if (direction < 0) View.FOCUS_UP else View.FOCUS_DOWN
-        val next = holder.itemView.focusSearch(focusDir)
-        if (next != null && next !== holder.itemView && next.requestFocus()) {
-            return true
-        }
-
-        TvNavHelper.focusCategoryItem(list, target)
-        return true
     }
 
     private fun categoryKey(item: Category): String = item.id.ifEmpty { "" }
