@@ -113,17 +113,12 @@ object MetaExtractor {
     fun castMembersFrom(vararg sources: JsonObject?): List<CastMember> {
         val keys = listOf(
             "cast", "actors", "starring", "actor", "actor_list",
-            "credits", "crew",
         )
         for (source in sources) {
             if (source == null) continue
             for (key in keys) {
                 val element = source.get(key) ?: continue
                 when {
-                    element.isJsonObject -> {
-                        val members = castMembersFrom(element.asJsonObject)
-                        if (members.isNotEmpty()) return members
-                    }
                     element.isJsonArray -> {
                         val members = element.asJsonArray.mapNotNull { parseCastElement(it) }
                         if (members.isNotEmpty()) return members
@@ -136,6 +131,14 @@ object MetaExtractor {
                                 .filter { it.name.isNotBlank() }
                         }
                     }
+                }
+            }
+            val credits = source.getAsJsonObject("credits")
+            if (credits != null) {
+                val castArr = credits.get("cast")
+                if (castArr != null && castArr.isJsonArray) {
+                    val members = castArr.asJsonArray.mapNotNull { parseCastElement(it) }
+                    if (members.isNotEmpty()) return members
                 }
             }
         }
