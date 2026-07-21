@@ -2905,6 +2905,7 @@ class MainActivity : BaseLocaleActivity() {
         title: String,
         cover: String,
         extension: String = "mp4",
+        added: Long = 0L,
     ) {
         startActivity(
             MovieDetailActivity.intent(
@@ -2913,6 +2914,7 @@ class MainActivity : BaseLocaleActivity() {
                 name = title,
                 cover = cover,
                 extension = extension,
+                added = added,
             ),
         )
     }
@@ -2922,6 +2924,7 @@ class MainActivity : BaseLocaleActivity() {
         title: String,
         cover: String,
         categoryId: String = "",
+        added: Long = 0L,
     ) {
         val open = {
             prefetchSeriesDetail(seriesId, title, cover)
@@ -2933,6 +2936,7 @@ class MainActivity : BaseLocaleActivity() {
                         name = title,
                         cover = cover,
                         categoryId = categoryId,
+                        added = added,
                     ),
                 ),
             )
@@ -3929,6 +3933,7 @@ class MainActivity : BaseLocaleActivity() {
                     title = movie.name,
                     imageUrl = movie.icon,
                     extension = movie.extension,
+                    added = movie.added,
                 ),
             )
         }
@@ -3949,6 +3954,7 @@ class MainActivity : BaseLocaleActivity() {
                     id = item.seriesId,
                     title = item.name,
                     imageUrl = item.cover,
+                    added = item.added,
                 ),
             )
         }
@@ -3984,12 +3990,12 @@ class MainActivity : BaseLocaleActivity() {
                         categoryId = categoryId,
                     )
                 } else if (DeviceUi.useDpadFocus(this)) {
-                    playMovie(
-                        title = item.title,
+                    openMovieDetail(
                         streamId = item.id,
+                        title = item.title,
+                        cover = item.imageUrl,
                         extension = item.extension,
-                        imageUrl = item.imageUrl,
-                        categoryId = categoryId,
+                        added = item.added,
                     )
                 } else {
                     openMovieEntry(
@@ -4011,11 +4017,12 @@ class MainActivity : BaseLocaleActivity() {
                         positionMs = item.resumePositionMs,
                     )
                 } else if (DeviceUi.useDpadFocus(this)) {
-                    playSeriesFirstEpisode(
+                    openSeriesDetail(
                         seriesId = item.id,
                         title = item.title,
-                        imageUrl = item.imageUrl,
+                        cover = item.imageUrl,
                         categoryId = categoryId,
+                        added = item.added,
                     )
                 } else {
                     openSeriesDetail(

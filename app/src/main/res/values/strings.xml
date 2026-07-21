@@ -155,6 +155,11 @@
     <string name="episode_label">Episodio %1$d</string>
     <string name="movie_director">Director: %1$s</string>
     <string name="movie_cast">Reparto: %1$s</string>
+    <string name="detail_watch_now">Ver ahora</string>
+    <string name="detail_trailer">Trailer</string>
+    <string name="detail_cast_label">Reparto:</string>
+    <string name="detail_genre_label">Género : %1$s</string>
+    <string name="detail_added_label">Fecha de adición : %1$s</string>
     <string name="epg_guide">Guía de programación</string>
     <string name="epg_live_badge">EN VIVO</string>
     <string name="epg_loading">Cargando EPG…</string>

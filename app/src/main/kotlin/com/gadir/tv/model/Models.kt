@@ -71,6 +71,11 @@ data class SeriesEpisode(
     val directSource: String = "",
 )
 
+data class CastMember(
+    val name: String,
+    val imageUrl: String = "",
+)
+
 data class SeriesDetail(
     val name: String,
     val cover: String,
@@ -81,6 +86,7 @@ data class SeriesDetail(
     val rating: String,
     val trailerUrl: String = "",
     val cast: String = "",
+    val castMembers: List<CastMember> = emptyList(),
     val seasons: Map<String, List<SeriesEpisode>>,
 )
 
@@ -94,6 +100,7 @@ data class VodInfo(
     val releaseDate: String,
     val trailerUrl: String = "",
     val cast: String = "",
+    val castMembers: List<CastMember> = emptyList(),
     val director: String = "",
     val extension: String = "mp4",
     val directSource: String = "",

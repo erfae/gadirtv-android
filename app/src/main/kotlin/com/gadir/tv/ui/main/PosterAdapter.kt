@@ -30,6 +30,7 @@ class PosterAdapter(
         val imageUrl: String,
         val extension: String = "mp4",
         val resumePositionMs: Long = 0L,
+        val added: Long = 0L,
     )
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
