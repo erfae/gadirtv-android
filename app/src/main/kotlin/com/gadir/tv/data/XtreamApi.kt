@@ -261,6 +261,7 @@ class XtreamApi(
                     ?: "",
                 trailerUrl = MetaExtractor.trailerFrom(name, info, root).orEmpty(),
                 cast = MetaExtractor.castFrom(info),
+                castMembers = MetaExtractor.castMembersFrom(info),
                 seasons = normalized,
             )
         } catch (_: Exception) {
@@ -365,6 +366,7 @@ class XtreamApi(
                     ?: "",
                 trailerUrl = MetaExtractor.trailerFrom(name, info, movieData, root).orEmpty(),
                 cast = MetaExtractor.castFrom(info, movieData),
+                castMembers = MetaExtractor.castMembersFrom(info, movieData),
                 director = MetaExtractor.directorFrom(info, movieData),
                 extension = movieData?.get("container_extension")?.asStringOrNull()
                     ?.ifBlank { info?.get("container_extension")?.asStringOrNull().orEmpty() }

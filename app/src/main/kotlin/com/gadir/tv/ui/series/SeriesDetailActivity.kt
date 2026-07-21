@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
+import com.gadir.tv.data.FavoritesStore
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.PlotCache
 import com.gadir.tv.data.ResumeStore
@@ -23,9 +24,11 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.player.VodStreamUrls
+import com.gadir.tv.ui.detail.VodDetailUi
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.RecyclerViewUtil
+import com.gadir.tv.util.TrailerLauncher
 import com.gadir.tv.util.TvFocusHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
@@ -36,18 +39,24 @@ import kotlinx.coroutines.withTimeout
 class SeriesDetailActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
+    private lateinit var favoritesStore: FavoritesStore
     private var seasons: Map<String, List<SeriesEpisode>> = emptyMap()
     private var selectedSeason: String? = null
     private var fallbackCover = ""
     private var seriesName = ""
     private var seriesId = 0
+    private var addedTimestamp = 0L
+    private var trailerUrl = ""
     private var loadToken = 0
     private var seasonAdapter: SeasonAdapter? = null
 
     private lateinit var seasonList: RecyclerView
     private lateinit var episodeList: RecyclerView
+    private lateinit var castList: RecyclerView
     private lateinit var loadingView: View
     private lateinit var btnSeriesPlay: TextView
+    private lateinit var btnSeriesTrailer: TextView
+    private lateinit var btnSeriesFavorite: ImageView
     private lateinit var seriesPlot: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,17 +64,44 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         setContentView(R.layout.activity_series_detail)
 
         resumeStore = ResumeStore(this)
+        favoritesStore = FavoritesStore(this)
         seriesId = intent.getIntExtra(EXTRA_SERIES_ID, 0)
         seriesName = intent.getStringExtra(EXTRA_SERIES_NAME).orEmpty()
         fallbackCover = intent.getStringExtra(EXTRA_SERIES_COVER).orEmpty()
+        addedTimestamp = intent.getLongExtra(EXTRA_ADDED, 0L)
 
         findViewById<TextView>(R.id.seriesTitle).text = seriesName
         seriesPlot = findViewById(R.id.seriesPlot)
         btnSeriesPlay = findViewById(R.id.btnSeriesPlay)
+        btnSeriesTrailer = findViewById(R.id.btnSeriesTrailer)
+        btnSeriesFavorite = findViewById(R.id.btnSeriesFavorite)
+        castList = findViewById(R.id.seriesCastList)
         btnSeriesPlay.setOnClickListener { playFirstEpisode() }
+        TvFocusHelper.bindButton(btnSeriesPlay) { playFirstEpisode() }
+        TvFocusHelper.bindButton(btnSeriesTrailer) { openTrailer() }
+        bindFavoriteButton()
+        findViewById<ImageView>(R.id.btnSeriesBack).apply {
+            setOnClickListener { finish() }
+            setOnKeyListener { _, keyCode, event ->
+                if (event.action == android.view.KeyEvent.ACTION_DOWN &&
+                    (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+                        keyCode == android.view.KeyEvent.KEYCODE_ENTER)
+                ) {
+                    finish()
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+        VodDetailUi.bindAddedDate(findViewById(R.id.seriesAddedDate), addedTimestamp)
         if (fallbackCover.isNotEmpty()) {
-            ImageLoader.loadPoster(findViewById(R.id.seriesPoster), fallbackCover, 280, 420)
-            ImageLoader.loadPoster(findViewById(R.id.seriesBackdrop), fallbackCover)
+            VodDetailUi.bindImages(
+                posterView = findViewById(R.id.seriesPoster),
+                backdropView = findViewById(R.id.seriesBackdrop),
+                poster = fallbackCover,
+                backdrop = fallbackCover,
+            )
         }
         applyPlotCache()
         if (seriesPlot.text.isNullOrBlank()) {
@@ -91,6 +127,25 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         loadSeriesDetail()
     }
 
+    private fun bindFavoriteButton() {
+        VodDetailUi.updateFavoriteButton(
+            btnSeriesFavorite,
+            favoritesStore.isFavorite(FavoritesStore.KIND_SERIES, seriesId),
+        )
+        btnSeriesFavorite.setOnClickListener {
+            favoritesStore.toggle(FavoritesStore.KIND_SERIES, seriesId)
+            VodDetailUi.updateFavoriteButton(
+                btnSeriesFavorite,
+                favoritesStore.isFavorite(FavoritesStore.KIND_SERIES, seriesId),
+            )
+        }
+    }
+
+    private fun openTrailer() {
+        if (trailerUrl.isBlank()) return
+        TrailerLauncher.open(this, trailerUrl, findViewById<TextView>(R.id.seriesTitle).text.toString())
+    }
+
     private fun applyPlotCache() {
         val cached = PlotCache.get("series", seriesId) ?: return
         if (cached.title.isNotBlank()) {
@@ -101,13 +156,15 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         }
         val backdrop = cached.backdrop.ifBlank { cached.poster }.ifBlank { fallbackCover }
         val poster = cached.poster.ifBlank { fallbackCover }
-        if (backdrop.isNotEmpty()) {
-            ImageLoader.loadPoster(findViewById(R.id.seriesBackdrop), backdrop)
-        }
         if (poster.isNotEmpty()) {
             fallbackCover = poster
-            ImageLoader.loadPoster(findViewById(R.id.seriesPoster), poster, 280, 420)
         }
+        VodDetailUi.bindImages(
+            posterView = findViewById(R.id.seriesPoster),
+            backdropView = findViewById(R.id.seriesBackdrop),
+            poster = poster,
+            backdrop = backdrop,
+        )
         btnSeriesPlay.visibility = View.VISIBLE
     }
 
@@ -151,32 +208,38 @@ class SeriesDetailActivity : BaseLocaleActivity() {
     }
 
     private fun bindDetail(detail: SeriesDetail) {
-        findViewById<TextView>(R.id.seriesTitle).text = detail.name.ifEmpty { seriesName }
-        val meta = buildList {
-            if (detail.releaseDate.isNotEmpty()) add(detail.releaseDate.take(4))
-            if (detail.genre.isNotEmpty()) add(detail.genre)
-            if (detail.rating.isNotEmpty()) add("★ ${detail.rating}")
-        }.joinToString(" · ")
-        findViewById<TextView>(R.id.seriesMeta).text = meta
+        val title = VodDetailUi.formatTitle(detail.name.ifEmpty { seriesName }, detail.releaseDate)
+        findViewById<TextView>(R.id.seriesTitle).text = title
+        VodDetailUi.bindReleaseDate(findViewById(R.id.seriesReleaseDate), detail.releaseDate)
+        VodDetailUi.bindRating(
+            findViewById(R.id.seriesRatingStars),
+            findViewById(R.id.seriesRatingValue),
+            detail.rating,
+        )
+        VodDetailUi.bindGenre(findViewById(R.id.seriesGenre), detail.genre)
+        VodDetailUi.bindAddedDate(findViewById(R.id.seriesAddedDate), addedTimestamp)
         seriesPlot.text = detail.plot.ifBlank { getString(R.string.hero_plot_empty) }
 
-        val castView = findViewById<TextView>(R.id.seriesCast)
-        if (detail.cast.isNotBlank()) {
-            castView.visibility = View.VISIBLE
-            castView.text = getString(R.string.movie_cast, detail.cast)
-        } else {
-            castView.visibility = View.GONE
-        }
+        VodDetailUi.bindCast(
+            labelView = findViewById(R.id.seriesCastLabel),
+            listView = castList,
+            castMembers = detail.castMembers,
+            fallbackCast = detail.cast,
+        )
 
         val backdrop = detail.backdrop.ifBlank { detail.cover.ifBlank { fallbackCover } }
-        if (backdrop.isNotEmpty()) {
-            ImageLoader.loadPoster(findViewById(R.id.seriesBackdrop), backdrop)
-        }
         val poster = detail.cover.ifBlank { fallbackCover }
         if (poster.isNotEmpty()) {
             fallbackCover = poster
-            ImageLoader.loadPoster(findViewById(R.id.seriesPoster), poster, 280, 420)
         }
+        VodDetailUi.bindImages(
+            posterView = findViewById(R.id.seriesPoster),
+            backdropView = findViewById(R.id.seriesBackdrop),
+            poster = poster,
+            backdrop = backdrop,
+        )
+        trailerUrl = detail.trailerUrl
+        btnSeriesTrailer.visibility = if (trailerUrl.isNotBlank()) View.VISIBLE else View.GONE
         PlotCache.put(
             "series",
             seriesId,
@@ -233,11 +296,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         episodeList.adapter = EpisodeAdapter(eps, fallbackCover) { ep ->
             playEpisode(ep)
         }
-        if (findViewById<View?>(R.id.seriesScroll) != null && DeviceUi.isCompact(this)) {
-            RecyclerViewUtil.expandInScrollView(episodeList)
-        } else {
-            episodeList.isNestedScrollingEnabled = true
-        }
+        RecyclerViewUtil.expandInScrollView(episodeList)
     }
 
     private fun playEpisode(ep: SeriesEpisode) {
@@ -356,11 +415,13 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         private const val EXTRA_SERIES_ID = "series_id"
         private const val EXTRA_SERIES_NAME = "series_name"
         private const val EXTRA_SERIES_COVER = "series_cover"
+        private const val EXTRA_ADDED = "added"
 
         fun intent(context: Context, series: SeriesItem): Intent =
             Intent(context, SeriesDetailActivity::class.java)
                 .putExtra(EXTRA_SERIES_ID, series.seriesId)
                 .putExtra(EXTRA_SERIES_NAME, series.name)
                 .putExtra(EXTRA_SERIES_COVER, series.cover)
+                .putExtra(EXTRA_ADDED, series.added)
     }
 }

@@ -1,5 +1,6 @@
 package com.gadir.tv.util
 
+import com.gadir.tv.model.CastMember
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
@@ -96,6 +97,8 @@ object MetaExtractor {
     }
 
     fun castFrom(vararg sources: JsonObject?): String {
+        val fromMembers = castMembersFrom(*sources).joinToString(", ") { it.name }
+        if (fromMembers.isNotBlank()) return fromMembers
         val keys = listOf("cast", "actors", "starring", "actor")
         for (source in sources) {
             if (source == null) continue
@@ -105,6 +108,58 @@ object MetaExtractor {
             }
         }
         return ""
+    }
+
+    fun castMembersFrom(vararg sources: JsonObject?): List<CastMember> {
+        val keys = listOf("cast", "actors", "starring", "actor", "actor_list")
+        for (source in sources) {
+            if (source == null) continue
+            for (key in keys) {
+                val element = source.get(key) ?: continue
+                when {
+                    element.isJsonArray -> {
+                        val members = element.asJsonArray.mapNotNull { parseCastElement(it) }
+                        if (members.isNotEmpty()) return members
+                    }
+                    element.isJsonPrimitive -> {
+                        val text = stripHtml(element.asStringOrNull())
+                        if (text.isNotBlank()) {
+                            return text.split(",", "/", "|", ";")
+                                .map { CastMember(it.trim()) }
+                                .filter { it.name.isNotBlank() }
+                        }
+                    }
+                }
+            }
+        }
+        return emptyList()
+    }
+
+    private fun parseCastElement(element: JsonElement): CastMember? {
+        if (element.isJsonPrimitive) {
+            val name = stripHtml(element.asStringOrNull()).orEmpty()
+            return name.takeIf { it.isNotBlank() }?.let { CastMember(it) }
+        }
+        if (!element.isJsonObject) return null
+        val obj = element.asJsonObject
+        val name = stripHtml(
+            obj.get("name")?.asStringOrNull()
+                ?: obj.get("actor")?.asStringOrNull()
+                ?: obj.get("cast")?.asStringOrNull()
+                ?: obj.get("character")?.asStringOrNull(),
+        ).orEmpty()
+        if (name.isBlank()) return null
+        val image = imageFrom(
+            obj,
+            "profile_path",
+            "image",
+            "photo",
+            "avatar",
+            "cast_image",
+            "url",
+            "cover",
+        )
+        return CastMember(name = name, imageUrl = image)
     }
 
     fun directorFrom(vararg sources: JsonObject?): String {
