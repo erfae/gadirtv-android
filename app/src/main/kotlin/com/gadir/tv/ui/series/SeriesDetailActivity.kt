@@ -182,12 +182,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             return
         }
         val token = ++loadToken
-        val hasCachedPlot = PlotCache.get("series", seriesId) != null
-        if (!hasCachedPlot && fallbackCover.isEmpty()) {
-            loadingView.visibility = View.VISIBLE
-        } else {
-            loadingView.visibility = View.GONE
-        }
+        loadingView.visibility = View.GONE
         episodeList.visibility = View.VISIBLE
         seasonList.visibility = View.VISIBLE
         btnSeriesPlay.visibility = View.VISIBLE
@@ -195,7 +190,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         lifecycleScope.launch {
             val detail = try {
                 withContext(Dispatchers.IO) {
-                    withTimeout(6_000L) {
+                    withTimeout(4_000L) {
                         api.seriesInfo(profile, seriesId)
                     }
                 }

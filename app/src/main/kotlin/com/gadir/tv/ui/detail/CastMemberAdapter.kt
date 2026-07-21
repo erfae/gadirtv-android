@@ -8,7 +8,6 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.model.CastMember
-import com.gadir.tv.util.ImageLoader
 
 class CastMemberAdapter(
     private val items: List<CastMember>,
@@ -30,11 +29,7 @@ class CastMemberAdapter(
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val item = items[position]
         holder.name.text = item.name
-        if (item.imageUrl.isNotBlank()) {
-            ImageLoader.loadCastAvatar(holder.avatar, item.imageUrl, 144)
-        } else {
-            holder.avatar.setImageResource(R.drawable.ic_user)
-        }
+        holder.avatar.visibility = View.GONE
 
         val list = holder.itemView.parent as? RecyclerView
         if (list != null) {

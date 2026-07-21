@@ -37,6 +37,7 @@ import com.gadir.tv.data.ParentalControlStore
 import com.gadir.tv.data.ParentalSession
 import com.gadir.tv.data.ProfileStore
 import com.gadir.tv.data.ResumeStore
+import com.gadir.tv.data.SearchRepository
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.Category
 import com.gadir.tv.model.EpgEntry
@@ -491,6 +492,15 @@ class MainActivity : BaseLocaleActivity() {
 
         startContentPreload()
         showTab(Tab.HOME)
+        lifecycleScope.launch {
+            repeat(8) {
+                if (isDestroyed) return@launch
+                syncLivePlaylistUi()
+                if (PlaylistRepository.bootstrapReady && PlaylistRepository.categories.isNotEmpty()) return@launch
+                kotlinx.coroutines.delay(750L)
+            }
+            syncLivePlaylistUi()
+        }
         if (DeviceUi.useDpadFocus(this)) {
             tabHome.post { tabHome.requestFocus() }
         }
@@ -596,25 +606,8 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun setupLiveTab() {
-        liveCategories.clear()
-        liveCategories.add(Category(id = "", name = getString(R.string.category_all)))
-        liveCategories.add(
-            Category(
-                id = FavoritesStore.FAVORITES_CATEGORY_ID,
-                name = getString(R.string.category_favorites),
-            ),
-        )
-        liveCategories.add(
-            Category(
-                id = ParentalControlStore.LOCK_CATEGORY_ID,
-                name = getString(R.string.category_locked),
-            ),
-        )
-        liveCategories.addAll(PlaylistRepository.categories)
-
-        syncLiveCategoryCounts()
-        bindLiveCategoryAdapter()
-        warmLiveCategoryPrefetch()
+        refreshLiveCategoryList()
+        syncLiveCategoryChannels()
         channelList.setItemViewCacheSize(48)
         channelAdapter = ChannelAdapter(
             items = channels,
@@ -787,8 +780,10 @@ class MainActivity : BaseLocaleActivity() {
         if (newIndex >= 0) liveCategoryFocusIndex = newIndex
 
         val loaded = liveCategoryPrefetch[newId] ?: channelsForLiveCategory(newId).also {
-            liveCategoryPrefetch[newId] = it
-            if (newId != null) liveCategoryCounts[newId] = it.size
+            if (it.isNotEmpty()) {
+                liveCategoryPrefetch[newId] = it
+                if (newId != null) liveCategoryCounts[newId] = it.size
+            }
         }
 
         val previousId = liveBrowsingCategoryId
@@ -1079,6 +1074,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun prefetchLiveCategory(categoryId: String?) {
         if (liveCategoryPrefetch.containsKey(categoryId)) return
         val loaded = channelsForLiveCategory(categoryId)
+        if (loaded.isEmpty()) return
         liveCategoryPrefetch[categoryId] = loaded
         liveCategoryCounts[categoryId] = loaded.size
         (liveCategoryList.adapter as? CategoryAdapter)?.refreshSelection()
@@ -1211,6 +1207,50 @@ class MainActivity : BaseLocaleActivity() {
         previewLogo.visibility = View.GONE
         livePanel().findViewById<View>(R.id.miniNoSignal)?.visibility = View.GONE
         liveChannelStore.lastStreamId = 0
+    }
+
+    /** Refresca grupos/canales cuando el bootstrap termina en segundo plano. */
+    private fun syncLivePlaylistUi() {
+        val hasLiveData = PlaylistRepository.bootstrapReady ||
+            PlaylistRepository.allChannels.isNotEmpty() ||
+            PlaylistRepository.categories.isNotEmpty()
+        if (!hasLiveData) return
+        if (currentTab == Tab.LIVE && !liveTabReady) {
+            ensureLiveTabReady()
+        }
+        if (!liveTabReady) return
+
+        if (PlaylistRepository.allChannels.isNotEmpty() && liveCategoryPrefetch.values.any { it.isEmpty() }) {
+            liveCategoryPrefetch.clear()
+            liveCategoryCounts.clear()
+        }
+
+        val repoCategoryCount = PlaylistRepository.categories.size + 3
+        if (liveCategories.size != repoCategoryCount) {
+            refreshLiveCategoryList()
+        }
+        syncLiveCategoryChannels()
+
+        if (currentTab == Tab.LIVE &&
+            DeviceUi.useDpadFocus(this) &&
+            liveBrowseLevel == TvBrowseNav.Level.TAB &&
+            liveCategories.isNotEmpty()
+        ) {
+            livePanel().post {
+                if (currentTab == Tab.LIVE && liveBrowseLevel == TvBrowseNav.Level.TAB) {
+                    enterLiveTabFromTabBar()
+                }
+            }
+        }
+    }
+
+    private fun syncLiveCategoryChannels() {
+        if (!liveTabReady || PlaylistRepository.allChannels.isEmpty()) return
+        if (channels.isNotEmpty()) return
+        val index = liveCategoryFocusIndex.coerceIn(0, (liveCategories.size - 1).coerceAtLeast(0))
+        liveCategories.getOrNull(index)?.let { cat ->
+            previewLiveCategoryGroup(cat, refreshCategories = true)
+        }
     }
 
     private fun refreshLiveCategoryList() {
@@ -2174,11 +2214,16 @@ class MainActivity : BaseLocaleActivity() {
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
                 livePreviewPaused = false
+                syncLivePlaylistUi()
                 livePanel().post {
                     if (currentTab != Tab.LIVE) return@post
                     if (DeviceUi.useDpadFocus(this)) {
                         ensurePreviewPlayer()
-                        applyLiveBrowseLevel()
+                        if (PlaylistRepository.bootstrapReady && liveBrowseLevel == TvBrowseNav.Level.TAB) {
+                            enterLiveTabFromTabBar()
+                        } else {
+                            applyLiveBrowseLevel()
+                        }
                     } else {
                         ensurePreviewPlayer()
                         restoreLiveTabSession()
@@ -2584,6 +2629,7 @@ class MainActivity : BaseLocaleActivity() {
                 runCatching { BootstrapLoader.load(this@MainActivity, api, profile) }
             }
             result.onSuccess {
+                SearchRepository.invalidate()
                 parentalStore.ensureAdultDefaultsBlocked()
                 when (currentTab) {
                     Tab.LIVE -> {
@@ -5110,6 +5156,7 @@ class MainActivity : BaseLocaleActivity() {
             }
         } else if (currentTab == Tab.LIVE) {
             ensureLiveTabReady()
+            syncLivePlaylistUi()
             livePreviewPaused = false
             if (!DeviceUi.useDpadFocus(this)) {
                 focusChannelAt(currentPreviewChannel)

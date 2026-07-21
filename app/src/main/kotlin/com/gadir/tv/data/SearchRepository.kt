@@ -4,6 +4,8 @@ import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.Profile
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.Normalizer
 
 object SearchRepository {
@@ -18,13 +20,32 @@ object SearchRepository {
     private var loaded = false
 
     suspend fun ensureIndex(api: XtreamApi, profile: Profile) {
-        val cachedMovies = PlaylistRepository.allCachedVod()
-        val cachedSeries = PlaylistRepository.allCachedSeries()
-        val fetchedMovies = runCatching { api.vodStreams(profile, null) }.getOrDefault(emptyList())
-        val fetchedSeries = runCatching { api.seriesList(profile, null) }.getOrDefault(emptyList())
-        moviesIndex = (cachedMovies + fetchedMovies).distinctBy { it.streamId }
-        seriesIndex = (cachedSeries + fetchedSeries).distinctBy { it.seriesId }
-        loaded = true
+        if (loaded) return
+        withContext(Dispatchers.IO) {
+            moviesIndex = PlaylistRepository.allCachedVod().distinctBy { it.streamId }
+            seriesIndex = PlaylistRepository.allCachedSeries().distinctBy { it.seriesId }
+            if (moviesIndex.isEmpty()) {
+                val categoryId = PlaylistRepository.vodCategories
+                    .firstOrNull { it.id.isNotBlank() }
+                    ?.id
+                if (categoryId != null) {
+                    moviesIndex = runCatching { api.vodStreams(profile, categoryId) }
+                        .getOrDefault(emptyList())
+                        .also { PlaylistRepository.cacheVod(categoryId, it) }
+                }
+            }
+            if (seriesIndex.isEmpty()) {
+                val categoryId = PlaylistRepository.seriesCategories
+                    .firstOrNull { it.id.isNotBlank() }
+                    ?.id
+                if (categoryId != null) {
+                    seriesIndex = runCatching { api.seriesList(profile, categoryId) }
+                        .getOrDefault(emptyList())
+                        .also { PlaylistRepository.cacheSeries(categoryId, it) }
+                }
+            }
+            loaded = true
+        }
     }
 
     fun invalidate() {

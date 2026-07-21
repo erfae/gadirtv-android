@@ -40,6 +40,7 @@ class SearchActivity : BaseLocaleActivity() {
     private lateinit var parentalStore: ParentalControlStore
     private val debounceHandler = Handler(Looper.getMainLooper())
     private var debounceRunnable: Runnable? = null
+    private var searchToken = 0
 
     private lateinit var searchInput: EditText
     private lateinit var searchLoading: TextView
@@ -102,9 +103,13 @@ class SearchActivity : BaseLocaleActivity() {
 
         searchLoading.visibility = View.VISIBLE
         lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
-                SearchRepository.ensureIndex(api, profile)
+            try {
+                withContext(Dispatchers.IO) {
+                    SearchRepository.ensureIndex(api, profile)
+                }
+            } catch (_: Exception) {
             }
+            if (isDestroyed) return@launch
             searchLoading.visibility = View.GONE
             searchInput.requestFocus()
         }
@@ -117,7 +122,18 @@ class SearchActivity : BaseLocaleActivity() {
     }
 
     private fun runSearch(query: String) {
-        val results = SearchRepository.search(query)
+        val token = ++searchToken
+        lifecycleScope.launch {
+            val results = withContext(Dispatchers.Default) {
+                runCatching { SearchRepository.search(query) }
+                    .getOrDefault(SearchRepository.Results())
+            }
+            if (token != searchToken || isDestroyed) return@launch
+            bindResults(query, results)
+        }
+    }
+
+    private fun bindResults(query: String, results: SearchRepository.Results) {
         val hasQuery = query.trim().isNotEmpty()
         val hasResults = results.channels.isNotEmpty() ||
             results.movies.isNotEmpty() ||
@@ -255,11 +271,13 @@ class SearchActivity : BaseLocaleActivity() {
         val profile = PlaylistRepository.profile ?: return
         LiveChannelNavigator.setPlaybackContext(this, channel, channel.categoryId)
         val urls = LiveStreamUrls.candidates(api, profile, channel)
+        val url = urls.firstOrNull().orEmpty()
+        if (url.isBlank()) return
         PlaybackLauncher.play(
             context = this,
             request = PlaybackRequest(
                 title = channel.name,
-                url = urls.first(),
+                url = url,
                 kind = com.gadir.tv.data.ResumeStore.KIND_LIVE,
                 contentId = channel.streamId.toString(),
                 imageUrl = channel.icon,
