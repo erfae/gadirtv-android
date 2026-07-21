@@ -2,10 +2,8 @@ package com.gadir.tv.player
 
 import android.content.Context
 import com.gadir.tv.data.AppSettings
-import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.ui.player.PlayerActivity
 import com.gadir.tv.ui.player.VlcPlayerActivity
-import com.gadir.tv.util.DeviceUi
 
 object PlaybackLauncher {
     fun play(context: Context, request: PlaybackRequest) {
@@ -26,8 +24,6 @@ object PlaybackLauncher {
                     launchVlc(context, request)
                 settings.playerMode == AppSettings.PLAYER_COMPAT ->
                     launchExo(context, request)
-                useVlcOnTv(context, request) ->
-                    launchVlc(context, request)
                 else -> launchExo(context, request)
             }
         } catch (_: Throwable) {
@@ -39,14 +35,13 @@ object PlaybackLauncher {
         }
     }
 
-    /** TV: VLC solo para live en pantalla completa; películas/series con Exo+FFmpeg. */
-    private fun useVlcOnTv(context: Context, request: PlaybackRequest): Boolean {
-        if (!DeviceUi.isTvUi(context)) return false
-        return request.kind == ResumeStore.KIND_LIVE
+    private fun vodFallback(context: Context, request: PlaybackRequest) {
+        if (settingsPlayerPrefersVlc(context)) launchVlc(context, request) else launchExo(context, request)
     }
 
-    private fun vodFallback(context: Context, request: PlaybackRequest) {
-        if (useVlcOnTv(context, request)) launchVlc(context, request) else launchExo(context, request)
+    /** Solo VLC automático si el usuario eligió VLC en ajustes. Exo hace fallback a VLC si falla. */
+    private fun settingsPlayerPrefersVlc(context: Context): Boolean {
+        return AppSettings(context).playerMode == AppSettings.PLAYER_VLC
     }
 
     private fun launchExternal(context: Context, request: PlaybackRequest, settings: AppSettings) {
