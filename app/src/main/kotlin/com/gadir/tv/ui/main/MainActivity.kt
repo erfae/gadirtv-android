@@ -58,6 +58,7 @@ import com.gadir.tv.player.VodStreamUrls
 import com.gadir.tv.player.LiveVlcPlayer
 import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
+import com.gadir.tv.player.VodPlaybackHelper
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.ui.profiles.ProfilesActivity
 import org.videolan.libvlc.util.VLCVideoLayout
@@ -3027,29 +3028,32 @@ class MainActivity : BaseLocaleActivity() {
         val record = resumeStore.get(ResumeStore.KIND_MOVIE, streamId.toString())
         if (record != null) {
             val profile = PlaylistRepository.profile ?: return
-            val cached = MovieDetailCache.get(streamId)
-            val ext = (cached?.extension ?: extension).ifBlank { "mp4" }
-            val direct = cached?.directSource?.takeIf { it.isNotBlank() } ?: directSource
-            val urls = VodStreamUrls.movieCandidates(api, profile, streamId, ext, direct)
-            val url = urls.firstOrNull().orEmpty()
-            if (url.isBlank()) {
-                openMovieDetail(streamId, title, cover, extension)
-                return
+            lifecycleScope.launch {
+                val resolved = withContext(Dispatchers.IO) {
+                    VodPlaybackHelper.resolveMovie(
+                        api, profile, streamId, extension, directSource,
+                    )
+                }
+                val url = resolved.urls.firstOrNull().orEmpty()
+                if (url.isBlank()) {
+                    openMovieDetail(streamId, title, cover, extension)
+                    return@launch
+                }
+                ResumePlaybackHelper.play(
+                    context = this@MainActivity,
+                    resumeStore = resumeStore,
+                    request = PlaybackRequest(
+                        title = title,
+                        url = url,
+                        kind = ResumeStore.KIND_MOVIE,
+                        contentId = streamId.toString(),
+                        imageUrl = cover,
+                        extension = resolved.extension,
+                        positionMs = record.positionMs,
+                        alternateUrls = resolved.urls.drop(1),
+                    ),
+                )
             }
-            ResumePlaybackHelper.play(
-                context = this,
-                resumeStore = resumeStore,
-                request = PlaybackRequest(
-                    title = title,
-                    url = url,
-                    kind = ResumeStore.KIND_MOVIE,
-                    contentId = streamId.toString(),
-                    imageUrl = cover,
-                    extension = ext,
-                    positionMs = record.positionMs,
-                    alternateUrls = urls.drop(1),
-                ),
-            )
             return
         }
         openMovieDetail(streamId, title, cover, extension)
@@ -3169,35 +3173,32 @@ class MainActivity : BaseLocaleActivity() {
         directSource: String = "",
     ) {
         val profile = PlaylistRepository.profile ?: return
-        val cached = MovieDetailCache.get(streamId)
-        val ext = (cached?.extension ?: extension).ifBlank { "mp4" }
-        val direct = cached?.directSource?.takeIf { it.isNotBlank() } ?: directSource
-        val urls = VodStreamUrls.movieCandidates(api, profile, streamId, ext, direct)
-        val url = urls.firstOrNull().orEmpty()
-        if (url.isBlank()) {
-            Toast.makeText(this, R.string.series_playback_failed, Toast.LENGTH_SHORT).show()
-            openMovieDetail(streamId, title, imageUrl, ext)
-            return
-        }
-        ResumePlaybackHelper.play(
-            context = this,
-            resumeStore = resumeStore,
-            request = PlaybackRequest(
-                title = title,
-                url = url,
-                kind = ResumeStore.KIND_MOVIE,
-                contentId = streamId.toString(),
-                imageUrl = imageUrl,
-                extension = ext,
-                positionMs = positionMs,
-                alternateUrls = urls.drop(1),
-            ),
-        )
-        if (cached == null || cached.directSource.isBlank()) {
-            lifecycleScope.launch(Dispatchers.IO) {
-                runCatching { api.vodInfo(profile, streamId) }?.getOrNull()
-                    ?.let { MovieDetailCache.put(streamId, it) }
+        lifecycleScope.launch {
+            val resolved = withContext(Dispatchers.IO) {
+                VodPlaybackHelper.resolveMovie(
+                    api, profile, streamId, extension, directSource,
+                )
             }
+            val url = resolved.urls.firstOrNull().orEmpty()
+            if (url.isBlank()) {
+                Toast.makeText(this@MainActivity, R.string.series_playback_failed, Toast.LENGTH_SHORT).show()
+                openMovieDetail(streamId, title, imageUrl, resolved.extension)
+                return@launch
+            }
+            ResumePlaybackHelper.play(
+                context = this@MainActivity,
+                resumeStore = resumeStore,
+                request = PlaybackRequest(
+                    title = title,
+                    url = url,
+                    kind = ResumeStore.KIND_MOVIE,
+                    contentId = streamId.toString(),
+                    imageUrl = imageUrl,
+                    extension = resolved.extension,
+                    positionMs = positionMs,
+                    alternateUrls = resolved.urls.drop(1),
+                ),
+            )
         }
     }
 

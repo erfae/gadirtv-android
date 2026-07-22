@@ -8,7 +8,20 @@ import com.gadir.tv.util.NetworkUrlResolver
 
 object VodStreamUrls {
     /** mp4 primero: muchos grupos del panel son solo MP4. */
-    private val EXTENSIONS = listOf("mp4", "mkv", "ts", "avi", "m3u8")
+    private val EXTENSIONS = listOf("mp4", "mkv", "ts", "avi", "mov", "m3u8")
+
+    private fun addDirectSource(urls: LinkedHashSet<String>, directSource: String) {
+        val direct = directSource.trim()
+        if (direct.isBlank()) return
+        val normalized = when {
+            direct.startsWith("http", ignoreCase = true) -> direct
+            direct.startsWith("//") -> "https:$direct"
+            else -> com.gadir.tv.util.ImageUrlResolver.resolve(direct)
+        }
+        if (normalized.isNotBlank()) {
+            urls.add(NetworkUrlResolver.resolveUrl(normalized))
+        }
+    }
 
     fun movieCandidates(
         api: XtreamApi,
@@ -18,17 +31,14 @@ object VodStreamUrls {
         directSource: String = "",
     ): List<String> {
         val urls = linkedSetOf<String>()
-        val direct = directSource.trim()
-        if (direct.startsWith("http")) {
-            urls.add(NetworkUrlResolver.resolveUrl(direct))
-        }
+        addDirectSource(urls, directSource)
         val primary = extension.ifBlank { "mp4" }.lowercase()
-        urls.add(api.movieStreamUrl(profile, streamId, primary))
         urls.add(api.movieStreamPhp(profile, streamId, primary))
+        urls.add(api.movieStreamUrl(profile, streamId, primary))
         EXTENSIONS.forEach { ext ->
             if (ext != primary) {
-                urls.add(api.movieStreamUrl(profile, streamId, ext))
                 urls.add(api.movieStreamPhp(profile, streamId, ext))
+                urls.add(api.movieStreamUrl(profile, streamId, ext))
             }
         }
         urls.add(api.movieStreamUrlWithoutExtension(profile, streamId))
@@ -45,17 +55,14 @@ object VodStreamUrls {
         directSource: String = "",
     ): List<String> {
         val urls = linkedSetOf<String>()
-        val direct = directSource.trim()
-        if (direct.startsWith("http")) {
-            urls.add(NetworkUrlResolver.resolveUrl(direct))
-        }
+        addDirectSource(urls, directSource)
         val primary = extension.ifBlank { "mp4" }.lowercase()
-        urls.add(api.seriesStreamUrl(profile, episodeId, primary))
         urls.add(api.seriesStreamPhp(profile, episodeId, primary))
+        urls.add(api.seriesStreamUrl(profile, episodeId, primary))
         EXTENSIONS.forEach { ext ->
             if (ext != primary) {
-                urls.add(api.seriesStreamUrl(profile, episodeId, ext))
                 urls.add(api.seriesStreamPhp(profile, episodeId, ext))
+                urls.add(api.seriesStreamUrl(profile, episodeId, ext))
             }
         }
         urls.add(api.seriesStreamUrlWithoutExtension(profile, episodeId))
