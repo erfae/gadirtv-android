@@ -31,6 +31,9 @@ import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
 import com.gadir.tv.ui.series.SeriesDetailActivity
 import com.gadir.tv.ui.settings.ParentalPinDialog
+import com.gadir.tv.util.DeviceUi
+import com.gadir.tv.util.RecyclerViewUtil
+import com.gadir.tv.util.TvFocusHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -77,7 +80,16 @@ class SearchActivity : BaseLocaleActivity() {
         moviesResults.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         seriesResults.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
 
-        findViewById<TextView>(R.id.btnBack).setOnClickListener { finish() }
+        findViewById<TextView>(R.id.btnBack).also { btnBack ->
+            btnBack.setOnClickListener { finish() }
+            TvFocusHelper.bindButton(btnBack) { finish() }
+        }
+
+        searchInput.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus && DeviceUi.useDpadFocus(this)) {
+                searchInput.post { showKeyboard(searchInput) }
+            }
+        }
 
         searchInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -112,7 +124,21 @@ class SearchActivity : BaseLocaleActivity() {
             if (isDestroyed) return@launch
             searchLoading.visibility = View.GONE
             searchInput.requestFocus()
+            if (DeviceUi.useDpadFocus(this@SearchActivity)) {
+                searchInput.post { showKeyboard(searchInput) }
+            }
         }
+    }
+
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.action == android.view.KeyEvent.ACTION_DOWN &&
+            event.keyCode == android.view.KeyEvent.KEYCODE_SEARCH
+        ) {
+            searchInput.requestFocus()
+            showKeyboard(searchInput)
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     private fun scheduleSearch(query: String) {
@@ -213,6 +239,11 @@ class SearchActivity : BaseLocaleActivity() {
         list.visibility = if (visible) View.VISIBLE else View.GONE
         if (!visible) return
         list.adapter = HomeRailAdapter(items = items, onClick = onClick)
+        RecyclerViewUtil.expandHorizontalList(list)
+        if (DeviceUi.useDpadFocus(this)) {
+            list.isFocusable = false
+            list.descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
+        }
     }
 
     private fun withChannelAccess(channel: LiveChannel, action: () -> Unit) {

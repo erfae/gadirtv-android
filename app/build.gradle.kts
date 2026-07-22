@@ -22,7 +22,7 @@ android {
         minSdk = 21
         targetSdk = 33
         // Must exceed Flutter v2.5.8 (versionCode 84) so native can replace it.
-        // TV release track (android-native). v1.45.2 preview, cast, seek, series focus.
+        // TV release track (android-native). v1.45.2 preview, cast, seek, search fix.
         versionCode = 296
         versionName = "1.45.2"
         ndk {

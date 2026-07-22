@@ -388,9 +388,7 @@ class MainActivity : BaseLocaleActivity() {
         startHeaderClock()
         findViewById<TextView>(R.id.appVersionLabel)?.text = "v${BuildConfig.VERSION_NAME}"
         findViewById<TextView>(R.id.btnSearch).also { btnSearch = it }
-        TvFocusHelper.bindButton(btnSearch) {
-            startActivity(Intent(this, SearchActivity::class.java))
-        }
+        TvFocusHelper.bindButton(btnSearch) { openSearch() }
         findViewById<TextView>(R.id.btnReload).also { btnReload = it }
         TvFocusHelper.bindButton(btnReload) { reloadPlaylist() }
         findViewById<TextView>(R.id.btnSettings).also { btnSettings = it }
@@ -470,6 +468,10 @@ class MainActivity : BaseLocaleActivity() {
                     focusFirstHomeRail()
                     true
                 }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    btnSearch.requestFocus()
+                    true
+                }
                 else -> false
             }
         }
@@ -477,10 +479,10 @@ class MainActivity : BaseLocaleActivity() {
         setupTabNavigation()
         installTvBackHandler()
         heroPlay.setOnClickListener { openHeroContent() }
-        tabHome.nextFocusUpId = R.id.btnSettings
-        tabLive.nextFocusUpId = R.id.btnSettings
-        tabMovies.nextFocusUpId = R.id.btnSettings
-        tabSeries.nextFocusUpId = R.id.btnSettings
+        tabHome.nextFocusUpId = R.id.btnSearch
+        tabLive.nextFocusUpId = R.id.btnSearch
+        tabMovies.nextFocusUpId = R.id.btnSearch
+        tabSeries.nextFocusUpId = R.id.btnSearch
         tabHome.setOnKeyListener { _, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN || currentTab != Tab.HOME) {
                 return@setOnKeyListener false
@@ -1499,7 +1501,10 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun updateHeaderFocusForTab(tab: Tab) {
         val headerFocusable = !DeviceUi.useDpadFocus(this) || tab == Tab.HOME
-        listOf(btnSearch, btnReload, btnSettings, btnLogout, btnExit).forEach { button ->
+        val searchFocusable = !DeviceUi.useDpadFocus(this) || true
+        btnSearch.isFocusable = searchFocusable
+        btnSearch.isFocusableInTouchMode = searchFocusable
+        listOf(btnReload, btnSettings, btnLogout, btnExit).forEach { button ->
             button.isFocusable = headerFocusable
             button.isFocusableInTouchMode = headerFocusable
             if (!headerFocusable && button.hasFocus()) button.clearFocus()
@@ -1507,6 +1512,10 @@ class MainActivity : BaseLocaleActivity() {
         if (DeviceUi.useDpadFocus(this)) {
             catalogCategoryList.nextFocusUpId = View.NO_ID
         }
+    }
+
+    private fun openSearch() {
+        startActivity(Intent(this, SearchActivity::class.java))
     }
 
     private fun updateHeaderDownFocus() {
@@ -5205,6 +5214,10 @@ class MainActivity : BaseLocaleActivity() {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
                     handleTvBack()
+                    return true
+                }
+                KeyEvent.KEYCODE_SEARCH -> {
+                    openSearch()
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
