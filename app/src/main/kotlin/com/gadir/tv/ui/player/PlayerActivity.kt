@@ -48,6 +48,7 @@ class PlayerActivity : BaseLocaleActivity() {
     private var liveOverlaysVisible = false
     private var epgLoaded = false
     private var liveStreamId = 0
+    private var liveEpgChannelId = ""
     private val pendingLiveUrls = ArrayDeque<String>()
     private val pendingVodUrls = ArrayDeque<String>()
 
@@ -122,6 +123,7 @@ class PlayerActivity : BaseLocaleActivity() {
         val positionMs = intent.getLongExtra(EXTRA_POSITION_MS, 0L)
         val kind = intent.getStringExtra(EXTRA_KIND).orEmpty()
         val streamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
+        liveEpgChannelId = intent.getStringExtra(EXTRA_EPG_CHANNEL_ID).orEmpty()
         val channelTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         allowVlcFallback = !intent.getBooleanExtra(EXTRA_DISABLE_VLC_FALLBACK, false)
         vodExtension = intent.getStringExtra(EXTRA_EXTENSION).orEmpty().ifBlank { "mkv" }
@@ -478,6 +480,7 @@ class PlayerActivity : BaseLocaleActivity() {
     private fun switchToLiveChannel(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         liveStreamId = channel.streamId
+        liveEpgChannelId = channel.epgChannelId
         LiveChannelStore(this).lastStreamId = channel.streamId
         findViewById<TextView>(R.id.playerChannelTitle).text = channel.name
         epgLoaded = false
@@ -661,7 +664,12 @@ class PlayerActivity : BaseLocaleActivity() {
 
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {
-                api.shortEpg(profile, streamId, limit = 10)
+                api.shortEpg(
+                    profile,
+                    streamId = streamId,
+                    epgChannelId = liveEpgChannelId,
+                    limit = 10,
+                )
             }
             loading.visibility = View.GONE
             if (epg.isEmpty()) {
@@ -717,6 +725,7 @@ class PlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_EXTENSION = "extension"
         private const val EXTRA_POSITION_MS = "position_ms"
         private const val EXTRA_STREAM_ID = "stream_id"
+        private const val EXTRA_EPG_CHANNEL_ID = "epg_channel_id"
         private const val EXTRA_ALTERNATE_URLS = "alternate_urls"
         private const val EXTRA_DISABLE_VLC_FALLBACK = "disable_vlc_fallback"
         private const val SEEK_STEP_MS = 10_000L
@@ -732,6 +741,7 @@ class PlayerActivity : BaseLocaleActivity() {
             extension: String = "mp4",
             positionMs: Long = 0L,
             streamId: Int = 0,
+            epgChannelId: String = "",
             alternateUrls: List<String> = emptyList(),
             disableVlcFallback: Boolean = false,
         ): Intent = Intent(context, PlayerActivity::class.java)
@@ -743,6 +753,7 @@ class PlayerActivity : BaseLocaleActivity() {
             .putExtra(EXTRA_EXTENSION, extension)
             .putExtra(EXTRA_POSITION_MS, positionMs)
             .putExtra(EXTRA_STREAM_ID, streamId)
+            .putExtra(EXTRA_EPG_CHANNEL_ID, epgChannelId)
             .putStringArrayListExtra(EXTRA_ALTERNATE_URLS, ArrayList(alternateUrls))
             .putExtra(EXTRA_DISABLE_VLC_FALLBACK, disableVlcFallback)
     }

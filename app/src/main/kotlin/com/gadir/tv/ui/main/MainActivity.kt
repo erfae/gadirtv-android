@@ -101,7 +101,7 @@ class MainActivity : BaseLocaleActivity() {
         private const val CHANNEL_PREVIEW_DELAY_MS = 60L
         private const val PREVIEW_TIMEOUT_MS = 4_500L
         private const val CATALOG_PREFETCH_DELAY_MS = 400L
-        private const val EPG_FOCUS_DELAY_MS = 450L
+        private const val EPG_FOCUS_DELAY_MS = 120L
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -779,15 +779,11 @@ class MainActivity : BaseLocaleActivity() {
         val newIndex = liveCategories.indexOfFirst { liveCategoryId(it) == newId }
         if (newIndex >= 0) liveCategoryFocusIndex = newIndex
 
-        val loaded = liveCategoryPrefetch[newId] ?: channelsForLiveCategory(newId).also {
-            if (it.isNotEmpty()) {
-                liveCategoryPrefetch[newId] = it
-                if (newId != null) liveCategoryCounts[newId] = it.size
-            }
-        }
+        val loaded = liveChannelsForCategory(newId)
 
         val previousId = liveBrowsingCategoryId
         val sameGroup = previousId == newId &&
+            loaded.isNotEmpty() &&
             channels.size == loaded.size &&
             channels.map { it.streamId } == loaded.map { it.streamId }
         liveBrowsingCategoryId = newId
@@ -824,6 +820,9 @@ class MainActivity : BaseLocaleActivity() {
         channelList.visibility = View.VISIBLE
         prefetchLiveChannelIcons(loaded)
         channelList.scrollToPosition(0)
+        if (liveBrowseLevel == TvBrowseNav.Level.GROUP && !livePreviewPaused) {
+            loaded.firstOrNull()?.let { schedulePreview(it) }
+        }
     }
 
     private fun showLiveCategoryChannels(
@@ -1003,6 +1002,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun warmLiveCategoryPrefetch() {
+        if (PlaylistRepository.allChannels.isEmpty()) return
         syncLiveCategoryCounts()
         refreshLiveCategorySelection()
         val token = ++livePrefetchToken
@@ -1011,12 +1011,13 @@ class MainActivity : BaseLocaleActivity() {
                 buildLiveCategoryPrefetchMap()
             }
             if (token != livePrefetchToken) return@launch
-            liveCategoryPrefetch.putAll(prefetched)
-            prefetched.forEach { (id, list) ->
+            liveCategoryPrefetch.putAll(prefetched.filterValues { it.isNotEmpty() })
+            prefetched.filterValues { it.isNotEmpty() }.forEach { (id, list) ->
                 liveCategoryCounts[id] = list.size
             }
             if (currentTab == Tab.LIVE) {
                 refreshLiveCategorySelection()
+                syncLiveCategoryChannels()
             }
         }
     }
@@ -1028,6 +1029,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun buildLiveCategoryPrefetchMap(): Map<String?, List<LiveChannel>> {
         val sortMode = appSettings.liveSortMode
         val all = PlaylistRepository.channelsFor(null, sortMode)
+        if (all.isEmpty()) return emptyMap()
         val favoriteIds = favoritesStore.load(FavoritesStore.KIND_LIVE)
         val lockedIds = parentalStore.lockedChannelIds()
         val grouped = all.groupBy { it.categoryId }
@@ -1052,6 +1054,21 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun liveChannelsForCategory(categoryId: String?): List<LiveChannel> {
+        if (PlaylistRepository.allChannels.isEmpty()) return emptyList()
+        val cached = liveCategoryPrefetch[categoryId]
+        if (cached != null) {
+            if (cached.isNotEmpty()) return cached
+            liveCategoryPrefetch.remove(categoryId)
+        }
+        val loaded = channelsForLiveCategory(categoryId)
+        if (loaded.isNotEmpty()) {
+            liveCategoryPrefetch[categoryId] = loaded
+            if (categoryId != null) liveCategoryCounts[categoryId] = loaded.size
+        }
+        return loaded
+    }
+
     private fun channelsForLiveCategory(categoryId: String?): List<LiveChannel> =
         when (categoryId) {
             FavoritesStore.FAVORITES_CATEGORY_ID ->
@@ -1072,7 +1089,11 @@ class MainActivity : BaseLocaleActivity() {
         }
 
     private fun prefetchLiveCategory(categoryId: String?) {
-        if (liveCategoryPrefetch.containsKey(categoryId)) return
+        val cached = liveCategoryPrefetch[categoryId]
+        if (cached != null && cached.isNotEmpty()) return
+        if (cached != null && cached.isEmpty()) {
+            liveCategoryPrefetch.remove(categoryId)
+        }
         val loaded = channelsForLiveCategory(categoryId)
         if (loaded.isEmpty()) return
         liveCategoryPrefetch[categoryId] = loaded
@@ -1246,9 +1267,17 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun syncLiveCategoryChannels() {
         if (!liveTabReady || PlaylistRepository.allChannels.isEmpty()) return
-        if (channels.isNotEmpty()) return
-        val index = liveCategoryFocusIndex.coerceIn(0, (liveCategories.size - 1).coerceAtLeast(0))
-        liveCategories.getOrNull(index)?.let { cat ->
+        val cat = liveCategories.getOrNull(liveCategoryFocusIndex) ?: return
+        val categoryId = liveCategoryId(cat)
+        val expected = liveChannelsForCategory(categoryId)
+        val currentIds = channels.map { it.streamId }
+        val expectedIds = expected.map { it.streamId }
+        if (currentIds == expectedIds && expected.isNotEmpty()) return
+        if (expected.isEmpty() && channels.isEmpty()) {
+            previewLiveCategoryGroup(cat, refreshCategories = true)
+            return
+        }
+        if (expected.isNotEmpty()) {
             previewLiveCategoryGroup(cat, refreshCategories = true)
         }
     }
@@ -1294,6 +1323,10 @@ class MainActivity : BaseLocaleActivity() {
                 }
                 if (liveBrowsingCategoryId == newId) {
                     refreshLiveCategoryHighlight(null, newId)
+                    if (channels.isEmpty() && PlaylistRepository.allChannels.isNotEmpty()) {
+                        liveCategoryPrefetch.remove(newId)
+                        previewLiveCategoryGroup(cat)
+                    }
                     return@CategoryAdapter
                 }
                 previewLiveCategoryGroup(cat)
@@ -1648,6 +1681,14 @@ class MainActivity : BaseLocaleActivity() {
             catalogBrowseLevel == TvBrowseNav.Level.GROUP
         ) {
             refreshCatalogCategoryHighlight(null, catId)
+            val needsReload = when (tab) {
+                Tab.MOVIES -> PlaylistRepository.cachedVod(catId).isNullOrEmpty() &&
+                    inFlightCatalogCategory != catId
+                Tab.SERIES -> PlaylistRepository.cachedSeries(catId).isNullOrEmpty() &&
+                    inFlightCatalogCategory != catId
+                else -> false
+            }
+            if (needsReload) warmCatalogCategoryContent(tab, catId)
             return
         }
         val previousId = catalogBrowsingCategoryId
@@ -3773,6 +3814,14 @@ class MainActivity : BaseLocaleActivity() {
                 if (idx >= 0) catalogCategoryFocusIndex = idx
                 if (catalogBrowsingCategoryId == cat.id) {
                     refreshCatalogCategoryHighlight(null, cat.id)
+                    val needsReload = when (tab) {
+                        Tab.MOVIES -> PlaylistRepository.cachedVod(cat.id).isNullOrEmpty() &&
+                            inFlightCatalogCategory != cat.id
+                        Tab.SERIES -> PlaylistRepository.cachedSeries(cat.id).isNullOrEmpty() &&
+                            inFlightCatalogCategory != cat.id
+                        else -> false
+                    }
+                    if (needsReload) warmCatalogCategoryContent(tab, cat.id)
                     return@CategoryAdapter
                 }
                 previewCatalogGroup(tab, cat)

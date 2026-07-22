@@ -107,6 +107,7 @@ object PlaybackLauncher {
                 extension = request.extension,
                 positionMs = request.positionMs,
                 streamId = request.streamId,
+                epgChannelId = request.epgChannelId,
                 alternateUrls = request.alternateUrls,
             ),
         )

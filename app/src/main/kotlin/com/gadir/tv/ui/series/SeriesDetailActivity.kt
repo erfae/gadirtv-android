@@ -180,7 +180,8 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             return
         }
         val token = ++loadToken
-        loadingView.visibility = View.GONE
+        val hasCached = PlotCache.get("series", seriesId) != null
+        loadingView.visibility = if (hasCached) View.GONE else View.VISIBLE
         episodeList.visibility = View.VISIBLE
         seasonList.visibility = View.VISIBLE
         btnSeriesPlay.visibility = View.VISIBLE
@@ -188,34 +189,17 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         lifecycleScope.launch {
             val detail = runCatching {
                 withContext(Dispatchers.IO) {
-                    api.seriesInfo(profile, seriesId, quick = true)
+                    api.seriesInfo(profile, seriesId)
                 }
             }.getOrNull()
             if (token != loadToken) return@launch
-            if (detail != null) {
-                bindDetail(detail)
+            loadingView.visibility = View.GONE
+            if (detail == null) {
+                resolvePlotLoadingState(failed = PlotCache.get("series", seriesId) == null)
+                btnSeriesPlay.requestFocus()
                 return@launch
             }
-            resolvePlotLoadingState(failed = PlotCache.get("series", seriesId) == null)
-            btnSeriesPlay.requestFocus()
-            retrySeriesDetailFull(token)
-        }
-    }
-
-    private fun retrySeriesDetailFull(token: Int) {
-        val profile = PlaylistRepository.profile ?: return
-        lifecycleScope.launch {
-            val detail = runCatching {
-                withContext(Dispatchers.IO) {
-                    api.seriesInfo(profile, seriesId, quick = false)
-                }
-            }.getOrNull()
-            if (token != loadToken) return@launch
-            if (detail != null) {
-                bindDetail(detail)
-            } else {
-                resolvePlotLoadingState(failed = true)
-            }
+            bindDetail(detail)
         }
     }
 
@@ -318,14 +302,12 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             playEpisode(episode)
             return
         }
-        if (seriesPlot.text?.toString() == getString(R.string.hero_plot_loading)) {
-            android.widget.Toast.makeText(
-                this,
-                R.string.series_load_failed,
-                android.widget.Toast.LENGTH_SHORT,
-            ).show()
-            loadSeriesDetail()
-        }
+        android.widget.Toast.makeText(
+            this,
+            R.string.series_load_failed,
+            android.widget.Toast.LENGTH_SHORT,
+        ).show()
+        loadSeriesDetail()
     }
 
     private fun focusCastList() {
