@@ -96,7 +96,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
         currentStreamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
         val kind = intent.getStringExtra(EXTRA_KIND).orEmpty()
-        isLivePlayback = kind == ResumeStore.KIND_LIVE || currentStreamId > 0
+        isLivePlayback = kind == ResumeStore.KIND_LIVE
         resumePositionMs = intent.getLongExtra(EXTRA_POSITION_MS, 0L).coerceAtLeast(0L)
         resumeSeekPending = resumePositionMs > 0L && !isLivePlayback
 
@@ -302,8 +302,11 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun seekBy(deltaMs: Long) {
         val player = mediaPlayer ?: return
         val duration = currentVodDuration()
-        if (duration <= 0L) return
-        val target = (player.time + deltaMs).coerceIn(0L, duration)
+        val target = if (duration > 0L) {
+            (player.time + deltaMs).coerceIn(0L, duration)
+        } else {
+            (player.time + deltaMs).coerceAtLeast(0L)
+        }
         player.time = target
         updateVodProgress()
         showControls()

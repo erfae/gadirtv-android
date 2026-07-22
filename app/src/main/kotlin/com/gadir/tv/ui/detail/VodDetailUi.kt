@@ -92,11 +92,7 @@ object VodDetailUi {
         onCastMoveUp: (() -> Unit)? = null,
         onCastMoveDown: (() -> Unit)? = null,
     ) {
-        val members = castMembers.ifEmpty {
-            fallbackCast.split(",", "/", "|", ";")
-                .map { CastMember(it.trim()) }
-                .filter { it.name.isNotBlank() }
-        }
+        val members = castMembers.filter { it.imageUrl.isNotBlank() }
         if (members.isEmpty()) {
             labelView.visibility = View.GONE
             listView.visibility = View.GONE

@@ -185,7 +185,8 @@ object MetaExtractor {
             "url",
             "cover",
         )
-        return CastMember(name = name, imageUrl = ImageUrlResolver.resolve(image))
+        val resolvedImage = ImageUrlResolver.resolve(image)
+        return CastMember(name = name, imageUrl = resolvedImage)
     }
 
     fun directorFrom(vararg sources: JsonObject?): String {

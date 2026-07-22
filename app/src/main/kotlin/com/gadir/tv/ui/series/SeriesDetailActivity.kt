@@ -16,6 +16,7 @@ import com.gadir.tv.R
 import com.gadir.tv.data.FavoritesStore
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.PlotCache
+import com.gadir.tv.data.SeriesDetailCache
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.SeriesDetail
@@ -180,11 +181,15 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             return
         }
         val token = ++loadToken
-        val hasCached = PlotCache.get("series", seriesId) != null
+        val cachedDetail = SeriesDetailCache.get(seriesId)
+        val hasCached = cachedDetail != null || PlotCache.get("series", seriesId) != null
         loadingView.visibility = if (hasCached) View.GONE else View.VISIBLE
         episodeList.visibility = View.VISIBLE
         seasonList.visibility = View.VISIBLE
         btnSeriesPlay.visibility = View.VISIBLE
+        if (cachedDetail != null) {
+            bindDetail(cachedDetail)
+        }
 
         lifecycleScope.launch {
             val detail = runCatching {
@@ -195,10 +200,13 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             if (token != loadToken) return@launch
             loadingView.visibility = View.GONE
             if (detail == null) {
-                resolvePlotLoadingState(failed = PlotCache.get("series", seriesId) == null)
-                btnSeriesPlay.requestFocus()
+                if (cachedDetail == null) {
+                    resolvePlotLoadingState(failed = PlotCache.get("series", seriesId) == null)
+                    btnSeriesPlay.requestFocus()
+                }
                 return@launch
             }
+            SeriesDetailCache.put(seriesId, detail)
             bindDetail(detail)
         }
     }
@@ -257,6 +265,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
                 title = detail.name.ifEmpty { seriesName },
             ),
         )
+        SeriesDetailCache.put(seriesId, detail)
 
         seasons = detail.seasons
         val keys = seasons.keys.sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
