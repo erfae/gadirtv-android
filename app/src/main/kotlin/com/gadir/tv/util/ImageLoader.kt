@@ -91,7 +91,47 @@ object ImageLoader {
     }
 
     fun loadPoster(target: ImageView, url: String, width: Int = 0, height: Int = 0) {
-        loadPoster(target, url, width, height, posterOptions)
+        loadVodPoster(target, url, contentId = 0, width = width, height = height)
+    }
+
+    fun vodPosterCandidates(primary: String, contentId: Int): List<String> {
+        return buildList {
+            val resolved = ImageUrlResolver.resolve(primary)
+            if (resolved.isNotBlank()) add(resolved)
+            if (contentId <= 0) return@buildList
+            val profile = PlaylistRepository.profile ?: return@buildList
+            val base = HostUtils.baseUrl(
+                PanelHttp.migrateProfileHost(profile.host),
+            ).trimEnd('/')
+            add(NetworkUrlResolver.resolveUrl("$base/images/$contentId.jpg"))
+            add(NetworkUrlResolver.resolveUrl("$base/images/$contentId.png"))
+        }.distinct().filter { it.isNotBlank() }
+    }
+
+    fun loadVodPoster(
+        target: ImageView,
+        url: String,
+        contentId: Int,
+        width: Int = 0,
+        height: Int = 0,
+    ) {
+        if (!canLoadInto(target)) return
+        val candidates = vodPosterCandidates(url, contentId)
+        if (candidates.isEmpty()) {
+            target.setImageResource(R.drawable.tv_banner)
+            return
+        }
+        var options = posterOptions
+        if (width > 0 && height > 0) {
+            options = options.override(width, height)
+        }
+        loadWithFallback(
+            target = target,
+            urls = candidates,
+            index = 0,
+            options = options,
+            errorDrawable = R.drawable.tv_banner,
+        )
     }
 
     fun loadCastAvatar(target: ImageView, rawUrl: String, sizePx: Int = 144) {
@@ -163,30 +203,6 @@ object ImageLoader {
         )
     }
 
-    private fun loadPoster(
-        target: ImageView,
-        url: String,
-        width: Int,
-        height: Int,
-        options: RequestOptions,
-    ) {
-        if (!canLoadInto(target)) return
-        val resolved = ImageUrlResolver.resolve(url)
-        if (resolved.isEmpty()) {
-            target.setImageResource(R.drawable.tv_banner)
-            return
-        }
-        try {
-            var request = Glide.with(target).load(glideModel(resolved)).apply(options)
-            if (width > 0 && height > 0) {
-                request = request.override(width, height)
-            }
-            request.into(target)
-        } catch (_: Throwable) {
-            target.setImageResource(R.drawable.tv_banner)
-        }
-    }
-
     private fun loadWithFallback(
         target: ImageView,
         urls: List<String>,
@@ -202,7 +218,11 @@ object ImageLoader {
         if (loadTag != null && target.getTag(R.id.image_load_tag) != loadTag) return
         if (index >= urls.size) {
             if (loadTag == null || target.getTag(R.id.image_load_tag) == loadTag) {
-                ChannelIconFallback.load(target, channelName.ifBlank { "TV" }, sizePx)
+                if (channelName.isNotBlank() || streamId > 0) {
+                    ChannelIconFallback.load(target, channelName.ifBlank { "TV" }, sizePx)
+                } else {
+                    target.setImageResource(errorDrawable)
+                }
             }
             return
         }
@@ -243,7 +263,11 @@ object ImageLoader {
                 .into(target)
         } catch (_: Throwable) {
             if (loadTag == null || target.getTag(R.id.image_load_tag) == loadTag) {
-                ChannelIconFallback.load(target, channelName.ifBlank { "TV" }, sizePx)
+                if (channelName.isNotBlank() || streamId > 0) {
+                    ChannelIconFallback.load(target, channelName.ifBlank { "TV" }, sizePx)
+                } else {
+                    target.setImageResource(errorDrawable)
+                }
             }
         }
     }

@@ -22,9 +22,8 @@ object PlaybackLauncher {
             when (settings.playerMode) {
                 AppSettings.PLAYER_EXTERNAL -> launchExternal(context, request, settings)
                 AppSettings.PLAYER_VLC -> launchVlc(context, request)
-                AppSettings.PLAYER_COMPAT,
-                AppSettings.PLAYER_STANDARD,
-                -> launchExo(context, request)
+                AppSettings.PLAYER_COMPAT -> launchExo(context, request)
+                AppSettings.PLAYER_STANDARD -> launchDefault(context, request)
                 else -> launchDefault(context, request)
             }
         } catch (_: Throwable) {
@@ -40,8 +39,8 @@ object PlaybackLauncher {
         when {
             request.kind == ResumeStore.KIND_LIVE && DeviceUi.isTvUi(context) ->
                 launchExo(context, request)
-            DeviceUi.isTvUi(context) ->
-                launchExo(context, request)
+            request.kind != ResumeStore.KIND_LIVE && DeviceUi.isTvUi(context) ->
+                launchVlc(context, request)
             else -> launchExo(context, request)
         }
     }

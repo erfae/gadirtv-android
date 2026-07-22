@@ -48,21 +48,14 @@ object ImageUrlResolver {
         if (url.startsWith("/t/p/")) {
             return "https://image.tmdb.org$url"
         }
-        tmdbSizedInPath.find(url)?.groupValues?.getOrNull(1)?.let { sized ->
-            return "https://image.tmdb.org/t/p/$sized"
-        }
-
-        if (tmdbSizedBare.matches(url)) {
-            return "https://image.tmdb.org/t/p/$url"
-        }
-        if (tmdbBareFile.matches(url)) {
-            return "https://image.tmdb.org/t/p/w185/$url"
-        }
 
         if (url.startsWith("/")) {
             if (panelPathPrefixes.any { prefix -> url.startsWith(prefix, ignoreCase = true) }) {
                 val base = host?.let { HostUtils.baseUrl(it) }.orEmpty()
                 return if (base.isEmpty()) url else "$base$url"
+            }
+            tmdbSizedInPath.find(url)?.groupValues?.getOrNull(1)?.let { sized ->
+                return "https://image.tmdb.org/t/p/$sized"
             }
             if (tmdbSizedPath.matches(url)) {
                 return "https://image.tmdb.org/t/p$url"
@@ -70,6 +63,16 @@ object ImageUrlResolver {
             if (tmdbFilePath.matches(url)) {
                 return "https://image.tmdb.org/t/p/w500$url"
             }
+        }
+
+        tmdbSizedInPath.find(url)?.groupValues?.getOrNull(1)?.let { sized ->
+            return "https://image.tmdb.org/t/p/$sized"
+        }
+        if (tmdbSizedBare.matches(url)) {
+            return "https://image.tmdb.org/t/p/$url"
+        }
+        if (tmdbBareFile.matches(url)) {
+            return "https://image.tmdb.org/t/p/w185/$url"
         }
 
         val base = host?.let { HostUtils.baseUrl(it) }.orEmpty()

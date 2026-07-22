@@ -198,7 +198,8 @@ class XtreamApi(
             VodMovie(
                 streamId = row.get("stream_id")?.asIntOrZero() ?: row.get("num")?.asIntOrZero() ?: 0,
                 name = row.get("name")?.asStringOrNull() ?: "",
-                icon = imageUrl(row, "stream_icon", "cover", "cover_big", "movie_image"),
+                icon = imageUrl(row, "stream_icon", "cover", "cover_big", "movie_image")
+                    .ifBlank { fallbackVodCover(profile, row.get("stream_id")?.asIntOrZero() ?: 0) },
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
                 extension = row.get("container_extension")?.asStringOrNull() ?: "mp4",
                 added = row.addedTimestamp(),
@@ -215,7 +216,13 @@ class XtreamApi(
             SeriesItem(
                 seriesId = row.get("series_id")?.asIntOrZero() ?: 0,
                 name = row.get("name")?.asStringOrNull() ?: "",
-                cover = imageUrl(row, "cover", "stream_icon", "cover_big"),
+                cover = imageUrl(row, "cover", "stream_icon", "cover_big")
+                    .ifBlank {
+                        fallbackVodCover(
+                            profile,
+                            row.get("series_id")?.asIntOrZero() ?: 0,
+                        )
+                    },
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
                 added = row.addedTimestamp(),
             )
@@ -762,6 +769,14 @@ class XtreamApi(
         if (streamId <= 0) return ""
         val base = panelHost(profile)
         return NetworkUrlResolver.resolveUrl("$base/images/$streamId.png")
+    }
+
+    private fun fallbackVodCover(profile: Profile, contentId: Int): String {
+        if (contentId <= 0) return ""
+        val base = panelHost(profile)
+        val jpg = NetworkUrlResolver.resolveUrl("$base/images/$contentId.jpg")
+        if (jpg.isNotBlank()) return jpg
+        return NetworkUrlResolver.resolveUrl("$base/images/$contentId.png")
     }
 
     private fun looksLikeStreamUrl(url: String): Boolean {

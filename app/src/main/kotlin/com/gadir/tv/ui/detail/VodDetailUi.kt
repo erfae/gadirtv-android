@@ -120,12 +120,18 @@ object VodDetailUi {
         RecyclerViewUtil.expandHorizontalList(listView)
     }
 
-    fun bindImages(posterView: ImageView, backdropView: ImageView, poster: String, backdrop: String) {
-        if (backdrop.isNotBlank()) {
-            ImageLoader.loadPoster(backdropView, backdrop)
+    fun bindImages(
+        posterView: ImageView,
+        backdropView: ImageView,
+        poster: String,
+        backdrop: String,
+        contentId: Int = 0,
+    ) {
+        if (backdrop.isNotBlank() || contentId > 0) {
+            ImageLoader.loadVodPoster(backdropView, backdrop, contentId)
         }
-        if (poster.isNotBlank()) {
-            ImageLoader.loadPoster(posterView, poster, 300, 450)
+        if (poster.isNotBlank() || contentId > 0) {
+            ImageLoader.loadVodPoster(posterView, poster, contentId, 300, 450)
         }
     }
 
