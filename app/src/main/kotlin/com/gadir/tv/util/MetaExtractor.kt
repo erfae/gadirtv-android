@@ -189,7 +189,7 @@ object MetaExtractor {
             ?: source.get("cast_images")
             ?: source.get("actors_images")
             ?: source.get("cast_pictures")
-            ?: source.get("images")
+            ?: source.get("stars_images")
             ?: return null
 
         val names = when {

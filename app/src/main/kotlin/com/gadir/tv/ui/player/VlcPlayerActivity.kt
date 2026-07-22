@@ -25,6 +25,7 @@ import com.gadir.tv.player.LiveChannelNavigator
 import com.gadir.tv.player.LiveStreamStallTracker
 import com.gadir.tv.player.LiveStreamUrls
 import com.gadir.tv.ui.BaseLocaleActivity
+import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.TimeFormat
 import com.gadir.tv.util.VolumeHelper
 import kotlinx.coroutines.Dispatchers
@@ -121,7 +122,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
         val settings = AppSettings(this)
         val bufferMs = settings.networkBufferMs.coerceIn(AppSettings.BUFFER_NORMAL_MS, AppSettings.BUFFER_STABLE_MS)
-        if (!initVlcPlayer(bufferMs, preferSoftware = false)) {
+        val preferSoftwareLiveTv = DeviceUi.isTvUi(this) && isLivePlayback
+        if (!initVlcPlayer(bufferMs, preferSoftware = preferSoftwareLiveTv)) {
             if (!fallbackToExoPlayer()) {
                 android.widget.Toast.makeText(this, R.string.series_playback_failed, android.widget.Toast.LENGTH_LONG).show()
                 finish()

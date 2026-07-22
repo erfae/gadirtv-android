@@ -83,6 +83,8 @@ object PlaybackLauncher {
     }
 
     private fun launchVlc(context: Context, request: PlaybackRequest) {
+        val disableExoFallback = DeviceUi.isTvUi(context) &&
+            request.kind == ResumeStore.KIND_LIVE
         context.startActivity(
             VlcPlayerActivity.intent(
                 context = context,
@@ -96,6 +98,7 @@ object PlaybackLauncher {
                 contentId = request.contentId,
                 imageUrl = request.imageUrl,
                 extension = request.extension,
+                disableExoFallback = disableExoFallback,
             ),
         )
     }
