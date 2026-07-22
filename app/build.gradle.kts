@@ -23,8 +23,8 @@ android {
         targetSdk = 33
         // Must exceed Flutter v2.5.8 (versionCode 84) so native can replace it.
         // TV release track (android-native). v1.45.4 detail metadata + live fullscreen.
-        versionCode = 306
-        versionName = "1.46.2"
+        versionCode = 307
+        versionName = "1.46.3"
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }

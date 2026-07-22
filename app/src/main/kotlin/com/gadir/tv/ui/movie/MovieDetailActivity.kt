@@ -294,11 +294,9 @@ class MovieDetailActivity : BaseLocaleActivity() {
         val title = findViewById<TextView>(R.id.movieTitle).text.toString()
         val cover = fallbackCover
         lifecycleScope.launch {
-            val resolved = withContext(Dispatchers.IO) {
-                VodPlaybackHelper.resolveMovie(
-                    api, profile, streamId, extension, directSource,
-                )
-            }
+            val resolved = VodPlaybackHelper.resolveMovie(
+                api, profile, streamId, extension, directSource,
+            )
             extension = resolved.extension
             MovieDetailCache.get(streamId)?.directSource?.let { directSource = it }
             val url = resolved.urls.firstOrNull().orEmpty()
@@ -310,6 +308,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
                 ).show()
                 return@launch
             }
+            VodPlaybackHelper.prefetchMeta(lifecycleScope, api, profile, streamId)
             ResumePlaybackHelper.play(
                 context = this@MovieDetailActivity,
                 resumeStore = resumeStore,

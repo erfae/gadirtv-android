@@ -3029,7 +3029,7 @@ class MainActivity : BaseLocaleActivity() {
         if (record != null) {
             val profile = PlaylistRepository.profile ?: return
             lifecycleScope.launch {
-                val resolved = withContext(Dispatchers.IO) {
+                val resolved = withContext(Dispatchers.Default) {
                     VodPlaybackHelper.resolveMovie(
                         api, profile, streamId, extension, directSource,
                     )
@@ -3039,6 +3039,7 @@ class MainActivity : BaseLocaleActivity() {
                     openMovieDetail(streamId, title, cover, extension)
                     return@launch
                 }
+                VodPlaybackHelper.prefetchMeta(lifecycleScope, api, profile, streamId)
                 ResumePlaybackHelper.play(
                     context = this@MainActivity,
                     resumeStore = resumeStore,
@@ -3174,7 +3175,7 @@ class MainActivity : BaseLocaleActivity() {
     ) {
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
-            val resolved = withContext(Dispatchers.IO) {
+            val resolved = withContext(Dispatchers.Default) {
                 VodPlaybackHelper.resolveMovie(
                     api, profile, streamId, extension, directSource,
                 )
@@ -3185,6 +3186,7 @@ class MainActivity : BaseLocaleActivity() {
                 openMovieDetail(streamId, title, imageUrl, resolved.extension)
                 return@launch
             }
+            VodPlaybackHelper.prefetchMeta(lifecycleScope, api, profile, streamId)
             ResumePlaybackHelper.play(
                 context = this@MainActivity,
                 resumeStore = resumeStore,
@@ -3253,12 +3255,16 @@ class MainActivity : BaseLocaleActivity() {
     ) {
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
-            val detail = try {
+            val cachedDetail = SeriesDetailCache.get(seriesId)
+            val detail = cachedDetail ?: try {
                 withContext(Dispatchers.IO) {
-                    withTimeout(18_000L) { api.seriesInfo(profile, seriesId) }
+                    withTimeout(8_000L) { api.seriesInfo(profile, seriesId) }
                 }
             } catch (_: Exception) {
                 null
+            }
+            if (detail != null && cachedDetail == null) {
+                SeriesDetailCache.put(seriesId, detail)
             }
             if (detail == null || detail.seasons.isEmpty()) {
                 Toast.makeText(
@@ -4886,16 +4892,14 @@ class MainActivity : BaseLocaleActivity() {
         val index = channels.indexOfFirst { it.streamId == channel.streamId }
         if (index < 0) return
         val neighbors = buildList {
-            channels.getOrNull(index - 1)?.let { add(it) }
             channels.getOrNull(index + 1)?.let { add(it) }
-            channels.getOrNull(index + 2)?.let { add(it) }
         }
         if (neighbors.isEmpty()) return
         lifecycleScope.launch(Dispatchers.IO) {
             neighbors.forEach { neighbor ->
                 if (EpgCache.get(neighbor.streamId)?.isNotEmpty() == true) return@forEach
                 runCatching {
-                    val epg = api.shortEpg(
+                    val epg = api.shortEpgFast(
                         profile,
                         streamId = neighbor.streamId,
                         epgChannelId = neighbor.epgChannelId,
@@ -4907,18 +4911,18 @@ class MainActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun prefetchEpgForChannels(channelBatch: List<LiveChannel>, limit: Int = 20) {
+    private fun prefetchEpgForChannels(channelBatch: List<LiveChannel>, limit: Int = 10) {
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
                 coroutineScope {
-                    val semaphore = Semaphore(4)
+                    val semaphore = Semaphore(2)
                     channelBatch.take(limit).map { channel ->
                         async {
                             semaphore.withPermit {
                                 if (EpgCache.get(channel.streamId)?.isNotEmpty() == true) return@withPermit
                                 runCatching {
-                                    val epg = api.shortEpg(
+                                    val epg = api.shortEpgFast(
                                         profile,
                                         streamId = channel.streamId,
                                         epgChannelId = channel.epgChannelId,
@@ -4945,7 +4949,7 @@ class MainActivity : BaseLocaleActivity() {
             val token = ++epgLoadToken
             lifecycleScope.launch {
                 val epg = withContext(Dispatchers.IO) {
-                    api.shortEpg(
+                    api.shortEpgFast(
                         profile,
                         streamId = streamId,
                         epgChannelId = channel.epgChannelId,

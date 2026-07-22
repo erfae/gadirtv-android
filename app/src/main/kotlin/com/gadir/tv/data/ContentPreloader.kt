@@ -286,7 +286,7 @@ object ContentPreloader {
                 semaphore.withPermit {
                     if (EpgCache.get(channel.streamId) != null) return@withPermit
                     val epg = runCatching {
-                        api.shortEpg(
+                        api.shortEpgFast(
                             profile,
                             streamId = channel.streamId,
                             epgChannelId = channel.epgChannelId,

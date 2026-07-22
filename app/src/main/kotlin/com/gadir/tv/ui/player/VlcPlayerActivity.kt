@@ -307,7 +307,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         loading.visibility = View.VISIBLE
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {
-                api.shortEpg(profile, streamId, epgChannelId = epgChannelId, limit = 10)
+                api.shortEpgFast(profile, streamId, epgChannelId = epgChannelId, limit = 10)
             }
             if (streamId != currentStreamId) return@launch
             loading.visibility = View.GONE
