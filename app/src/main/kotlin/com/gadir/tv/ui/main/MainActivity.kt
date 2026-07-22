@@ -5107,15 +5107,15 @@ class MainActivity : BaseLocaleActivity() {
             extension = channel.extension,
             alternateUrls = urls.drop(1),
         )
-        livePanel().post {
-            if (isDestroyed || currentTab != Tab.LIVE) return@post
+        livePanel().postDelayed({
+            if (isDestroyed || currentTab != Tab.LIVE) return@postDelayed
             try {
                 PlaybackLauncher.play(context = this, request = request)
             } catch (_: Exception) {
                 livePreviewPaused = false
                 Toast.makeText(this, R.string.connection_failed, Toast.LENGTH_SHORT).show()
             }
-        }
+        }, 300L)
     }
 
     private var fullscreenWaitToken = 0
