@@ -285,6 +285,52 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun usesExoPreview(): Boolean = previewUsesExo
 
+    private fun isLivePreviewContext(): Boolean =
+        !isDestroyed && currentTab == Tab.LIVE && liveTabReady
+
+    /** Stop preview and cancel in-flight work when leaving the Live tab. */
+    private fun leaveLiveTabSession() {
+        livePreviewResumeToken++
+        fullscreenWaitToken++
+        previewToken++
+        epgLoadToken++
+        pendingPreview?.let { previewHandler.removeCallbacks(it) }
+        pendingPreview = null
+        pendingEpg?.let { previewHandler.removeCallbacks(it) }
+        pendingEpg = null
+        pendingLiveCategoryPreview?.let { liveCategoryHandler.removeCallbacks(it) }
+        pendingLiveCategoryPreview = null
+        cancelPreviewTimeout()
+        disarmPreviewStallWatchdog()
+        teardownLivePreviewPlayback()
+        detachPreviewPlayersFromSurface()
+        if (liveTabReady) {
+            setPreviewVideoVisible(false)
+            hideMiniPreviewControls()
+        }
+        livePreviewPaused = true
+    }
+
+    private fun detachPreviewPlayersFromSurface() {
+        try {
+            miniExoPlayer?.stop()
+            miniExoView?.player = null
+        } catch (_: Throwable) {
+        }
+        try {
+            miniVlcPlayer?.stop()
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun attachPreviewPlayersToSurface() {
+        if (!isLivePreviewContext()) return
+        if (usesExoPreview()) {
+            val player = miniExoPlayer?.player ?: return
+            miniExoView?.player = player
+        }
+    }
+
     private fun livePanel(): View {
         ensureLiveTabReady()
         return inflateLivePanelIfNeeded()
@@ -1414,11 +1460,25 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun pauseLivePreviewPlayback() {
         if (!liveTabReady) return
+        previewToken++
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
+        cancelPreviewTimeout()
+        disarmPreviewStallWatchdog()
         teardownLivePreviewPlayback()
+        detachPreviewPlayersFromSurface()
         setPreviewVideoVisible(false)
         hideMiniPreviewControls()
+    }
+
+    /** @deprecated Use leaveLiveTabSession — kept for call-site clarity. */
+    private fun suspendLivePreview() {
+        if (currentTab == Tab.LIVE) {
+            leaveLiveTabSession()
+        } else {
+            detachPreviewPlayersFromSurface()
+            livePreviewPaused = true
+        }
     }
 
     private fun zapChannel(delta: Int, keepPreviewFocus: Boolean = false) {
@@ -2247,9 +2307,13 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun showTab(tab: Tab) {
+        val leavingLive = currentTab == Tab.LIVE && tab != Tab.LIVE
         val enteringFromOtherTab = currentTab != tab
         previousTab = currentTab
         currentTab = tab
+        if (leavingLive) {
+            leaveLiveTabSession()
+        }
         tabHome.isSelected = tab == Tab.HOME
         tabLive.isSelected = tab == Tab.LIVE
         tabMovies.isSelected = tab == Tab.MOVIES
@@ -2265,7 +2329,6 @@ class MainActivity : BaseLocaleActivity() {
                 panelHome.visibility = View.VISIBLE
                 panelLive?.visibility = View.GONE
                 panelCatalog.visibility = View.GONE
-                suspendLivePreview()
                 if (!homeLoaded) {
                     panelHome.post {
                         if (!isDestroyed && currentTab == Tab.HOME) {
@@ -2292,6 +2355,7 @@ class MainActivity : BaseLocaleActivity() {
                     if (currentTab != Tab.LIVE) return@post
                     if (DeviceUi.useDpadFocus(this)) {
                         ensurePreviewPlayer()
+                        attachPreviewPlayersToSurface()
                         warmupPreviewPlayer()
                         if (PlaylistRepository.bootstrapReady && liveBrowseLevel == TvBrowseNav.Level.TAB) {
                             enterLiveTabFromTabBar()
@@ -2300,6 +2364,7 @@ class MainActivity : BaseLocaleActivity() {
                         }
                     } else {
                         ensurePreviewPlayer()
+                        attachPreviewPlayersToSurface()
                         restoreLiveTabSession()
                     }
                 }
@@ -2309,7 +2374,6 @@ class MainActivity : BaseLocaleActivity() {
                 panelLive?.visibility = View.GONE
                 panelCatalog.visibility = View.VISIBLE
                 stopHeroRotation()
-                suspendLivePreview()
                 if (DeviceUi.useDpadFocus(this)) {
                     catalogBrowseLevel = TvBrowseNav.Level.TAB
                     panelCatalog.post { applyCatalogBrowseLevel(tab) }
@@ -4661,11 +4725,6 @@ class MainActivity : BaseLocaleActivity() {
         suspendLivePreview()
     }
 
-    /** Pausa el preview sin destruir libVLC/Exo (evita crash al volver en Android TV). */
-    private fun suspendLivePreview() {
-        pauseLivePreviewPlayback()
-    }
-
     private fun schedulePreview(channel: LiveChannel) {
         if (currentTab != Tab.LIVE) return
         if (liveBrowseLevel == TvBrowseNav.Level.TAB) return
@@ -5067,6 +5126,7 @@ class MainActivity : BaseLocaleActivity() {
         panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility == View.VISIBLE
 
     private fun setPreviewVideoVisible(visible: Boolean) {
+        if (!liveTabReady) return
         if (usesExoPreview()) {
             miniExoView?.alpha = if (visible) 1f else 0f
             miniVlcView?.alpha = 0f
@@ -5468,6 +5528,7 @@ class MainActivity : BaseLocaleActivity() {
                 if (isDestroyed || currentTab != Tab.LIVE || resumeToken != livePreviewResumeToken) return@postDelayed
                 livePreviewPaused = false
                 ensurePreviewPlayer()
+                attachPreviewPlayersToSurface()
                 if (DeviceUi.useDpadFocus(this)) {
                     currentPreviewChannel?.let { schedulePreview(it) }
                 } else {
@@ -5596,6 +5657,7 @@ class MainActivity : BaseLocaleActivity() {
             if (miniExoPlayer == null) {
                 createMiniExoPlayer()
             }
+            attachPreviewPlayersToSurface()
             return miniExoPlayer != null
         }
         if (miniVlcPlayer == null) {
@@ -5661,12 +5723,14 @@ class MainActivity : BaseLocaleActivity() {
             context = this,
             playerView = playerView,
             onError = {
+                if (!isLivePreviewContext()) return@LiveExoPreviewPlayer
                 setPreviewVideoVisible(false)
                 if (!tryNextPreviewUrl()) {
                     noSignal.visibility = View.VISIBLE
                 }
             },
             onPlaying = {
+                if (!isLivePreviewContext()) return@LiveExoPreviewPlayer
                 if (previewPlaybackToken != previewToken) return@LiveExoPreviewPlayer
                 cancelPreviewTimeout()
                 if (previewUrlIndex in previewUrls.indices) {
@@ -5693,12 +5757,14 @@ class MainActivity : BaseLocaleActivity() {
             networkBufferMs = appSettings.networkBufferMs.coerceIn(1_000, 1_800),
             previewMode = true,
             onError = {
+                if (!isLivePreviewContext()) return@LiveVlcPlayer
                 setPreviewVideoVisible(false)
                 if (!tryNextPreviewUrl()) {
                     noSignal.visibility = View.VISIBLE
                 }
             },
             onPlaying = {
+                if (!isLivePreviewContext()) return@LiveVlcPlayer
                 if (previewPlaybackToken != previewToken) return@LiveVlcPlayer
                 cancelPreviewTimeout()
                 if (previewUrlIndex in previewUrls.indices) {
