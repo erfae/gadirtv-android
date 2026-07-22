@@ -230,7 +230,7 @@ class XtreamApi(
     }
 
     fun seriesInfo(profile: Profile, seriesId: Int): SeriesDetail? {
-        val host = HostUtils.baseUrl(profile.host)
+        val host = HostUtils.baseUrl(com.gadir.tv.net.PanelHttp.migrateProfileHost(profile.host))
         val query = buildString {
             append("username=").append(encode(profile.username))
             append("&password=").append(encode(profile.password))
@@ -265,7 +265,7 @@ class XtreamApi(
                 name = name,
                 cover = imageUrl(info, "cover", "cover_big", "stream_icon", "movie_image"),
                 backdrop = imageUrl(info, "backdrop_path", "cover_big", "cover", "stream_icon"),
-                plot = MetaExtractor.plotFrom(info),
+                plot = MetaExtractor.plotFrom(info, root),
                 genre = info?.get("genre")?.asStringOrNull() ?: "",
                 releaseDate = info?.get("releaseDate")?.asStringOrNull() ?: "",
                 rating = info?.get("rating_5based")?.asStringOrNull()
@@ -347,7 +347,7 @@ class XtreamApi(
     }
 
     fun vodInfo(profile: Profile, vodId: Int): VodInfo? {
-        val host = HostUtils.baseUrl(profile.host)
+        val host = HostUtils.baseUrl(com.gadir.tv.net.PanelHttp.migrateProfileHost(profile.host))
         val query = buildString {
             append("username=").append(encode(profile.username))
             append("&password=").append(encode(profile.password))
@@ -364,7 +364,7 @@ class XtreamApi(
                 ?: ""
             VodInfo(
                 name = name,
-                plot = MetaExtractor.plotFrom(info, movieData),
+                plot = MetaExtractor.plotFrom(info, movieData, root),
                 cover = imageUrl(info, "movie_image", "cover", "cover_big")
                     .ifBlank { imageUrl(movieData, "stream_icon", "cover", "movie_image") },
                 backdrop = imageUrl(info, "backdrop_path", "cover_big", "movie_image", "cover")
@@ -655,18 +655,25 @@ class XtreamApi(
         for (ua in agents) {
             val get = NativeHttpClient.detailRequest(resolvedUrl, ua, "GET")
             val body = get.body.trim()
-            if (get.status == 200 && body.isNotBlank() && body != "[]" && !body.contains("\"info\":[]")) {
+            if (get.status == 200 && body.isNotBlank() && body != "[]" && isUsableDetailBody(body)) {
                 return body
             }
             if (get.status == 512 || get.status == 403 || get.status == 405 || body.isBlank()) {
                 val post = NativeHttpClient.detailRequest(resolvedUrl, ua, "POST")
                 val postBody = post.body.trim()
-                if (post.status == 200 && postBody.isNotBlank() && postBody != "[]" && !postBody.contains("\"info\":[]")) {
+                if (post.status == 200 && postBody.isNotBlank() && postBody != "[]" && isUsableDetailBody(postBody)) {
                     return postBody
                 }
             }
         }
         return null
+    }
+
+    private fun isUsableDetailBody(body: String): Boolean {
+        if (!body.contains("\"info\":[]")) return true
+        return body.contains("\"movie_data\"") &&
+            !body.contains("\"movie_data\":[]") &&
+            !body.contains("\"movie_data\":null")
     }
 
     private fun fetchList(
