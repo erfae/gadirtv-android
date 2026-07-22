@@ -95,16 +95,37 @@ object ImageLoader {
     }
 
     fun vodPosterCandidates(primary: String, contentId: Int): List<String> {
+        val trimmed = primary.trim()
         return buildList {
-            val resolved = ImageUrlResolver.resolve(primary)
-            if (resolved.isNotBlank()) add(resolved)
+            if (trimmed.isNotBlank()) {
+                ImageUrlResolver.resolve(trimmed).takeIf { it.isNotBlank() }?.let { add(it) }
+                if (trimmed.startsWith("http", ignoreCase = true) && trimmed !in this) add(trimmed)
+                CastImageResolver.resolve(trimmed).takeIf { it.isNotBlank() && it !in this }?.let { add(it) }
+            }
             if (contentId <= 0) return@buildList
             val profile = PlaylistRepository.profile ?: return@buildList
             val base = HostUtils.baseUrl(
                 PanelHttp.migrateProfileHost(profile.host),
             ).trimEnd('/')
-            add(NetworkUrlResolver.resolveUrl("$base/images/$contentId.jpg"))
-            add(NetworkUrlResolver.resolveUrl("$base/images/$contentId.png"))
+            listOf(
+                "$base/images/$contentId.jpg",
+                "$base/images/$contentId.png",
+                "$base/images/$contentId.webp",
+                "$base/$contentId.jpg",
+                "$base/images/movie/$contentId.jpg",
+                "$base/images/series/$contentId.jpg",
+                "$base/images/vod/$contentId.jpg",
+                "$base/streaming/movies/$contentId.jpg",
+                "$base/streaming/series/$contentId.jpg",
+                "$base/movie/$contentId.jpg",
+                "$base/series/$contentId.jpg",
+            ).forEach { path ->
+                NetworkUrlResolver.resolveUrl(path).takeIf { it.isNotBlank() && it !in this }?.let { add(it) }
+            }
+            ImageUrlResolver.resolve("/images/$contentId.jpg").takeIf { it.isNotBlank() && it !in this }?.let { add(it) }
+            ImageUrlResolver.resolve("/images/$contentId.png").takeIf { it.isNotBlank() && it !in this }?.let { add(it) }
+            ImageUrlResolver.resolve("/images/movie/$contentId.jpg").takeIf { it.isNotBlank() && it !in this }?.let { add(it) }
+            ImageUrlResolver.resolve("/images/series/$contentId.jpg").takeIf { it.isNotBlank() && it !in this }?.let { add(it) }
         }.distinct().filter { it.isNotBlank() }
     }
 
@@ -268,12 +289,8 @@ object ImageLoader {
         val trimmed = url.trim()
         if (!trimmed.startsWith("http", ignoreCase = true)) return trimmed
 
-        val panelUrl = isPanelMediaUrl(trimmed)
-        val resolved = if (panelUrl) {
-            NetworkUrlResolver.resolve(trimmed)
-        } else {
-            NetworkUrlResolver.Resolved(trimmed)
-        }
+        val resolved = NetworkUrlResolver.resolve(trimmed)
+        val panelUrl = isPanelMediaUrl(trimmed) || resolved.hostHeader != null
         val headers = LazyHeaders.Builder()
             .addHeader("User-Agent", PlaylistRepository.userAgent)
             .addHeader("Accept", "image/*,*/*")

@@ -4816,8 +4816,9 @@ class MainActivity : BaseLocaleActivity() {
                 exoLiveProgressKey(player.currentPosition, player.bufferedPosition),
             )
         } else {
-            val time = miniVlcPlayer?.playbackTimeMs() ?: return
-            if (time >= 0L) previewStallTracker.noteProgress(time)
+            if (miniVlcPlayer?.isPlaying() == true) {
+                previewStallTracker.ping()
+            }
         }
     }
 
