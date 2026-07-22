@@ -166,40 +166,24 @@ class MovieDetailActivity : BaseLocaleActivity() {
     private fun loadMovieDetail() {
         val profile = PlaylistRepository.profile ?: return
         val token = ++loadToken
-        loadingView.visibility = View.GONE
+        val hasCached = PlotCache.get("movie", streamId) != null
+        loadingView.visibility = if (hasCached) View.GONE else View.VISIBLE
         btnMoviePlay.visibility = View.VISIBLE
 
         lifecycleScope.launch {
             val info = runCatching {
                 withContext(Dispatchers.IO) {
-                    api.vodInfo(profile, streamId, quick = true)
+                    api.vodInfo(profile, streamId)
                 }
             }.getOrNull()
             if (token != loadToken) return@launch
-            if (info != null) {
-                bindDetail(info)
+            loadingView.visibility = View.GONE
+            if (info == null) {
+                resolvePlotLoadingState(failed = PlotCache.get("movie", streamId) == null)
+                btnMoviePlay.requestFocus()
                 return@launch
             }
-            resolvePlotLoadingState(failed = PlotCache.get("movie", streamId) == null)
-            btnMoviePlay.requestFocus()
-            retryMovieDetailFull(token)
-        }
-    }
-
-    private fun retryMovieDetailFull(token: Int) {
-        val profile = PlaylistRepository.profile ?: return
-        lifecycleScope.launch {
-            val info = runCatching {
-                withContext(Dispatchers.IO) {
-                    api.vodInfo(profile, streamId, quick = false)
-                }
-            }.getOrNull()
-            if (token != loadToken) return@launch
-            if (info != null) {
-                bindDetail(info)
-            } else {
-                resolvePlotLoadingState(failed = true)
-            }
+            bindDetail(info)
         }
     }
 

@@ -50,11 +50,15 @@ object NativeHttpClient {
     }
 
     /** Single-target detail fetch with a short deadline (does not block UI for minutes). */
-    fun quickRequest(url: String, userAgent: String, method: String = "GET"): HttpResult {
+    fun detailRequest(url: String, userAgent: String, method: String = "GET"): HttpResult {
         val target = PanelHttp.buildTargets(url).firstOrNull()
             ?: return HttpResult(0, "", method.uppercase(), "Sin destino")
         return requestOkHttp(target, userAgent, method, PanelHttp.detailOkHttpClient)
     }
+
+    @Deprecated("Use detailRequest", ReplaceWith("detailRequest(url, userAgent, method)"))
+    fun quickRequest(url: String, userAgent: String, method: String = "GET"): HttpResult =
+        detailRequest(url, userAgent, method)
 
     private fun requestOkHttp(
         target: PanelHttp.RequestTarget,
