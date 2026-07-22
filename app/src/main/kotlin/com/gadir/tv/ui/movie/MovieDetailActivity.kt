@@ -23,12 +23,12 @@ import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.ui.detail.DetailTvNav
 import com.gadir.tv.ui.detail.VodDetailUi
 import com.gadir.tv.util.TrailerLauncher
-import com.gadir.tv.util.TvFocusHelper
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.gadir.tv.util.TvFocusHelper
 
 class MovieDetailActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
@@ -292,29 +292,47 @@ class MovieDetailActivity : BaseLocaleActivity() {
         val profile = PlaylistRepository.profile ?: return
         val title = findViewById<TextView>(R.id.movieTitle).text.toString()
         val cover = fallbackCover
-        val urls = VodStreamUrls.movieCandidates(api, profile, streamId, extension, directSource)
-        val url = urls.firstOrNull().orEmpty()
-        if (url.isBlank()) {
-            android.widget.Toast.makeText(
-                this,
-                R.string.series_playback_failed,
-                android.widget.Toast.LENGTH_SHORT,
-            ).show()
-            return
+        lifecycleScope.launch {
+            var ext = extension.ifBlank { "mp4" }
+            var direct = directSource
+            MovieDetailCache.get(streamId)?.let { cached ->
+                ext = cached.extension.ifBlank { ext }
+                direct = cached.directSource.ifBlank { direct }
+            }
+            if (direct.isBlank()) {
+                val info = withContext(Dispatchers.IO) { api.vodInfo(profile, streamId) }
+                info?.let { cached ->
+                    MovieDetailCache.put(streamId, cached)
+                    ext = cached.extension.ifBlank { ext }
+                    direct = cached.directSource
+                    extension = ext
+                    directSource = direct
+                }
+            }
+            val urls = VodStreamUrls.movieCandidates(api, profile, streamId, ext, direct)
+            val url = urls.firstOrNull().orEmpty()
+            if (url.isBlank()) {
+                android.widget.Toast.makeText(
+                    this@MovieDetailActivity,
+                    R.string.series_playback_failed,
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+                return@launch
+            }
+            ResumePlaybackHelper.play(
+                context = this@MovieDetailActivity,
+                resumeStore = resumeStore,
+                request = PlaybackRequest(
+                    title = title,
+                    url = url,
+                    kind = ResumeStore.KIND_MOVIE,
+                    contentId = streamId.toString(),
+                    imageUrl = cover,
+                    extension = ext,
+                    alternateUrls = urls.drop(1),
+                ),
+            )
         }
-        ResumePlaybackHelper.play(
-            context = this,
-            resumeStore = resumeStore,
-            request = PlaybackRequest(
-                title = title,
-                url = url,
-                kind = ResumeStore.KIND_MOVIE,
-                contentId = streamId.toString(),
-                imageUrl = cover,
-                extension = extension,
-                alternateUrls = urls.drop(1),
-            ),
-        )
     }
 
     companion object {

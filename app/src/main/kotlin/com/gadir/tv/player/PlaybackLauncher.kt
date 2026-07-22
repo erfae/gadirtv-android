@@ -37,8 +37,8 @@ object PlaybackLauncher {
 
     private fun launchDefault(context: Context, request: PlaybackRequest) {
         when {
-            // TV: siempre VLC (live y VOD) para evitar conflicto Exo preview + fullscreen.
-            DeviceUi.isTvUi(context) -> launchVlc(context, request)
+            request.kind == ResumeStore.KIND_LIVE && DeviceUi.isTvUi(context) ->
+                launchVlc(context, request)
             else -> launchExo(context, request)
         }
     }
