@@ -136,7 +136,7 @@ object ImageLoader {
 
     fun loadCastAvatar(target: ImageView, rawUrl: String, sizePx: Int = 144) {
         if (!canLoadInto(target)) return
-        val candidates = castAvatarCandidates(rawUrl)
+        val candidates = CastImageResolver.candidates(rawUrl)
         if (candidates.isEmpty()) {
             target.setImageResource(R.drawable.ic_user)
             return
@@ -156,35 +156,6 @@ object ImageLoader {
             errorDrawable = R.drawable.ic_user,
             sizePx = size,
         )
-    }
-
-    private fun castAvatarCandidates(rawUrl: String): List<String> {
-        val trimmed = rawUrl.trim()
-        if (trimmed.isEmpty()) return emptyList()
-        return buildList {
-            ImageUrlResolver.resolve(trimmed).takeIf { it.isNotBlank() }?.let { add(it) }
-            if (trimmed.startsWith("http", ignoreCase = true)) return@buildList
-            val path = trimmed.removePrefix("/")
-            if (path.startsWith("t/p/", ignoreCase = true)) {
-                add("https://image.tmdb.org/$path")
-            }
-            if (path.matches(Regex("^w\\d+/.+", RegexOption.IGNORE_CASE))) {
-                add("https://image.tmdb.org/t/p/$path")
-            }
-            if (path.contains('.')) {
-                add("https://image.tmdb.org/t/p/w185/$path")
-                add("https://image.tmdb.org/t/p/w342/$path")
-                PlaylistRepository.profile?.host?.let { host ->
-                    val base = HostUtils.baseUrl(PanelHttp.migrateProfileHost(host)).trimEnd('/')
-                    add(NetworkUrlResolver.resolveUrl("$base/$path"))
-                    add(NetworkUrlResolver.resolveUrl("$base/images/$path"))
-                    add(NetworkUrlResolver.resolveUrl("$base/images/cast/$path"))
-                    add(NetworkUrlResolver.resolveUrl("$base/cast/$path"))
-                    add(NetworkUrlResolver.resolveUrl("$base/actor/$path"))
-                }
-            }
-            ImageUrlResolver.resolve("/$path").takeIf { it.isNotBlank() && it !in this }?.let { add(it) }
-        }.distinct().filter { it.isNotBlank() }
     }
 
     private val heroBackdropOptions = RequestOptions()

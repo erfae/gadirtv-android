@@ -93,10 +93,10 @@ object VodDetailUi {
         onCastMoveDown: (() -> Unit)? = null,
     ) {
         val members = when {
-            castMembers.any { it.name.isNotBlank() && it.imageUrl.isNotBlank() } ->
-                castMembers.filter { it.name.isNotBlank() && it.imageUrl.isNotBlank() }
             castMembers.any { it.name.isNotBlank() } ->
-                castMembers.filter { it.name.isNotBlank() }
+                castMembers
+                    .filter { it.name.isNotBlank() }
+                    .sortedByDescending { it.imageUrl.isNotBlank() }
             fallbackCast.isNotBlank() ->
                 fallbackCast.split(",")
                     .map { it.trim() }
