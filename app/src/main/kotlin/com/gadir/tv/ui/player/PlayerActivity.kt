@@ -415,6 +415,7 @@ class PlayerActivity : BaseLocaleActivity() {
 
     private fun seekBy(deltaMs: Long) {
         val exo = player ?: return
+        val wasPlaying = exo.isPlaying
         val duration = exo.duration
         val target = if (duration > 0L) {
             (exo.currentPosition + deltaMs).coerceIn(0L, duration)
@@ -422,6 +423,13 @@ class PlayerActivity : BaseLocaleActivity() {
             (exo.currentPosition + deltaMs).coerceAtLeast(0L)
         }
         exo.seekTo(target)
+        if (wasPlaying) {
+            exo.play()
+        } else {
+            exo.playWhenReady = true
+            exo.play()
+            exo.pause()
+        }
         updateVodProgress()
     }
 

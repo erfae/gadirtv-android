@@ -32,6 +32,7 @@ import com.gadir.tv.data.ContentPreloader
 import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.LiveChannelStore
 import com.gadir.tv.data.PlotCache
+import com.gadir.tv.data.MovieDetailCache
 import com.gadir.tv.data.SeriesDetailCache
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ParentalControlStore
@@ -99,8 +100,10 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_LIMIT_TV = 8
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
-        private const val CHANNEL_PREVIEW_DELAY_MS = 60L
+        private const val CHANNEL_PREVIEW_DELAY_MS = 0L
         private const val PREVIEW_TIMEOUT_MS = 4_500L
+        private const val PREVIEW_RETRY_DELAY_MS = 700L
+        private const val PREVIEW_SURFACE_MAX_ATTEMPTS = 10
         private const val CATALOG_PREFETCH_DELAY_MS = 400L
         private const val EPG_FOCUS_DELAY_MS = 120L
     }
@@ -2021,6 +2024,7 @@ class MainActivity : BaseLocaleActivity() {
                     when (activeTab) {
                         Tab.MOVIES -> {
                             val info = api.vodInfo(profile, item.id) ?: return@withContext
+                            MovieDetailCache.put(item.id, info)
                             val backdrop = info.backdrop.ifBlank { info.cover }
                             PlotCache.put(
                                 kind,
@@ -2269,6 +2273,7 @@ class MainActivity : BaseLocaleActivity() {
                     if (currentTab != Tab.LIVE) return@post
                     if (DeviceUi.useDpadFocus(this)) {
                         ensurePreviewPlayer()
+                        warmupPreviewPlayer()
                         if (PlaylistRepository.bootstrapReady && liveBrowseLevel == TvBrowseNav.Level.TAB) {
                             enterLiveTabFromTabBar()
                         } else {
@@ -3037,6 +3042,7 @@ class MainActivity : BaseLocaleActivity() {
         extension: String = "mp4",
         added: Long = 0L,
     ) {
+        prefetchMovieDetail(streamId, title, cover)
         startActivity(
             MovieDetailActivity.intent(
                 context = this,
@@ -3047,6 +3053,29 @@ class MainActivity : BaseLocaleActivity() {
                 added = added,
             ),
         )
+    }
+
+    private fun prefetchMovieDetail(streamId: Int, title: String, cover: String) {
+        if (MovieDetailCache.get(streamId) != null) return
+        val profile = PlaylistRepository.profile ?: return
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                api.vodInfo(profile, streamId)?.let { info ->
+                    MovieDetailCache.put(streamId, info)
+                    PlotCache.put(
+                        "movie",
+                        streamId,
+                        PlotCache.Entry(
+                            plot = info.plot,
+                            backdrop = info.backdrop.ifBlank { info.cover },
+                            poster = info.cover.ifBlank { cover },
+                            title = info.name.ifBlank { title },
+                        ),
+                    )
+                }
+            } catch (_: Exception) {
+            }
+        }
     }
 
     private fun openSeriesDetail(
@@ -4683,10 +4712,21 @@ class MainActivity : BaseLocaleActivity() {
             if (token != previewToken || previewIsSettled()) return@Runnable
             if (!tryNextPreviewUrl(token)) {
                 showNoSignal()
+                schedulePreviewRetry(token)
             }
         }
         previewTimeoutRunnable = task
         previewHandler.postDelayed(task, PREVIEW_TIMEOUT_MS)
+    }
+
+    private fun schedulePreviewRetry(token: Int) {
+        if (token != previewToken) return
+        previewHandler.postDelayed({
+            if (token != previewToken || previewIsSettled() || livePreviewPaused) return@postDelayed
+            val channel = currentPreviewChannel ?: return@postDelayed
+            previewUrlIndex = 0
+            previewChannel(channel, token)
+        }, PREVIEW_RETRY_DELAY_MS)
     }
 
     private fun cancelPreviewTimeout() {
@@ -5324,6 +5364,7 @@ class MainActivity : BaseLocaleActivity() {
         }
         miniExoView?.alpha = 0f
         miniVlcView?.alpha = 0f
+        warmupPreviewPlayer()
     }
 
     /** NetTV-style: crea VLC al enlazar el panel (evita race con surface no medido). */
@@ -5372,16 +5413,33 @@ class MainActivity : BaseLocaleActivity() {
             block()
             return
         }
-        if (surface.width > 0 && surface.height > 0 && surface.isAttachedToWindow) {
-            block()
-            return
-        }
-        surface.post {
-            if (surface.width > 0 && surface.height > 0) {
+        var attempts = 0
+        fun tryRun() {
+            if (surface.width > 0 && surface.height > 0 && surface.isAttachedToWindow) {
                 block()
-            } else {
-                surface.post(block)
+                return
             }
+            attempts += 1
+            if (attempts >= PREVIEW_SURFACE_MAX_ATTEMPTS) {
+                block()
+                return
+            }
+            surface.post { tryRun() }
+        }
+        if (surface.isAttachedToWindow) {
+            tryRun()
+        } else {
+            surface.post { tryRun() }
+        }
+    }
+
+    private fun warmupPreviewPlayer() {
+        if (currentTab != Tab.LIVE) return
+        livePanel().post {
+            if (currentTab != Tab.LIVE) return@post
+            ensurePreviewPlayer()
+            val surface = if (usesExoPreview()) miniExoView else miniVlcView
+            surface?.requestLayout()
         }
     }
 

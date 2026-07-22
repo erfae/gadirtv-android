@@ -35,7 +35,8 @@ class CastMemberAdapter(
             holder.avatar.visibility = View.VISIBLE
             ImageLoader.loadCastAvatar(holder.avatar, item.imageUrl, avatarSize)
         } else {
-            holder.avatar.visibility = View.GONE
+            holder.avatar.visibility = View.VISIBLE
+            holder.avatar.setImageResource(R.drawable.ic_user)
         }
 
         val list = holder.itemView.parent as? RecyclerView

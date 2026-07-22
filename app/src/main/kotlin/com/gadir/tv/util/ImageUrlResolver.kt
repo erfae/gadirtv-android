@@ -24,6 +24,11 @@ object ImageUrlResolver {
         "/movie/", "/series/", "/static/", "/media/",
     )
 
+    private val tmdbSizedInPath = Regex(
+        "(?:^|/)(w\\d+/[\\w.-]+\\.(?:jpg|jpeg|png|webp))$",
+        RegexOption.IGNORE_CASE,
+    )
+
     fun resolve(raw: String?, host: String? = PlaylistRepository.profile?.host): String {
         var url = raw?.trim().orEmpty()
         if (url.isEmpty()) return ""
@@ -38,6 +43,13 @@ object ImageUrlResolver {
 
         if (url.startsWith("http://") || url.startsWith("https://")) {
             return url
+        }
+
+        if (url.startsWith("/t/p/")) {
+            return "https://image.tmdb.org$url"
+        }
+        tmdbSizedInPath.find(url)?.groupValues?.getOrNull(1)?.let { sized ->
+            return "https://image.tmdb.org/t/p/$sized"
         }
 
         if (tmdbSizedBare.matches(url)) {

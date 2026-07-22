@@ -301,13 +301,21 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
     private fun seekBy(deltaMs: Long) {
         val player = mediaPlayer ?: return
+        val wasPlaying = player.isPlaying
         val duration = currentVodDuration()
         val target = if (duration > 0L) {
             (player.time + deltaMs).coerceIn(0L, duration)
         } else {
             (player.time + deltaMs).coerceAtLeast(0L)
         }
+        if (wasPlaying) player.pause()
         player.time = target
+        if (wasPlaying) {
+            player.play()
+        } else {
+            player.play()
+            player.pause()
+        }
         updateVodProgress()
         showControls()
     }
