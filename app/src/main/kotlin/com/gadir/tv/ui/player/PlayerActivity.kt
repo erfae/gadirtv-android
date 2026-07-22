@@ -145,6 +145,7 @@ class PlayerActivity : BaseLocaleActivity() {
 
         findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).apply {
             useController = false
+            setKeepContentOnPlayerReset(true)
             setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_NEVER)
             setOnClickListener {
                 if (!isLive) showVodControls()
@@ -423,13 +424,7 @@ class PlayerActivity : BaseLocaleActivity() {
             (exo.currentPosition + deltaMs).coerceAtLeast(0L)
         }
         exo.seekTo(target)
-        if (wasPlaying) {
-            exo.play()
-        } else {
-            exo.playWhenReady = true
-            exo.play()
-            exo.pause()
-        }
+        exo.playWhenReady = wasPlaying
         updateVodProgress()
     }
 

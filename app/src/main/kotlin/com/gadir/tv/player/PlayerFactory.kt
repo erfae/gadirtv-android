@@ -68,13 +68,13 @@ object PlayerFactory {
     }
 
     fun create(context: Context): ExoPlayer {
-        val bufferMs = AppSettings(context).networkBufferMs
+        val bufferMs = AppSettings(context).networkBufferMs.coerceIn(1_500, 5_000)
         return build(
             context = context,
-            minBuffer = bufferMs * 40,
-            maxBuffer = bufferMs * 100,
-            playbackBuffer = bufferMs * 2,
-            rebuffer = bufferMs * 4,
+            minBuffer = (bufferMs * 8).coerceIn(15_000, 60_000),
+            maxBuffer = (bufferMs * 20).coerceIn(45_000, 120_000),
+            playbackBuffer = bufferMs.coerceIn(2_000, 4_000),
+            rebuffer = (bufferMs * 3).coerceIn(5_000, 15_000),
             audioAttributes = vodAudioAttributes(),
             handleAudioFocus = true,
             extensionRendererMode = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER,
@@ -113,14 +113,9 @@ object PlayerFactory {
             .apply { volume = 1f }
     }
 
-    fun createForLive(context: Context): ExoPlayer =
-        if (com.gadir.tv.util.DeviceUi.isTvUi(context)) {
-            createForLivePreview(context)
-        } else {
-            createForLiveFullscreen(context)
-        }
+    fun createForLive(context: Context): ExoPlayer = createForLiveFullscreen(context)
 
-    /** Fullscreen live (phone/tablet): buffers equilibrados. */
+    /** Fullscreen live: balanced buffers (preview settings caused stutter on TV). */
     fun createForLiveFullscreen(context: Context): ExoPlayer {
         val bufferMs = AppSettings(context).networkBufferMs.coerceIn(1_500, 5_000)
         val renderersFactory = renderersFactory(
@@ -137,10 +132,10 @@ object PlayerFactory {
         }
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                (bufferMs * 2).coerceIn(4_000, 8_000),
-                (bufferMs * 6).coerceIn(15_000, 30_000),
-                bufferMs.coerceIn(1_000, 2_500),
-                (bufferMs * 2).coerceIn(3_000, 6_000),
+                (bufferMs * 2).coerceIn(3_000, 10_000),
+                (bufferMs * 8).coerceIn(20_000, 60_000),
+                bufferMs.coerceIn(1_500, 3_500),
+                (bufferMs * 3).coerceIn(4_000, 12_000),
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()

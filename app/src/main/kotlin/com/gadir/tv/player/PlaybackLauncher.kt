@@ -29,7 +29,7 @@ object PlaybackLauncher {
                 request.kind == ResumeStore.KIND_LIVE && DeviceUi.isTvUi(context) ->
                     launchExo(context, request)
                 DeviceUi.isTvUi(context) ->
-                    launchVlc(context, request)
+                    launchExo(context, request)
                 else -> launchExo(context, request)
             }
         } catch (_: Throwable) {
@@ -42,7 +42,7 @@ object PlaybackLauncher {
     }
 
     private fun vodFallback(context: Context, request: PlaybackRequest) {
-        if (DeviceUi.isTvUi(context)) launchVlc(context, request) else launchExo(context, request)
+        launchExo(context, request)
     }
 
     private fun launchExternal(context: Context, request: PlaybackRequest, settings: AppSettings) {

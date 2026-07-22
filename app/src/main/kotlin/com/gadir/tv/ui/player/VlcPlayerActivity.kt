@@ -107,11 +107,15 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         }
 
         val settings = AppSettings(this)
-        val bufferMs = settings.networkBufferMs.coerceAtLeast(AppSettings.BUFFER_FAST_MS)
-        val options = com.gadir.tv.player.VlcAudioOptions.baseOptions(bufferMs)
+        val bufferMs = settings.networkBufferMs.coerceIn(AppSettings.BUFFER_NORMAL_MS, AppSettings.BUFFER_STABLE_MS)
+        val options = if (isLivePlayback) {
+            com.gadir.tv.player.VlcAudioOptions.liveFullscreenOptions(bufferMs)
+        } else {
+            com.gadir.tv.player.VlcAudioOptions.vodOptions(bufferMs)
+        }
         libVlc = LibVLC(this, options)
         mediaPlayer = MediaPlayer(libVlc).apply {
-            attachViews(findViewById(R.id.vlcVideo), null, false, false)
+            attachViews(findViewById(R.id.vlcVideo), null, false, !isLivePlayback)
             volume = VLC_VOLUME
             setEventListener { event ->
                 when (event.type) {
@@ -206,7 +210,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                 val duration = currentVodDuration()
                 if (duration > 0L && seekBar != null) {
                     val position = (duration * seekBar.progress) / seekBar.max
-                    mediaPlayer?.time = position
+                    mediaPlayer?.setTime(position, true)
                 }
                 scheduleHideControls()
             }
@@ -254,6 +258,12 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             media.addOption(":http-referrer=${com.gadir.tv.util.HostUtils.baseUrl(host)}/")
         }
         media.addOption(":http-user-agent=${PlaylistRepository.userAgent}")
+        if (!isLivePlayback) {
+            val cache = AppSettings(this).networkBufferMs.coerceIn(2_000, 8_000)
+            media.addOption(":network-caching=$cache")
+            media.addOption(":file-caching=${(cache * 3).coerceIn(8_000, 24_000)}")
+            media.addOption(":clock-jitter=0")
+        }
         player.media = media
         media.release()
         player.volume = VLC_VOLUME
@@ -308,13 +318,9 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         } else {
             (player.time + deltaMs).coerceAtLeast(0L)
         }
-        if (wasPlaying) player.pause()
-        player.time = target
-        if (wasPlaying) {
+        player.setTime(target, true)
+        if (wasPlaying && !player.isPlaying) {
             player.play()
-        } else {
-            player.play()
-            player.pause()
         }
         updateVodProgress()
         showControls()
