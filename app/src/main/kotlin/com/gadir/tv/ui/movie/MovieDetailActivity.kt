@@ -27,7 +27,6 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 
 class MovieDetailActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
@@ -167,28 +166,49 @@ class MovieDetailActivity : BaseLocaleActivity() {
     private fun loadMovieDetail() {
         val profile = PlaylistRepository.profile ?: return
         val token = ++loadToken
-        val hasCached = PlotCache.get("movie", streamId) != null
         loadingView.visibility = View.GONE
         btnMoviePlay.visibility = View.VISIBLE
 
         lifecycleScope.launch {
-            val info = try {
+            val info = runCatching {
                 withContext(Dispatchers.IO) {
-                    withTimeout(4_000L) { api.vodInfo(profile, streamId) }
+                    api.vodInfo(profile, streamId, quick = true)
                 }
-            } catch (_: Exception) {
-                null
-            }
+            }.getOrNull()
             if (token != loadToken) return@launch
-            loadingView.visibility = View.GONE
-            if (info == null) {
-                if (PlotCache.get("movie", streamId) == null) {
-                    moviePlot.text = getString(R.string.movie_load_failed)
-                }
-                btnMoviePlay.requestFocus()
+            if (info != null) {
+                bindDetail(info)
                 return@launch
             }
-            bindDetail(info)
+            resolvePlotLoadingState(failed = PlotCache.get("movie", streamId) == null)
+            btnMoviePlay.requestFocus()
+            retryMovieDetailFull(token)
+        }
+    }
+
+    private fun retryMovieDetailFull(token: Int) {
+        val profile = PlaylistRepository.profile ?: return
+        lifecycleScope.launch {
+            val info = runCatching {
+                withContext(Dispatchers.IO) {
+                    api.vodInfo(profile, streamId, quick = false)
+                }
+            }.getOrNull()
+            if (token != loadToken) return@launch
+            if (info != null) {
+                bindDetail(info)
+            } else {
+                resolvePlotLoadingState(failed = true)
+            }
+        }
+    }
+
+    private fun resolvePlotLoadingState(failed: Boolean) {
+        if (moviePlot.text?.toString() != getString(R.string.hero_plot_loading)) return
+        moviePlot.text = if (failed) {
+            getString(R.string.movie_load_failed)
+        } else {
+            getString(R.string.hero_plot_empty)
         }
     }
 
