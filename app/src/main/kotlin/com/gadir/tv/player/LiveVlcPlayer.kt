@@ -23,23 +23,31 @@ class LiveVlcPlayer(
     val mediaPlayer: MediaPlayer
 
     init {
-        val options = if (previewMode) {
-            VlcAudioOptions.previewOptions(networkBufferMs)
-        } else {
-            VlcAudioOptions.baseOptions(networkBufferMs)
+        if (!VlcInstanceGuard.acquire()) {
+            throw IllegalStateException("libVLC busy")
         }
-        libVlc = LibVLC(context.applicationContext, options)
-        mediaPlayer = MediaPlayer(libVlc).apply {
-            attachViews(videoLayout, null, false, false)
-            setEventListener { event ->
-                when (event.type) {
-                    MediaPlayer.Event.Playing -> onPlaying()
-                    MediaPlayer.Event.Vout -> {
-                        if (event.voutCount > 0) onPlaying()
+        try {
+            val options = if (previewMode) {
+                VlcAudioOptions.previewOptions(networkBufferMs)
+            } else {
+                VlcAudioOptions.baseOptions(networkBufferMs)
+            }
+            libVlc = LibVLC(context.applicationContext, options)
+            mediaPlayer = MediaPlayer(libVlc).apply {
+                attachViews(videoLayout, null, false, false)
+                setEventListener { event ->
+                    when (event.type) {
+                        MediaPlayer.Event.Playing -> onPlaying()
+                        MediaPlayer.Event.Vout -> {
+                            if (event.voutCount > 0) onPlaying()
+                        }
+                        MediaPlayer.Event.EncounteredError -> onError()
                     }
-                    MediaPlayer.Event.EncounteredError -> onError()
                 }
             }
+        } catch (e: Throwable) {
+            VlcInstanceGuard.release()
+            throw e
         }
     }
 
@@ -107,10 +115,18 @@ class LiveVlcPlayer(
     fun isPlaying(): Boolean = mediaPlayer.isPlaying
 
     fun release() {
-        mediaPlayer.stop()
-        mediaPlayer.detachViews()
-        mediaPlayer.release()
-        libVlc.release()
+        try {
+            mediaPlayer.setEventListener(null)
+            mediaPlayer.stop()
+            mediaPlayer.detachViews()
+            mediaPlayer.release()
+        } catch (_: Throwable) {
+        }
+        try {
+            libVlc.release()
+        } catch (_: Throwable) {
+        }
+        VlcInstanceGuard.release()
     }
 
     companion object {

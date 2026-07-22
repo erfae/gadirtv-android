@@ -58,6 +58,7 @@ import com.gadir.tv.player.VodStreamUrls
 import com.gadir.tv.player.LiveVlcPlayer
 import com.gadir.tv.player.PlaybackLauncher
 import com.gadir.tv.player.PlaybackRequest
+import com.gadir.tv.player.VlcInstanceGuard
 import com.gadir.tv.player.VodPlaybackHelper
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.ui.profiles.ProfilesActivity
@@ -111,6 +112,8 @@ class MainActivity : BaseLocaleActivity() {
         private const val PREVIEW_SURFACE_MAX_ATTEMPTS = 4
         private const val CATALOG_PREFETCH_DELAY_MS = 400L
         private const val EPG_FOCUS_DELAY_MS = 0L
+        private const val FULLSCREEN_LAUNCH_DELAY_MS = 1_000L
+        private const val LIVE_VLC_COOLDOWN_MS = 1_200L
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -250,6 +253,7 @@ class MainActivity : BaseLocaleActivity() {
     private var reloadingChannels = false
     private var channelsLoadToken = 0
     private var livePreviewPaused = false
+    private var livePreviewResumeToken = 0
     private var epgLoadToken = 0
     private var pendingEpg: Runnable? = null
     private var epgFocusStreamId = 0
@@ -5186,7 +5190,12 @@ class MainActivity : BaseLocaleActivity() {
             extension = channel.extension,
             alternateUrls = urls.drop(1),
         )
-        val launchDelayMs = if (DeviceUi.isTvUi(this)) 600L else 300L
+        val launchDelayMs = if (DeviceUi.isTvUi(this)) {
+            FULLSCREEN_LAUNCH_DELAY_MS + VlcInstanceGuard.cooldownRemainingMs(LIVE_VLC_COOLDOWN_MS)
+        } else {
+            300L
+        }
+        livePreviewResumeToken++
         livePanel().postDelayed({
             if (isDestroyed || currentTab != Tab.LIVE) return@postDelayed
             try {
@@ -5451,16 +5460,21 @@ class MainActivity : BaseLocaleActivity() {
         } else if (currentTab == Tab.LIVE) {
             ensureLiveTabReady()
             syncLivePlaylistUi()
-            livePreviewPaused = false
-            ensurePreviewPlayer()
-            if (DeviceUi.useDpadFocus(this)) {
-                currentPreviewChannel?.let { schedulePreview(it) }
-            } else {
-                focusChannelAt(currentPreviewChannel)
-                if (appSettings.autoplayPreview && currentPreviewChannel != null) {
+            val resumeToken = ++livePreviewResumeToken
+            val resumeDelay = VlcInstanceGuard.cooldownRemainingMs(LIVE_VLC_COOLDOWN_MS)
+            livePanel().postDelayed({
+                if (isDestroyed || currentTab != Tab.LIVE || resumeToken != livePreviewResumeToken) return@postDelayed
+                livePreviewPaused = false
+                ensurePreviewPlayer()
+                if (DeviceUi.useDpadFocus(this)) {
                     currentPreviewChannel?.let { schedulePreview(it) }
+                } else {
+                    focusChannelAt(currentPreviewChannel)
+                    if (appSettings.autoplayPreview && currentPreviewChannel != null) {
+                        currentPreviewChannel?.let { schedulePreview(it) }
+                    }
                 }
-            }
+            }, resumeDelay)
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
             if (!DeviceUi.useDpadFocus(this)) {
                 refreshCatalogResumeCategory(currentTab)
