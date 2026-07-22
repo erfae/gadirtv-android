@@ -1,6 +1,7 @@
 package com.gadir.tv.player
 
 import com.gadir.tv.data.MovieDetailCache
+import com.gadir.tv.data.SeriesDetailCache
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.Profile
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +32,26 @@ object VodPlaybackHelper {
         return ResolvedPlayback(
             extension = ext,
             urls = VodStreamUrls.movieCandidates(api, profile, streamId, ext, direct),
+        )
+    }
+
+    /** Build series episode URLs immediately — never blocks on seriesInfo network fetch. */
+    fun resolveSeriesEpisode(
+        api: XtreamApi,
+        profile: Profile,
+        episodeId: Int,
+        extension: String = "mp4",
+        directSource: String = "",
+    ): ResolvedPlayback {
+        var ext = extension.ifBlank { "mp4" }
+        var direct = directSource.trim()
+        SeriesDetailCache.findEpisode(episodeId)?.let { episode ->
+            ext = episode.extension.ifBlank { ext }
+            if (direct.isBlank()) direct = episode.directSource.trim()
+        }
+        return ResolvedPlayback(
+            extension = ext,
+            urls = VodStreamUrls.seriesCandidates(api, profile, episodeId, ext, direct),
         )
     }
 

@@ -37,7 +37,11 @@ object PlaybackLauncher {
 
     private fun launchDefault(context: Context, request: PlaybackRequest) {
         when {
+            // TV live: ExoPlayer is more stable than libVLC on Amlogic/Xiaomi boxes.
             request.kind == ResumeStore.KIND_LIVE && DeviceUi.isTvUi(context) ->
+                launchExo(context, request)
+            // TV VOD: libVLC handles more IPTV codecs/containers than Exo alone.
+            request.kind != ResumeStore.KIND_LIVE && DeviceUi.isTvUi(context) ->
                 launchVlc(context, request)
             else -> launchExo(context, request)
         }

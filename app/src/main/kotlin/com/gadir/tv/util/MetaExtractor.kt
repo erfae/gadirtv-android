@@ -111,9 +111,22 @@ object MetaExtractor {
     }
 
     fun castMembersFrom(vararg sources: JsonObject?): List<CastMember> {
+        mergeCastAcrossSources(sources)?.let { return it }
+        val htmlKeys = listOf("cast", "actors", "starring", "actor", "plot", "description", "overview")
+        for (source in sources) {
+            if (source == null) continue
+            for (key in htmlKeys) {
+                val text = source.get(key)?.asStringOrNull().orEmpty()
+                if (!text.contains("<img", ignoreCase = true)) continue
+                val fromHtml = CastImageResolver.membersFromHtml(text)
+                    .map { (name, image) -> CastMember(name, image) }
+                if (fromHtml.isNotEmpty()) return fromHtml
+            }
+        }
         val keys = listOf(
             "cast", "actors", "starring", "actor", "actor_list", "cast_list",
             "stars", "reparto", "crew_cast", "credits", "crew",
+            "movie_cast", "serie_cast", "series_cast",
         )
         for (source in sources) {
             if (source == null) continue
@@ -178,6 +191,75 @@ object MetaExtractor {
             }
         }
         return emptyList()
+    }
+
+    /** Names in one object, images in another (common Xtream panel layout). */
+    private fun mergeCastAcrossSources(sources: Array<out JsonObject?>): List<CastMember>? {
+        val names = mutableListOf<String>()
+        for (source in sources) {
+            if (source == null) continue
+            for (key in listOf("cast", "actors", "starring", "actor", "reparto")) {
+                val element = source.get(key) ?: continue
+                when {
+                    element.isJsonArray -> {
+                        element.asJsonArray.mapNotNull { parseCastElement(it)?.name }
+                            .filter { it.isNotBlank() }
+                            .let { if (it.isNotEmpty()) names.addAll(it) }
+                    }
+                    element.isJsonPrimitive -> {
+                        val text = stripHtml(element.asStringOrNull()).orEmpty()
+                        if (text.isBlank() || text.contains("<img", ignoreCase = true)) continue
+                        names.addAll(
+                            text.split(",", ";", "/")
+                                .map { it.trim() }
+                                .filter { it.isNotBlank() },
+                        )
+                    }
+                }
+                if (names.isNotEmpty()) break
+            }
+            if (names.isNotEmpty()) break
+        }
+        if (names.isEmpty()) return null
+
+        val images = mutableListOf<String>()
+        for (source in sources) {
+            if (source == null) continue
+            for (key in listOf(
+                "actor_images", "cast_images", "actors_images", "cast_pictures",
+                "stars_images", "actor_pictures", "cast_photos",
+            )) {
+                val element = source.get(key) ?: continue
+                when {
+                    element.isJsonArray -> images.addAll(
+                        element.asJsonArray.map { el ->
+                            when {
+                                el.isJsonPrimitive -> CastImageResolver.resolve(el.asStringOrNull())
+                                el.isJsonObject -> CastImageResolver.resolve(parseCastElement(el)?.imageUrl)
+                                else -> ""
+                            }
+                        },
+                    )
+                    element.isJsonPrimitive -> images.addAll(
+                        element.asString.orEmpty()
+                            .split(",", ";", "|")
+                            .map { CastImageResolver.resolve(it.trim()) },
+                    )
+                    element.isJsonObject -> images.addAll(
+                        element.asJsonObject.entrySet()
+                            .sortedBy { it.key.toIntOrNull() ?: Int.MAX_VALUE }
+                            .map { CastImageResolver.resolve(it.value.asStringOrNull()) },
+                    )
+                }
+                if (images.isNotEmpty()) break
+            }
+            if (images.isNotEmpty()) break
+        }
+
+        return names.mapIndexed { index, name ->
+            val image = images.getOrNull(index).orEmpty()
+            CastMember(name.substringBefore("|").substringBefore(":").trim(), image)
+        }.filter { it.name.isNotBlank() }
     }
 
     private fun castMembersWithParallelArrays(source: JsonObject): List<CastMember>? {
