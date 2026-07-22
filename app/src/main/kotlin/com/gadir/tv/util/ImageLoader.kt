@@ -330,6 +330,8 @@ object ImageLoader {
             lower.contains("/logos/") ||
             lower.contains("/streaming/") ||
             lower.contains("/movie/") ||
-            lower.contains("/series/")
+            lower.contains("/series/") ||
+            lower.contains("/cast/") ||
+            lower.contains("/actor/")
     }
 }

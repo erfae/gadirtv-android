@@ -52,6 +52,7 @@ data class VodMovie(
     val categoryId: String,
     val extension: String,
     val added: Long = 0,
+    val directSource: String = "",
 )
 
 data class SeriesItem(

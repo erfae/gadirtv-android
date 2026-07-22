@@ -113,10 +113,11 @@ object MetaExtractor {
     fun castMembersFrom(vararg sources: JsonObject?): List<CastMember> {
         val keys = listOf(
             "cast", "actors", "starring", "actor", "actor_list", "cast_list",
-            "stars", "reparto", "crew_cast",
+            "stars", "reparto", "crew_cast", "actor_images", "cast_images",
         )
         for (source in sources) {
             if (source == null) continue
+            castMembersWithSeparateImages(source)?.let { return it }
             for (key in keys) {
                 val element = source.get(key) ?: continue
                 when {
@@ -133,6 +134,7 @@ object MetaExtractor {
                     element.isJsonPrimitive -> {
                         val text = stripHtml(element.asStringOrNull())
                         if (text.isNotBlank()) {
+                            parseCastJsonString(text)?.let { return it }
                             return text.split(",", ";")
                                 .mapNotNull { parseCastNameToken(it.trim()) }
                                 .filter { it.name.isNotBlank() }
@@ -150,6 +152,48 @@ object MetaExtractor {
             }
         }
         return emptyList()
+    }
+
+    private fun castMembersWithSeparateImages(source: JsonObject): List<CastMember>? {
+        val namesText = source.get("cast")?.asStringOrNull()
+            ?: source.get("actors")?.asStringOrNull()
+            ?: return null
+        if (namesText.trimStart().startsWith("[") || namesText.trimStart().startsWith("{")) {
+            return null
+        }
+        val imagesText = source.get("cast_images")?.asStringOrNull()
+            ?: source.get("actor_images")?.asStringOrNull()
+            ?: source.get("cast_pictures")?.asStringOrNull()
+            ?: return null
+        val names = namesText.split(",", ";").map { stripHtml(it.trim()) }.filter { it.isNotBlank() }
+        if (names.isEmpty()) return null
+        val images = imagesText.split(",", ";").map { it.trim() }
+        return names.mapIndexed { index, name ->
+            val image = images.getOrNull(index).orEmpty()
+            CastMember(name, resolveCastImage(image))
+        }
+    }
+
+    private fun parseCastJsonString(text: String): List<CastMember>? {
+        val trimmed = text.trim()
+        if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return null
+        return try {
+            when {
+                trimmed.startsWith("[") -> {
+                    val arr = com.google.gson.JsonParser.parseString(trimmed).asJsonArray
+                    arr.mapNotNull { parseCastElement(it) }.takeIf { it.isNotEmpty() }
+                }
+                else -> {
+                    val obj = com.google.gson.JsonParser.parseString(trimmed).asJsonObject
+                    obj.entrySet()
+                        .sortedBy { it.key.toIntOrNull() ?: Int.MAX_VALUE }
+                        .mapNotNull { parseCastElement(it.value) }
+                        .takeIf { it.isNotEmpty() }
+                }
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun parseCastNameToken(token: String): CastMember? {

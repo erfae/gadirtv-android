@@ -201,8 +201,9 @@ class XtreamApi(
                 icon = imageUrl(row, "stream_icon", "cover", "cover_big", "movie_image")
                     .ifBlank { fallbackVodCover(profile, row.get("stream_id")?.asIntOrZero() ?: 0) },
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
-                extension = row.get("container_extension")?.asStringOrNull() ?: "mp4",
+                extension = row.get("container_extension")?.asStringOrNull()?.ifBlank { "mp4" } ?: "mp4",
                 added = row.addedTimestamp(),
+                directSource = row.get("direct_source")?.asStringOrNull().orEmpty().trim(),
             )
         }.filter { it.streamId > 0 }
     }

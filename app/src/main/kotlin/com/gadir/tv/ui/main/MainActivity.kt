@@ -1957,7 +1957,8 @@ class MainActivity : BaseLocaleActivity() {
             if (token != catalogPrefetchToken) return@Runnable
             prefetchCatalogGroup(tab, catId)
         }
-        catalogCategoryHandler.post(task)
+        catalogCategoryHandler.removeCallbacksAndMessages(null)
+        catalogCategoryHandler.postDelayed(task, 180L)
     }
 
     private fun prefetchCatalogGroup(tab: Tab, catId: String) {
@@ -3021,11 +3022,15 @@ class MainActivity : BaseLocaleActivity() {
         title: String,
         cover: String,
         extension: String = "mp4",
+        directSource: String = "",
     ) {
         val record = resumeStore.get(ResumeStore.KIND_MOVIE, streamId.toString())
         if (record != null) {
             val profile = PlaylistRepository.profile ?: return
-            val urls = VodStreamUrls.movieCandidates(api, profile, streamId, extension)
+            val cached = MovieDetailCache.get(streamId)
+            val ext = (cached?.extension ?: extension).ifBlank { "mp4" }
+            val direct = cached?.directSource?.takeIf { it.isNotBlank() } ?: directSource
+            val urls = VodStreamUrls.movieCandidates(api, profile, streamId, ext, direct)
             val url = urls.firstOrNull().orEmpty()
             if (url.isBlank()) {
                 openMovieDetail(streamId, title, cover, extension)
@@ -3040,7 +3045,7 @@ class MainActivity : BaseLocaleActivity() {
                     kind = ResumeStore.KIND_MOVIE,
                     contentId = streamId.toString(),
                     imageUrl = cover,
-                    extension = extension,
+                    extension = ext,
                     positionMs = record.positionMs,
                     alternateUrls = urls.drop(1),
                 ),
@@ -3148,9 +3153,10 @@ class MainActivity : BaseLocaleActivity() {
         imageUrl: String = "",
         positionMs: Long = 0L,
         categoryId: String = "",
+        directSource: String = "",
     ) {
         withMovieAccess(title, categoryId) {
-            playMovieInternal(title, streamId, extension, imageUrl, positionMs)
+            playMovieInternal(title, streamId, extension, imageUrl, positionMs, directSource)
         }
     }
 
@@ -3160,10 +3166,13 @@ class MainActivity : BaseLocaleActivity() {
         extension: String,
         imageUrl: String = "",
         positionMs: Long = 0L,
+        directSource: String = "",
     ) {
         val profile = PlaylistRepository.profile ?: return
-        val ext = extension.ifBlank { "mkv" }
-        val urls = VodStreamUrls.movieCandidates(api, profile, streamId, ext)
+        val cached = MovieDetailCache.get(streamId)
+        val ext = (cached?.extension ?: extension).ifBlank { "mp4" }
+        val direct = cached?.directSource?.takeIf { it.isNotBlank() } ?: directSource
+        val urls = VodStreamUrls.movieCandidates(api, profile, streamId, ext, direct)
         val url = urls.firstOrNull().orEmpty()
         if (url.isBlank()) {
             Toast.makeText(this, R.string.series_playback_failed, Toast.LENGTH_SHORT).show()
@@ -3184,8 +3193,11 @@ class MainActivity : BaseLocaleActivity() {
                 alternateUrls = urls.drop(1),
             ),
         )
-        lifecycleScope.launch(Dispatchers.IO) {
-            runCatching { api.vodPlaybackMeta(profile, streamId) }.getOrNull()
+        if (cached == null || cached.directSource.isBlank()) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                runCatching { api.vodInfo(profile, streamId) }?.getOrNull()
+                    ?.let { MovieDetailCache.put(streamId, it) }
+            }
         }
     }
 
@@ -3731,11 +3743,7 @@ class MainActivity : BaseLocaleActivity() {
         catalogGrid.adapter = PosterAdapter(
             items = posterItems,
             onClick = { item -> onPosterClick(tab, item) },
-            onFocus = if (DeviceUi.useDpadFocus(this)) {
-                { item -> prefetchCatalogDetail(tab, item) }
-            } else {
-                null
-            },
+            onFocus = null,
             kind = when (tab) {
                 Tab.MOVIES -> FavoritesStore.KIND_MOVIE
                 Tab.SERIES -> FavoritesStore.KIND_SERIES
@@ -4113,6 +4121,7 @@ class MainActivity : BaseLocaleActivity() {
                     imageUrl = movie.icon,
                     extension = movie.extension,
                     added = movie.added,
+                    directSource = movie.directSource,
                 ),
             )
         }
@@ -4168,6 +4177,7 @@ class MainActivity : BaseLocaleActivity() {
                         imageUrl = item.imageUrl,
                         positionMs = item.resumePositionMs,
                         categoryId = categoryId,
+                        directSource = item.directSource,
                     )
                 } else if (DeviceUi.useDpadFocus(this)) {
                     openMovieDetail(

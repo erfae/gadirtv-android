@@ -7,8 +7,8 @@ import com.gadir.tv.model.Profile
 import com.gadir.tv.util.NetworkUrlResolver
 
 object VodStreamUrls {
-    /** mkv/ts primero: mejor compatibilidad en FHD/4K y HEVC (v1.34.1 estable). */
-    private val EXTENSIONS = listOf("mkv", "ts", "mp4", "avi", "m3u8")
+    /** mp4 primero: muchos grupos del panel son solo MP4. */
+    private val EXTENSIONS = listOf("mp4", "mkv", "ts", "avi", "m3u8")
 
     fun movieCandidates(
         api: XtreamApi,
@@ -22,7 +22,7 @@ object VodStreamUrls {
         if (direct.startsWith("http")) {
             urls.add(NetworkUrlResolver.resolveUrl(direct))
         }
-        val primary = extension.ifBlank { "mkv" }.lowercase()
+        val primary = extension.ifBlank { "mp4" }.lowercase()
         urls.add(api.movieStreamUrl(profile, streamId, primary))
         urls.add(api.movieStreamPhp(profile, streamId, primary))
         EXTENSIONS.forEach { ext ->
@@ -49,7 +49,7 @@ object VodStreamUrls {
         if (direct.startsWith("http")) {
             urls.add(NetworkUrlResolver.resolveUrl(direct))
         }
-        val primary = extension.ifBlank { "mkv" }.lowercase()
+        val primary = extension.ifBlank { "mp4" }.lowercase()
         urls.add(api.seriesStreamUrl(profile, episodeId, primary))
         urls.add(api.seriesStreamPhp(profile, episodeId, primary))
         EXTENSIONS.forEach { ext ->
