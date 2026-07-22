@@ -122,8 +122,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
         val settings = AppSettings(this)
         val bufferMs = settings.networkBufferMs.coerceIn(AppSettings.BUFFER_NORMAL_MS, AppSettings.BUFFER_STABLE_MS)
-        val preferSoftwareLiveTv = DeviceUi.isTvUi(this) && isLivePlayback
-        if (!initVlcPlayer(bufferMs, preferSoftware = preferSoftwareLiveTv)) {
+        if (!initVlcPlayer(bufferMs, preferSoftware = false)) {
             if (!fallbackToExoPlayer()) {
                 android.widget.Toast.makeText(this, R.string.series_playback_failed, android.widget.Toast.LENGTH_LONG).show()
                 finish()
@@ -194,11 +193,16 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                     resumeSeekPending = false
                 }
                 if (isLivePlayback) {
-                    mediaPlayer?.time?.takeIf { it >= 0L }?.let { liveStallTracker.noteProgress(it) }
+                    liveStallTracker.ping()
                     armLiveStallWatchdog()
                 }
                 showControls()
                 updatePlayPauseIcon()
+            }
+            MediaPlayer.Event.Vout -> {
+                if (isLivePlayback && event.voutCount > 0) {
+                    liveStallTracker.ping()
+                }
             }
             MediaPlayer.Event.Paused -> updatePlayPauseIcon()
             MediaPlayer.Event.LengthChanged -> {
@@ -208,7 +212,12 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             MediaPlayer.Event.TimeChanged -> {
                 updateVodProgress()
                 if (isLivePlayback) {
-                    mediaPlayer?.time?.takeIf { it >= 0L }?.let { liveStallTracker.noteProgress(it) }
+                    liveStallTracker.ping()
+                }
+            }
+            MediaPlayer.Event.PositionChanged -> {
+                if (isLivePlayback) {
+                    liveStallTracker.ping()
                 }
             }
         }
@@ -351,7 +360,10 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                     disarmLiveStallWatchdog()
                     return
                 }
-                mediaPlayer?.time?.takeIf { it >= 0L }?.let { liveStallTracker.noteProgress(it) }
+                if (mediaPlayer?.isPlaying != true) {
+                    disarmLiveStallWatchdog()
+                    return
+                }
                 if (liveStallTracker.isStalled()) {
                     recoverLiveFromStall()
                     return

@@ -12,6 +12,13 @@ class LiveStreamStallTracker(
         lastProgressKey = Long.MIN_VALUE
     }
 
+    fun ping(now: Long = System.currentTimeMillis()) {
+        lastProgressAt = now
+        if (lastProgressKey == Long.MIN_VALUE) {
+            lastProgressKey = 0L
+        }
+    }
+
     fun noteProgress(progressKey: Long, now: Long = System.currentTimeMillis()) {
         if (progressKey != lastProgressKey) {
             lastProgressKey = progressKey

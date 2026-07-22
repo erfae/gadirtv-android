@@ -823,9 +823,18 @@ class XtreamApi(
     private fun fallbackVodCover(profile: Profile, contentId: Int): String {
         if (contentId <= 0) return ""
         val base = panelHost(profile)
-        val jpg = NetworkUrlResolver.resolveUrl("$base/images/$contentId.jpg")
-        if (jpg.isNotBlank()) return jpg
-        return NetworkUrlResolver.resolveUrl("$base/images/$contentId.png")
+        val paths = listOf(
+            "$base/images/$contentId.jpg",
+            "$base/images/$contentId.png",
+            "$base/images/$contentId.webp",
+            "$base/images/movie/$contentId.jpg",
+            "$base/images/series/$contentId.jpg",
+        )
+        for (path in paths) {
+            val resolved = NetworkUrlResolver.resolveUrl(path)
+            if (resolved.isNotBlank()) return resolved
+        }
+        return ""
     }
 
     private fun looksLikeStreamUrl(url: String): Boolean {
