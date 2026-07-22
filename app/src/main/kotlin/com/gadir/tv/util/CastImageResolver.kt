@@ -19,6 +19,13 @@ object CastImageResolver {
 
         if (trimmed.startsWith("http", ignoreCase = true)) return trimmed
 
+        if (trimmed.startsWith("/t/p/", ignoreCase = true)) {
+            return "https://image.tmdb.org$trimmed"
+        }
+        if (trimmed.startsWith("t/p/", ignoreCase = true)) {
+            return "https://image.tmdb.org/$trimmed"
+        }
+
         val path = trimmed.removePrefix("/")
         if (path.startsWith("t/p/", ignoreCase = true)) {
             return "https://image.tmdb.org/$path"

@@ -19,6 +19,7 @@ object LivePreviewStreamUrls {
         if (ext.isNotEmpty() && ext !in setOf("ts", "m3u8")) {
             urls.add(api.liveStreamUrlDirect(profile, channel.streamId, ext))
         }
+        urls.add(api.liveStreamUrlDirect(profile, channel.streamId, "m3u8"))
         return urls.filter { it.isNotBlank() }.distinct()
     }
 }

@@ -33,15 +33,15 @@ object VodStreamUrls {
         val urls = linkedSetOf<String>()
         addDirectSource(urls, directSource)
         val primary = extension.ifBlank { "mp4" }.lowercase()
-        urls.add(api.movieStreamPhp(profile, streamId, primary))
         urls.add(api.movieStreamUrl(profile, streamId, primary))
+        urls.add(api.movieStreamUrlWithoutExtension(profile, streamId))
+        urls.add(api.movieStreamPhp(profile, streamId, primary))
         EXTENSIONS.forEach { ext ->
             if (ext != primary) {
-                urls.add(api.movieStreamPhp(profile, streamId, ext))
                 urls.add(api.movieStreamUrl(profile, streamId, ext))
+                urls.add(api.movieStreamPhp(profile, streamId, ext))
             }
         }
-        urls.add(api.movieStreamUrlWithoutExtension(profile, streamId))
         return urls.filter { it.isNotBlank() }
             .map { NetworkUrlResolver.resolveUrl(it) }
             .distinct()
@@ -57,15 +57,15 @@ object VodStreamUrls {
         val urls = linkedSetOf<String>()
         addDirectSource(urls, directSource)
         val primary = extension.ifBlank { "mp4" }.lowercase()
-        urls.add(api.seriesStreamPhp(profile, episodeId, primary))
         urls.add(api.seriesStreamUrl(profile, episodeId, primary))
+        urls.add(api.seriesStreamUrlWithoutExtension(profile, episodeId))
+        urls.add(api.seriesStreamPhp(profile, episodeId, primary))
         EXTENSIONS.forEach { ext ->
             if (ext != primary) {
-                urls.add(api.seriesStreamPhp(profile, episodeId, ext))
                 urls.add(api.seriesStreamUrl(profile, episodeId, ext))
+                urls.add(api.seriesStreamPhp(profile, episodeId, ext))
             }
         }
-        urls.add(api.seriesStreamUrlWithoutExtension(profile, episodeId))
         return urls.filter { it.isNotBlank() }
             .map { NetworkUrlResolver.resolveUrl(it) }
             .distinct()

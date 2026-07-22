@@ -105,15 +105,15 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
         private const val CHANNEL_PREVIEW_DELAY_MS = 0L
-        private const val PREVIEW_TIMEOUT_MS = 2_800L
-        private const val PREVIEW_RETRY_DELAY_MS = 350L
-        private const val PREVIEW_STALL_CHECK_MS = 4_000L
-        private const val PREVIEW_STALL_TIMEOUT_MS = 10_000L
+        private const val PREVIEW_TIMEOUT_MS = 4_500L
+        private const val PREVIEW_RETRY_DELAY_MS = 250L
+        private const val PREVIEW_STALL_CHECK_MS = 5_000L
+        private const val PREVIEW_STALL_TIMEOUT_MS = 14_000L
         private const val PREVIEW_SURFACE_MAX_ATTEMPTS = 4
         private const val CATALOG_PREFETCH_DELAY_MS = 400L
         private const val EPG_FOCUS_DELAY_MS = 0L
-        private const val FULLSCREEN_LAUNCH_DELAY_MS = 1_000L
-        private const val LIVE_VLC_COOLDOWN_MS = 1_200L
+        private const val FULLSCREEN_LAUNCH_DELAY_MS = 700L
+        private const val LIVE_VLC_COOLDOWN_MS = 600L
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -3229,8 +3229,10 @@ class MainActivity : BaseLocaleActivity() {
         directSource: String = "",
     ) {
         val profile = PlaylistRepository.profile ?: return
-        val urls = VodStreamUrls.seriesCandidates(api, profile, episodeId, extension, directSource)
-        val url = urls.firstOrNull().orEmpty()
+        val resolved = VodPlaybackHelper.resolveSeriesEpisode(
+            api, profile, episodeId, extension, directSource,
+        )
+        val url = resolved.urls.firstOrNull().orEmpty()
         if (url.isBlank()) {
             Toast.makeText(this, R.string.series_playback_failed, Toast.LENGTH_SHORT).show()
             return
@@ -3244,9 +3246,9 @@ class MainActivity : BaseLocaleActivity() {
                 kind = ResumeStore.KIND_SERIES,
                 contentId = episodeId.toString(),
                 imageUrl = imageUrl,
-                extension = extension,
+                extension = resolved.extension,
                 positionMs = positionMs,
-                alternateUrls = urls.drop(1),
+                alternateUrls = resolved.urls.drop(1),
             ),
         )
     }
