@@ -51,7 +51,9 @@ import com.gadir.tv.ui.movie.MovieDetailActivity
 import com.gadir.tv.player.LiveChannelNavigator
 import com.gadir.tv.player.LiveExoPreviewPlayer
 import com.gadir.tv.player.LivePreviewStreamUrls
+import com.gadir.tv.player.LiveStreamStallTracker
 import com.gadir.tv.player.LiveStreamUrls
+import com.gadir.tv.player.exoLiveProgressKey
 import com.gadir.tv.player.VodStreamUrls
 import com.gadir.tv.player.LiveVlcPlayer
 import com.gadir.tv.player.PlaybackLauncher
@@ -103,6 +105,8 @@ class MainActivity : BaseLocaleActivity() {
         private const val CHANNEL_PREVIEW_DELAY_MS = 0L
         private const val PREVIEW_TIMEOUT_MS = 4_500L
         private const val PREVIEW_RETRY_DELAY_MS = 700L
+        private const val PREVIEW_STALL_CHECK_MS = 4_000L
+        private const val PREVIEW_STALL_TIMEOUT_MS = 10_000L
         private const val PREVIEW_SURFACE_MAX_ATTEMPTS = 10
         private const val CATALOG_PREFETCH_DELAY_MS = 400L
         private const val EPG_FOCUS_DELAY_MS = 120L
@@ -4557,6 +4561,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun teardownLivePreviewPlayback() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
+        disarmPreviewStallWatchdog()
         previewToken++
         miniVlcPlayer?.stop()
         miniExoPlayer?.stop()
@@ -4636,6 +4641,7 @@ class MainActivity : BaseLocaleActivity() {
     /** Stops preview A/V without tearing down the player instance. */
     private fun stopPreviewForZap() {
         cancelPreviewTimeout()
+        disarmPreviewStallWatchdog()
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
         miniVlcPlayer?.stop()
@@ -4648,6 +4654,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun abortPreviewPlayback() {
         previewToken++
         cancelPreviewTimeout()
+        disarmPreviewStallWatchdog()
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
         miniVlcPlayer?.stop()
@@ -4743,6 +4750,78 @@ class MainActivity : BaseLocaleActivity() {
     private fun cancelPreviewTimeout() {
         previewTimeoutRunnable?.let { previewHandler.removeCallbacks(it) }
         previewTimeoutRunnable = null
+    }
+
+    private fun disarmPreviewStallWatchdog() {
+        previewStallRunnable?.let { previewHandler.removeCallbacks(it) }
+        previewStallRunnable = null
+        previewStallTracker.reset()
+        previewStallRecoverAttempts = 0
+    }
+
+    private fun armPreviewStallWatchdog() {
+        disarmPreviewStallWatchdog()
+        val runnable = object : Runnable {
+            override fun run() {
+                if (!previewIsSettled() || livePreviewPaused || currentTab != Tab.LIVE) {
+                    disarmPreviewStallWatchdog()
+                    return
+                }
+                notePreviewPlaybackProgress()
+                if (previewStallTracker.isStalled()) {
+                    recoverPreviewFromStall()
+                    return
+                }
+                previewHandler.postDelayed(this, PREVIEW_STALL_CHECK_MS)
+            }
+        }
+        previewStallRunnable = runnable
+        previewHandler.postDelayed(runnable, PREVIEW_STALL_CHECK_MS)
+    }
+
+    private fun notePreviewPlaybackProgress() {
+        if (usesExoPreview()) {
+            val player = miniExoPlayer?.player ?: return
+            previewStallTracker.noteProgress(
+                exoLiveProgressKey(player.currentPosition, player.bufferedPosition),
+            )
+        } else {
+            val time = miniVlcPlayer?.playbackTimeMs() ?: return
+            if (time >= 0L) previewStallTracker.noteProgress(time)
+        }
+    }
+
+    private fun recoverPreviewFromStall() {
+        val token = previewToken
+        previewStallRecoverAttempts += 1
+        previewStallTracker.reset()
+        val volume = if (appSettings.previewSound) {
+            LiveVlcPlayer.VOLUME_PREVIEW
+        } else {
+            0
+        }
+        if (previewStallRecoverAttempts <= 2) {
+            setPreviewVideoVisible(false)
+            hideNoSignal()
+            val replayed = if (usesExoPreview()) {
+                miniExoPlayer?.replay(volume) == true
+            } else {
+                miniVlcPlayer?.replay(volume) == true
+            }
+            if (replayed) {
+                armPreviewTimeout(token)
+                armPreviewStallWatchdog()
+                return
+            }
+        }
+        previewStallRecoverAttempts = 0
+        previewWorkingUrl = null
+        if (!tryNextPreviewUrl(token)) {
+            showNoSignal()
+            schedulePreviewRetry(token)
+        } else {
+            armPreviewStallWatchdog()
+        }
     }
 
     private fun schedulePreviewInternal(channel: LiveChannel) {
@@ -4845,6 +4924,9 @@ class MainActivity : BaseLocaleActivity() {
 
     private var previewPlaybackToken = 0
     private var previewTimeoutRunnable: Runnable? = null
+    private var previewStallRunnable: Runnable? = null
+    private val previewStallTracker = LiveStreamStallTracker(PREVIEW_STALL_TIMEOUT_MS)
+    private var previewStallRecoverAttempts = 0
 
     private fun playMiniPreviewUrl(url: String, token: Int, hideVideo: Boolean = false) {
         if (token != previewToken || url.isBlank()) return
@@ -5481,6 +5563,8 @@ class MainActivity : BaseLocaleActivity() {
                 setPreviewVideoVisible(true)
                 hideNoSignal()
                 if (DeviceUi.useDpadFocus(this)) showMiniPreviewControls()
+                notePreviewPlaybackProgress()
+                armPreviewStallWatchdog()
             },
         )
     }
@@ -5511,6 +5595,8 @@ class MainActivity : BaseLocaleActivity() {
                 setPreviewVideoVisible(true)
                 hideNoSignal()
                 if (DeviceUi.useDpadFocus(this)) showMiniPreviewControls()
+                notePreviewPlaybackProgress()
+                armPreviewStallWatchdog()
             },
         )
     }

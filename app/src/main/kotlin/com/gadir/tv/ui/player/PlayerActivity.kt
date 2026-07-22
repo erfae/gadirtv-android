@@ -51,6 +51,8 @@ class PlayerActivity : BaseLocaleActivity() {
     private var liveEpgChannelId = ""
     private val pendingLiveUrls = ArrayDeque<String>()
     private val pendingVodUrls = ArrayDeque<String>()
+    private var activeLiveUrl: String? = null
+    private var liveRecoverAttempts = 0
 
     private lateinit var volumeControls: View
     private lateinit var epgPanel: View
@@ -89,6 +91,7 @@ class PlayerActivity : BaseLocaleActivity() {
                 updateVodProgress()
                 if (isLive && player?.isPlaying == true && (player?.currentPosition ?: 0L) > 1_500L) {
                     liveUrlSettled = true
+                    liveRecoverAttempts = 0
                 }
             }
             updatePlayPauseIcon()
@@ -98,6 +101,7 @@ class PlayerActivity : BaseLocaleActivity() {
             updatePlayPauseIcon()
             if (isLive && isPlaying && (player?.currentPosition ?: 0L) > 1_500L) {
                 liveUrlSettled = true
+                liveRecoverAttempts = 0
             }
         }
 
@@ -199,9 +203,15 @@ class PlayerActivity : BaseLocaleActivity() {
                     overlay = noSignal,
                     timeoutMs = 20_000L,
                     bufferingFallbackMs = 25_000L,
+                    stallTimeoutMs = 12_000L,
                     shouldHoldStream = { liveUrlSettled },
                     onBeforeNoSignal = {
-                        tryNextLiveUrl() || fallbackToVlcLivePlayer()
+                        if (restartLivePlayback()) {
+                            true
+                        } else {
+                            liveRecoverAttempts = 0
+                            tryNextLiveUrl() || fallbackToVlcLivePlayer()
+                        }
                     },
                 ).also { it.start() }
             } else {
@@ -218,6 +228,10 @@ class PlayerActivity : BaseLocaleActivity() {
     }
 
     private fun startPlayback(exo: ExoPlayer, url: String, positionMs: Long) {
+        if (isLive) {
+            activeLiveUrl = url
+            liveRecoverAttempts = 0
+        }
         val item = if (isLive) {
             LiveStreamUrls.mediaItem(url)
         } else {
@@ -231,12 +245,29 @@ class PlayerActivity : BaseLocaleActivity() {
         exo.playWhenReady = true
     }
 
+    private fun restartLivePlayback(): Boolean {
+        if (!isLive || liveRecoverAttempts >= 2) return false
+        val url = activeLiveUrl?.takeIf { it.isNotBlank() } ?: return false
+        val exo = player ?: return false
+        liveRecoverAttempts += 1
+        liveUrlSettled = false
+        playbackMonitor?.reset()
+        exo.stop()
+        exo.clearMediaItems()
+        exo.setMediaItem(LiveStreamUrls.mediaItem(url))
+        exo.prepare()
+        exo.playWhenReady = true
+        return true
+    }
+
     private fun tryNextLiveUrl(): Boolean {
         if (pendingLiveUrls.isEmpty()) return false
         pendingLiveUrls.removeFirst()
         val next = pendingLiveUrls.firstOrNull() ?: return false
         val exo = player ?: return false
         liveUrlSettled = false
+        liveRecoverAttempts = 0
+        activeLiveUrl = next
         playbackMonitor?.reset()
         exo.setMediaItem(LiveStreamUrls.mediaItem(next))
         exo.prepare()
@@ -501,6 +532,8 @@ class PlayerActivity : BaseLocaleActivity() {
         val next = pendingLiveUrls.firstOrNull() ?: return
         val exo = player ?: return
         liveUrlSettled = false
+        liveRecoverAttempts = 0
+        activeLiveUrl = next
         playbackMonitor?.reset()
         exo.setMediaItem(LiveStreamUrls.mediaItem(next))
         exo.prepare()

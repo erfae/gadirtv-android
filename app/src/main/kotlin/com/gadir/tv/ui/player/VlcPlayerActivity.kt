@@ -22,6 +22,7 @@ import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.player.LiveChannelNavigator
+import com.gadir.tv.player.LiveStreamStallTracker
 import com.gadir.tv.player.LiveStreamUrls
 import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.util.TimeFormat
@@ -70,6 +71,10 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private var allowExoFallback = true
 
     private var vlcUsesSoftwareDecode = false
+    private var activeLiveUrl: String? = null
+    private var liveRecoverAttempts = 0
+    private val liveStallTracker = LiveStreamStallTracker(12_000L)
+    private var liveStallRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -176,6 +181,10 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                     mediaPlayer?.setTime(resumePositionMs, true)
                     resumeSeekPending = false
                 }
+                if (isLivePlayback) {
+                    mediaPlayer?.time?.takeIf { it >= 0L }?.let { liveStallTracker.noteProgress(it) }
+                    armLiveStallWatchdog()
+                }
                 showControls()
                 updatePlayPauseIcon()
             }
@@ -184,7 +193,12 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                 vodDurationMs = mediaPlayer?.length ?: 0L
                 updateVodProgress()
             }
-            MediaPlayer.Event.TimeChanged -> updateVodProgress()
+            MediaPlayer.Event.TimeChanged -> {
+                updateVodProgress()
+                if (isLivePlayback) {
+                    mediaPlayer?.time?.takeIf { it >= 0L }?.let { liveStallTracker.noteProgress(it) }
+                }
+            }
         }
     }
 
@@ -290,6 +304,11 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun playUrl(url: String) {
         val vlc = libVlc ?: return
         val player = mediaPlayer ?: return
+        if (isLivePlayback) {
+            activeLiveUrl = url
+            liveRecoverAttempts = 0
+            liveStallTracker.reset()
+        }
         player.stop()
         player.volume = 0
         val resolved = com.gadir.tv.util.NetworkUrlResolver.resolve(url)
@@ -309,6 +328,46 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         media.release()
         player.volume = VLC_VOLUME
         player.play()
+    }
+
+    private fun armLiveStallWatchdog() {
+        if (!isLivePlayback) return
+        disarmLiveStallWatchdog()
+        val runnable = object : Runnable {
+            override fun run() {
+                if (!isLivePlayback || mediaPlayer == null) {
+                    disarmLiveStallWatchdog()
+                    return
+                }
+                mediaPlayer?.time?.takeIf { it >= 0L }?.let { liveStallTracker.noteProgress(it) }
+                if (liveStallTracker.isStalled()) {
+                    recoverLiveFromStall()
+                    return
+                }
+                hideHandler.postDelayed(this, 4_000L)
+            }
+        }
+        liveStallRunnable = runnable
+        hideHandler.postDelayed(runnable, 4_000L)
+    }
+
+    private fun disarmLiveStallWatchdog() {
+        liveStallRunnable?.let { hideHandler.removeCallbacks(it) }
+        liveStallRunnable = null
+        liveStallTracker.reset()
+    }
+
+    private fun recoverLiveFromStall() {
+        liveRecoverAttempts += 1
+        liveStallTracker.reset()
+        if (liveRecoverAttempts <= 2) {
+            activeLiveUrl?.let { playUrl(it) }
+            return
+        }
+        liveRecoverAttempts = 0
+        if (!tryNextUrl()) {
+            fallbackToExoPlayer()
+        }
     }
 
     private fun tryNextUrl(): Boolean {

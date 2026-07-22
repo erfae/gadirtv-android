@@ -102,10 +102,10 @@ object PlayerFactory {
         }
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
+                3_000,
+                20_000,
                 1_500,
-                8_000,
-                500,
-                1_000,
+                3_000,
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
