@@ -689,7 +689,7 @@ class PlayerActivity : BaseLocaleActivity() {
 
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {
-                api.shortEpg(
+                api.shortEpgFast(
                     profile,
                     streamId = streamId,
                     epgChannelId = liveEpgChannelId,

@@ -483,38 +483,69 @@ class XtreamApi(
         )
     }
 
-    fun shortEpg(
+    fun shortEpgFast(
         profile: Profile,
         streamId: Int,
         epgChannelId: String = "",
         limit: Int = 4,
     ): List<EpgEntry> {
         if (streamId <= 0 && epgChannelId.isBlank()) return emptyList()
+        if (streamId > 0) {
+            fetchEpgListingsFast(profile, mapOf("stream_id" to streamId.toString()), limit)
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
+        }
+        if (epgChannelId.isNotBlank()) {
+            fetchEpgListingsFast(profile, mapOf("epg_channel_id" to epgChannelId), limit)
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
+            fetchEpgListingsFast(profile, mapOf("stream_id" to epgChannelId), limit)
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
+        }
+        return emptyList()
+    }
+
+    fun shortEpg(
+        profile: Profile,
+        streamId: Int,
+        epgChannelId: String = "",
+        limit: Int = 4,
+    ): List<EpgEntry> {
+        val fast = shortEpgFast(profile, streamId, epgChannelId, limit)
+        if (fast.isNotEmpty()) return fast
+        if (streamId <= 0 && epgChannelId.isBlank()) return emptyList()
         val attempts = buildList {
             if (streamId > 0) {
-                add(Triple("get_short_epg", mapOf("stream_id" to streamId.toString()), limit))
                 add(Triple("get_simple_data_table", mapOf("stream_id" to streamId.toString()), limit))
             }
             if (epgChannelId.isNotBlank()) {
-                add(Triple("get_short_epg", mapOf("epg_channel_id" to epgChannelId), limit))
-                add(Triple("get_short_epg", mapOf("stream_id" to epgChannelId), limit))
                 add(Triple("get_short_epg", mapOf("channel_id" to epgChannelId), limit))
                 add(Triple("get_simple_data_table", mapOf("epg_channel_id" to epgChannelId), limit))
                 add(Triple("get_simple_data_table", mapOf("stream_id" to epgChannelId), limit))
             }
         }.distinct()
         for ((action, params, requestLimit) in attempts) {
-            val listings = fetchEpgListings(profile, params, requestLimit, action)
+            val listings = fetchEpgListings(profile, params, requestLimit, action, fastOnly = false)
             if (listings.isNotEmpty()) return listings
         }
         return emptyList()
     }
+
+    private fun fetchEpgListingsFast(
+        profile: Profile,
+        params: Map<String, String>,
+        limit: Int,
+        actionOverride: String = "get_short_epg",
+    ): List<EpgEntry>? = fetchEpgListings(profile, params, limit, actionOverride, fastOnly = true)
+        .takeIf { it.isNotEmpty() }
 
     private fun fetchEpgListings(
         profile: Profile,
         params: Map<String, String>,
         limit: Int,
         actionOverride: String = "get_short_epg",
+        fastOnly: Boolean = false,
     ): List<EpgEntry> {
         val host = panelHost(profile)
         val action = actionOverride
@@ -532,16 +563,15 @@ class XtreamApi(
             }
         }
         val url = "$host/player_api.php?$query"
-        val agents = linkedSetOf(activeUserAgent).apply { addAll(userAgents.take(2)) }
+        val agents = linkedSetOf(activeUserAgent).apply { addAll(userAgents.take(if (fastOnly) 1 else 2)) }
         for (ua in agents) {
-            for (method in listOf("GET", "POST")) {
-                val fast = if (method == "GET") {
-                    NativeHttpClient.fastRequest(url, ua)
-                } else {
-                    NativeHttpClient.fastRequest(url, ua, "POST")
-                }
-                parseEpgResponse(fast)?.let { return it }
+            val get = NativeHttpClient.fastRequest(url, ua)
+            parseEpgResponse(get)?.let { return it }
+            if (get.status == 512 || get.status == 403 || get.status == 405) {
+                val post = NativeHttpClient.fastRequest(url, ua, "POST")
+                parseEpgResponse(post)?.let { return it }
             }
+            if (fastOnly) continue
             for (method in listOf("GET", "POST")) {
                 val response = NativeHttpClient.request(url, ua, method)
                 parseEpgResponse(response)?.let { return it }
@@ -662,18 +692,8 @@ class XtreamApi(
             .sortedBy { it.order }
 
     private fun fetchDetailBody(url: String): String? {
-        val resolvedUrl = runCatching {
-            val uri = java.net.URI(url)
-            val host = uri.host ?: return@runCatching url
-            val migrated = com.gadir.tv.net.PanelHttp.migrateProfileHost(
-                "${uri.scheme ?: "http"}://$host",
-            )
-            val path = uri.rawPath.orEmpty()
-            val query = uri.rawQuery?.let { "?$it" }.orEmpty()
-            val port = uri.port
-            val portSuffix = if (port > 0 && port != 80 && port != 443) ":$port" else ""
-            "$migrated$portSuffix$path$query"
-        }.getOrDefault(url)
+        fetchDetailBodyFast(url)?.let { return it }
+        val resolvedUrl = resolveDetailUrl(url)
         val agents = linkedSetOf(activeUserAgent).apply { addAll(userAgents) }
         for (ua in agents) {
             val get = NativeHttpClient.request(resolvedUrl, ua, "GET")
@@ -691,6 +711,40 @@ class XtreamApi(
         }
         return null
     }
+
+    private fun fetchDetailBodyFast(url: String): String? {
+        val resolvedUrl = resolveDetailUrl(url)
+        val agents = linkedSetOf(activeUserAgent).apply { addAll(userAgents.take(2)) }
+        for (ua in agents) {
+            val get = NativeHttpClient.detailRequest(resolvedUrl, ua, "GET")
+            val body = get.body.trim()
+            if (get.status == 200 && body.isNotBlank() && body != "[]" && isUsableDetailBody(body)) {
+                return body
+            }
+            if (get.status == 512 || get.status == 403 || get.status == 405) {
+                val post = NativeHttpClient.detailRequest(resolvedUrl, ua, "POST")
+                val postBody = post.body.trim()
+                if (post.status == 200 && postBody.isNotBlank() && postBody != "[]" && isUsableDetailBody(postBody)) {
+                    return postBody
+                }
+            }
+        }
+        return null
+    }
+
+    private fun resolveDetailUrl(url: String): String =
+        runCatching {
+            val uri = java.net.URI(url)
+            val host = uri.host ?: return@runCatching url
+            val migrated = com.gadir.tv.net.PanelHttp.migrateProfileHost(
+                "${uri.scheme ?: "http"}://$host",
+            )
+            val path = uri.rawPath.orEmpty()
+            val query = uri.rawQuery?.let { "?$it" }.orEmpty()
+            val port = uri.port
+            val portSuffix = if (port > 0 && port != 80 && port != 443) ":$port" else ""
+            "$migrated$portSuffix$path$query"
+        }.getOrDefault(url)
 
     private fun isUsableDetailBody(body: String): Boolean {
         if (body.contains("\"info\"") &&
