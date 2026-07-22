@@ -5180,6 +5180,7 @@ class MainActivity : BaseLocaleActivity() {
             extension = channel.extension,
             alternateUrls = urls.drop(1),
         )
+        val launchDelayMs = if (DeviceUi.isTvUi(this)) 600L else 300L
         livePanel().postDelayed({
             if (isDestroyed || currentTab != Tab.LIVE) return@postDelayed
             try {
@@ -5188,7 +5189,7 @@ class MainActivity : BaseLocaleActivity() {
                 livePreviewPaused = false
                 Toast.makeText(this, R.string.connection_failed, Toast.LENGTH_SHORT).show()
             }
-        }, 300L)
+        }, launchDelayMs)
     }
 
     private var fullscreenWaitToken = 0
@@ -5667,7 +5668,7 @@ class MainActivity : BaseLocaleActivity() {
         miniVlcPlayer = LiveVlcPlayer(
             context = this,
             videoLayout = videoLayout,
-            networkBufferMs = appSettings.networkBufferMs.coerceIn(600, 1_200),
+            networkBufferMs = appSettings.networkBufferMs.coerceIn(1_000, 1_800),
             previewMode = true,
             onError = {
                 setPreviewVideoVisible(false)

@@ -14,7 +14,8 @@ object CastImageResolver {
         val trimmed = raw?.trim().orEmpty()
         if (trimmed.isEmpty()) return ""
 
-        ImageUrlResolver.resolve(trimmed).takeIf { isLikelyImageUrl(it) }?.let { return it }
+        val resolved = ImageUrlResolver.resolve(trimmed)
+        if (resolved.isNotBlank()) return resolved
 
         if (trimmed.startsWith("http", ignoreCase = true)) return trimmed
 
@@ -35,9 +36,12 @@ object CastImageResolver {
             "/actors/$path",
             "/images/actor/$path",
             "/images/actors/$path",
+            "/stars/$path",
+            "/images/stars/$path",
             path,
         ).forEach { candidate ->
-            ImageUrlResolver.resolve(candidate).takeIf { isLikelyImageUrl(it) }?.let { return it }
+            val candidateUrl = ImageUrlResolver.resolve(candidate)
+            if (candidateUrl.isNotBlank()) return candidateUrl
         }
 
         if (path.contains('.')) {
@@ -59,6 +63,9 @@ object CastImageResolver {
             val path = trimmed.removePrefix("/")
             if (path.isBlank()) return@buildList
 
+            ImageUrlResolver.resolve(trimmed).takeIf { it.isNotBlank() && it !in this }?.let { add(it) }
+            ImageUrlResolver.resolve("/$path").takeIf { it.isNotBlank() && it !in this }?.let { add(it) }
+
             add("https://image.tmdb.org/t/p/w185/$path")
             add("https://image.tmdb.org/t/p/w342/$path")
             add("https://image.tmdb.org/t/p/w500/$path")
@@ -77,12 +84,12 @@ object CastImageResolver {
                 "$base/actors/$path",
                 "$base/images/actor/$path",
                 "$base/images/actors/$path",
+                "$base/stars/$path",
+                "$base/images/stars/$path",
             ).forEach { url ->
                 val resolved = NetworkUrlResolver.resolveUrl(url)
                 if (resolved.isNotBlank() && resolved !in this) add(resolved)
             }
-
-            ImageUrlResolver.resolve("/$path").takeIf { isLikelyImageUrl(it) && it !in this }?.let { add(it) }
         }.distinct().filter { it.isNotBlank() }
     }
 
@@ -98,15 +105,5 @@ object CastImageResolver {
             }
         }
         return members
-    }
-
-    private fun isLikelyImageUrl(url: String): Boolean {
-        if (url.isBlank()) return false
-        val lower = url.lowercase()
-        return lower.contains("image.tmdb.org") ||
-            lower.contains("/images/") ||
-            lower.contains("/cast/") ||
-            lower.contains("/actor") ||
-            lower.matches(Regex(".*\\.(jpg|jpeg|png|gif|webp|bmp)(\\?.*)?$", RegexOption.IGNORE_CASE))
     }
 }

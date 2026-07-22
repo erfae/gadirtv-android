@@ -12,6 +12,7 @@ import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodInfo
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.model.VodPlaybackMeta
+import com.gadir.tv.net.HttpResult
 import com.gadir.tv.net.NativeHttpClient
 import com.gadir.tv.util.HostUtils
 import com.gadir.tv.util.ImageUrlResolver
@@ -489,21 +490,22 @@ class XtreamApi(
         limit: Int = 4,
     ): List<EpgEntry> {
         if (streamId <= 0 && epgChannelId.isBlank()) return emptyList()
-        if (streamId > 0) {
-            val byStream = fetchEpgListings(
-                profile,
-                mapOf("stream_id" to streamId.toString()),
-                limit,
-            )
-            if (byStream.isNotEmpty()) return byStream
-        }
-        if (epgChannelId.isNotBlank()) {
-            val byEpgId = fetchEpgListings(
-                profile,
-                mapOf("epg_channel_id" to epgChannelId),
-                limit,
-            )
-            if (byEpgId.isNotEmpty()) return byEpgId
+        val attempts = buildList {
+            if (streamId > 0) {
+                add(Triple("get_short_epg", mapOf("stream_id" to streamId.toString()), limit))
+                add(Triple("get_simple_data_table", mapOf("stream_id" to streamId.toString()), limit))
+            }
+            if (epgChannelId.isNotBlank()) {
+                add(Triple("get_short_epg", mapOf("epg_channel_id" to epgChannelId), limit))
+                add(Triple("get_short_epg", mapOf("stream_id" to epgChannelId), limit))
+                add(Triple("get_short_epg", mapOf("channel_id" to epgChannelId), limit))
+                add(Triple("get_simple_data_table", mapOf("epg_channel_id" to epgChannelId), limit))
+                add(Triple("get_simple_data_table", mapOf("stream_id" to epgChannelId), limit))
+            }
+        }.distinct()
+        for ((action, params, requestLimit) in attempts) {
+            val listings = fetchEpgListings(profile, params, requestLimit, action)
+            if (listings.isNotEmpty()) return listings
         }
         return emptyList()
     }
@@ -532,20 +534,26 @@ class XtreamApi(
         val url = "$host/player_api.php?$query"
         val agents = linkedSetOf(activeUserAgent).apply { addAll(userAgents.take(2)) }
         for (ua in agents) {
-            val response = NativeHttpClient.fastRequest(url, ua)
-            if (response.status == 200 && response.body.isNotBlank()) {
-                val parsed = parseEpgListings(response.body)
-                if (parsed.isNotEmpty()) return parsed
-            }
-            if (response.status == 512 || response.status == 403 || response.status == 405) {
-                val post = NativeHttpClient.fastRequest(url, ua, "POST")
-                if (post.status == 200 && post.body.isNotBlank()) {
-                    val parsed = parseEpgListings(post.body)
-                    if (parsed.isNotEmpty()) return parsed
+            for (method in listOf("GET", "POST")) {
+                val fast = if (method == "GET") {
+                    NativeHttpClient.fastRequest(url, ua)
+                } else {
+                    NativeHttpClient.fastRequest(url, ua, "POST")
                 }
+                parseEpgResponse(fast)?.let { return it }
+            }
+            for (method in listOf("GET", "POST")) {
+                val response = NativeHttpClient.request(url, ua, method)
+                parseEpgResponse(response)?.let { return it }
             }
         }
         return emptyList()
+    }
+
+    private fun parseEpgResponse(response: HttpResult): List<EpgEntry>? {
+        if (response.status != 200 || response.body.isBlank()) return null
+        val parsed = parseEpgListings(response.body)
+        return parsed.takeIf { it.isNotEmpty() }
     }
 
     private fun parseEpgListings(body: String): List<EpgEntry> {
