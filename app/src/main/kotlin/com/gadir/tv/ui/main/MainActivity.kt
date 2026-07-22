@@ -2314,10 +2314,7 @@ class MainActivity : BaseLocaleActivity() {
                     if (catalogCategories.isNotEmpty()) {
                         if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
                     }
-                } else if (DeviceUi.useDpadFocus(this)) {
-                    restoreCatalogTab(tab)
-                }
-                if (!DeviceUi.useDpadFocus(this) && ready) {
+                } else if (!DeviceUi.useDpadFocus(this)) {
                     restoreCatalogTab(tab)
                 }
             }
@@ -2710,7 +2707,12 @@ class MainActivity : BaseLocaleActivity() {
                 when (currentTab) {
                     Tab.MOVIES, Tab.SERIES -> {
                         setupCatalogTab(currentTab)
-                        openCatalogTabAtFirstGroup(currentTab)
+                        if (DeviceUi.useDpadFocus(this@MainActivity)) {
+                            catalogBrowseLevel = TvBrowseNav.Level.TAB
+                            panelCatalog.post { applyCatalogBrowseLevel(currentTab) }
+                        } else {
+                            openCatalogTabAtFirstGroup(currentTab)
+                        }
                     }
                     Tab.LIVE -> currentPreviewChannel?.let { schedulePreview(it) }
                     Tab.HOME -> Unit
