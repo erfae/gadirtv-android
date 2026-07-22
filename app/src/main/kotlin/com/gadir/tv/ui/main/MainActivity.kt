@@ -4577,7 +4577,12 @@ class MainActivity : BaseLocaleActivity() {
         pendingPreview = null
         previewToken++
         cancelPreviewTimeout()
-        miniVlcPlayer?.release()
+        disarmPreviewStallWatchdog()
+        try {
+            miniVlcPlayer?.stop()
+            miniVlcPlayer?.release()
+        } catch (_: Throwable) {
+        }
         miniVlcPlayer = null
         releaseExoPreview()
         previewingStreamId = null
@@ -4587,11 +4592,21 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun releaseExoPreview() {
         val view = miniExoView
-        miniExoPlayer?.let { player ->
-            if (view != null) player.detach(view) else player.teardown()
-            player.release()
-        }
+        val player = miniExoPlayer ?: return
         miniExoPlayer = null
+        try {
+            if (view != null) {
+                player.detach(view)
+            } else {
+                player.teardown()
+            }
+            player.release()
+        } catch (_: Throwable) {
+            try {
+                player.release()
+            } catch (_: Throwable) {
+            }
+        }
     }
 
     /** NetTV-style: destruye el preview por completo (categoría, pestaña, salir). */
@@ -5081,24 +5096,25 @@ class MainActivity : BaseLocaleActivity() {
             livePreviewPaused = false
             return
         }
-        try {
-            PlaybackLauncher.play(
-                context = this,
-                request = PlaybackRequest(
-                    title = channel.name,
-                    url = urls.first(),
-                    kind = ResumeStore.KIND_LIVE,
-                    contentId = channel.streamId.toString(),
-                    imageUrl = channel.icon,
-                    streamId = channel.streamId,
-                    epgChannelId = channel.epgChannelId,
-                    extension = channel.extension,
-                    alternateUrls = urls.drop(1),
-                ),
-            )
-        } catch (_: Exception) {
-            livePreviewPaused = false
-            Toast.makeText(this, R.string.connection_failed, Toast.LENGTH_SHORT).show()
+        val request = PlaybackRequest(
+            title = channel.name,
+            url = urls.first(),
+            kind = ResumeStore.KIND_LIVE,
+            contentId = channel.streamId.toString(),
+            imageUrl = channel.icon,
+            streamId = channel.streamId,
+            epgChannelId = channel.epgChannelId,
+            extension = channel.extension,
+            alternateUrls = urls.drop(1),
+        )
+        livePanel().post {
+            if (isDestroyed || currentTab != Tab.LIVE) return@post
+            try {
+                PlaybackLauncher.play(context = this, request = request)
+            } catch (_: Exception) {
+                livePreviewPaused = false
+                Toast.makeText(this, R.string.connection_failed, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

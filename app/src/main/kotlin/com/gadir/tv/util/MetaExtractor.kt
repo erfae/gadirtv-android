@@ -123,6 +123,12 @@ object MetaExtractor {
                         val members = element.asJsonArray.mapNotNull { parseCastElement(it) }
                         if (members.isNotEmpty()) return members
                     }
+                    element.isJsonObject -> {
+                        val members = element.asJsonObject.entrySet()
+                            .sortedBy { it.key.toIntOrNull() ?: Int.MAX_VALUE }
+                            .mapNotNull { parseCastElement(it.value) }
+                        if (members.isNotEmpty()) return members
+                    }
                     element.isJsonPrimitive -> {
                         val text = stripHtml(element.asStringOrNull())
                         if (text.isNotBlank()) {
@@ -150,7 +156,7 @@ object MetaExtractor {
         val pipeParts = token.split("|", limit = 2)
         if (pipeParts.size == 2) {
             val name = pipeParts[0].trim()
-            val image = ImageUrlResolver.resolve(pipeParts[1].trim())
+            val image = resolveCastImage(pipeParts[1].trim())
             if (name.isNotBlank()) return CastMember(name, image)
         }
         return CastMember(token)
@@ -189,8 +195,26 @@ object MetaExtractor {
                 imageFrom(person, "profile_path", "profile", "image", "photo", "avatar")
             }.orEmpty()
         }
-        val resolvedImage = ImageUrlResolver.resolve(image)
+        val resolvedImage = resolveCastImage(image)
         return CastMember(name = name, imageUrl = resolvedImage)
+    }
+
+    private fun resolveCastImage(raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return ""
+        ImageUrlResolver.resolve(trimmed).takeIf { it.isNotBlank() }?.let { return it }
+        if (trimmed.startsWith("http", ignoreCase = true)) return trimmed
+        val path = trimmed.removePrefix("/")
+        if (path.startsWith("t/p/", ignoreCase = true)) {
+            return "https://image.tmdb.org/$path"
+        }
+        if (path.matches(Regex("^w\\d+/.+", RegexOption.IGNORE_CASE))) {
+            return "https://image.tmdb.org/t/p/$path"
+        }
+        if (path.contains('.')) {
+            return "https://image.tmdb.org/t/p/w185/$path"
+        }
+        return ""
     }
 
     fun directorFrom(vararg sources: JsonObject?): String {
