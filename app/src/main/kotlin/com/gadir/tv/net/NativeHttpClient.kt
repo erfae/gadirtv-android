@@ -13,7 +13,7 @@ import java.net.URL
 /** Cliente HTTP Xtream — OkHttp + HttpURLConnection, IPv4, fallback por IP. */
 object NativeHttpClient {
     private const val TAG = "GadirIPTV-HTTP"
-    private const val MAX_RETRIES = 3
+    private const val MAX_RETRIES = 2
 
     fun request(url: String, userAgent: String, method: String = "GET"): HttpResult {
         val targets = PanelHttp.buildTargets(url)
@@ -42,7 +42,7 @@ object NativeHttpClient {
                     }
                 }
                 if (attempt < MAX_RETRIES - 1) {
-                    Thread.sleep(600L * (attempt + 1))
+                    Thread.sleep(350L * (attempt + 1))
                 }
             }
         }

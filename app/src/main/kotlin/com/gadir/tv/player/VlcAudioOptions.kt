@@ -21,6 +21,8 @@ object VlcAudioOptions {
             "--no-video-title-show",
             "--avcodec-hw=any",
             "--http-reconnect",
+            "--clock-jitter=0",
+            "--clock-synchro=0",
         )
     }
 
