@@ -103,13 +103,13 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
         private const val CHANNEL_PREVIEW_DELAY_MS = 0L
-        private const val PREVIEW_TIMEOUT_MS = 4_500L
-        private const val PREVIEW_RETRY_DELAY_MS = 700L
+        private const val PREVIEW_TIMEOUT_MS = 2_800L
+        private const val PREVIEW_RETRY_DELAY_MS = 350L
         private const val PREVIEW_STALL_CHECK_MS = 4_000L
         private const val PREVIEW_STALL_TIMEOUT_MS = 10_000L
-        private const val PREVIEW_SURFACE_MAX_ATTEMPTS = 10
+        private const val PREVIEW_SURFACE_MAX_ATTEMPTS = 4
         private const val CATALOG_PREFETCH_DELAY_MS = 400L
-        private const val EPG_FOCUS_DELAY_MS = 120L
+        private const val EPG_FOCUS_DELAY_MS = 0L
     }
     private val api = XtreamApi()
     private lateinit var resumeStore: ResumeStore
@@ -4543,6 +4543,8 @@ class MainActivity : BaseLocaleActivity() {
                     }
                     channelList.visibility = View.VISIBLE
                     prefetchLiveChannelIcons(loaded)
+                    ensurePreviewPlayer()
+                    prefetchEpgForChannels(loaded)
                     val previewIndex = 0
                     channelList.scrollToPosition(previewIndex)
                     when {
@@ -4723,9 +4725,9 @@ class MainActivity : BaseLocaleActivity() {
         val delayMs = if (DeviceUi.useDpadFocus(this)) {
             CHANNEL_PREVIEW_DELAY_MS
         } else if (usesExoPreview()) {
-            300L
+            120L
         } else {
-            250L
+            150L
         }
         val task = Runnable {
             if (token != previewToken || reloadingChannels || livePreviewPaused) return@Runnable
@@ -4874,6 +4876,60 @@ class MainActivity : BaseLocaleActivity() {
             epgPreviewAdapter?.submit(emptyList())
         }
         scheduleEpgLoad(channel)
+        prefetchEpgNeighbors(channel)
+    }
+
+    private fun prefetchEpgNeighbors(channel: LiveChannel) {
+        val profile = PlaylistRepository.profile ?: return
+        val index = channels.indexOfFirst { it.streamId == channel.streamId }
+        if (index < 0) return
+        val neighbors = buildList {
+            channels.getOrNull(index - 1)?.let { add(it) }
+            channels.getOrNull(index + 1)?.let { add(it) }
+            channels.getOrNull(index + 2)?.let { add(it) }
+        }
+        if (neighbors.isEmpty()) return
+        lifecycleScope.launch(Dispatchers.IO) {
+            neighbors.forEach { neighbor ->
+                if (EpgCache.get(neighbor.streamId)?.isNotEmpty() == true) return@forEach
+                runCatching {
+                    val epg = api.shortEpg(
+                        profile,
+                        streamId = neighbor.streamId,
+                        epgChannelId = neighbor.epgChannelId,
+                        limit = 4,
+                    )
+                    if (epg.isNotEmpty()) EpgCache.put(neighbor.streamId, epg)
+                }
+            }
+        }
+    }
+
+    private fun prefetchEpgForChannels(channelBatch: List<LiveChannel>, limit: Int = 20) {
+        val profile = PlaylistRepository.profile ?: return
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                coroutineScope {
+                    val semaphore = Semaphore(4)
+                    channelBatch.take(limit).map { channel ->
+                        async {
+                            semaphore.withPermit {
+                                if (EpgCache.get(channel.streamId)?.isNotEmpty() == true) return@withPermit
+                                runCatching {
+                                    val epg = api.shortEpg(
+                                        profile,
+                                        streamId = channel.streamId,
+                                        epgChannelId = channel.epgChannelId,
+                                        limit = 4,
+                                    )
+                                    if (epg.isNotEmpty()) EpgCache.put(channel.streamId, epg)
+                                }
+                            }
+                        }
+                    }.awaitAll()
+                }
+            }
+        }
     }
 
     private fun scheduleEpgLoad(channel: LiveChannel) {
@@ -4903,7 +4959,11 @@ class MainActivity : BaseLocaleActivity() {
             }
         }
         pendingEpg = task
-        previewHandler.postDelayed(task, EPG_FOCUS_DELAY_MS)
+        if (EPG_FOCUS_DELAY_MS > 0L) {
+            previewHandler.postDelayed(task, EPG_FOCUS_DELAY_MS)
+        } else {
+            previewHandler.post(task)
+        }
     }
 
     private fun cancelMiniPreviewPlayback() {
@@ -5607,7 +5667,7 @@ class MainActivity : BaseLocaleActivity() {
         miniVlcPlayer = LiveVlcPlayer(
             context = this,
             videoLayout = videoLayout,
-            networkBufferMs = appSettings.networkBufferMs.coerceIn(1_500, 4_000),
+            networkBufferMs = appSettings.networkBufferMs.coerceIn(600, 1_200),
             previewMode = true,
             onError = {
                 setPreviewVideoVisible(false)

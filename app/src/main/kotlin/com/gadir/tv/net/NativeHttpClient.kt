@@ -49,6 +49,13 @@ object NativeHttpClient {
         return last
     }
 
+    /** Fast single-attempt request for EPG/preview (avoids multi-retry latency). */
+    fun fastRequest(url: String, userAgent: String, method: String = "GET"): HttpResult {
+        val target = PanelHttp.buildTargets(url).firstOrNull()
+            ?: return HttpResult(0, "", method.uppercase(), "Sin destino")
+        return requestOkHttp(target, userAgent, method, PanelHttp.detailOkHttpClient)
+    }
+
     /** Single-target detail fetch with a short deadline (does not block UI for minutes). */
     fun detailRequest(url: String, userAgent: String, method: String = "GET"): HttpResult {
         val target = PanelHttp.buildTargets(url).firstOrNull()

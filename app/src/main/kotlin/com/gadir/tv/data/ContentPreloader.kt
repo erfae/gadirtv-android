@@ -25,8 +25,8 @@ import kotlinx.coroutines.withContext
 object ContentPreloader {
     private const val ICON_PARALLEL = 8
     private const val PLOT_PARALLEL = 4
-    private const val EPG_PARALLEL = 3
-    private const val EPG_CHANNEL_LIMIT = 40
+    private const val EPG_PARALLEL = 5
+    private const val EPG_CHANNEL_LIMIT = 48
     private const val PLOT_LIMIT = 24
     private const val PRIORITY_CHANNEL_ICONS = 120
     private const val CHANNEL_ICON_BATCH = 200
@@ -59,10 +59,11 @@ object ContentPreloader {
     ) = withContext(Dispatchers.IO) {
         coroutineScope {
             val catalogJob = async { CatalogPreloader.preloadRemaining(api, profile) }
+            val epgJob = async { preloadEpg(api, profile, prioritizedChannels(context)) }
             preloadHomeAssets(context, api, profile)
             preloadPrioritizedChannelIcons(context)
+            epgJob.await()
             catalogJob.await()
-            preloadEpg(api, profile, prioritizedChannels(context))
             preloadRemainingChannelIcons(context)
             preloadCatalogPosters(context)
         }

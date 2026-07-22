@@ -46,6 +46,7 @@ class LiveVlcPlayer(
     private var currentUrl: String? = null
 
     fun play(url: String, volume: Int) {
+        if (url == currentUrl && mediaPlayer.isPlaying) return
         currentUrl = url
         startPlayback(url, volume)
     }
@@ -78,6 +79,7 @@ class LiveVlcPlayer(
             mediaPlayer.volume = volume
             mediaPlayer.play()
         } catch (_: Throwable) {
+            currentUrl = null
             onError()
         }
     }
