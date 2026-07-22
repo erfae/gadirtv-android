@@ -241,6 +241,10 @@ class TrailerActivity : BaseLocaleActivity() {
     private fun playYoutube(videoId: String) {
         currentYoutubeId = videoId
         if (DeviceUi.isTvUi(this)) {
+            if (openYoutubeExternal(videoId)) {
+                finish()
+                return
+            }
             youtubeStreamTried = true
             lifecycleScope.launch {
                 val direct = withContext(Dispatchers.IO) {
@@ -430,6 +434,12 @@ class TrailerActivity : BaseLocaleActivity() {
     private fun showFailed() {
         cancelLoadTimeout()
         releasePlayer()
+        val youtubeId = currentYoutubeId
+            ?: sources.filterIsInstance<TrailerSource.Youtube>().firstOrNull()?.videoId
+        if (DeviceUi.isTvUi(this) && youtubeId != null && openYoutubeExternal(youtubeId)) {
+            finish()
+            return
+        }
         showWebView()
         statusView.visibility = View.VISIBLE
         statusView.text = getString(R.string.trailer_playback_failed)

@@ -348,13 +348,15 @@ class XtreamApi(
 
     fun vodInfo(profile: Profile, vodId: Int): VodInfo? {
         val host = HostUtils.baseUrl(com.gadir.tv.net.PanelHttp.migrateProfileHost(profile.host))
-        val query = buildString {
+        val baseQuery = buildString {
             append("username=").append(encode(profile.username))
             append("&password=").append(encode(profile.password))
             append("&action=get_vod_info")
-            append("&vod_id=").append(vodId)
         }
-        val body = fetchDetailBody("$host/player_api.php?$query") ?: return null
+        val idKeys = listOf("vod_id", "stream_id")
+        val body = idKeys.firstNotNullOfOrNull { key ->
+            fetchDetailBody("$host/player_api.php?$baseQuery&$key=$vodId")
+        } ?: return null
         return try {
             val root = gson.fromJson(body, JsonObject::class.java) ?: return null
             val info = root.getAsJsonObject("info")
@@ -653,13 +655,13 @@ class XtreamApi(
         }.getOrDefault(url)
         val agents = linkedSetOf(activeUserAgent).apply { addAll(userAgents) }
         for (ua in agents) {
-            val get = NativeHttpClient.detailRequest(resolvedUrl, ua, "GET")
+            val get = NativeHttpClient.request(resolvedUrl, ua, "GET")
             val body = get.body.trim()
             if (get.status == 200 && body.isNotBlank() && body != "[]" && isUsableDetailBody(body)) {
                 return body
             }
-            if (get.status == 512 || get.status == 403 || get.status == 405 || body.isBlank()) {
-                val post = NativeHttpClient.detailRequest(resolvedUrl, ua, "POST")
+            if (get.status == 512 || get.status == 403 || get.status == 405 || body.isBlank() || body == "[]") {
+                val post = NativeHttpClient.request(resolvedUrl, ua, "POST")
                 val postBody = post.body.trim()
                 if (post.status == 200 && postBody.isNotBlank() && postBody != "[]" && isUsableDetailBody(postBody)) {
                     return postBody
@@ -670,10 +672,29 @@ class XtreamApi(
     }
 
     private fun isUsableDetailBody(body: String): Boolean {
-        if (!body.contains("\"info\":[]")) return true
-        return body.contains("\"movie_data\"") &&
+        if (body.contains("\"info\"") &&
+            !body.contains("\"info\":[]") &&
+            !body.contains("\"info\":null")
+        ) {
+            return true
+        }
+        if (body.contains("\"movie_data\"") &&
             !body.contains("\"movie_data\":[]") &&
             !body.contains("\"movie_data\":null")
+        ) {
+            return true
+        }
+        if (body.contains("\"episodes\"") &&
+            !body.contains("\"episodes\":[]") &&
+            !body.contains("\"episodes\":null")
+        ) {
+            return true
+        }
+        return body.contains("\"plot\"") ||
+            body.contains("\"description\"") ||
+            body.contains("\"overview\"") ||
+            body.contains("\"cast\"") ||
+            body.contains("\"actors\"")
     }
 
     private fun fetchList(

@@ -178,8 +178,12 @@ object ImageLoader {
                     val base = HostUtils.baseUrl(PanelHttp.migrateProfileHost(host)).trimEnd('/')
                     add(NetworkUrlResolver.resolveUrl("$base/$path"))
                     add(NetworkUrlResolver.resolveUrl("$base/images/$path"))
+                    add(NetworkUrlResolver.resolveUrl("$base/images/cast/$path"))
+                    add(NetworkUrlResolver.resolveUrl("$base/cast/$path"))
+                    add(NetworkUrlResolver.resolveUrl("$base/actor/$path"))
                 }
             }
+            ImageUrlResolver.resolve("/$path").takeIf { it.isNotBlank() && it !in this }?.let { add(it) }
         }.distinct().filter { it.isNotBlank() }
     }
 

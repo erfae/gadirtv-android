@@ -22,6 +22,7 @@ object ImageUrlResolver {
     private val panelPathPrefixes = listOf(
         "/images/", "/imgs/", "/logo", "/logos/", "/live/", "/streaming/",
         "/movie/", "/series/", "/static/", "/media/",
+        "/cast/", "/casts/", "/actor/", "/actors/", "/star/", "/profile/",
     )
 
     private val tmdbSizedInPath = Regex(

@@ -112,7 +112,8 @@ object MetaExtractor {
 
     fun castMembersFrom(vararg sources: JsonObject?): List<CastMember> {
         val keys = listOf(
-            "cast", "actors", "starring", "actor", "actor_list",
+            "cast", "actors", "starring", "actor", "actor_list", "cast_list",
+            "stars", "reparto", "crew_cast",
         )
         for (source in sources) {
             if (source == null) continue
@@ -132,7 +133,7 @@ object MetaExtractor {
                     element.isJsonPrimitive -> {
                         val text = stripHtml(element.asStringOrNull())
                         if (text.isNotBlank()) {
-                            return text.split(",")
+                            return text.split(",", ";")
                                 .mapNotNull { parseCastNameToken(it.trim()) }
                                 .filter { it.name.isNotBlank() }
                         }
@@ -153,27 +154,33 @@ object MetaExtractor {
 
     private fun parseCastNameToken(token: String): CastMember? {
         if (token.isBlank()) return null
-        val pipeParts = token.split("|", limit = 2)
-        if (pipeParts.size == 2) {
-            val name = pipeParts[0].trim()
-            val image = resolveCastImage(pipeParts[1].trim())
-            if (name.isNotBlank()) return CastMember(name, image)
+        for (separator in listOf("|", ":")) {
+            val parts = token.split(separator, limit = 2)
+            if (parts.size == 2) {
+                val name = parts[0].trim()
+                val image = resolveCastImage(parts[1].trim())
+                if (name.isNotBlank()) return CastMember(name, image)
+            }
         }
         return CastMember(token)
     }
 
     private fun parseCastElement(element: JsonElement): CastMember? {
         if (element.isJsonPrimitive) {
-            val name = stripHtml(element.asStringOrNull()).orEmpty()
-            return name.takeIf { it.isNotBlank() }?.let { CastMember(it) }
+            val raw = stripHtml(element.asStringOrNull()).orEmpty()
+            if (raw.isBlank()) return null
+            return parseCastNameToken(raw) ?: CastMember(raw)
         }
         if (!element.isJsonObject) return null
         val obj = element.asJsonObject
         val name = stripHtml(
             obj.get("name")?.asStringOrNull()
                 ?: obj.get("actor")?.asStringOrNull()
+                ?: obj.get("actor_name")?.asStringOrNull()
+                ?: obj.get("star")?.asStringOrNull()
                 ?: obj.get("cast")?.asStringOrNull()
-                ?: obj.get("character")?.asStringOrNull(),
+                ?: obj.get("character")?.asStringOrNull()
+                ?: obj.get("role")?.asStringOrNull(),
         ).orEmpty()
         if (name.isBlank()) return null
         val image = imageFrom(
@@ -190,9 +197,21 @@ object MetaExtractor {
             "portrait",
             "url",
             "cover",
+            "picture",
+            "img",
+            "actor_pic",
+            "star_pic",
         ).ifBlank {
             obj.getAsJsonObject("person")?.let { person ->
-                imageFrom(person, "profile_path", "profile", "image", "photo", "avatar")
+                imageFrom(
+                    person,
+                    "profile_path",
+                    "profile",
+                    "image",
+                    "photo",
+                    "avatar",
+                    "url",
+                )
             }.orEmpty()
         }
         val resolvedImage = resolveCastImage(image)
@@ -212,9 +231,10 @@ object MetaExtractor {
             return "https://image.tmdb.org/t/p/$path"
         }
         if (path.contains('.')) {
+            ImageUrlResolver.resolve("/$path").takeIf { it.isNotBlank() }?.let { return it }
             return "https://image.tmdb.org/t/p/w185/$path"
         }
-        return ""
+        return ImageUrlResolver.resolve(trimmed)
     }
 
     fun directorFrom(vararg sources: JsonObject?): String {
