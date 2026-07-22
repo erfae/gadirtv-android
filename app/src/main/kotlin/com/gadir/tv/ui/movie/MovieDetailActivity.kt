@@ -17,6 +17,7 @@ import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.VodInfo
 import com.gadir.tv.model.VodMovie
 import com.gadir.tv.player.PlaybackRequest
+import com.gadir.tv.player.VodPlaybackHelper
 import com.gadir.tv.player.ResumePlaybackHelper
 import com.gadir.tv.player.VodStreamUrls
 import com.gadir.tv.ui.BaseLocaleActivity
@@ -293,24 +294,14 @@ class MovieDetailActivity : BaseLocaleActivity() {
         val title = findViewById<TextView>(R.id.movieTitle).text.toString()
         val cover = fallbackCover
         lifecycleScope.launch {
-            var ext = extension.ifBlank { "mp4" }
-            var direct = directSource
-            MovieDetailCache.get(streamId)?.let { cached ->
-                ext = cached.extension.ifBlank { ext }
-                direct = cached.directSource.ifBlank { direct }
+            val resolved = withContext(Dispatchers.IO) {
+                VodPlaybackHelper.resolveMovie(
+                    api, profile, streamId, extension, directSource,
+                )
             }
-            if (direct.isBlank()) {
-                val info = withContext(Dispatchers.IO) { api.vodInfo(profile, streamId) }
-                info?.let { cached ->
-                    MovieDetailCache.put(streamId, cached)
-                    ext = cached.extension.ifBlank { ext }
-                    direct = cached.directSource
-                    extension = ext
-                    directSource = direct
-                }
-            }
-            val urls = VodStreamUrls.movieCandidates(api, profile, streamId, ext, direct)
-            val url = urls.firstOrNull().orEmpty()
+            extension = resolved.extension
+            MovieDetailCache.get(streamId)?.directSource?.let { directSource = it }
+            val url = resolved.urls.firstOrNull().orEmpty()
             if (url.isBlank()) {
                 android.widget.Toast.makeText(
                     this@MovieDetailActivity,
@@ -328,8 +319,8 @@ class MovieDetailActivity : BaseLocaleActivity() {
                     kind = ResumeStore.KIND_MOVIE,
                     contentId = streamId.toString(),
                     imageUrl = cover,
-                    extension = ext,
-                    alternateUrls = urls.drop(1),
+                    extension = resolved.extension,
+                    alternateUrls = resolved.urls.drop(1),
                 ),
             )
         }
