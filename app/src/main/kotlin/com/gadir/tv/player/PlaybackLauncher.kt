@@ -19,18 +19,13 @@ object PlaybackLauncher {
         }
         val settings = AppSettings(context)
         try {
-            when {
-                settings.playerMode == AppSettings.PLAYER_EXTERNAL ->
-                    launchExternal(context, request, settings)
-                settings.playerMode == AppSettings.PLAYER_VLC ->
-                    launchVlc(context, request)
-                settings.playerMode == AppSettings.PLAYER_COMPAT ->
-                    launchExo(context, request)
-                request.kind == ResumeStore.KIND_LIVE && DeviceUi.isTvUi(context) ->
-                    launchExo(context, request)
-                DeviceUi.isTvUi(context) ->
-                    launchExo(context, request)
-                else -> launchExo(context, request)
+            when (settings.playerMode) {
+                AppSettings.PLAYER_EXTERNAL -> launchExternal(context, request, settings)
+                AppSettings.PLAYER_VLC -> launchVlc(context, request)
+                AppSettings.PLAYER_COMPAT,
+                AppSettings.PLAYER_STANDARD,
+                -> launchExo(context, request)
+                else -> launchDefault(context, request)
             }
         } catch (_: Throwable) {
             android.widget.Toast.makeText(
@@ -41,8 +36,22 @@ object PlaybackLauncher {
         }
     }
 
+    private fun launchDefault(context: Context, request: PlaybackRequest) {
+        when {
+            request.kind == ResumeStore.KIND_LIVE && DeviceUi.isTvUi(context) ->
+                launchExo(context, request)
+            DeviceUi.isTvUi(context) ->
+                launchExo(context, request)
+            else -> launchExo(context, request)
+        }
+    }
+
     private fun vodFallback(context: Context, request: PlaybackRequest) {
-        launchExo(context, request)
+        val settings = AppSettings(context)
+        when (settings.playerMode) {
+            AppSettings.PLAYER_VLC -> launchVlc(context, request)
+            else -> launchExo(context, request)
+        }
     }
 
     private fun launchExternal(context: Context, request: PlaybackRequest, settings: AppSettings) {

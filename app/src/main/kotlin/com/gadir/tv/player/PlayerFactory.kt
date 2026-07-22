@@ -68,7 +68,13 @@ object PlayerFactory {
     }
 
     fun create(context: Context): ExoPlayer {
-        val bufferMs = AppSettings(context).networkBufferMs.coerceIn(1_500, 5_000)
+        val settings = AppSettings(context)
+        val bufferMs = settings.networkBufferMs.coerceIn(1_500, 5_000)
+        val rendererMode = if (settings.isCompatPlayer) {
+            DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+        } else {
+            DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+        }
         return build(
             context = context,
             minBuffer = (bufferMs * 8).coerceIn(15_000, 60_000),
@@ -77,7 +83,7 @@ object PlayerFactory {
             rebuffer = (bufferMs * 3).coerceIn(5_000, 15_000),
             audioAttributes = vodAudioAttributes(),
             handleAudioFocus = true,
-            extensionRendererMode = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER,
+            extensionRendererMode = rendererMode,
         )
     }
 

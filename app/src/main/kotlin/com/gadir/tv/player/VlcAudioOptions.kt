@@ -19,12 +19,12 @@ object VlcAudioOptions {
             "--live-caching=$cache",
             "--file-caching=${(cache * 2).coerceIn(3_000, 10_000)}",
             "--no-video-title-show",
-            "--avcodec-hw=mediacodec",
+            "--avcodec-hw=any",
             "--http-reconnect",
         )
     }
 
-    /** VOD: larger cache and stable decode (avoids frozen frames on TV boxes). */
+    /** VOD: larger cache for progressive HTTP streams. */
     fun vodOptions(networkBufferMs: Int): ArrayList<String> {
         val network = networkBufferMs.coerceIn(2_000, 8_000)
         val file = (network * 3).coerceIn(8_000, 24_000)
@@ -34,9 +34,23 @@ object VlcAudioOptions {
             "--live-caching=$network",
             "--file-caching=$file",
             "--no-video-title-show",
-            "--avcodec-hw=mediacodec",
+            "--avcodec-hw=any",
             "--http-reconnect",
-            "--no-drop-late-frames",
+        )
+    }
+
+    /** Software decode fallback when hardware init/playback fails. */
+    fun softwareOptions(networkBufferMs: Int): ArrayList<String> {
+        val cache = networkBufferMs.coerceIn(1_500, 5_000)
+        return arrayListOf(
+            "--http-user-agent=${PlaylistRepository.userAgent}",
+            "--network-caching=$cache",
+            "--live-caching=$cache",
+            "--file-caching=${(cache * 2).coerceIn(3_000, 10_000)}",
+            "--no-video-title-show",
+            "--avcodec-hw=none",
+            "--avcodec-fast",
+            "--http-reconnect",
         )
     }
 

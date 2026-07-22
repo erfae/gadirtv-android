@@ -69,6 +69,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private var exoFallbackLaunched = false
     private var allowExoFallback = true
 
+    private var vlcUsesSoftwareDecode = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_vlc_player)
@@ -108,40 +110,14 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
         val settings = AppSettings(this)
         val bufferMs = settings.networkBufferMs.coerceIn(AppSettings.BUFFER_NORMAL_MS, AppSettings.BUFFER_STABLE_MS)
-        val options = if (isLivePlayback) {
-            com.gadir.tv.player.VlcAudioOptions.liveFullscreenOptions(bufferMs)
-        } else {
-            com.gadir.tv.player.VlcAudioOptions.vodOptions(bufferMs)
-        }
-        libVlc = LibVLC(this, options)
-        mediaPlayer = MediaPlayer(libVlc).apply {
-            attachViews(findViewById(R.id.vlcVideo), null, false, !isLivePlayback)
-            volume = VLC_VOLUME
-            setEventListener { event ->
-                when (event.type) {
-                    MediaPlayer.Event.EncounteredError -> {
-                        if (!tryNextUrl()) {
-                            fallbackToExoPlayer()
-                        }
-                    }
-                    MediaPlayer.Event.Playing -> {
-                        if (resumeSeekPending && resumePositionMs > 0L) {
-                            mediaPlayer?.time = resumePositionMs
-                            resumeSeekPending = false
-                        }
-                        showControls()
-                        updatePlayPauseIcon()
-                    }
-                    MediaPlayer.Event.Paused -> updatePlayPauseIcon()
-                    MediaPlayer.Event.LengthChanged -> {
-                        vodDurationMs = mediaPlayer?.length ?: 0L
-                        updateVodProgress()
-                    }
-                    MediaPlayer.Event.TimeChanged -> updateVodProgress()
-                }
+        if (!initVlcPlayer(bufferMs, preferSoftware = false)) {
+            if (!fallbackToExoPlayer()) {
+                android.widget.Toast.makeText(this, R.string.series_playback_failed, android.widget.Toast.LENGTH_LONG).show()
+                finish()
             }
+            return
         }
-        playUrl(url)
+        playUrl(pendingUrls.firstOrNull().orEmpty())
         VolumeHelper.boostOnPlaybackStart(this)
 
         findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
@@ -154,6 +130,71 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         }
 
         showControls()
+    }
+
+    private fun initVlcPlayer(bufferMs: Int, preferSoftware: Boolean): Boolean {
+        releaseVlcPlayer()
+        vlcUsesSoftwareDecode = preferSoftware
+        val options = when {
+            preferSoftware -> com.gadir.tv.player.VlcAudioOptions.softwareOptions(bufferMs)
+            isLivePlayback -> com.gadir.tv.player.VlcAudioOptions.liveFullscreenOptions(bufferMs)
+            else -> com.gadir.tv.player.VlcAudioOptions.vodOptions(bufferMs)
+        }
+        return try {
+            libVlc = LibVLC(this, options)
+            mediaPlayer = MediaPlayer(libVlc).apply {
+                attachViews(findViewById(R.id.vlcVideo), null, false, false)
+                volume = VLC_VOLUME
+                setEventListener { event -> handleVlcEvent(event) }
+            }
+            true
+        } catch (_: Throwable) {
+            releaseVlcPlayer()
+            if (!preferSoftware) {
+                initVlcPlayer(bufferMs, preferSoftware = true)
+            } else {
+                false
+            }
+        }
+    }
+
+    private fun handleVlcEvent(event: MediaPlayer.Event) {
+        when (event.type) {
+            MediaPlayer.Event.EncounteredError -> {
+                val bufferMs = AppSettings(this).networkBufferMs
+                    .coerceIn(AppSettings.BUFFER_NORMAL_MS, AppSettings.BUFFER_STABLE_MS)
+                if (!vlcUsesSoftwareDecode && initVlcPlayer(bufferMs, preferSoftware = true)) {
+                    playUrl(pendingUrls.firstOrNull().orEmpty())
+                    return
+                }
+                if (!tryNextUrl()) {
+                    fallbackToExoPlayer()
+                }
+            }
+            MediaPlayer.Event.Playing -> {
+                if (resumeSeekPending && resumePositionMs > 0L) {
+                    mediaPlayer?.setTime(resumePositionMs, true)
+                    resumeSeekPending = false
+                }
+                showControls()
+                updatePlayPauseIcon()
+            }
+            MediaPlayer.Event.Paused -> updatePlayPauseIcon()
+            MediaPlayer.Event.LengthChanged -> {
+                vodDurationMs = mediaPlayer?.length ?: 0L
+                updateVodProgress()
+            }
+            MediaPlayer.Event.TimeChanged -> updateVodProgress()
+        }
+    }
+
+    private fun releaseVlcPlayer() {
+        mediaPlayer?.stop()
+        mediaPlayer?.detachViews()
+        mediaPlayer?.release()
+        mediaPlayer = null
+        libVlc?.release()
+        libVlc = null
     }
 
     private fun setupLiveUi(channelTitle: String) {
@@ -278,11 +319,11 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         return true
     }
 
-    private fun fallbackToExoPlayer() {
-        if (!allowExoFallback || exoFallbackLaunched) return
+    private fun fallbackToExoPlayer(): Boolean {
+        if (!allowExoFallback || exoFallbackLaunched) return false
         exoFallbackLaunched = true
         val url = pendingUrls.firstOrNull().orEmpty()
-        if (url.isBlank()) return
+        if (url.isBlank()) return false
         startActivity(
             PlayerActivity.intent(
                 context = this,
@@ -300,6 +341,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             ),
         )
         finish()
+        return true
     }
 
     private fun togglePlayPause() {
@@ -419,12 +461,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
     override fun onDestroy() {
         hideHandler.removeCallbacksAndMessages(null)
-        mediaPlayer?.stop()
-        mediaPlayer?.detachViews()
-        mediaPlayer?.release()
-        mediaPlayer = null
-        libVlc?.release()
-        libVlc = null
+        releaseVlcPlayer()
         super.onDestroy()
     }
 
