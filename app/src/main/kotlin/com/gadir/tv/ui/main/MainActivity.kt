@@ -3399,7 +3399,10 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun isHeroShowing(kind: String, id: Int): Boolean {
-        if (currentTab != Tab.HOME || railPreviewItem != null) return false
+        if (currentTab != Tab.HOME) return false
+        railPreviewItem?.let { preview ->
+            return preview.kind == kind && preview.id == id
+        }
         val key = heroItemContentKey(heroItems.getOrNull(heroIndex) ?: return false) ?: return false
         return key.first == kind && key.second == id
     }
@@ -3922,7 +3925,7 @@ class MainActivity : BaseLocaleActivity() {
                 }
                 else -> PlaylistRepository.cachedVod(categoryId)?.takeIf { it.isNotEmpty() }?.let {
                     bindMovies(it)
-                    return
+                    if (!showLoadingIndicator) return
                 }
             }
             Tab.SERIES -> when (categoryId) {
@@ -3932,7 +3935,7 @@ class MainActivity : BaseLocaleActivity() {
                 }
                 else -> PlaylistRepository.cachedSeries(categoryId)?.takeIf { it.isNotEmpty() }?.let {
                     bindSeries(it)
-                    return
+                    if (!showLoadingIndicator) return
                 }
             }
             Tab.LIVE, Tab.HOME -> Unit

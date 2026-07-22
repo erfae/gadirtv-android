@@ -74,7 +74,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private var vlcUsesSoftwareDecode = false
     private var activeLiveUrl: String? = null
     private var liveRecoverAttempts = 0
-    private val liveStallTracker = LiveStreamStallTracker(12_000L)
+    private val liveStallTracker = LiveStreamStallTracker(8_000L)
     private var liveStallRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -370,14 +370,13 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun recoverLiveFromStall() {
         liveRecoverAttempts += 1
         liveStallTracker.reset()
-        if (liveRecoverAttempts <= 2) {
+        if (tryNextUrl()) return
+        if (liveRecoverAttempts <= 1) {
             activeLiveUrl?.let { playUrl(it) }
             return
         }
         liveRecoverAttempts = 0
-        if (!tryNextUrl()) {
-            fallbackToExoPlayer()
-        }
+        fallbackToExoPlayer()
     }
 
     private fun tryNextUrl(): Boolean {

@@ -150,6 +150,26 @@ object MetaExtractor {
                     if (members.isNotEmpty()) return members
                 }
             }
+            for ((key, value) in source.entrySet()) {
+                if (!key.contains("cast", ignoreCase = true) &&
+                    !key.contains("actor", ignoreCase = true)
+                ) {
+                    continue
+                }
+                if (keys.contains(key)) continue
+                when {
+                    value.isJsonArray -> {
+                        val members = value.asJsonArray.mapNotNull { parseCastElement(it) }
+                        if (members.isNotEmpty()) return members
+                    }
+                    value.isJsonObject -> {
+                        val members = value.asJsonObject.entrySet()
+                            .sortedBy { it.key.toIntOrNull() ?: Int.MAX_VALUE }
+                            .mapNotNull { parseCastElement(it.value) }
+                        if (members.isNotEmpty()) return members
+                    }
+                }
+            }
         }
         return emptyList()
     }
@@ -276,9 +296,13 @@ object MetaExtractor {
         }
         if (path.contains('.')) {
             ImageUrlResolver.resolve("/$path").takeIf { it.isNotBlank() }?.let { return it }
+            ImageUrlResolver.resolve("images/$path").takeIf { it.isNotBlank() }?.let { return it }
             return "https://image.tmdb.org/t/p/w185/$path"
         }
-        return ImageUrlResolver.resolve(trimmed)
+        listOf("/images/$path", "/cast/$path", "/actor/$path", path).forEach { candidate ->
+            ImageUrlResolver.resolve(candidate).takeIf { it.isNotBlank() }?.let { return it }
+        }
+        return ""
     }
 
     fun directorFrom(vararg sources: JsonObject?): String {
