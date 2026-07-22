@@ -240,4 +240,14 @@ object PanelHttp {
             .writeTimeout(6, TimeUnit.SECONDS)
             .build()
     }
+
+    /** VOD/series detail: short deadline so UI is not blocked by multi-UA retries. */
+    val detailOkHttpClient: OkHttpClient by lazy {
+        baseClientBuilder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(5, TimeUnit.SECONDS)
+            .callTimeout(12, TimeUnit.SECONDS)
+            .build()
+    }
 }

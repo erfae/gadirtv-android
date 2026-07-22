@@ -222,7 +222,7 @@ class XtreamApi(
         }.filter { it.seriesId > 0 }
     }
 
-    fun seriesInfo(profile: Profile, seriesId: Int): SeriesDetail? {
+    fun seriesInfo(profile: Profile, seriesId: Int, quick: Boolean = false): SeriesDetail? {
         val host = HostUtils.baseUrl(profile.host)
         val query = buildString {
             append("username=").append(encode(profile.username))
@@ -230,7 +230,7 @@ class XtreamApi(
             append("&action=get_series_info")
             append("&series_id=").append(seriesId)
         }
-        val body = fetchDetailBody("$host/player_api.php?$query") ?: return null
+        val body = fetchDetailBody("$host/player_api.php?$query", quick = quick) ?: return null
         return try {
             val root = gson.fromJson(body, JsonObject::class.java) ?: return null
             val info = root.getAsJsonObject("info")
@@ -339,7 +339,7 @@ class XtreamApi(
         return trimmed
     }
 
-    fun vodInfo(profile: Profile, vodId: Int): VodInfo? {
+    fun vodInfo(profile: Profile, vodId: Int, quick: Boolean = false): VodInfo? {
         val host = HostUtils.baseUrl(profile.host)
         val query = buildString {
             append("username=").append(encode(profile.username))
@@ -347,7 +347,7 @@ class XtreamApi(
             append("&action=get_vod_info")
             append("&vod_id=").append(vodId)
         }
-        val body = fetchDetailBody("$host/player_api.php?$query") ?: return null
+        val body = fetchDetailBody("$host/player_api.php?$query", quick = quick) ?: return null
         return try {
             val root = gson.fromJson(body, JsonObject::class.java) ?: return null
             val info = root.getAsJsonObject("info")
@@ -631,7 +631,7 @@ class XtreamApi(
         }.filter { it.id.isNotEmpty() }
             .sortedBy { it.order }
 
-    private fun fetchDetailBody(url: String): String? {
+    private fun fetchDetailBody(url: String, quick: Boolean = false): String? {
         val resolvedUrl = runCatching {
             val uri = java.net.URI(url)
             val host = uri.host ?: return@runCatching url
@@ -644,16 +644,27 @@ class XtreamApi(
             val portSuffix = if (port > 0 && port != 80 && port != 443) ":$port" else ""
             "$migrated$portSuffix$path$query"
         }.getOrDefault(url)
-        val agents = linkedSetOf(activeUserAgent)
-        agents.addAll(userAgents)
+        val agents = if (quick) {
+            listOf(activeUserAgent)
+        } else {
+            linkedSetOf(activeUserAgent).apply { addAll(userAgents) }.toList()
+        }
         for (ua in agents) {
-            val get = NativeHttpClient.request(resolvedUrl, ua, "GET")
+            val get = if (quick) {
+                NativeHttpClient.quickRequest(resolvedUrl, ua, "GET")
+            } else {
+                NativeHttpClient.request(resolvedUrl, ua, "GET")
+            }
             val body = get.body.trim()
             if (get.status == 200 && body.isNotBlank() && body != "[]" && !body.contains("\"info\":[]")) {
                 return body
             }
             if (get.status == 512 || get.status == 403 || get.status == 405 || body.isBlank()) {
-                val post = NativeHttpClient.request(resolvedUrl, ua, "POST")
+                val post = if (quick) {
+                    NativeHttpClient.quickRequest(resolvedUrl, ua, "POST")
+                } else {
+                    NativeHttpClient.request(resolvedUrl, ua, "POST")
+                }
                 val postBody = post.body.trim()
                 if (post.status == 200 && postBody.isNotBlank() && postBody != "[]" && !postBody.contains("\"info\":[]")) {
                     return postBody

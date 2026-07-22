@@ -5158,11 +5158,14 @@ class MainActivity : BaseLocaleActivity() {
             ensureLiveTabReady()
             syncLivePlaylistUi()
             livePreviewPaused = false
-            if (!DeviceUi.useDpadFocus(this)) {
-                focusChannelAt(currentPreviewChannel)
-            }
-            if (appSettings.autoplayPreview && currentPreviewChannel != null) {
+            ensurePreviewPlayer()
+            if (DeviceUi.useDpadFocus(this)) {
                 currentPreviewChannel?.let { schedulePreview(it) }
+            } else {
+                focusChannelAt(currentPreviewChannel)
+                if (appSettings.autoplayPreview && currentPreviewChannel != null) {
+                    currentPreviewChannel?.let { schedulePreview(it) }
+                }
             }
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
             if (!DeviceUi.useDpadFocus(this)) {

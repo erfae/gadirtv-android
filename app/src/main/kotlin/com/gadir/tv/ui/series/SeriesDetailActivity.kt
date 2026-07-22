@@ -33,10 +33,8 @@ import com.gadir.tv.util.TrailerLauncher
 import com.gadir.tv.util.TvFocusHelper
 import com.gadir.tv.util.TvNavHelper
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 
 class SeriesDetailActivity : BaseLocaleActivity() {
     private val api = XtreamApi()
@@ -188,25 +186,45 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         btnSeriesPlay.visibility = View.VISIBLE
 
         lifecycleScope.launch {
-            val detail = try {
+            val detail = runCatching {
                 withContext(Dispatchers.IO) {
-                    withTimeout(4_000L) {
-                        api.seriesInfo(profile, seriesId)
-                    }
+                    api.seriesInfo(profile, seriesId, quick = true)
                 }
-            } catch (_: Exception) {
-                null
-            }
+            }.getOrNull()
             if (token != loadToken) return@launch
-            loadingView.visibility = View.GONE
-            if (detail == null) {
-                if (PlotCache.get("series", seriesId) == null) {
-                    seriesPlot.text = getString(R.string.series_load_failed)
-                }
-                btnSeriesPlay.requestFocus()
+            if (detail != null) {
+                bindDetail(detail)
                 return@launch
             }
-            bindDetail(detail)
+            resolvePlotLoadingState(failed = PlotCache.get("series", seriesId) == null)
+            btnSeriesPlay.requestFocus()
+            retrySeriesDetailFull(token)
+        }
+    }
+
+    private fun retrySeriesDetailFull(token: Int) {
+        val profile = PlaylistRepository.profile ?: return
+        lifecycleScope.launch {
+            val detail = runCatching {
+                withContext(Dispatchers.IO) {
+                    api.seriesInfo(profile, seriesId, quick = false)
+                }
+            }.getOrNull()
+            if (token != loadToken) return@launch
+            if (detail != null) {
+                bindDetail(detail)
+            } else {
+                resolvePlotLoadingState(failed = true)
+            }
+        }
+    }
+
+    private fun resolvePlotLoadingState(failed: Boolean) {
+        if (seriesPlot.text?.toString() != getString(R.string.hero_plot_loading)) return
+        seriesPlot.text = if (failed) {
+            getString(R.string.series_load_failed)
+        } else {
+            getString(R.string.hero_plot_empty)
         }
     }
 
@@ -298,6 +316,15 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         val episode = season?.let { seasons[it]?.minByOrNull { ep -> ep.episodeNum } }
         if (episode != null) {
             playEpisode(episode)
+            return
+        }
+        if (seriesPlot.text?.toString() == getString(R.string.hero_plot_loading)) {
+            android.widget.Toast.makeText(
+                this,
+                R.string.series_load_failed,
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+            loadSeriesDetail()
         }
     }
 

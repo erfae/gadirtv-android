@@ -23,7 +23,7 @@ object NativeHttpClient {
             repeat(MAX_RETRIES) { attempt ->
                 for (transport in listOf("OkHttp", "HttpURL")) {
                     val result = when (transport) {
-                        "OkHttp" -> requestOkHttp(target, userAgent, method)
+                        "OkHttp" -> requestOkHttp(target, userAgent, method, PanelHttp.okHttpClient)
                         else -> requestHttpUrl(target, userAgent, method)
                     }
                     last = result
@@ -49,7 +49,19 @@ object NativeHttpClient {
         return last
     }
 
-    private fun requestOkHttp(target: PanelHttp.RequestTarget, userAgent: String, method: String): HttpResult {
+    /** Single-target detail fetch with a short deadline (does not block UI for minutes). */
+    fun quickRequest(url: String, userAgent: String, method: String = "GET"): HttpResult {
+        val target = PanelHttp.buildTargets(url).firstOrNull()
+            ?: return HttpResult(0, "", method.uppercase(), "Sin destino")
+        return requestOkHttp(target, userAgent, method, PanelHttp.detailOkHttpClient)
+    }
+
+    private fun requestOkHttp(
+        target: PanelHttp.RequestTarget,
+        userAgent: String,
+        method: String,
+        client: okhttp3.OkHttpClient = PanelHttp.okHttpClient,
+    ): HttpResult {
         return try {
             val uri = URI(target.requestUrl)
             val originHost = target.hostHeader ?: uri.host
@@ -79,7 +91,7 @@ object NativeHttpClient {
                 Log.i(TAG, "OkHttp GET ${target.requestUrl} [${target.label}] UA=$userAgent")
             }
 
-            PanelHttp.okHttpClient.newCall(builder.build()).execute().use { response ->
+            client.newCall(builder.build()).execute().use { response ->
                 HttpResult(response.code, response.body?.string() ?: "", method.uppercase())
             }
         } catch (e: Exception) {
