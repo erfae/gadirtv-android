@@ -172,6 +172,7 @@ object PlaylistRepository {
         homeRecentSeries = emptyList()
         bootstrapReady = false
         PlotCache.clear()
+        MovieDetailCache.clear()
         SeriesDetailCache.clear()
         EpgCache.clear()
         com.gadir.tv.util.ChannelIconCache.clear()
@@ -193,6 +194,7 @@ object PlaylistRepository {
         accountInfo = null
         userAgent = "XCIPTV"
         PlotCache.clear()
+        MovieDetailCache.clear()
         SeriesDetailCache.clear()
         EpgCache.clear()
         com.gadir.tv.util.ChannelIconCache.clear()

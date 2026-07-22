@@ -32,6 +32,7 @@ import com.gadir.tv.data.ContentPreloader
 import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.LiveChannelStore
 import com.gadir.tv.data.PlotCache
+import com.gadir.tv.data.MovieDetailCache
 import com.gadir.tv.data.SeriesDetailCache
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ParentalControlStore
@@ -50,7 +51,9 @@ import com.gadir.tv.ui.movie.MovieDetailActivity
 import com.gadir.tv.player.LiveChannelNavigator
 import com.gadir.tv.player.LiveExoPreviewPlayer
 import com.gadir.tv.player.LivePreviewStreamUrls
+import com.gadir.tv.player.LiveStreamStallTracker
 import com.gadir.tv.player.LiveStreamUrls
+import com.gadir.tv.player.exoLiveProgressKey
 import com.gadir.tv.player.VodStreamUrls
 import com.gadir.tv.player.LiveVlcPlayer
 import com.gadir.tv.player.PlaybackLauncher
@@ -99,8 +102,12 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_LIMIT_TV = 8
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
-        private const val CHANNEL_PREVIEW_DELAY_MS = 60L
+        private const val CHANNEL_PREVIEW_DELAY_MS = 0L
         private const val PREVIEW_TIMEOUT_MS = 4_500L
+        private const val PREVIEW_RETRY_DELAY_MS = 700L
+        private const val PREVIEW_STALL_CHECK_MS = 4_000L
+        private const val PREVIEW_STALL_TIMEOUT_MS = 10_000L
+        private const val PREVIEW_SURFACE_MAX_ATTEMPTS = 10
         private const val CATALOG_PREFETCH_DELAY_MS = 400L
         private const val EPG_FOCUS_DELAY_MS = 120L
     }
@@ -385,9 +392,7 @@ class MainActivity : BaseLocaleActivity() {
         startHeaderClock()
         findViewById<TextView>(R.id.appVersionLabel)?.text = "v${BuildConfig.VERSION_NAME}"
         findViewById<TextView>(R.id.btnSearch).also { btnSearch = it }
-        TvFocusHelper.bindButton(btnSearch) {
-            startActivity(Intent(this, SearchActivity::class.java))
-        }
+        TvFocusHelper.bindButton(btnSearch) { openSearch() }
         findViewById<TextView>(R.id.btnReload).also { btnReload = it }
         TvFocusHelper.bindButton(btnReload) { reloadPlaylist() }
         findViewById<TextView>(R.id.btnSettings).also { btnSettings = it }
@@ -467,6 +472,10 @@ class MainActivity : BaseLocaleActivity() {
                     focusFirstHomeRail()
                     true
                 }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    btnSearch.requestFocus()
+                    true
+                }
                 else -> false
             }
         }
@@ -474,10 +483,10 @@ class MainActivity : BaseLocaleActivity() {
         setupTabNavigation()
         installTvBackHandler()
         heroPlay.setOnClickListener { openHeroContent() }
-        tabHome.nextFocusUpId = R.id.btnSettings
-        tabLive.nextFocusUpId = R.id.btnSettings
-        tabMovies.nextFocusUpId = R.id.btnSettings
-        tabSeries.nextFocusUpId = R.id.btnSettings
+        tabHome.nextFocusUpId = R.id.btnSearch
+        tabLive.nextFocusUpId = R.id.btnSearch
+        tabMovies.nextFocusUpId = R.id.btnSearch
+        tabSeries.nextFocusUpId = R.id.btnSearch
         tabHome.setOnKeyListener { _, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN || currentTab != Tab.HOME) {
                 return@setOnKeyListener false
@@ -1496,7 +1505,10 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun updateHeaderFocusForTab(tab: Tab) {
         val headerFocusable = !DeviceUi.useDpadFocus(this) || tab == Tab.HOME
-        listOf(btnSearch, btnReload, btnSettings, btnLogout, btnExit).forEach { button ->
+        val searchFocusable = !DeviceUi.useDpadFocus(this) || true
+        btnSearch.isFocusable = searchFocusable
+        btnSearch.isFocusableInTouchMode = searchFocusable
+        listOf(btnReload, btnSettings, btnLogout, btnExit).forEach { button ->
             button.isFocusable = headerFocusable
             button.isFocusableInTouchMode = headerFocusable
             if (!headerFocusable && button.hasFocus()) button.clearFocus()
@@ -1504,6 +1516,10 @@ class MainActivity : BaseLocaleActivity() {
         if (DeviceUi.useDpadFocus(this)) {
             catalogCategoryList.nextFocusUpId = View.NO_ID
         }
+    }
+
+    private fun openSearch() {
+        startActivity(Intent(this, SearchActivity::class.java))
     }
 
     private fun updateHeaderDownFocus() {
@@ -2021,6 +2037,7 @@ class MainActivity : BaseLocaleActivity() {
                     when (activeTab) {
                         Tab.MOVIES -> {
                             val info = api.vodInfo(profile, item.id) ?: return@withContext
+                            MovieDetailCache.put(item.id, info)
                             val backdrop = info.backdrop.ifBlank { info.cover }
                             PlotCache.put(
                                 kind,
@@ -2269,6 +2286,7 @@ class MainActivity : BaseLocaleActivity() {
                     if (currentTab != Tab.LIVE) return@post
                     if (DeviceUi.useDpadFocus(this)) {
                         ensurePreviewPlayer()
+                        warmupPreviewPlayer()
                         if (PlaylistRepository.bootstrapReady && liveBrowseLevel == TvBrowseNav.Level.TAB) {
                             enterLiveTabFromTabBar()
                         } else {
@@ -2300,10 +2318,7 @@ class MainActivity : BaseLocaleActivity() {
                     if (catalogCategories.isNotEmpty()) {
                         if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
                     }
-                } else if (DeviceUi.useDpadFocus(this)) {
-                    restoreCatalogTab(tab)
-                }
-                if (!DeviceUi.useDpadFocus(this) && ready) {
+                } else if (!DeviceUi.useDpadFocus(this)) {
                     restoreCatalogTab(tab)
                 }
             }
@@ -2696,7 +2711,12 @@ class MainActivity : BaseLocaleActivity() {
                 when (currentTab) {
                     Tab.MOVIES, Tab.SERIES -> {
                         setupCatalogTab(currentTab)
-                        openCatalogTabAtFirstGroup(currentTab)
+                        if (DeviceUi.useDpadFocus(this@MainActivity)) {
+                            catalogBrowseLevel = TvBrowseNav.Level.TAB
+                            panelCatalog.post { applyCatalogBrowseLevel(currentTab) }
+                        } else {
+                            openCatalogTabAtFirstGroup(currentTab)
+                        }
                     }
                     Tab.LIVE -> currentPreviewChannel?.let { schedulePreview(it) }
                     Tab.HOME -> Unit
@@ -3037,6 +3057,7 @@ class MainActivity : BaseLocaleActivity() {
         extension: String = "mp4",
         added: Long = 0L,
     ) {
+        prefetchMovieDetail(streamId, title, cover)
         startActivity(
             MovieDetailActivity.intent(
                 context = this,
@@ -3047,6 +3068,29 @@ class MainActivity : BaseLocaleActivity() {
                 added = added,
             ),
         )
+    }
+
+    private fun prefetchMovieDetail(streamId: Int, title: String, cover: String) {
+        if (MovieDetailCache.get(streamId) != null) return
+        val profile = PlaylistRepository.profile ?: return
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                api.vodInfo(profile, streamId)?.let { info ->
+                    MovieDetailCache.put(streamId, info)
+                    PlotCache.put(
+                        "movie",
+                        streamId,
+                        PlotCache.Entry(
+                            plot = info.plot,
+                            backdrop = info.backdrop.ifBlank { info.cover },
+                            poster = info.cover.ifBlank { cover },
+                            title = info.name.ifBlank { title },
+                        ),
+                    )
+                }
+            } catch (_: Exception) {
+            }
+        }
     }
 
     private fun openSeriesDetail(
@@ -4517,6 +4561,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun teardownLivePreviewPlayback() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
+        disarmPreviewStallWatchdog()
         previewToken++
         miniVlcPlayer?.stop()
         miniExoPlayer?.stop()
@@ -4596,6 +4641,7 @@ class MainActivity : BaseLocaleActivity() {
     /** Stops preview A/V without tearing down the player instance. */
     private fun stopPreviewForZap() {
         cancelPreviewTimeout()
+        disarmPreviewStallWatchdog()
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
         miniVlcPlayer?.stop()
@@ -4608,6 +4654,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun abortPreviewPlayback() {
         previewToken++
         cancelPreviewTimeout()
+        disarmPreviewStallWatchdog()
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
         miniVlcPlayer?.stop()
@@ -4683,15 +4730,98 @@ class MainActivity : BaseLocaleActivity() {
             if (token != previewToken || previewIsSettled()) return@Runnable
             if (!tryNextPreviewUrl(token)) {
                 showNoSignal()
+                schedulePreviewRetry(token)
             }
         }
         previewTimeoutRunnable = task
         previewHandler.postDelayed(task, PREVIEW_TIMEOUT_MS)
     }
 
+    private fun schedulePreviewRetry(token: Int) {
+        if (token != previewToken) return
+        previewHandler.postDelayed({
+            if (token != previewToken || previewIsSettled() || livePreviewPaused) return@postDelayed
+            val channel = currentPreviewChannel ?: return@postDelayed
+            previewUrlIndex = 0
+            previewChannel(channel, token)
+        }, PREVIEW_RETRY_DELAY_MS)
+    }
+
     private fun cancelPreviewTimeout() {
         previewTimeoutRunnable?.let { previewHandler.removeCallbacks(it) }
         previewTimeoutRunnable = null
+    }
+
+    private fun disarmPreviewStallWatchdog() {
+        previewStallRunnable?.let { previewHandler.removeCallbacks(it) }
+        previewStallRunnable = null
+        previewStallTracker.reset()
+        previewStallRecoverAttempts = 0
+    }
+
+    private fun armPreviewStallWatchdog() {
+        disarmPreviewStallWatchdog()
+        val runnable = object : Runnable {
+            override fun run() {
+                if (!previewIsSettled() || livePreviewPaused || currentTab != Tab.LIVE) {
+                    disarmPreviewStallWatchdog()
+                    return
+                }
+                notePreviewPlaybackProgress()
+                if (previewStallTracker.isStalled()) {
+                    recoverPreviewFromStall()
+                    return
+                }
+                previewHandler.postDelayed(this, PREVIEW_STALL_CHECK_MS)
+            }
+        }
+        previewStallRunnable = runnable
+        previewHandler.postDelayed(runnable, PREVIEW_STALL_CHECK_MS)
+    }
+
+    private fun notePreviewPlaybackProgress() {
+        if (usesExoPreview()) {
+            val player = miniExoPlayer?.player ?: return
+            previewStallTracker.noteProgress(
+                exoLiveProgressKey(player.currentPosition, player.bufferedPosition),
+            )
+        } else {
+            val time = miniVlcPlayer?.playbackTimeMs() ?: return
+            if (time >= 0L) previewStallTracker.noteProgress(time)
+        }
+    }
+
+    private fun recoverPreviewFromStall() {
+        val token = previewToken
+        previewStallRecoverAttempts += 1
+        previewStallTracker.reset()
+        val volume = if (appSettings.previewSound) {
+            LiveVlcPlayer.VOLUME_PREVIEW
+        } else {
+            0
+        }
+        if (previewStallRecoverAttempts <= 2) {
+            setPreviewVideoVisible(false)
+            hideNoSignal()
+            val replayed = if (usesExoPreview()) {
+                miniExoPlayer?.replay(volume) == true
+            } else {
+                miniVlcPlayer?.replay(volume) == true
+            }
+            if (replayed) {
+                armPreviewTimeout(token)
+                armPreviewStallWatchdog()
+                return
+            }
+        }
+        previewStallRecoverAttempts = 0
+        previewWorkingUrl = null
+        if (!tryNextPreviewUrl(token)) {
+            showNoSignal()
+            schedulePreviewRetry(token)
+        } else {
+            armPreviewStallWatchdog()
+        }
     }
 
     private fun schedulePreviewInternal(channel: LiveChannel) {
@@ -4794,6 +4924,9 @@ class MainActivity : BaseLocaleActivity() {
 
     private var previewPlaybackToken = 0
     private var previewTimeoutRunnable: Runnable? = null
+    private var previewStallRunnable: Runnable? = null
+    private val previewStallTracker = LiveStreamStallTracker(PREVIEW_STALL_TIMEOUT_MS)
+    private var previewStallRecoverAttempts = 0
 
     private fun playMiniPreviewUrl(url: String, token: Int, hideVideo: Boolean = false) {
         if (token != previewToken || url.isBlank()) return
@@ -5167,6 +5300,10 @@ class MainActivity : BaseLocaleActivity() {
                     handleTvBack()
                     return true
                 }
+                KeyEvent.KEYCODE_SEARCH -> {
+                    openSearch()
+                    return true
+                }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     if (handleTvDpadLeft()) return true
                 }
@@ -5324,6 +5461,7 @@ class MainActivity : BaseLocaleActivity() {
         }
         miniExoView?.alpha = 0f
         miniVlcView?.alpha = 0f
+        warmupPreviewPlayer()
     }
 
     /** NetTV-style: crea VLC al enlazar el panel (evita race con surface no medido). */
@@ -5372,16 +5510,33 @@ class MainActivity : BaseLocaleActivity() {
             block()
             return
         }
-        if (surface.width > 0 && surface.height > 0 && surface.isAttachedToWindow) {
-            block()
-            return
-        }
-        surface.post {
-            if (surface.width > 0 && surface.height > 0) {
+        var attempts = 0
+        fun tryRun() {
+            if (surface.width > 0 && surface.height > 0 && surface.isAttachedToWindow) {
                 block()
-            } else {
-                surface.post(block)
+                return
             }
+            attempts += 1
+            if (attempts >= PREVIEW_SURFACE_MAX_ATTEMPTS) {
+                block()
+                return
+            }
+            surface.post { tryRun() }
+        }
+        if (surface.isAttachedToWindow) {
+            tryRun()
+        } else {
+            surface.post { tryRun() }
+        }
+    }
+
+    private fun warmupPreviewPlayer() {
+        if (currentTab != Tab.LIVE) return
+        livePanel().post {
+            if (currentTab != Tab.LIVE) return@post
+            ensurePreviewPlayer()
+            val surface = if (usesExoPreview()) miniExoView else miniVlcView
+            surface?.requestLayout()
         }
     }
 
@@ -5408,6 +5563,8 @@ class MainActivity : BaseLocaleActivity() {
                 setPreviewVideoVisible(true)
                 hideNoSignal()
                 if (DeviceUi.useDpadFocus(this)) showMiniPreviewControls()
+                notePreviewPlaybackProgress()
+                armPreviewStallWatchdog()
             },
         )
     }
@@ -5438,6 +5595,8 @@ class MainActivity : BaseLocaleActivity() {
                 setPreviewVideoVisible(true)
                 hideNoSignal()
                 if (DeviceUi.useDpadFocus(this)) showMiniPreviewControls()
+                notePreviewPlaybackProgress()
+                armPreviewStallWatchdog()
             },
         )
     }

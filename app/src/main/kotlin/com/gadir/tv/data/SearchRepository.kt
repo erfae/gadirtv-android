@@ -4,6 +4,7 @@ import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.model.Profile
 import com.gadir.tv.model.SeriesItem
 import com.gadir.tv.model.VodMovie
+import com.gadir.tv.util.CategorySort
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.Normalizer
@@ -24,26 +25,37 @@ object SearchRepository {
         withContext(Dispatchers.IO) {
             moviesIndex = PlaylistRepository.allCachedVod().distinctBy { it.streamId }
             seriesIndex = PlaylistRepository.allCachedSeries().distinctBy { it.seriesId }
-            if (moviesIndex.isEmpty()) {
-                val categoryId = PlaylistRepository.vodCategories
-                    .firstOrNull { it.id.isNotBlank() }
-                    ?.id
-                if (categoryId != null) {
-                    moviesIndex = runCatching { api.vodStreams(profile, categoryId) }
-                        .getOrDefault(emptyList())
-                        .also { PlaylistRepository.cacheVod(categoryId, it) }
+
+            for (category in PlaylistRepository.vodCategories) {
+                if (category.id.isBlank() || CategorySort.isAdultCategory(category.name)) continue
+                val cached = PlaylistRepository.cachedVod(category.id)
+                if (cached != null) {
+                    moviesIndex = (moviesIndex + cached).distinctBy { it.streamId }
+                    continue
+                }
+                val fetched = runCatching { api.vodStreams(profile, category.id) }
+                    .getOrDefault(emptyList())
+                if (fetched.isNotEmpty()) {
+                    PlaylistRepository.cacheVod(category.id, fetched)
+                    moviesIndex = (moviesIndex + fetched).distinctBy { it.streamId }
                 }
             }
-            if (seriesIndex.isEmpty()) {
-                val categoryId = PlaylistRepository.seriesCategories
-                    .firstOrNull { it.id.isNotBlank() }
-                    ?.id
-                if (categoryId != null) {
-                    seriesIndex = runCatching { api.seriesList(profile, categoryId) }
-                        .getOrDefault(emptyList())
-                        .also { PlaylistRepository.cacheSeries(categoryId, it) }
+
+            for (category in PlaylistRepository.seriesCategories) {
+                if (category.id.isBlank() || CategorySort.isAdultCategory(category.name)) continue
+                val cached = PlaylistRepository.cachedSeries(category.id)
+                if (cached != null) {
+                    seriesIndex = (seriesIndex + cached).distinctBy { it.seriesId }
+                    continue
+                }
+                val fetched = runCatching { api.seriesList(profile, category.id) }
+                    .getOrDefault(emptyList())
+                if (fetched.isNotEmpty()) {
+                    PlaylistRepository.cacheSeries(category.id, fetched)
+                    seriesIndex = (seriesIndex + fetched).distinctBy { it.seriesId }
                 }
             }
+
             loaded = true
         }
     }
@@ -64,11 +76,22 @@ object SearchRepository {
             .filter { matches(it.name, needle, tokens) }
             .take(40)
 
-        val movies = moviesIndex
+        val moviesSource = if (moviesIndex.isNotEmpty()) {
+            moviesIndex
+        } else {
+            PlaylistRepository.allCachedVod()
+        }
+        val seriesSource = if (seriesIndex.isNotEmpty()) {
+            seriesIndex
+        } else {
+            PlaylistRepository.allCachedSeries()
+        }
+
+        val movies = moviesSource
             .filter { matches(it.name, needle, tokens) }
             .take(40)
 
-        val series = seriesIndex
+        val series = seriesSource
             .filter { matches(it.name, needle, tokens) }
             .take(40)
 

@@ -43,7 +43,26 @@ class LiveVlcPlayer(
         }
     }
 
+    private var currentUrl: String? = null
+
     fun play(url: String, volume: Int) {
+        currentUrl = url
+        startPlayback(url, volume)
+    }
+
+    fun replay(volume: Int): Boolean {
+        val url = currentUrl?.takeIf { it.isNotBlank() } ?: return false
+        startPlayback(url, volume)
+        return true
+    }
+
+    fun playbackTimeMs(): Long = try {
+        mediaPlayer.time
+    } catch (_: Throwable) {
+        -1L
+    }
+
+    private fun startPlayback(url: String, volume: Int) {
         try {
             mediaPlayer.stop()
             mediaPlayer.volume = 0
@@ -64,6 +83,7 @@ class LiveVlcPlayer(
     }
 
     fun stop() {
+        currentUrl = null
         try {
             mediaPlayer.stop()
             mediaPlayer.volume = 0

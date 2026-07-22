@@ -39,7 +39,20 @@ class LiveExoPreviewPlayer(
         )
     }
 
+    private var currentUrl: String? = null
+
     fun play(url: String, volume: Int) {
+        currentUrl = url
+        startPlayback(url, volume)
+    }
+
+    fun replay(volume: Int): Boolean {
+        val url = currentUrl?.takeIf { it.isNotBlank() } ?: return false
+        startPlayback(url, volume)
+        return true
+    }
+
+    private fun startPlayback(url: String, volume: Int) {
         val item = LiveStreamUrls.mediaItem(url)
         player.playWhenReady = false
         player.stop()
@@ -51,6 +64,7 @@ class LiveExoPreviewPlayer(
     }
 
     fun teardown() {
+        currentUrl = null
         player.playWhenReady = false
         player.stop()
         player.clearMediaItems()

@@ -22,6 +22,7 @@ import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
 import com.gadir.tv.model.LiveChannel
 import com.gadir.tv.player.LiveChannelNavigator
+import com.gadir.tv.player.LiveStreamStallTracker
 import com.gadir.tv.player.LiveStreamUrls
 import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.util.TimeFormat
@@ -69,6 +70,12 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private var exoFallbackLaunched = false
     private var allowExoFallback = true
 
+    private var vlcUsesSoftwareDecode = false
+    private var activeLiveUrl: String? = null
+    private var liveRecoverAttempts = 0
+    private val liveStallTracker = LiveStreamStallTracker(12_000L)
+    private var liveStallRunnable: Runnable? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_vlc_player)
@@ -107,37 +114,15 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         }
 
         val settings = AppSettings(this)
-        val bufferMs = settings.networkBufferMs.coerceAtLeast(AppSettings.BUFFER_FAST_MS)
-        val options = com.gadir.tv.player.VlcAudioOptions.baseOptions(bufferMs)
-        libVlc = LibVLC(this, options)
-        mediaPlayer = MediaPlayer(libVlc).apply {
-            attachViews(findViewById(R.id.vlcVideo), null, false, false)
-            volume = VLC_VOLUME
-            setEventListener { event ->
-                when (event.type) {
-                    MediaPlayer.Event.EncounteredError -> {
-                        if (!tryNextUrl()) {
-                            fallbackToExoPlayer()
-                        }
-                    }
-                    MediaPlayer.Event.Playing -> {
-                        if (resumeSeekPending && resumePositionMs > 0L) {
-                            mediaPlayer?.time = resumePositionMs
-                            resumeSeekPending = false
-                        }
-                        showControls()
-                        updatePlayPauseIcon()
-                    }
-                    MediaPlayer.Event.Paused -> updatePlayPauseIcon()
-                    MediaPlayer.Event.LengthChanged -> {
-                        vodDurationMs = mediaPlayer?.length ?: 0L
-                        updateVodProgress()
-                    }
-                    MediaPlayer.Event.TimeChanged -> updateVodProgress()
-                }
+        val bufferMs = settings.networkBufferMs.coerceIn(AppSettings.BUFFER_NORMAL_MS, AppSettings.BUFFER_STABLE_MS)
+        if (!initVlcPlayer(bufferMs, preferSoftware = false)) {
+            if (!fallbackToExoPlayer()) {
+                android.widget.Toast.makeText(this, R.string.series_playback_failed, android.widget.Toast.LENGTH_LONG).show()
+                finish()
             }
+            return
         }
-        playUrl(url)
+        playUrl(pendingUrls.firstOrNull().orEmpty())
         VolumeHelper.boostOnPlaybackStart(this)
 
         findViewById<ImageButton>(R.id.btnVolUp).setOnClickListener {
@@ -150,6 +135,80 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         }
 
         showControls()
+    }
+
+    private fun initVlcPlayer(bufferMs: Int, preferSoftware: Boolean): Boolean {
+        releaseVlcPlayer()
+        vlcUsesSoftwareDecode = preferSoftware
+        val options = when {
+            preferSoftware -> com.gadir.tv.player.VlcAudioOptions.softwareOptions(bufferMs)
+            isLivePlayback -> com.gadir.tv.player.VlcAudioOptions.liveFullscreenOptions(bufferMs)
+            else -> com.gadir.tv.player.VlcAudioOptions.vodOptions(bufferMs)
+        }
+        return try {
+            libVlc = LibVLC(this, options)
+            mediaPlayer = MediaPlayer(libVlc).apply {
+                attachViews(findViewById(R.id.vlcVideo), null, false, false)
+                volume = VLC_VOLUME
+                setEventListener { event -> handleVlcEvent(event) }
+            }
+            true
+        } catch (_: Throwable) {
+            releaseVlcPlayer()
+            if (!preferSoftware) {
+                initVlcPlayer(bufferMs, preferSoftware = true)
+            } else {
+                false
+            }
+        }
+    }
+
+    private fun handleVlcEvent(event: MediaPlayer.Event) {
+        when (event.type) {
+            MediaPlayer.Event.EncounteredError -> {
+                val bufferMs = AppSettings(this).networkBufferMs
+                    .coerceIn(AppSettings.BUFFER_NORMAL_MS, AppSettings.BUFFER_STABLE_MS)
+                if (!vlcUsesSoftwareDecode && initVlcPlayer(bufferMs, preferSoftware = true)) {
+                    playUrl(pendingUrls.firstOrNull().orEmpty())
+                    return
+                }
+                if (!tryNextUrl()) {
+                    fallbackToExoPlayer()
+                }
+            }
+            MediaPlayer.Event.Playing -> {
+                if (resumeSeekPending && resumePositionMs > 0L) {
+                    mediaPlayer?.setTime(resumePositionMs, true)
+                    resumeSeekPending = false
+                }
+                if (isLivePlayback) {
+                    mediaPlayer?.time?.takeIf { it >= 0L }?.let { liveStallTracker.noteProgress(it) }
+                    armLiveStallWatchdog()
+                }
+                showControls()
+                updatePlayPauseIcon()
+            }
+            MediaPlayer.Event.Paused -> updatePlayPauseIcon()
+            MediaPlayer.Event.LengthChanged -> {
+                vodDurationMs = mediaPlayer?.length ?: 0L
+                updateVodProgress()
+            }
+            MediaPlayer.Event.TimeChanged -> {
+                updateVodProgress()
+                if (isLivePlayback) {
+                    mediaPlayer?.time?.takeIf { it >= 0L }?.let { liveStallTracker.noteProgress(it) }
+                }
+            }
+        }
+    }
+
+    private fun releaseVlcPlayer() {
+        mediaPlayer?.stop()
+        mediaPlayer?.detachViews()
+        mediaPlayer?.release()
+        mediaPlayer = null
+        libVlc?.release()
+        libVlc = null
     }
 
     private fun setupLiveUi(channelTitle: String) {
@@ -206,7 +265,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                 val duration = currentVodDuration()
                 if (duration > 0L && seekBar != null) {
                     val position = (duration * seekBar.progress) / seekBar.max
-                    mediaPlayer?.time = position
+                    mediaPlayer?.setTime(position, true)
                 }
                 scheduleHideControls()
             }
@@ -245,6 +304,11 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun playUrl(url: String) {
         val vlc = libVlc ?: return
         val player = mediaPlayer ?: return
+        if (isLivePlayback) {
+            activeLiveUrl = url
+            liveRecoverAttempts = 0
+            liveStallTracker.reset()
+        }
         player.stop()
         player.volume = 0
         val resolved = com.gadir.tv.util.NetworkUrlResolver.resolve(url)
@@ -254,10 +318,56 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             media.addOption(":http-referrer=${com.gadir.tv.util.HostUtils.baseUrl(host)}/")
         }
         media.addOption(":http-user-agent=${PlaylistRepository.userAgent}")
+        if (!isLivePlayback) {
+            val cache = AppSettings(this).networkBufferMs.coerceIn(2_000, 8_000)
+            media.addOption(":network-caching=$cache")
+            media.addOption(":file-caching=${(cache * 3).coerceIn(8_000, 24_000)}")
+            media.addOption(":clock-jitter=0")
+        }
         player.media = media
         media.release()
         player.volume = VLC_VOLUME
         player.play()
+    }
+
+    private fun armLiveStallWatchdog() {
+        if (!isLivePlayback) return
+        disarmLiveStallWatchdog()
+        val runnable = object : Runnable {
+            override fun run() {
+                if (!isLivePlayback || mediaPlayer == null) {
+                    disarmLiveStallWatchdog()
+                    return
+                }
+                mediaPlayer?.time?.takeIf { it >= 0L }?.let { liveStallTracker.noteProgress(it) }
+                if (liveStallTracker.isStalled()) {
+                    recoverLiveFromStall()
+                    return
+                }
+                hideHandler.postDelayed(this, 4_000L)
+            }
+        }
+        liveStallRunnable = runnable
+        hideHandler.postDelayed(runnable, 4_000L)
+    }
+
+    private fun disarmLiveStallWatchdog() {
+        liveStallRunnable?.let { hideHandler.removeCallbacks(it) }
+        liveStallRunnable = null
+        liveStallTracker.reset()
+    }
+
+    private fun recoverLiveFromStall() {
+        liveRecoverAttempts += 1
+        liveStallTracker.reset()
+        if (liveRecoverAttempts <= 2) {
+            activeLiveUrl?.let { playUrl(it) }
+            return
+        }
+        liveRecoverAttempts = 0
+        if (!tryNextUrl()) {
+            fallbackToExoPlayer()
+        }
     }
 
     private fun tryNextUrl(): Boolean {
@@ -268,11 +378,11 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         return true
     }
 
-    private fun fallbackToExoPlayer() {
-        if (!allowExoFallback || exoFallbackLaunched) return
+    private fun fallbackToExoPlayer(): Boolean {
+        if (!allowExoFallback || exoFallbackLaunched) return false
         exoFallbackLaunched = true
         val url = pendingUrls.firstOrNull().orEmpty()
-        if (url.isBlank()) return
+        if (url.isBlank()) return false
         startActivity(
             PlayerActivity.intent(
                 context = this,
@@ -290,6 +400,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             ),
         )
         finish()
+        return true
     }
 
     private fun togglePlayPause() {
@@ -301,13 +412,17 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
     private fun seekBy(deltaMs: Long) {
         val player = mediaPlayer ?: return
+        val wasPlaying = player.isPlaying
         val duration = currentVodDuration()
         val target = if (duration > 0L) {
             (player.time + deltaMs).coerceIn(0L, duration)
         } else {
             (player.time + deltaMs).coerceAtLeast(0L)
         }
-        player.time = target
+        player.setTime(target, true)
+        if (wasPlaying && !player.isPlaying) {
+            player.play()
+        }
         updateVodProgress()
         showControls()
     }
@@ -405,12 +520,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
     override fun onDestroy() {
         hideHandler.removeCallbacksAndMessages(null)
-        mediaPlayer?.stop()
-        mediaPlayer?.detachViews()
-        mediaPlayer?.release()
-        mediaPlayer = null
-        libVlc?.release()
-        libVlc = null
+        releaseVlcPlayer()
         super.onDestroy()
     }
 

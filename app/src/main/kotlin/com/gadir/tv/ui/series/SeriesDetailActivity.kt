@@ -79,10 +79,10 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         castList = findViewById(R.id.seriesCastList)
         btnSeriesPlay.setOnClickListener { playFirstEpisode() }
         TvFocusHelper.bindButton(btnSeriesPlay, onActivate = { playFirstEpisode() }, onMoveDown = {
-            if (DeviceUi.useDpadFocus(this)) focusCastList()
+            if (DeviceUi.useDpadFocus(this)) focusSeasonList()
         })
         TvFocusHelper.bindButton(btnSeriesTrailer, onActivate = { openTrailer() }, onMoveDown = {
-            if (DeviceUi.useDpadFocus(this)) focusCastList()
+            if (DeviceUi.useDpadFocus(this)) focusSeasonList()
         })
         bindFavoriteButton()
         findViewById<ImageView>(R.id.btnSeriesBack).apply {

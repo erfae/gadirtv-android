@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.data.FavoritesStore
+import com.gadir.tv.data.MovieDetailCache
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.PlotCache
 import com.gadir.tv.data.ResumeStore
@@ -25,6 +26,7 @@ import com.gadir.tv.util.TrailerLauncher
 import com.gadir.tv.util.TvFocusHelper
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -166,9 +168,13 @@ class MovieDetailActivity : BaseLocaleActivity() {
     private fun loadMovieDetail() {
         val profile = PlaylistRepository.profile ?: return
         val token = ++loadToken
-        val hasCached = PlotCache.get("movie", streamId) != null
+        val cachedInfo = MovieDetailCache.get(streamId)
+        val hasCached = cachedInfo != null || PlotCache.get("movie", streamId) != null
         loadingView.visibility = if (hasCached) View.GONE else View.VISIBLE
         btnMoviePlay.visibility = View.VISIBLE
+        if (cachedInfo != null) {
+            bindDetail(cachedInfo)
+        }
 
         lifecycleScope.launch {
             val info = runCatching {
@@ -179,11 +185,28 @@ class MovieDetailActivity : BaseLocaleActivity() {
             if (token != loadToken) return@launch
             loadingView.visibility = View.GONE
             if (info == null) {
-                resolvePlotLoadingState(failed = PlotCache.get("movie", streamId) == null)
+                if (cachedInfo == null) {
+                    resolvePlotLoadingState(failed = !canPlayMovie())
+                }
                 btnMoviePlay.requestFocus()
+                scheduleMovieDetailRetry(token)
                 return@launch
             }
+            MovieDetailCache.put(streamId, info)
             bindDetail(info)
+        }
+    }
+
+    private fun canPlayMovie(): Boolean =
+        streamId > 0 && PlaylistRepository.profile != null &&
+            (movieName.isNotBlank() || fallbackCover.isNotBlank() || PlotCache.get("movie", streamId) != null)
+
+    private fun scheduleMovieDetailRetry(token: Int) {
+        if (MovieDetailCache.get(streamId) != null) return
+        lifecycleScope.launch {
+            delay(2_500L)
+            if (token != loadToken || MovieDetailCache.get(streamId) != null) return@launch
+            loadMovieDetail()
         }
     }
 
@@ -244,6 +267,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
         extension = info.extension.ifBlank { extension }
         directSource = info.directSource
         btnMoviePlay.requestFocus()
+        MovieDetailCache.put(streamId, info)
         PlotCache.put(
             "movie",
             streamId,

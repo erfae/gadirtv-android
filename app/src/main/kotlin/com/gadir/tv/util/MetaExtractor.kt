@@ -184,7 +184,11 @@ object MetaExtractor {
             "portrait",
             "url",
             "cover",
-        )
+        ).ifBlank {
+            obj.getAsJsonObject("person")?.let { person ->
+                imageFrom(person, "profile_path", "profile", "image", "photo", "avatar")
+            }.orEmpty()
+        }
         val resolvedImage = ImageUrlResolver.resolve(image)
         return CastMember(name = name, imageUrl = resolvedImage)
     }
