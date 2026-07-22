@@ -12,6 +12,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.PlaylistRepository
+import com.gadir.tv.util.DeviceUi
 
 object PlayerFactory {
     private fun dataSourceFactory(): DataSource.Factory {
@@ -69,16 +70,25 @@ object PlayerFactory {
 
     fun create(context: Context): ExoPlayer {
         val settings = AppSettings(context)
+        val isTv = DeviceUi.isTvUi(context)
         val bufferMs = settings.networkBufferMs.coerceIn(1_500, 5_000)
-        val rendererMode = if (settings.isCompatPlayer) {
-            DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
-        } else {
-            DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+        val rendererMode = when {
+            settings.isCompatPlayer -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+            isTv -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+            else -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
         }
         return build(
             context = context,
-            minBuffer = (bufferMs * 8).coerceIn(15_000, 60_000),
-            maxBuffer = (bufferMs * 20).coerceIn(45_000, 120_000),
+            minBuffer = if (isTv) {
+                (bufferMs * 4).coerceIn(8_000, 30_000)
+            } else {
+                (bufferMs * 8).coerceIn(15_000, 60_000)
+            },
+            maxBuffer = if (isTv) {
+                (bufferMs * 10).coerceIn(20_000, 45_000)
+            } else {
+                (bufferMs * 20).coerceIn(45_000, 120_000)
+            },
             playbackBuffer = bufferMs.coerceIn(2_000, 4_000),
             rebuffer = (bufferMs * 3).coerceIn(5_000, 15_000),
             audioAttributes = vodAudioAttributes(),

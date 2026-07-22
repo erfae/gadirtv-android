@@ -40,6 +40,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private var mediaPlayer: MediaPlayer? = null
     private var controlsVisible = false
     private val pendingUrls = ArrayDeque<String>()
+    private val allPlaybackUrls = ArrayList<String>()
     private val hideHandler = Handler(Looper.getMainLooper())
     private val hideControlsRunnable = Runnable { hideControls() }
     private val progressRunnable = object : Runnable {
@@ -88,9 +89,14 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val url = intent.getStringExtra(EXTRA_URL).orEmpty()
         allowExoFallback = !intent.getBooleanExtra(EXTRA_DISABLE_EXO_FALLBACK, false)
+        allPlaybackUrls.clear()
+        allPlaybackUrls.add(url)
         pendingUrls.add(url)
         intent.getStringArrayListExtra(EXTRA_ALTERNATE_URLS)?.forEach { alt ->
-            if (alt.isNotBlank() && alt !in pendingUrls) pendingUrls.add(alt)
+            if (alt.isNotBlank() && alt !in allPlaybackUrls) {
+                allPlaybackUrls.add(alt)
+                pendingUrls.add(alt)
+            }
         }
 
         volumeControls = findViewById(R.id.vlcVolumeControls)
@@ -166,14 +172,18 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun handleVlcEvent(event: MediaPlayer.Event) {
         when (event.type) {
             MediaPlayer.Event.EncounteredError -> {
-                val bufferMs = AppSettings(this).networkBufferMs
-                    .coerceIn(AppSettings.BUFFER_NORMAL_MS, AppSettings.BUFFER_STABLE_MS)
-                if (!vlcUsesSoftwareDecode && initVlcPlayer(bufferMs, preferSoftware = true)) {
-                    playUrl(pendingUrls.firstOrNull().orEmpty())
-                    return
-                }
-                if (!tryNextUrl()) {
-                    fallbackToExoPlayer()
+                runOnUiThread {
+                    val bufferMs = AppSettings(this).networkBufferMs
+                        .coerceIn(AppSettings.BUFFER_NORMAL_MS, AppSettings.BUFFER_STABLE_MS)
+                    val currentUrl = pendingUrls.firstOrNull().orEmpty()
+                        .ifBlank { allPlaybackUrls.firstOrNull().orEmpty() }
+                    if (!vlcUsesSoftwareDecode && initVlcPlayer(bufferMs, preferSoftware = true)) {
+                        playUrl(currentUrl)
+                        return@runOnUiThread
+                    }
+                    if (!tryNextUrl()) {
+                        fallbackToExoPlayer()
+                    }
                 }
             }
             MediaPlayer.Event.Playing -> {
@@ -381,8 +391,10 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun fallbackToExoPlayer(): Boolean {
         if (!allowExoFallback || exoFallbackLaunched) return false
         exoFallbackLaunched = true
-        val url = pendingUrls.firstOrNull().orEmpty()
+        val url = intent.getStringExtra(EXTRA_URL).orEmpty()
+            .ifBlank { allPlaybackUrls.firstOrNull().orEmpty() }
         if (url.isBlank()) return false
+        val alternates = allPlaybackUrls.filter { it.isNotBlank() && it != url }
         startActivity(
             PlayerActivity.intent(
                 context = this,
@@ -395,7 +407,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                     .ifBlank { if (isLivePlayback) "ts" else "mkv" },
                 positionMs = resumePositionMs,
                 streamId = currentStreamId,
-                alternateUrls = pendingUrls.drop(1).toList(),
+                alternateUrls = alternates,
                 disableVlcFallback = true,
             ),
         )

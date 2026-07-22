@@ -110,6 +110,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
                 backdropView = findViewById(R.id.movieBackdrop),
                 poster = fallbackCover,
                 backdrop = fallbackCover,
+                contentId = streamId,
             )
         }
         applyPlotCache()
@@ -161,6 +162,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
             backdropView = findViewById(R.id.movieBackdrop),
             poster = poster,
             backdrop = backdrop,
+            contentId = streamId,
         )
         btnMoviePlay.visibility = View.VISIBLE
     }
@@ -258,6 +260,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
             backdropView = findViewById(R.id.movieBackdrop),
             poster = poster,
             backdrop = backdrop,
+            contentId = streamId,
         )
 
         trailerUrl = info.trailerUrl

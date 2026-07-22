@@ -49,12 +49,12 @@ class PosterAdapter(
         holder.title.text = item.title
         if (item.imageUrl.isNotEmpty()) {
             if (DeviceUi.isTelevision(holder.itemView.context)) {
-                ImageLoader.loadPoster(holder.image, item.imageUrl, 200, 280)
+                ImageLoader.loadVodPoster(holder.image, item.imageUrl, item.id, 200, 280)
             } else {
-                ImageLoader.loadPoster(holder.image, item.imageUrl)
+                ImageLoader.loadVodPoster(holder.image, item.imageUrl, item.id)
             }
         } else {
-            holder.image.setImageResource(R.drawable.tv_banner)
+            ImageLoader.loadVodPoster(holder.image, "", item.id)
         }
 
         holder.itemView.isSelected = holder.itemView.hasFocus()

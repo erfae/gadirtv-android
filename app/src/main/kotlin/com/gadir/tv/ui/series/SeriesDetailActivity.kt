@@ -106,6 +106,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
                 backdropView = findViewById(R.id.seriesBackdrop),
                 poster = fallbackCover,
                 backdrop = fallbackCover,
+                contentId = seriesId,
             )
         }
         applyPlotCache()
@@ -169,6 +170,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             backdropView = findViewById(R.id.seriesBackdrop),
             poster = poster,
             backdrop = backdrop,
+            contentId = seriesId,
         )
         btnSeriesPlay.visibility = View.VISIBLE
     }
@@ -252,6 +254,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             backdropView = findViewById(R.id.seriesBackdrop),
             poster = poster,
             backdrop = backdrop,
+            contentId = seriesId,
         )
         trailerUrl = detail.trailerUrl
         btnSeriesTrailer.visibility = if (trailerUrl.isNotBlank()) View.VISIBLE else View.GONE
