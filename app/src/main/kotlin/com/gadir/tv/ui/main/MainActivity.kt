@@ -32,6 +32,7 @@ import com.gadir.tv.data.ContentPreloader
 import com.gadir.tv.data.HomeLoader
 import com.gadir.tv.data.LiveChannelStore
 import com.gadir.tv.data.PlotCache
+import com.gadir.tv.data.SeriesDetailCache
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ParentalControlStore
 import com.gadir.tv.data.ParentalSession
@@ -141,6 +142,7 @@ class MainActivity : BaseLocaleActivity() {
     private var movieCategoryId: String? = null
     private var seriesCategoryId: String? = null
     private var moviesCatalogReady = false
+    private var catalogPosterTab: Tab? = null
     private var seriesCatalogReady = false
     private var moviesGroupLoaded = false
     private var seriesGroupLoaded = false
@@ -1998,8 +2000,14 @@ class MainActivity : BaseLocaleActivity() {
         prefetchCatalogGroup(tab, firstId)
     }
 
+    private fun catalogActionTab(fallback: Tab): Tab = when (currentTab) {
+        Tab.MOVIES, Tab.SERIES -> currentTab
+        else -> fallback
+    }
+
     private fun prefetchCatalogDetail(tab: Tab, item: PosterAdapter.PosterItem) {
-        val kind = when (tab) {
+        val activeTab = catalogActionTab(tab)
+        val kind = when (activeTab) {
             Tab.MOVIES -> "movie"
             Tab.SERIES -> "series"
             else -> return
@@ -2010,7 +2018,7 @@ class MainActivity : BaseLocaleActivity() {
         lifecycleScope.launch {
             try {
                 withContext(Dispatchers.IO) {
-                    when (tab) {
+                    when (activeTab) {
                         Tab.MOVIES -> {
                             val info = api.vodInfo(profile, item.id) ?: return@withContext
                             val backdrop = info.backdrop.ifBlank { info.cover }
@@ -2030,6 +2038,7 @@ class MainActivity : BaseLocaleActivity() {
                         }
                         Tab.SERIES -> {
                             val detail = api.seriesInfo(profile, item.id) ?: return@withContext
+                            SeriesDetailCache.put(item.id, detail)
                             val backdrop = detail.backdrop.ifBlank { detail.cover }
                             val seasons = detail.seasons.keys
                                 .sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
@@ -2286,7 +2295,7 @@ class MainActivity : BaseLocaleActivity() {
                     (previousTab == Tab.MOVIES || previousTab == Tab.SERIES) && previousTab != tab
                 val ready = if (tab == Tab.MOVIES) moviesCatalogReady else seriesCatalogReady
                 ensureCatalogTabReady(tab)
-                if (!ready || switchingBetweenCatalog) {
+                if (!ready || switchingBetweenCatalog || catalogPosterTab != tab) {
                     setupCatalogTab(tab)
                     if (catalogCategories.isNotEmpty()) {
                         if (tab == Tab.MOVIES) moviesCatalogReady = true else seriesCatalogReady = true
@@ -3066,11 +3075,12 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun prefetchSeriesDetail(seriesId: Int, title: String, cover: String) {
-        if (PlotCache.get("series", seriesId) != null) return
+        if (SeriesDetailCache.get(seriesId) != null) return
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 api.seriesInfo(profile, seriesId)?.let { detail ->
+                    SeriesDetailCache.put(seriesId, detail)
                     PlotCache.put(
                         "series",
                         seriesId,
@@ -3673,6 +3683,7 @@ class MainActivity : BaseLocaleActivity() {
             savedId?.takeIf { id -> cats.any { it.id == id } } ?: cats.firstOrNull()?.id
         }
         posterItems.clear()
+        catalogPosterTab = tab
         catalogGrid.adapter = PosterAdapter(
             items = posterItems,
             onClick = { item -> onPosterClick(tab, item) },
@@ -4101,8 +4112,9 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun onPosterClick(tab: Tab, item: PosterAdapter.PosterItem) {
+        val activeTab = catalogActionTab(tab)
         val categoryId = activeCatalogCategoryId().orEmpty()
-        when (tab) {
+        when (activeTab) {
             Tab.MOVIES -> {
                 if (item.resumePositionMs > 0L) {
                     playMovie(

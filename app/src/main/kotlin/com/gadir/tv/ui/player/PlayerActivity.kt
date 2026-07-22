@@ -416,8 +416,11 @@ class PlayerActivity : BaseLocaleActivity() {
     private fun seekBy(deltaMs: Long) {
         val exo = player ?: return
         val duration = exo.duration
-        if (duration <= 0L) return
-        val target = (exo.currentPosition + deltaMs).coerceIn(0L, duration)
+        val target = if (duration > 0L) {
+            (exo.currentPosition + deltaMs).coerceIn(0L, duration)
+        } else {
+            (exo.currentPosition + deltaMs).coerceAtLeast(0L)
+        }
         exo.seekTo(target)
         updateVodProgress()
     }
@@ -552,28 +555,14 @@ class PlayerActivity : BaseLocaleActivity() {
                     }
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    if (!controlsVisible) {
-                        seekBy(-SEEK_STEP_MS)
-                        showVodControls()
-                        return true
-                    }
-                    if (controlsVisible && currentFocus == vodSeekBar) {
-                        seekBy(-SEEK_STEP_MS)
-                        scheduleHideControls()
-                        return true
-                    }
+                    seekBy(-SEEK_STEP_MS)
+                    showVodControls()
+                    return true
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (!controlsVisible) {
-                        seekBy(SEEK_STEP_MS)
-                        showVodControls()
-                        return true
-                    }
-                    if (controlsVisible && currentFocus == vodSeekBar) {
-                        seekBy(SEEK_STEP_MS)
-                        scheduleHideControls()
-                        return true
-                    }
+                    seekBy(SEEK_STEP_MS)
+                    showVodControls()
+                    return true
                 }
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
                     togglePlayPause()
