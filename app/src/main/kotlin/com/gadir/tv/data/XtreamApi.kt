@@ -489,22 +489,21 @@ class XtreamApi(
         limit: Int = 4,
     ): List<EpgEntry> {
         if (streamId <= 0 && epgChannelId.isBlank()) return emptyList()
-        val attempts = buildList {
-            if (streamId > 0) {
-                add(Triple("get_short_epg", mapOf("stream_id" to streamId.toString()), limit))
-                add(Triple("get_simple_data_table", mapOf("stream_id" to streamId.toString()), limit))
-            }
-            if (epgChannelId.isNotBlank()) {
-                add(Triple("get_short_epg", mapOf("epg_channel_id" to epgChannelId), limit))
-                add(Triple("get_short_epg", mapOf("stream_id" to epgChannelId), limit))
-                add(Triple("get_short_epg", mapOf("channel_id" to epgChannelId), limit))
-                add(Triple("get_simple_data_table", mapOf("epg_channel_id" to epgChannelId), limit))
-                add(Triple("get_simple_data_table", mapOf("stream_id" to epgChannelId), limit))
-            }
-        }.distinct()
-        for ((action, params, requestLimit) in attempts) {
-            val listings = fetchEpgListings(profile, params, requestLimit, action)
-            if (listings.isNotEmpty()) return listings
+        if (streamId > 0) {
+            val byStream = fetchEpgListings(
+                profile,
+                mapOf("stream_id" to streamId.toString()),
+                limit,
+            )
+            if (byStream.isNotEmpty()) return byStream
+        }
+        if (epgChannelId.isNotBlank()) {
+            val byEpgId = fetchEpgListings(
+                profile,
+                mapOf("epg_channel_id" to epgChannelId),
+                limit,
+            )
+            if (byEpgId.isNotEmpty()) return byEpgId
         }
         return emptyList()
     }
@@ -531,9 +530,22 @@ class XtreamApi(
             }
         }
         val url = "$host/player_api.php?$query"
-        val response = NativeHttpClient.request(url, activeUserAgent)
-        if (response.status != 200 || response.body.isBlank()) return emptyList()
-        return parseEpgListings(response.body)
+        val agents = linkedSetOf(activeUserAgent).apply { addAll(userAgents.take(2)) }
+        for (ua in agents) {
+            val response = NativeHttpClient.fastRequest(url, ua)
+            if (response.status == 200 && response.body.isNotBlank()) {
+                val parsed = parseEpgListings(response.body)
+                if (parsed.isNotEmpty()) return parsed
+            }
+            if (response.status == 512 || response.status == 403 || response.status == 405) {
+                val post = NativeHttpClient.fastRequest(url, ua, "POST")
+                if (post.status == 200 && post.body.isNotBlank()) {
+                    val parsed = parseEpgListings(post.body)
+                    if (parsed.isNotEmpty()) return parsed
+                }
+            }
+        }
+        return emptyList()
     }
 
     private fun parseEpgListings(body: String): List<EpgEntry> {
