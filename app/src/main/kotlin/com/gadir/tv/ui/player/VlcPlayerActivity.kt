@@ -76,6 +76,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private var allowExoFallback = true
 
     private var vlcUsesSoftwareDecode = false
+    private var vlcGuardHeld = false
     private var vlcReleased = false
     private var vlcPlaybackToken = 0
     private var activeLiveUrl: String? = null
@@ -160,10 +161,17 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun startVlcPlayback(bufferMs: Int, attempt: Int = 0) {
         if (isFinishing || isDestroyed) return
         if (!initVlcPlayer(bufferMs, preferSoftware = false)) {
-            if (isLivePlayback && DeviceUi.isTvUi(this) && attempt < 3) {
+            // VlcInstanceGuard is non-blocking, so a "busy" result here just means another
+            // player instance (e.g. a live preview, or a fullscreen player mid-teardown)
+            // hasn't released yet — a few quick retries are cheap and usually enough,
+            // instead of jumping straight to the Exo fallback (which was masking movies
+            // that only "worked on the second try": the first VLC attempt used to block the
+            // UI thread for seconds waiting on the old guard holder, which itself couldn't
+            // finish releasing until this call returned).
+            if (attempt < 5) {
                 findViewById<View>(R.id.vlcVideo).postDelayed({
                     startVlcPlayback(bufferMs, attempt + 1)
-                }, 400L)
+                }, 300L)
                 return
             }
             if (!fallbackToExoPlayer()) {
@@ -180,9 +188,10 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
     private fun initVlcPlayer(bufferMs: Int, preferSoftware: Boolean): Boolean {
         releaseVlcPlayer()
-        if (!VlcInstanceGuard.acquire(LIVE_VLC_ACQUIRE_MS)) {
+        if (!VlcInstanceGuard.tryAcquire()) {
             return false
         }
+        vlcGuardHeld = true
         vlcReleased = false
         vlcPlaybackToken++
         vlcUsesSoftwareDecode = preferSoftware
@@ -306,7 +315,14 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             vlc?.release()
         } catch (_: Throwable) {
         }
-        VlcInstanceGuard.release()
+        // Only release the shared guard if THIS instance actually acquired it — this is
+        // also called defensively at the top of initVlcPlayer() before any acquire attempt,
+        // and releasing unconditionally there could free a guard held by another active
+        // player (e.g. a live preview), letting two libVLC instances run at once.
+        if (vlcGuardHeld) {
+            vlcGuardHeld = false
+            VlcInstanceGuard.release()
+        }
     }
 
     private fun setupLiveUi(channelTitle: String) {
@@ -775,7 +791,6 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val SEEK_STEP_MS = 10_000L
         private const val CONTROLS_HIDE_MS = 5_000L
         private const val LIVE_VLC_COOLDOWN_MS = 1_200L
-        private const val LIVE_VLC_ACQUIRE_MS = 4_000L
         private const val ZAP_RECONNECT_DELAY_MS = 500L
 
         fun intent(

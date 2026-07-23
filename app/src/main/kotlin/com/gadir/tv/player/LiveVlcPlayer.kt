@@ -23,7 +23,7 @@ class LiveVlcPlayer(
     val mediaPlayer: MediaPlayer
 
     init {
-        if (!VlcInstanceGuard.acquire()) {
+        if (!VlcInstanceGuard.tryAcquire()) {
             throw IllegalStateException("libVLC busy")
         }
         try {
