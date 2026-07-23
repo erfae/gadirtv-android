@@ -117,6 +117,9 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         isLivePlayback = kind == ResumeStore.KIND_LIVE
         resumePositionMs = intent.getLongExtra(EXTRA_POSITION_MS, 0L).coerceAtLeast(0L)
         resumeSeekPending = resumePositionMs > 0L && !isLivePlayback
+        if (isLivePlayback) {
+            com.gadir.tv.data.LivePlaybackGate.acquire()
+        }
 
         if (isLivePlayback) {
             setupLiveUi(title)
@@ -642,6 +645,9 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     }
 
     override fun onDestroy() {
+        if (isLivePlayback) {
+            com.gadir.tv.data.LivePlaybackGate.release()
+        }
         hideHandler.removeCallbacksAndMessages(null)
         releaseVlcPlayer()
         super.onDestroy()

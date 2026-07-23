@@ -122,6 +122,7 @@ object CatalogPreloader {
             val jobs = vodTargets.map { category ->
                 async {
                     semaphore.withPermit {
+                        LivePlaybackGate.awaitIdle()
                         onCategory?.invoke(category.name)
                         loadVodCategory(api, profile, category.id)
                     }
@@ -129,6 +130,7 @@ object CatalogPreloader {
             } + seriesTargets.map { category ->
                 async {
                     semaphore.withPermit {
+                        LivePlaybackGate.awaitIdle()
                         onCategory?.invoke(category.name)
                         loadSeriesCategory(api, profile, category.id)
                     }

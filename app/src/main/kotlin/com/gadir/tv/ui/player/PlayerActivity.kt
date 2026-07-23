@@ -134,6 +134,7 @@ class PlayerActivity : BaseLocaleActivity() {
         isLive = kind == ResumeStore.KIND_LIVE
         liveStreamId = streamId
         if (isLive) {
+            com.gadir.tv.data.LivePlaybackGate.acquire()
             pendingLiveUrls.clear()
             pendingLiveUrls.add(url)
             intent.getStringArrayListExtra(EXTRA_ALTERNATE_URLS)?.forEach { alt ->
@@ -714,6 +715,9 @@ class PlayerActivity : BaseLocaleActivity() {
     }
 
     override fun onDestroy() {
+        if (isLive) {
+            com.gadir.tv.data.LivePlaybackGate.release()
+        }
         hideHandler.removeCallbacksAndMessages(null)
         playbackMonitor?.stop()
         playbackMonitor = null
