@@ -54,6 +54,7 @@ class PlayerActivity : BaseLocaleActivity() {
     private var activeLiveUrl: String? = null
     private var liveRecoverAttempts = 0
     private var liveZapToken = 0
+    private var liveStoppedInBackground = false
 
     private lateinit var volumeControls: View
     private lateinit var epgPanel: View
@@ -341,6 +342,17 @@ class PlayerActivity : BaseLocaleActivity() {
     override fun onResume() {
         super.onResume()
         enableImmersiveMode()
+        if (isLive && liveStoppedInBackground) {
+            liveStoppedInBackground = false
+            val exo = player
+            val url = activeLiveUrl?.takeIf { it.isNotBlank() } ?: pendingLiveUrls.firstOrNull()
+            if (exo != null && !url.isNullOrBlank()) {
+                liveUrlSettled = false
+                exo.setMediaItem(LiveStreamUrls.mediaItem(url))
+                exo.prepare()
+                playbackMonitor?.start()
+            }
+        }
         player?.playWhenReady = true
     }
 
@@ -721,7 +733,21 @@ class PlayerActivity : BaseLocaleActivity() {
     override fun onStop() {
         saveProgress()
         super.onStop()
-        player?.pause()
+        if (isLive) {
+            // Live has no meaningful "resume position" — pausing just keeps the panel
+            // connection open in the background (sometimes for a long time, depending on
+            // how long Android keeps the backgrounded process alive), which looks to the
+            // panel like the account is still watching after the user left. Fully stop so
+            // the connection actually closes; onResume() reconnects fresh if the user comes
+            // back without the Activity being destroyed. Stop the stall/no-signal monitor
+            // too, otherwise it would see STATE_IDLE and try to auto-reconnect in the
+            // background on its own.
+            playbackMonitor?.stop()
+            player?.stop()
+            liveStoppedInBackground = true
+        } else {
+            player?.pause()
+        }
     }
 
     override fun onDestroy() {
