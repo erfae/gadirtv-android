@@ -63,6 +63,7 @@ object ContentPreloader {
         api: XtreamApi,
         profile: Profile,
     ) = withContext(Dispatchers.IO) {
+        LivePlaybackGate.awaitIdle()
         coroutineScope {
             val catalogJob = async { CatalogPreloader.preloadRemaining(api, profile) }
             val epgJob = async { preloadEpg(api, profile, prioritizedChannels(context)) }
@@ -160,6 +161,7 @@ object ContentPreloader {
 
     private suspend fun preloadChannelIcons(context: Context, channels: List<LiveChannel>) {
         if (channels.isEmpty()) return
+        LivePlaybackGate.awaitIdle()
         val profile = PlaylistRepository.profile
         val urls = channels.flatMap { channel ->
             buildList {
@@ -179,6 +181,7 @@ object ContentPreloader {
     }
 
     private suspend fun preloadCatalogPosters(context: Context) {
+        LivePlaybackGate.awaitIdle()
         val urls = buildList {
             PlaylistRepository.allCachedVod().forEach { add(it.icon) }
             PlaylistRepository.allCachedSeries().forEach { add(it.cover) }
@@ -219,7 +222,7 @@ object ContentPreloader {
         jobs.awaitAll()
     }
 
-    private fun loadMoviePlot(
+    private suspend fun loadMoviePlot(
         context: Context,
         api: XtreamApi,
         profile: Profile,
@@ -227,6 +230,7 @@ object ContentPreloader {
     ) {
         val kind = "movie"
         if (PlotCache.get(kind, movie.streamId) != null) return
+        LivePlaybackGate.awaitIdle()
         val info = runCatching { api.vodInfo(profile, movie.streamId) }.getOrNull() ?: return
         val backdrop = info.backdrop.ifBlank { info.cover }
         PlotCache.put(
@@ -244,7 +248,7 @@ object ContentPreloader {
         )
     }
 
-    private fun loadSeriesPlot(
+    private suspend fun loadSeriesPlot(
         context: Context,
         api: XtreamApi,
         profile: Profile,
@@ -252,6 +256,7 @@ object ContentPreloader {
     ) {
         val kind = "series"
         if (PlotCache.get(kind, item.seriesId) != null) return
+        LivePlaybackGate.awaitIdle()
         val detail = runCatching { api.seriesInfo(profile, item.seriesId) }.getOrNull() ?: return
         val backdrop = detail.backdrop.ifBlank { detail.cover }
         val seasonsSummary = formatSeriesSeasons(context, detail.seasons.keys)
@@ -291,6 +296,9 @@ object ContentPreloader {
             async {
                 semaphore.withPermit {
                     if (EpgCache.get(channel.streamId) != null) return@withPermit
+                    // EPG requests carry stream_id and can appear as "active connections" on
+                    // some panels — don't fetch other channels' EPG while one is watching live.
+                    LivePlaybackGate.awaitIdle()
                     val epg = runCatching {
                         api.shortEpgFast(
                             profile,
