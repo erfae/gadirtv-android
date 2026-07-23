@@ -53,6 +53,7 @@ class PlayerActivity : BaseLocaleActivity() {
     private val pendingVodUrls = ArrayDeque<String>()
     private var activeLiveUrl: String? = null
     private var liveRecoverAttempts = 0
+    private var liveZapToken = 0
 
     private lateinit var volumeControls: View
     private lateinit var epgPanel: View
@@ -536,9 +537,18 @@ class PlayerActivity : BaseLocaleActivity() {
         liveRecoverAttempts = 0
         activeLiveUrl = next
         playbackMonitor?.reset()
-        exo.setMediaItem(LiveStreamUrls.mediaItem(next))
-        exo.prepare()
-        exo.playWhenReady = true
+        exo.stop()
+        val token = ++liveZapToken
+        // Give the panel a moment to register the previous stream's disconnect before
+        // opening a new one — some panels are slow to free the connection slot, so
+        // zapping too fast can make the new channel fail with "max connections reached".
+        hideHandler.postDelayed({
+            if (token != liveZapToken) return@postDelayed
+            val current = player ?: return@postDelayed
+            current.setMediaItem(LiveStreamUrls.mediaItem(next))
+            current.prepare()
+            current.playWhenReady = true
+        }, ZAP_RECONNECT_DELAY_MS)
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -759,6 +769,7 @@ class PlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_DISABLE_VLC_FALLBACK = "disable_vlc_fallback"
         private const val SEEK_STEP_MS = 10_000L
         private const val CONTROLS_HIDE_MS = 4_000L
+        private const val ZAP_RECONNECT_DELAY_MS = 500L
 
         fun intent(
             context: Context,
