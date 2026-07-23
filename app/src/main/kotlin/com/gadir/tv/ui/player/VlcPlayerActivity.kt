@@ -80,6 +80,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private var liveRecoverAttempts = 0
     private val liveStallTracker = LiveStreamStallTracker(8_000L)
     private var liveStallRunnable: Runnable? = null
+    private var lastDisplayedPictures = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -216,6 +217,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                     resumeSeekPending = false
                 }
                 if (isLivePlayback) {
+                    lastDisplayedPictures = -1
+                    liveStallTracker.reset()
                     liveStallTracker.ping()
                     armLiveStallWatchdog()
                 }
@@ -237,15 +240,30 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             }
             MediaPlayer.Event.TimeChanged -> {
                 updateVodProgress()
-                if (isLivePlayback) {
-                    liveStallTracker.ping()
-                }
             }
-            MediaPlayer.Event.PositionChanged -> {
-                if (isLivePlayback) {
-                    liveStallTracker.ping()
-                }
-            }
+            MediaPlayer.Event.PositionChanged -> {}
+        }
+    }
+
+    /**
+     * IPTV live streams keep firing TimeChanged/PositionChanged even when the decoder/
+     * renderer is stuck on a frozen frame (network layer still demuxes data), so those
+     * events alone are not reliable proof of a healthy stream. libVLC's displayedPictures
+     * counter only increases when a frame is actually rendered — use it as ground truth
+     * for stall detection when available, falling back to event-based pings otherwise.
+     */
+    private fun sampleLiveFrameProgress() {
+        val stats = try {
+            mediaPlayer?.media?.stats
+        } catch (_: Throwable) {
+            null
+        }
+        val displayed = stats?.displayedPictures
+        if (displayed != null && displayed > 0) {
+            liveStallTracker.noteProgress(displayed.toLong())
+            lastDisplayedPictures = displayed
+        } else {
+            liveStallTracker.ping()
         }
     }
 
@@ -418,7 +436,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
     private fun armLiveStallWatchdog() {
         if (!isLivePlayback) return
-        disarmLiveStallWatchdog()
+        disarmLiveStallWatchdog(resetTracker = true)
         val runnable = object : Runnable {
             override fun run() {
                 if (!isLivePlayback || mediaPlayer == null) {
@@ -426,9 +444,12 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                     return
                 }
                 if (mediaPlayer?.isPlaying != true) {
-                    disarmLiveStallWatchdog()
+                    // Momentary pause/buffering shouldn't kill stall detection permanently —
+                    // just skip this sample and check again on the next tick.
+                    hideHandler.postDelayed(this, 4_000L)
                     return
                 }
+                sampleLiveFrameProgress()
                 if (liveStallTracker.isStalled()) {
                     recoverLiveFromStall()
                     return
@@ -440,10 +461,10 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         hideHandler.postDelayed(runnable, 4_000L)
     }
 
-    private fun disarmLiveStallWatchdog() {
+    private fun disarmLiveStallWatchdog(resetTracker: Boolean = true) {
         liveStallRunnable?.let { hideHandler.removeCallbacks(it) }
         liveStallRunnable = null
-        liveStallTracker.reset()
+        if (resetTracker) liveStallTracker.reset()
     }
 
     private fun recoverLiveFromStall() {

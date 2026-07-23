@@ -71,6 +71,13 @@ class LiveVlcPlayer(
         -1L
     }
 
+    /** Real rendered-frame count; more reliable than isPlaying()/time for freeze detection. */
+    fun displayedPictures(): Int? = try {
+        mediaPlayer.media?.stats?.displayedPictures
+    } catch (_: Throwable) {
+        null
+    }
+
     private fun startPlayback(url: String, volume: Int) {
         try {
             mediaPlayer.stop()

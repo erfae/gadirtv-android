@@ -106,7 +106,8 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_ROTATE_FIRST_MS = 10_000L
         private const val CHANNEL_PREVIEW_DELAY_MS = 0L
         private const val PREVIEW_TIMEOUT_MS = 4_500L
-        private const val PREVIEW_RETRY_DELAY_MS = 250L
+        private const val PREVIEW_RETRY_DELAY_MS = 400L
+        private const val PREVIEW_RETRY_MAX_CYCLES = 4
         private const val PREVIEW_STALL_CHECK_MS = 5_000L
         private const val PREVIEW_STALL_TIMEOUT_MS = 14_000L
         private const val PREVIEW_SURFACE_MAX_ATTEMPTS = 4
@@ -132,6 +133,7 @@ class MainActivity : BaseLocaleActivity() {
     private var previewLogoStreamId = 0
     private var previewUrls = listOf<String>()
     private var previewUrlIndex = 0
+    private var previewRetryCycleCount = 0
     private var previewWorkingUrl: String? = null
     private val previewHandler = Handler(Looper.getMainLooper())
     private var pendingPreview: Runnable? = null
@@ -3634,11 +3636,18 @@ class MainActivity : BaseLocaleActivity() {
     private fun loadMoviePlot(streamId: Int, backdropRequestId: Int) {
         val profile = PlaylistRepository.profile ?: return
         val kind = HomeRailAdapter.HomeRailItem.KIND_MOVIE
+        // A background prefetch (ContentPreloader) may already be fetching/have fetched
+        // this exact item concurrently. Skip the redundant network call if cached.
+        if (applyCachedHeroPlot(kind, streamId, backdropRequestId)) return
         lifecycleScope.launch {
             try {
                 val info = withContext(Dispatchers.IO) { api.vodInfo(profile, streamId) }
                 if (isDestroyed) return@launch
                 if (info == null) {
+                    // The concurrent background prefetch may have succeeded while our own
+                    // call failed/timed out due to connection contention — check before
+                    // overwriting with an empty state.
+                    if (applyCachedHeroPlot(kind, streamId, backdropRequestId)) return@launch
                     if (isHeroShowing(kind, streamId)) {
                         heroPlot.text = getString(R.string.hero_plot_empty)
                     }
@@ -3678,11 +3687,13 @@ class MainActivity : BaseLocaleActivity() {
     private fun loadSeriesPlot(seriesId: Int, backdropRequestId: Int) {
         val profile = PlaylistRepository.profile ?: return
         val kind = HomeRailAdapter.HomeRailItem.KIND_SERIES
+        if (applyCachedHeroPlot(kind, seriesId, backdropRequestId)) return
         lifecycleScope.launch {
             try {
                 val detail = withContext(Dispatchers.IO) { api.seriesInfo(profile, seriesId) }
                 if (isDestroyed) return@launch
                 if (detail == null) {
+                    if (applyCachedHeroPlot(kind, seriesId, backdropRequestId)) return@launch
                     if (isHeroShowing(kind, seriesId)) {
                         heroPlot.text = getString(R.string.hero_plot_empty)
                     }
@@ -4841,12 +4852,20 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun schedulePreviewRetry(token: Int) {
         if (token != previewToken) return
+        previewRetryCycleCount += 1
+        if (previewRetryCycleCount > PREVIEW_RETRY_MAX_CYCLES) {
+            // Give up after a few full cycles instead of retrying silently forever —
+            // keep the "no signal" state visible until the user picks another channel.
+            showNoSignal()
+            return
+        }
+        val delay = (PREVIEW_RETRY_DELAY_MS * previewRetryCycleCount).coerceAtMost(2_500L)
         previewHandler.postDelayed({
             if (token != previewToken || previewIsSettled() || livePreviewPaused) return@postDelayed
             val channel = currentPreviewChannel ?: return@postDelayed
             previewUrlIndex = 0
             previewChannel(channel, token)
-        }, PREVIEW_RETRY_DELAY_MS)
+        }, delay)
     }
 
     private fun cancelPreviewTimeout() {
@@ -4887,10 +4906,16 @@ class MainActivity : BaseLocaleActivity() {
             previewStallTracker.noteProgress(
                 exoLiveProgressKey(player.currentPosition, player.bufferedPosition),
             )
+            return
+        }
+        if (miniVlcPlayer?.isPlaying() != true) return
+        // isPlaying() stays true on a frozen frame; use the real rendered-frame count
+        // when libVLC exposes it, so a stuck preview is actually detected as stalled.
+        val displayed = miniVlcPlayer?.displayedPictures()
+        if (displayed != null && displayed > 0) {
+            previewStallTracker.noteProgress(displayed.toLong())
         } else {
-            if (miniVlcPlayer?.isPlaying() == true) {
-                previewStallTracker.ping()
-            }
+            previewStallTracker.ping()
         }
     }
 
@@ -5065,6 +5090,7 @@ class MainActivity : BaseLocaleActivity() {
         if (channelChanged || previewUrls.isEmpty()) {
             previewUrls = orderPreviewUrls(LivePreviewStreamUrls.candidates(api, profile, channel))
             previewUrlIndex = 0
+            previewRetryCycleCount = 0
             previewWorkingUrl = null
             previewingStreamId = channel.streamId
         }
@@ -5733,6 +5759,7 @@ class MainActivity : BaseLocaleActivity() {
                 if (!isLivePreviewContext()) return@LiveExoPreviewPlayer
                 if (previewPlaybackToken != previewToken) return@LiveExoPreviewPlayer
                 cancelPreviewTimeout()
+                previewRetryCycleCount = 0
                 if (previewUrlIndex in previewUrls.indices) {
                     previewWorkingUrl = previewUrls[previewUrlIndex]
                 }
@@ -5767,6 +5794,7 @@ class MainActivity : BaseLocaleActivity() {
                 if (!isLivePreviewContext()) return@LiveVlcPlayer
                 if (previewPlaybackToken != previewToken) return@LiveVlcPlayer
                 cancelPreviewTimeout()
+                previewRetryCycleCount = 0
                 if (previewUrlIndex in previewUrls.indices) {
                     previewWorkingUrl = previewUrls[previewUrlIndex]
                 }

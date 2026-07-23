@@ -17,6 +17,7 @@ object DetailTvNav {
     ) {
         itemView.setOnFocusChangeListener { view, hasFocus ->
             view.isSelected = hasFocus
+            animateFocusScale(view, hasFocus)
             if (hasFocus) TvFocusHelper.scrollToParent(view)
         }
         itemView.setOnKeyListener { _, keyCode, event ->
@@ -91,5 +92,15 @@ object DetailTvNav {
         if ((list.adapter?.itemCount ?: 0) > 0) {
             TvNavHelper.focusItem(list, 0)
         }
+    }
+
+    /** Subtle NetTV-style pop on focus for horizontal rails (cast, seasons). */
+    private fun animateFocusScale(view: View, hasFocus: Boolean) {
+        val scale = if (hasFocus) 1.08f else 1f
+        view.animate()
+            .scaleX(scale)
+            .scaleY(scale)
+            .setDuration(120L)
+            .start()
     }
 }

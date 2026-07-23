@@ -31,13 +31,8 @@ class CastMemberAdapter(
         val item = items[position]
         holder.name.text = item.name
         val avatarSize = (56 * holder.itemView.resources.displayMetrics.density).toInt()
-        if (item.imageUrl.isNotBlank()) {
-            holder.avatar.visibility = View.VISIBLE
-            ImageLoader.loadCastAvatar(holder.avatar, item.imageUrl, avatarSize)
-        } else {
-            holder.avatar.visibility = View.VISIBLE
-            holder.avatar.setImageResource(R.drawable.ic_user)
-        }
+        holder.avatar.visibility = View.VISIBLE
+        ImageLoader.loadCastAvatar(holder.avatar, item.imageUrl, avatarSize, item.name)
 
         val list = holder.itemView.parent as? RecyclerView
         if (list != null) {
