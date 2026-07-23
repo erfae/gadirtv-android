@@ -110,9 +110,11 @@ object PlayerFactory {
                     .build(),
             )
         }
+        // minBufferMs must be >= bufferForPlaybackAfterRebufferMs or DefaultLoadControl throws
+        // IllegalArgumentException at build() time, crashing on first Live tab entry.
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                2_000,
+                3_000,
                 18_000,
                 1_000,
                 2_500,
@@ -146,13 +148,14 @@ object PlayerFactory {
                     .build(),
             )
         }
+        // minBufferMs must stay >= both bufferForPlaybackMs and bufferForPlaybackAfterRebufferMs
+        // across the whole clamped range, or DefaultLoadControl throws at build() time.
+        val playbackBuffer = (bufferMs * 2).coerceIn(2_000, 5_000)
+        val rebuffer = (bufferMs * 3).coerceIn(4_000, 10_000)
+        val minBuffer = (bufferMs * 5).coerceIn(8_000, 20_000)
+        val maxBuffer = (bufferMs * 15).coerceIn(30_000, 60_000)
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                (bufferMs * 3).coerceIn(4_000, 12_000),
-                (bufferMs * 12).coerceIn(30_000, 90_000),
-                (bufferMs * 2).coerceIn(2_000, 5_000),
-                (bufferMs * 4).coerceIn(6_000, 18_000),
-            )
+            .setBufferDurationsMs(minBuffer, maxBuffer, playbackBuffer, rebuffer)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
         return ExoPlayer.Builder(context, renderersFactory)
