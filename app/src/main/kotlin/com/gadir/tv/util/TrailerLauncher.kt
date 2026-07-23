@@ -12,13 +12,10 @@ object TrailerLauncher {
             Toast.makeText(context, R.string.trailer_unavailable, Toast.LENGTH_LONG).show()
             return
         }
-        if (DeviceUi.isTvUi(context)) {
-            val youtubeId = YoutubeTrailerHelper.extractId(rawUrl)
-                ?: sources.filterIsInstance<TrailerSource.Youtube>().firstOrNull()?.videoId
-            if (youtubeId != null && YoutubeTrailerHelper.openExternally(context, youtubeId)) {
-                return
-            }
-        }
+        // Deliberately does NOT launch the external YouTube app: on Android TV that forces
+        // the user through a Google account picker, and leaves them stuck browsing/playing
+        // in YouTube itself once the trailer ends with no way back into Gadir TV. The
+        // in-app embedded player (TrailerActivity) keeps the whole experience inside the app.
         context.startActivity(TrailerActivity.intent(context, rawUrl, title))
     }
 }
