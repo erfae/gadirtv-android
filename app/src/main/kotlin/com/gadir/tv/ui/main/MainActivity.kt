@@ -499,7 +499,7 @@ class MainActivity : BaseLocaleActivity() {
             catalogCategoryList.setPreserveFocusAfterLayout(false)
             catalogGrid.setPreserveFocusAfterLayout(false)
             catalogCategoryList.setItemViewCacheSize(24)
-            catalogGrid.setItemViewCacheSize(30)
+            catalogGrid.setItemViewCacheSize(48)
             panelCatalog.findViewById<View>(R.id.catalogHeroContainer)?.visibility = View.GONE
         }
         configureCatalogGrid()

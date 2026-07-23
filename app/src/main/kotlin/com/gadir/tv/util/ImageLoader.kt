@@ -94,7 +94,24 @@ object ImageLoader {
         loadVodPoster(target, url, contentId = 0, width = width, height = height)
     }
 
+    // Building this list touches PanelHttp/NetworkUrlResolver ~15 times; the result never
+    // changes for a given item, but RecyclerView re-binds the same item repeatedly during
+    // scroll/notifyDataSetChanged — memoize to keep D-pad scrolling snappy.
+    private val posterCandidatesCache = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
+
     fun vodPosterCandidates(primary: String, contentId: Int): List<String> {
+        val cacheKey = "$contentId|$primary"
+        posterCandidatesCache[cacheKey]?.let { return it }
+        val result = computeVodPosterCandidates(primary, contentId)
+        if (result.isNotEmpty()) posterCandidatesCache[cacheKey] = result
+        return result
+    }
+
+    fun clearPosterCandidatesCache() {
+        posterCandidatesCache.clear()
+    }
+
+    private fun computeVodPosterCandidates(primary: String, contentId: Int): List<String> {
         val trimmed = primary.trim()
         return buildList {
             if (trimmed.isNotBlank()) {

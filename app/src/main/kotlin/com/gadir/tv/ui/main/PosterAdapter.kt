@@ -40,9 +40,91 @@ class PosterAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
-        val view = LayoutInflater.from(parent.context)
+        val inflated = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_poster, parent, false)
-        return Holder(view)
+        val holder = Holder(inflated)
+
+        // Listeners registered once per holder (not per bind) — resolve the current item via
+        // bindingAdapterPosition at event time, since the same holder is reused across many
+        // items during scroll/notifyDataSetChanged.
+        holder.itemView.setOnFocusChangeListener { focusedView, hasFocus ->
+            focusedView.isSelected = hasFocus
+            if (!hasFocus) return@setOnFocusChangeListener
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
+            onFocus?.invoke(items[pos])
+        }
+
+        holder.itemView.setOnClickListener {
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
+            onClick(items[pos])
+        }
+        holder.itemView.setOnLongClickListener {
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION || onToggleFavorite == null) return@setOnLongClickListener false
+            onToggleFavorite.invoke(items[pos])
+            notifyItemChanged(pos)
+            true
+        }
+        holder.itemView.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (pos % columnCount == 0) {
+                        onMoveLeft?.invoke()
+                        true
+                    } else {
+                        false
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    if (pos < columnCount) {
+                        onMoveUp?.invoke()
+                        true
+                    } else {
+                        val list = holder.itemView.parent as? RecyclerView
+                        if (list != null) {
+                            TvNavHelper.moveFocus(list, pos, pos - columnCount, items.size)
+                        }
+                        list != null
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    val next = pos + columnCount
+                    if (next < items.size) {
+                        val list = holder.itemView.parent as? RecyclerView
+                        if (list != null) {
+                            TvNavHelper.moveFocus(list, pos, next, items.size)
+                        }
+                        list != null
+                    } else {
+                        false
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    val col = pos % columnCount
+                    if (col < columnCount - 1 && pos + 1 < items.size) {
+                        val list = holder.itemView.parent as? RecyclerView
+                        if (list != null) {
+                            TvNavHelper.moveFocus(list, pos, pos + 1, items.size)
+                        }
+                        list != null
+                    } else {
+                        false
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                    onClick(items[pos])
+                    true
+                }
+                else -> false
+            }
+        }
+
+        return holder
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
@@ -57,88 +139,7 @@ class PosterAdapter(
         } else {
             ImageLoader.loadVodPoster(holder.image, "", item.id)
         }
-
         holder.itemView.isSelected = holder.itemView.hasFocus()
-        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
-            view.isSelected = hasFocus
-            if (!hasFocus) return@setOnFocusChangeListener
-            val pos = holder.bindingAdapterPosition
-            if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
-            onFocus?.invoke(items[pos])
-        }
-
-        holder.itemView.setOnClickListener { onClick(item) }
-        holder.itemView.setOnLongClickListener {
-            if (onToggleFavorite != null) {
-                onToggleFavorite.invoke(item)
-                notifyItemChanged(holder.bindingAdapterPosition)
-                true
-            } else {
-                false
-            }
-        }
-        holder.itemView.setOnKeyListener { _, keyCode, event ->
-            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
-            when (keyCode) {
-                KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    val pos = holder.bindingAdapterPosition
-                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
-                    if (pos % columnCount == 0) {
-                        onMoveLeft?.invoke()
-                        true
-                    } else {
-                        false
-                    }
-                }
-                KeyEvent.KEYCODE_DPAD_UP -> {
-                    val pos = holder.bindingAdapterPosition
-                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
-                    if (pos < columnCount) {
-                        onMoveUp?.invoke()
-                        true
-                    } else {
-                        val list = holder.itemView.parent as? RecyclerView
-                        if (list != null) {
-                            TvNavHelper.moveFocus(list, pos, pos - columnCount, items.size)
-                        }
-                        list != null
-                    }
-                }
-                KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    val pos = holder.bindingAdapterPosition
-                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
-                    val next = pos + columnCount
-                    if (next < items.size) {
-                        val list = holder.itemView.parent as? RecyclerView
-                        if (list != null) {
-                            TvNavHelper.moveFocus(list, pos, next, items.size)
-                        }
-                        list != null
-                    } else {
-                        false
-                    }
-                }
-                KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    val pos = holder.bindingAdapterPosition
-                    if (pos == RecyclerView.NO_POSITION) return@setOnKeyListener false
-                    val col = pos % columnCount
-                    if (col < columnCount - 1 && pos + 1 < items.size) {
-                        val list = holder.itemView.parent as? RecyclerView
-                        if (list != null) {
-                            TvNavHelper.moveFocus(list, pos, pos + 1, items.size)
-                        }
-                        list != null
-                    } else {
-                        false
-                    }
-                }
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                    onClick(item)
-                    true
-                }
-                else -> false
-            }
-        }
     }
 
     override fun getItemCount(): Int = items.size
