@@ -206,10 +206,20 @@ class SeriesDetailActivity : BaseLocaleActivity() {
                     resolvePlotLoadingState(failed = PlotCache.get("series", seriesId) == null)
                     btnSeriesPlay.requestFocus()
                 }
+                scheduleSeriesDetailRetry(token)
                 return@launch
             }
             SeriesDetailCache.put(seriesId, detail)
             bindDetail(detail)
+        }
+    }
+
+    private fun scheduleSeriesDetailRetry(token: Int) {
+        if (SeriesDetailCache.get(seriesId) != null) return
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(2_500L)
+            if (token != loadToken || SeriesDetailCache.get(seriesId) != null) return@launch
+            loadSeriesDetail()
         }
     }
 
