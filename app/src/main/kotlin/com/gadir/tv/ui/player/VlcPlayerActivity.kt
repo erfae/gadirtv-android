@@ -76,6 +76,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private var allowExoFallback = true
 
     private var vlcUsesSoftwareDecode = false
+    private var liveStoppedInBackground = false
     private var vlcGuardHeld = false
     private var vlcReleased = false
     private var vlcPlaybackToken = 0
@@ -672,6 +673,19 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (isLivePlayback && liveStoppedInBackground) {
+            liveStoppedInBackground = false
+            // The surface behind VLCVideoLayout gets torn down and recreated by Android
+            // while backgrounded — reusing the old MediaPlayer's stale attachViews() binding
+            // just spins forever on "video output creation failed". Recreate the whole VLC
+            // instance fresh, exactly like the very first launch in onCreate() (which always
+            // works), instead of trying to resume the old one.
+            val settings = AppSettings(this)
+            val bufferMs = settings.networkBufferMs.coerceIn(AppSettings.BUFFER_NORMAL_MS, AppSettings.BUFFER_STABLE_MS)
+            startVlcPlayback(bufferMs)
+            VolumeHelper.boostOnPlaybackStart(this)
+            return
+        }
         if (!vlcAlive()) return
         try {
             mediaPlayer?.play()
@@ -683,7 +697,18 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
     override fun onStop() {
         try {
-            mediaPlayer?.pause()
+            if (isLivePlayback) {
+                // Live has no meaningful "resume position" — pausing just keeps the panel
+                // connection open in the background (sometimes for a long time, depending on
+                // how long Android keeps the backgrounded process alive), which looks to the
+                // panel like the account is still watching after the user left. Fully release
+                // so the connection actually closes; onResume() recreates the player fresh if
+                // the user comes back without the Activity being destroyed.
+                releaseVlcPlayer()
+                liveStoppedInBackground = true
+            } else {
+                mediaPlayer?.pause()
+            }
         } catch (_: Throwable) {
         }
         super.onStop()
