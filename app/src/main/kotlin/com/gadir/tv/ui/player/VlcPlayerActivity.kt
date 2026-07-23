@@ -64,6 +64,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private lateinit var btnVodPlayPause: ImageButton
 
     private var currentStreamId = 0
+    private var currentChannelTitle = ""
+    private var currentEpgChannelId = ""
     private var isLivePlayback = false
     private var resumePositionMs = 0L
     private var resumeSeekPending = false
@@ -310,8 +312,10 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun setupLiveUi(channelTitle: String) {
         vodControls.visibility = View.GONE
         epgPanel.visibility = View.GONE
+        currentChannelTitle = channelTitle
+        currentEpgChannelId = intent.getStringExtra(EXTRA_EPG_CHANNEL_ID).orEmpty()
         findViewById<TextView>(R.id.playerChannelTitle).text = channelTitle
-        loadFullscreenEpg(currentStreamId, intent.getStringExtra(EXTRA_EPG_CHANNEL_ID).orEmpty())
+        loadFullscreenEpg(currentStreamId, currentEpgChannelId)
     }
 
     private fun setupVodControls(title: String) {
@@ -397,9 +401,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun playUrl(url: String) {
+    private fun playUrl(url: String, stopDelayMs: Long = 0L) {
         if (!vlcAlive()) return
-        val vlc = libVlc ?: return
         val player = mediaPlayer ?: return
         val token = ++vlcPlaybackToken
         if (isLivePlayback) {
@@ -410,6 +413,25 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         try {
             player.stop()
             player.volume = 0
+        } catch (_: Throwable) {
+        }
+        if (stopDelayMs > 0L) {
+            // Give the panel a moment to register the previous stream's disconnect before
+            // opening a new one — some panels are slow to free the connection slot, so
+            // zapping too fast can make the new channel fail with "max connections reached".
+            hideHandler.postDelayed({
+                startMediaForUrl(url, token)
+            }, stopDelayMs)
+        } else {
+            startMediaForUrl(url, token)
+        }
+    }
+
+    private fun startMediaForUrl(url: String, token: Int) {
+        if (!vlcAlive() || token != vlcPlaybackToken) return
+        val vlc = libVlc ?: return
+        val player = mediaPlayer ?: return
+        try {
             val resolved = com.gadir.tv.util.NetworkUrlResolver.resolve(url)
             val media = Media(vlc, Uri.parse(resolved.url))
             resolved.hostHeader?.let { media.addOption(":http-host=$it") }
@@ -498,22 +520,27 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun fallbackToExoPlayer(): Boolean {
         if (!allowExoFallback || exoFallbackLaunched) return false
         exoFallbackLaunched = true
-        val url = intent.getStringExtra(EXTRA_URL).orEmpty()
+        // Use the CURRENTLY playing channel's state, not the original launch intent — after
+        // zapping, the intent still refers to whichever channel was opened first, which would
+        // hand off to the wrong channel (or a stale EPG id) if VLC fails mid-zap.
+        val url = (activeLiveUrl?.takeIf { it.isNotBlank() } ?: pendingUrls.firstOrNull().orEmpty())
+            .ifBlank { intent.getStringExtra(EXTRA_URL).orEmpty() }
             .ifBlank { allPlaybackUrls.firstOrNull().orEmpty() }
         if (url.isBlank()) return false
-        val alternates = allPlaybackUrls.filter { it.isNotBlank() && it != url }
+        val alternates = (pendingUrls.ifEmpty { allPlaybackUrls }).filter { it.isNotBlank() && it != url }
         startActivity(
             PlayerActivity.intent(
                 context = this,
-                title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
+                title = currentChannelTitle.ifBlank { intent.getStringExtra(EXTRA_TITLE).orEmpty() },
                 url = url,
                 kind = intent.getStringExtra(EXTRA_KIND).orEmpty(),
-                contentId = intent.getStringExtra(EXTRA_CONTENT_ID).orEmpty(),
+                contentId = if (isLivePlayback) currentStreamId.toString() else intent.getStringExtra(EXTRA_CONTENT_ID).orEmpty(),
                 imageUrl = intent.getStringExtra(EXTRA_IMAGE_URL).orEmpty(),
                 extension = intent.getStringExtra(EXTRA_EXTENSION).orEmpty()
                     .ifBlank { if (isLivePlayback) "ts" else "mkv" },
                 positionMs = resumePositionMs,
                 streamId = currentStreamId,
+                epgChannelId = currentEpgChannelId,
                 alternateUrls = alternates,
                 disableVlcFallback = true,
             ),
@@ -576,6 +603,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun switchToChannel(channel: LiveChannel) {
         val profile = PlaylistRepository.profile ?: return
         currentStreamId = channel.streamId
+        currentChannelTitle = channel.name
+        currentEpgChannelId = channel.epgChannelId
         LiveChannelStore(this).lastStreamId = channel.streamId
         findViewById<TextView>(R.id.playerChannelTitle).text = channel.name
         epgLoaded = false
@@ -587,7 +616,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         }
         pendingUrls.clear()
         pendingUrls.addAll(urls)
-        playUrl(urls.first())
+        playUrl(urls.first(), stopDelayMs = ZAP_RECONNECT_DELAY_MS)
         showControls()
     }
 
@@ -747,6 +776,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val CONTROLS_HIDE_MS = 5_000L
         private const val LIVE_VLC_COOLDOWN_MS = 1_200L
         private const val LIVE_VLC_ACQUIRE_MS = 4_000L
+        private const val ZAP_RECONNECT_DELAY_MS = 500L
 
         fun intent(
             context: Context,
