@@ -176,6 +176,8 @@ object PlaylistRepository {
         SeriesDetailCache.clear()
         EpgCache.clear()
         com.gadir.tv.util.ChannelIconCache.clear()
+        com.gadir.tv.util.ImageLoader.clearPosterCandidatesCache()
+        com.gadir.tv.util.ChannelIconHelper.clearFallbackCache()
     }
 
     fun clear() {
@@ -198,5 +200,7 @@ object PlaylistRepository {
         SeriesDetailCache.clear()
         EpgCache.clear()
         com.gadir.tv.util.ChannelIconCache.clear()
+        com.gadir.tv.util.ImageLoader.clearPosterCandidatesCache()
+        com.gadir.tv.util.ChannelIconHelper.clearFallbackCache()
     }
 }

@@ -29,6 +29,18 @@ class CategoryAdapter(
 
     companion object {
         private val PAYLOAD_VISUAL = Any()
+
+        // ResourcesCompat.getFont() is cheap once cached by the framework, but calling it on
+        // every focus change (i.e. every D-pad move) still adds avoidable overhead — cache the
+        // resolved Typeface instances once per process instead.
+        @Volatile private var titleFont: android.graphics.Typeface? = null
+        @Volatile private var uiFont: android.graphics.Typeface? = null
+
+        private fun titleFont(context: android.content.Context): android.graphics.Typeface? =
+            titleFont ?: ResourcesCompat.getFont(context, R.font.gtv_font_title)?.also { titleFont = it }
+
+        private fun uiFont(context: android.content.Context): android.graphics.Typeface? =
+            uiFont ?: ResourcesCompat.getFont(context, R.font.gtv_font_ui)?.also { uiFont = it }
     }
 
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
@@ -50,36 +62,12 @@ class CategoryAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_category, parent, false)
-        return Holder(view)
-    }
+        val holder = Holder(view)
 
-    override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
-        if (payloads.contains(PAYLOAD_VISUAL)) {
-            bindVisuals(holder, position)
-            return
-        }
-        onBindViewHolder(holder, position)
-    }
-
-    override fun onBindViewHolder(holder: Holder, position: Int) {
-        bindVisuals(holder, position)
+        // Listeners registered once per holder (not per bind) — resolve the current item via
+        // bindingAdapterPosition at event time so this survives holder reuse across rebinds.
         holder.itemView.isFocusable = true
         holder.itemView.isFocusableInTouchMode = true
-        if (position == 0) {
-            holder.itemView.nextFocusUpId = if (upFocusViewId != View.NO_ID) {
-                upFocusViewId
-            } else {
-                holder.itemView.id
-            }
-        } else {
-            holder.itemView.nextFocusUpId = View.NO_ID
-        }
-        holder.itemView.nextFocusLeftId = if (leftFocusViewId != View.NO_ID) {
-            leftFocusViewId
-        } else {
-            View.NO_ID
-        }
-
         holder.itemView.setOnFocusChangeListener { _, hasFocus ->
             val pos = holder.bindingAdapterPosition
             if (pos == RecyclerView.NO_POSITION) return@setOnFocusChangeListener
@@ -143,6 +131,34 @@ class CategoryAdapter(
                 else -> false
             }
         }
+
+        return holder
+    }
+
+    override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.contains(PAYLOAD_VISUAL)) {
+            bindVisuals(holder, position)
+            return
+        }
+        onBindViewHolder(holder, position)
+    }
+
+    override fun onBindViewHolder(holder: Holder, position: Int) {
+        bindVisuals(holder, position)
+        if (position == 0) {
+            holder.itemView.nextFocusUpId = if (upFocusViewId != View.NO_ID) {
+                upFocusViewId
+            } else {
+                holder.itemView.id
+            }
+        } else {
+            holder.itemView.nextFocusUpId = View.NO_ID
+        }
+        holder.itemView.nextFocusLeftId = if (leftFocusViewId != View.NO_ID) {
+            leftFocusViewId
+        } else {
+            View.NO_ID
+        }
     }
 
     private fun bindVisuals(holder: Holder, position: Int) {
@@ -183,10 +199,7 @@ class CategoryAdapter(
             },
         )
         holder.name.setTypeface(
-            ResourcesCompat.getFont(
-                context,
-                if (contentSelected && !focused) R.font.gtv_font_title else R.font.gtv_font_ui,
-            ),
+            if (contentSelected && !focused) titleFont(context) else uiFont(context),
         )
     }
 

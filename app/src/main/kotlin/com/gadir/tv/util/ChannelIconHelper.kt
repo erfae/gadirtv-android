@@ -13,6 +13,16 @@ object ChannelIconHelper {
     private const val LIST_ICON_MAX_FALLBACKS = 32
     private const val PANEL_FALLBACK_LIMIT = 10
 
+    // Building fallback URLs touches PiconUrls + panelFallbackUrls (regex slugify, URL
+    // encoding, NetworkUrlResolver) on every call. The result only depends on the channel's
+    // own fields, but RecyclerView re-binds the same channel on every scroll pass — memoize
+    // per streamId to keep D-pad scrolling through the channel list smooth.
+    private val fallbackCache = java.util.concurrent.ConcurrentHashMap<Int, List<String>>()
+
+    fun clearFallbackCache() {
+        fallbackCache.clear()
+    }
+
     fun loadListIcon(target: ImageView, channel: LiveChannel) {
         val density = target.resources.displayMetrics.density
         val size = (44 * density).toInt().coerceAtLeast(96)
@@ -56,9 +66,11 @@ object ChannelIconHelper {
         )
     }
 
-    private fun iconFallbackUrls(channel: LiveChannel, primary: String): List<String> =
-        buildList {
-            ChannelIconCache.get(channel.streamId)?.let { add(it) }
+    private fun iconFallbackUrls(channel: LiveChannel, primary: String): List<String> {
+        if (channel.streamId > 0) {
+            fallbackCache[channel.streamId]?.let { return it }
+        }
+        val result = buildList {
             addAll(PiconUrls.candidates(channel))
             addAll(panelFallbackUrls(PlaylistRepository.profile, channel).take(PANEL_FALLBACK_LIMIT))
         }
@@ -66,6 +78,11 @@ object ChannelIconHelper {
             .filter { it.isNotBlank() && it != primary }
             .distinct()
             .take(LIST_ICON_MAX_FALLBACKS)
+        if (channel.streamId > 0 && result.isNotEmpty()) {
+            fallbackCache[channel.streamId] = result
+        }
+        return result
+    }
 
     /** @deprecated Use [loadListIcon] or [loadPanelIcon]. */
     fun load(target: ImageView, channel: LiveChannel) = loadPanelIcon(target, channel)
