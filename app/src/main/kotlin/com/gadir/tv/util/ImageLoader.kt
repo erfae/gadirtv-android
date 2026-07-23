@@ -155,14 +155,14 @@ object ImageLoader {
         )
     }
 
-    fun loadCastAvatar(target: ImageView, rawUrl: String, sizePx: Int = 144) {
+    fun loadCastAvatar(target: ImageView, rawUrl: String, sizePx: Int = 144, name: String = "") {
         if (!canLoadInto(target)) return
         val candidates = CastImageResolver.candidates(rawUrl)
+        val size = sizePx.coerceAtLeast(72)
         if (candidates.isEmpty()) {
-            target.setImageResource(R.drawable.ic_user)
+            if (name.isNotBlank()) CastAvatarFallback.load(target, name, size) else target.setImageResource(R.drawable.ic_user)
             return
         }
-        val size = sizePx.coerceAtLeast(72)
         val options = RequestOptions()
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .override(size, size)
@@ -176,6 +176,7 @@ object ImageLoader {
             options = options,
             errorDrawable = R.drawable.ic_user,
             sizePx = size,
+            castName = name,
         )
     }
 
@@ -226,16 +227,13 @@ object ImageLoader {
         sizePx: Int = 96,
         channelName: String = "",
         streamId: Int = 0,
+        castName: String = "",
     ) {
         if (!canLoadInto(target)) return
         if (loadTag != null && target.getTag(R.id.image_load_tag) != loadTag) return
         if (index >= urls.size) {
             if (loadTag == null || target.getTag(R.id.image_load_tag) == loadTag) {
-                if (channelName.isNotBlank() || streamId > 0) {
-                    ChannelIconFallback.load(target, channelName.ifBlank { "TV" }, sizePx)
-                } else {
-                    target.setImageResource(errorDrawable)
-                }
+                applyFallback(target, errorDrawable, sizePx, channelName, streamId, castName)
             }
             return
         }
@@ -252,7 +250,7 @@ object ImageLoader {
                     ): Boolean {
                         loadWithFallback(
                             target, urls, index + 1, options, loadTag, errorDrawable,
-                            sizePx, channelName, streamId,
+                            sizePx, channelName, streamId, castName,
                         )
                         return true
                     }
@@ -276,12 +274,24 @@ object ImageLoader {
                 .into(target)
         } catch (_: Throwable) {
             if (loadTag == null || target.getTag(R.id.image_load_tag) == loadTag) {
-                if (channelName.isNotBlank() || streamId > 0) {
-                    ChannelIconFallback.load(target, channelName.ifBlank { "TV" }, sizePx)
-                } else {
-                    target.setImageResource(errorDrawable)
-                }
+                applyFallback(target, errorDrawable, sizePx, channelName, streamId, castName)
             }
+        }
+    }
+
+    private fun applyFallback(
+        target: ImageView,
+        errorDrawable: Int,
+        sizePx: Int,
+        channelName: String,
+        streamId: Int,
+        castName: String,
+    ) {
+        when {
+            castName.isNotBlank() -> CastAvatarFallback.load(target, castName, sizePx)
+            channelName.isNotBlank() || streamId > 0 ->
+                ChannelIconFallback.load(target, channelName.ifBlank { "TV" }, sizePx)
+            else -> target.setImageResource(errorDrawable)
         }
     }
 

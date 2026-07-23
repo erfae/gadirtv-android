@@ -23,9 +23,12 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 object ContentPreloader {
-    private const val ICON_PARALLEL = 8
-    private const val PLOT_PARALLEL = 4
-    private const val EPG_PARALLEL = 5
+    // Kept modest: the panel rate-limits (503) when too many concurrent requests
+    // hit it at once, which was starving the hero's own plot fetch (see loadMoviePlot).
+    private const val ICON_PARALLEL = 6
+    private const val PLOT_PARALLEL = 2
+    private const val EPG_PARALLEL = 3
+    private const val PRELOAD_START_DELAY_MS = 1_200L
     private const val EPG_CHANNEL_LIMIT = 48
     private const val PLOT_LIMIT = 24
     private const val PRIORITY_CHANNEL_ICONS = 120
@@ -42,6 +45,9 @@ object ContentPreloader {
         activeProfileKey = key
         val appContext = context.applicationContext
         backgroundJob = scope.launch {
+            // Give the hero's own plot/backdrop fetch (fired immediately on Home load) a
+            // head start before this burst starts competing for the same panel connections.
+            kotlinx.coroutines.delay(PRELOAD_START_DELAY_MS)
             preloadInBackground(appContext, api, profile)
         }
     }
