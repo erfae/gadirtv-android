@@ -1,7 +1,6 @@
 package com.gadir.tv.ui.player
 
 import android.annotation.SuppressLint
-import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -221,6 +220,8 @@ class TrailerActivity : BaseLocaleActivity() {
                 override fun onPlaybackStateChanged(state: Int) {
                     if (state == Player.STATE_READY && player.isPlaying) {
                         markPlaybackStarted()
+                    } else if (state == Player.STATE_ENDED) {
+                        finish()
                     }
                 }
 
@@ -240,25 +241,6 @@ class TrailerActivity : BaseLocaleActivity() {
 
     private fun playYoutube(videoId: String) {
         currentYoutubeId = videoId
-        if (DeviceUi.isTvUi(this)) {
-            if (openYoutubeExternal(videoId)) {
-                finish()
-                return
-            }
-            youtubeStreamTried = true
-            lifecycleScope.launch {
-                val direct = withContext(Dispatchers.IO) {
-                    TrailerStreamResolver.directPlayUrl(videoId)
-                }
-                if (isFinishing) return@launch
-                if (direct != null) {
-                    playDirectVideo(direct)
-                } else {
-                    playYoutubeEmbed(videoId)
-                }
-            }
-            return
-        }
         if (!youtubeStreamTried) {
             youtubeStreamTried = true
             lifecycleScope.launch {
@@ -281,14 +263,32 @@ class TrailerActivity : BaseLocaleActivity() {
         showWebView()
         val origin = "https://www.youtube.com"
         when (youtubeStep) {
-            0 -> webView.loadUrl(
+            // Tried first: uses the YouTube IFrame Player API, which is the only variant
+            // that reports playback state back to us — lets us detect when the trailer
+            // actually ends and close automatically instead of leaving YouTube's own
+            // "up next"/recommendations screen showing inside the WebView.
+            0 -> webView.loadDataWithBaseURL(
+                "https://www.youtube-nocookie.com",
+                YoutubeTrailerHelper.iframeApiHtml(videoId, "https://www.youtube-nocookie.com", origin),
+                "text/html",
+                "UTF-8",
+                null,
+            )
+            1 -> webView.loadDataWithBaseURL(
+                origin,
+                YoutubeTrailerHelper.iframeApiHtml(videoId, origin, origin),
+                "text/html",
+                "UTF-8",
+                null,
+            )
+            2 -> webView.loadUrl(
                 YoutubeTrailerHelper.directEmbedUrl(videoId, origin),
                 YoutubeTrailerHelper.embedHeaders(),
             )
-            1 -> webView.loadUrl(YoutubeTrailerHelper.pipedEmbedUrl(videoId))
-            2, 3, 4 -> {
+            3 -> webView.loadUrl(YoutubeTrailerHelper.pipedEmbedUrl(videoId))
+            4, 5, 6 -> {
                 val mirrors = YoutubeTrailerHelper.invidiousEmbedUrls(videoId)
-                val index = youtubeStep - 2
+                val index = youtubeStep - 4
                 if (index < mirrors.size) {
                     webView.loadUrl(mirrors[index])
                 } else {
@@ -296,20 +296,10 @@ class TrailerActivity : BaseLocaleActivity() {
                     return
                 }
             }
-            5 -> webView.loadDataWithBaseURL(
-                "https://www.youtube-nocookie.com",
-                YoutubeTrailerHelper.nocookieIframeHtml(videoId, origin),
-                "text/html",
-                "UTF-8",
-                null,
-            )
-            else -> webView.loadDataWithBaseURL(
-                origin,
-                YoutubeTrailerHelper.iframeApiHtml(videoId, origin),
-                "text/html",
-                "UTF-8",
-                null,
-            )
+            else -> {
+                advancePlayback()
+                return
+            }
         }
         scheduleLoadTimeout()
     }
@@ -409,37 +399,9 @@ class TrailerActivity : BaseLocaleActivity() {
         }
     }
 
-    private fun openYoutubeExternal(videoId: String): Boolean {
-        val uri = Uri.parse("https://www.youtube.com/watch?v=$videoId")
-        val packages = listOf(
-            "com.google.android.youtube.tv",
-            "com.google.android.youtube",
-        )
-        for (pkg in packages) {
-            val intent = Intent(Intent.ACTION_VIEW, uri).setPackage(pkg)
-            if (intent.resolveActivity(packageManager) != null) {
-                startActivity(intent)
-                return true
-            }
-        }
-        val generic = Intent(Intent.ACTION_VIEW, uri)
-        return if (generic.resolveActivity(packageManager) != null) {
-            startActivity(generic)
-            true
-        } else {
-            false
-        }
-    }
-
     private fun showFailed() {
         cancelLoadTimeout()
         releasePlayer()
-        val youtubeId = currentYoutubeId
-            ?: sources.filterIsInstance<TrailerSource.Youtube>().firstOrNull()?.videoId
-        if (DeviceUi.isTvUi(this) && youtubeId != null && openYoutubeExternal(youtubeId)) {
-            finish()
-            return
-        }
         showWebView()
         statusView.visibility = View.VISIBLE
         statusView.text = getString(R.string.trailer_playback_failed)
@@ -539,6 +501,11 @@ class TrailerActivity : BaseLocaleActivity() {
         @JavascriptInterface
         fun onPlaying() {
             runOnUiThread { markPlaybackStarted() }
+        }
+
+        @JavascriptInterface
+        fun onEnded() {
+            runOnUiThread { finish() }
         }
 
         @JavascriptInterface
