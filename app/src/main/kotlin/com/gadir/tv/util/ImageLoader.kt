@@ -14,6 +14,7 @@ import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.Target
 import com.gadir.tv.R
 import com.gadir.tv.data.PlaylistRepository
+import com.gadir.tv.data.TmdbApi
 import com.gadir.tv.net.PanelHttp
 import java.net.URI
 
@@ -174,7 +175,12 @@ object ImageLoader {
 
     fun loadCastAvatar(target: ImageView, rawUrl: String, sizePx: Int = 144, name: String = "") {
         if (!canLoadInto(target)) return
-        val candidates = CastImageResolver.candidates(rawUrl)
+        val trimmed = rawUrl.trim()
+        val candidates = if (TmdbApi.isTrustedCastPhoto(trimmed)) {
+            listOf(trimmed)
+        } else {
+            CastImageResolver.candidates(rawUrl)
+        }
         val size = sizePx.coerceAtLeast(72)
         if (candidates.isEmpty()) {
             if (name.isNotBlank()) CastAvatarFallback.load(target, name, size) else target.setImageResource(R.drawable.ic_user)

@@ -141,9 +141,9 @@ object VodDetailUi {
         onCastMoveDown: (() -> Unit)? = null,
     ) {
         if (!TmdbApi.isConfigured()) return
+        val cleanedTitle = TmdbApi.cleanTitle(title)
         scope.launch {
             val enriched = withContext(Dispatchers.IO) {
-                val cleanedTitle = TmdbApi.cleanTitle(title)
                 val fromTmdb = TmdbApi.fetchCast(
                     title = cleanedTitle,
                     releaseDate = releaseDate,
@@ -151,7 +151,7 @@ object VodDetailUi {
                     tmdbId = tmdbId.takeIf { it > 0 },
                 )
                 when {
-                    fromTmdb.isNotEmpty() -> fromTmdb
+                    fromTmdb.any { TmdbApi.isTrustedCastPhoto(it.imageUrl) } -> fromTmdb
                     members.any { it.name.isNotBlank() } ->
                         TmdbApi.enrichCastMembers(
                             members = members,
@@ -160,11 +160,16 @@ object VodDetailUi {
                             tmdbId = tmdbId.takeIf { it > 0 },
                             isSeries = isSeries,
                         )
-                    fallbackCast.isNotBlank() -> fromTmdb
-                    else -> emptyList()
+                    fromTmdb.isNotEmpty() -> fromTmdb
+                    fallbackCast.isNotBlank() ->
+                        fallbackCast.split(",")
+                            .map { it.trim() }
+                            .filter { it.isNotBlank() }
+                            .map { CastMember(it) }
+                    else -> members
                 }
             }
-            if (!listView.isAttachedToWindow) return@launch
+            if (enriched.none { it.name.isNotBlank() }) return@launch
             bindCast(
                 labelView = labelView,
                 listView = listView,

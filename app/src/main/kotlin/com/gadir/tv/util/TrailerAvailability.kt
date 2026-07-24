@@ -1,5 +1,7 @@
 package com.gadir.tv.util
 
+import com.gadir.tv.data.TmdbApi
+
 data class TrailerMatch(
     val url: String,
     val title: String,
@@ -7,28 +9,38 @@ data class TrailerMatch(
 
 object TrailerAvailability {
     fun resolveLocal(title: String, serverUrl: String = ""): TrailerMatch? {
-        if (serverUrl.isNotBlank()) {
-            MetaExtractor.normalizeTrailerUrl(serverUrl)?.let {
-                return TrailerMatch(it, title)
-            }
-        }
-        if (title.isNotBlank()) {
-            TrailerCatalog.find(title)?.let { catalog ->
-                MetaExtractor.normalizeTrailerUrl(catalog)?.let {
-                    return TrailerMatch(it, title)
-                }
-            }
+        TrailerResolver.firstPlayableUrl(TrailerResolver.resolveAll(serverUrl, title))?.let {
+            return TrailerMatch(it, title)
         }
         return null
     }
 
-    fun resolve(title: String, serverUrl: String = ""): TrailerMatch? {
+    fun resolve(
+        title: String,
+        serverUrl: String = "",
+        isSeries: Boolean = false,
+        releaseDate: String = "",
+    ): TrailerMatch? {
         resolveLocal(title, serverUrl)?.let { return it }
         if (title.isBlank()) return null
-        val id = TrailerSearch.findYoutubeId(title) ?: return null
-        return TrailerMatch("https://www.youtube.com/watch?v=$id", title)
+        if (TmdbApi.isConfigured()) {
+            TmdbApi.fetchTrailerUrl(title, releaseDate, isSeries)?.let {
+                return TrailerMatch(it, title)
+            }
+        }
+        TrailerSearch.findFallbackSource(title)?.let {
+            return TrailerMatch(
+                url = "https://www.dailymotion.com/video/${(it as TrailerSource.Dailymotion).videoId}",
+                title = title,
+            )
+        }
+        return null
     }
 
-    fun hasTrailer(title: String, serverUrl: String = ""): Boolean =
-        resolve(title, serverUrl) != null
+    fun hasTrailer(
+        title: String,
+        serverUrl: String = "",
+        isSeries: Boolean = false,
+        releaseDate: String = "",
+    ): Boolean = resolve(title, serverUrl, isSeries, releaseDate) != null
 }

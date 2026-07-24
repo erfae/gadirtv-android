@@ -2,55 +2,77 @@ package com.gadir.tv.util
 
 sealed class TrailerSource {
     data class DirectVideo(val url: String) : TrailerSource()
-    data class Youtube(val videoId: String) : TrailerSource()
-    data class ExternalLink(val url: String) : TrailerSource()
-    data class WebPage(val url: String) : TrailerSource()
+    data class Vimeo(val videoId: String, val pageUrl: String = "") : TrailerSource()
+    data class Dailymotion(val videoId: String) : TrailerSource()
 }
 
 object TrailerResolver {
     fun resolveAll(rawUrl: String, title: String = ""): List<TrailerSource> {
         val sources = LinkedHashSet<TrailerSource>()
-        if (title.isNotBlank()) {
-            TrailerCatalog.find(title)?.let { addRaw(sources, it) }
-        }
         addRaw(sources, rawUrl)
         if (sources.isEmpty() && title.isNotBlank()) {
-            TrailerSearch.findYoutubeId(title)?.let { sources.add(TrailerSource.Youtube(it)) }
+            TrailerSearch.findFallbackSource(title)?.let { sources.add(it) }
         }
         return sources.toList()
     }
 
+    fun resolveFromTmdb(site: String, key: String): List<TrailerSource> {
+        val sources = LinkedHashSet<TrailerSource>()
+        when {
+            site.equals("Vimeo", ignoreCase = true) && key.isNotBlank() ->
+                sources.add(TrailerSource.Vimeo(key, "https://vimeo.com/$key"))
+            site.equals("Dailymotion", ignoreCase = true) && key.isNotBlank() ->
+                sources.add(TrailerSource.Dailymotion(key))
+            site.equals("Direct", ignoreCase = true) && key.startsWith("http") ->
+                addRaw(sources, key)
+        }
+        return sources.toList()
+    }
+
+    fun hasPlayableSource(rawUrl: String, title: String = ""): Boolean =
+        resolveAll(rawUrl, title).isNotEmpty()
+
     private fun addRaw(sources: LinkedHashSet<TrailerSource>, raw: String) {
         val trimmed = raw.trim()
-        if (trimmed.isEmpty()) return
+        if (trimmed.isEmpty() || isYoutubeUrl(trimmed)) return
         classify(trimmed)?.let { sources.add(it) }
         MetaExtractor.normalizeTrailerUrl(trimmed)?.let { normalized ->
-            if (normalized != trimmed) classify(normalized)?.let { sources.add(it) }
+            if (normalized != trimmed && !isYoutubeUrl(normalized)) {
+                classify(normalized)?.let { sources.add(it) }
+            }
         }
     }
 
     private fun classify(url: String): TrailerSource? {
+        if (isYoutubeUrl(url)) return null
         if (MetaExtractor.isDirectVideoUrl(url)) return TrailerSource.DirectVideo(url)
-        YoutubeTrailerHelper.extractId(url)?.let { return TrailerSource.Youtube(it) }
-        val lower = url.lowercase()
-        when {
-            lower.contains("vimeo.com") ||
-                lower.contains("dailymotion.com") ||
-                lower.contains("twitch.tv") ||
-                lower.contains("facebook.com/watch") -> return TrailerSource.ExternalLink(url)
-            url.startsWith("http") -> return TrailerSource.WebPage(url)
+        VimeoStreamResolver.extractId(url)?.let { id ->
+            return TrailerSource.Vimeo(id, VimeoStreamResolver.pageUrl(url).orEmpty())
         }
+        DailymotionStreamResolver.extractId(url)?.let { return TrailerSource.Dailymotion(it) }
         return null
     }
 
-    fun firstWebUrl(sources: List<TrailerSource>): String? {
+    fun isYoutubeUrl(url: String): Boolean {
+        if (url.isBlank()) return false
+        if (YoutubeTrailerHelper.extractId(url) != null) return true
+        val lower = url.lowercase()
+        return lower.contains("youtube.com") ||
+            lower.contains("youtu.be") ||
+            lower.contains("youtube-nocookie.com") ||
+            lower.contains("piped.video") ||
+            lower.contains("yewtu.be") ||
+            lower.contains("invidious")
+    }
+
+    fun firstPlayableUrl(sources: List<TrailerSource>): String? {
         for (source in sources) {
             when (source) {
-                is TrailerSource.Youtube ->
-                    return "https://www.youtube.com/watch?v=${source.videoId}"
-                is TrailerSource.WebPage -> return source.url
-                is TrailerSource.ExternalLink -> return source.url
-                is TrailerSource.DirectVideo -> Unit
+                is TrailerSource.DirectVideo -> return source.url
+                is TrailerSource.Vimeo ->
+                    return source.pageUrl.ifBlank { "https://vimeo.com/${source.videoId}" }
+                is TrailerSource.Dailymotion ->
+                    return "https://www.dailymotion.com/video/${source.videoId}"
             }
         }
         return null
