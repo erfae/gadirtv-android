@@ -269,19 +269,27 @@ class XtreamApi(
                 eps.sortedBy { it.episodeNum }
             }
             val name = info?.get("name")?.asStringOrNull() ?: ""
+            val castMembers = MetaExtractor.castMembersFrom(info, root)
+            val releaseDate = info?.get("releaseDate")?.asStringOrNull() ?: ""
             SeriesDetail(
                 name = name,
                 cover = imageUrl(info, "cover", "cover_big", "stream_icon", "movie_image"),
                 backdrop = imageUrl(info, "backdrop_path", "cover_big", "cover", "stream_icon"),
                 plot = MetaExtractor.plotFrom(info, root),
                 genre = info?.get("genre")?.asStringOrNull() ?: "",
-                releaseDate = info?.get("releaseDate")?.asStringOrNull() ?: "",
+                releaseDate = releaseDate,
                 rating = info?.get("rating_5based")?.asStringOrNull()
                     ?: info?.get("rating")?.asStringOrNull()
                     ?: "",
                 trailerUrl = MetaExtractor.trailerFrom(name, info, root).orEmpty(),
                 cast = MetaExtractor.castFrom(info),
-                castMembers = MetaExtractor.castMembersFrom(info, root),
+                castMembers = TmdbApi.enrichCastMembers(
+                    members = castMembers,
+                    title = name,
+                    releaseDate = releaseDate,
+                    tmdbId = MetaExtractor.tmdbIdFrom(info, root),
+                    isSeries = true,
+                ),
                 seasons = normalized,
             )
         } catch (_: Exception) {
@@ -372,6 +380,10 @@ class XtreamApi(
             val name = info?.get("name")?.asStringOrNull()
                 ?: movieData?.get("name")?.asStringOrNull()
                 ?: ""
+            val castMembers = MetaExtractor.castMembersFrom(info, movieData, root)
+            val releaseDate = info?.get("releasedate")?.asStringOrNull()
+                ?: info?.get("releaseDate")?.asStringOrNull()
+                ?: ""
             VodInfo(
                 name = name,
                 plot = MetaExtractor.plotFrom(info, movieData, root),
@@ -383,12 +395,16 @@ class XtreamApi(
                     ?: info?.get("rating_5based")?.asStringOrNull()
                     ?: "",
                 genre = info?.get("genre")?.asStringOrNull() ?: "",
-                releaseDate = info?.get("releasedate")?.asStringOrNull()
-                    ?: info?.get("releaseDate")?.asStringOrNull()
-                    ?: "",
+                releaseDate = releaseDate,
                 trailerUrl = MetaExtractor.trailerFrom(name, info, movieData, root).orEmpty(),
                 cast = MetaExtractor.castFrom(info, movieData, root),
-                castMembers = MetaExtractor.castMembersFrom(info, movieData, root),
+                castMembers = TmdbApi.enrichCastMembers(
+                    members = castMembers,
+                    title = name,
+                    releaseDate = releaseDate,
+                    tmdbId = MetaExtractor.tmdbIdFrom(info, movieData, root),
+                    isSeries = false,
+                ),
                 director = MetaExtractor.directorFrom(info, movieData),
                 extension = movieData?.get("container_extension")?.asStringOrNull()
                     ?.ifBlank { info?.get("container_extension")?.asStringOrNull().orEmpty() }
