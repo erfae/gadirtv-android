@@ -41,6 +41,22 @@ object VlcAudioOptions {
         )
     }
 
+    /** VOD software decode — same no-reconnect policy as [vodOptions]. */
+    fun vodSoftwareOptions(networkBufferMs: Int): ArrayList<String> {
+        val network = networkBufferMs.coerceIn(2_000, 8_000)
+        val file = (network * 3).coerceIn(8_000, 24_000)
+        return arrayListOf(
+            "--http-user-agent=${PlaylistRepository.userAgent}",
+            "--network-caching=$network",
+            "--live-caching=$network",
+            "--file-caching=$file",
+            "--no-video-title-show",
+            "--avcodec-hw=none",
+            "--avcodec-fast",
+            "--no-http-reconnect",
+        )
+    }
+
     /** Software decode fallback when hardware init/playback fails. */
     fun softwareOptions(networkBufferMs: Int): ArrayList<String> {
         val cache = networkBufferMs.coerceIn(1_500, 5_000)

@@ -1348,11 +1348,9 @@ class MainActivity : BaseLocaleActivity() {
             liveBrowseLevel == TvBrowseNav.Level.TAB &&
             liveCategories.isNotEmpty()
         ) {
-            livePanel().post {
-                if (currentTab == Tab.LIVE && liveBrowseLevel == TvBrowseNav.Level.TAB) {
-                    enterLiveTabFromTabBar()
-                }
-            }
+            syncLiveCategoryCounts()
+            refreshLiveCategorySelection()
+            warmLiveCategoryPrefetch()
         }
     }
 
@@ -2098,32 +2096,44 @@ class MainActivity : BaseLocaleActivity() {
                 else -> false
             }
         }
+        syncCatalogCategoryCounts(tab)
+        catalogCategoryAdapter?.refreshSelection()
         if (targets.isEmpty()) return
         val token = ++catalogPrefetchToken
         lifecycleScope.launch {
-            for (cat in targets) {
-                if (token != catalogPrefetchToken || currentTab != tab) return@launch
-                try {
-                    val count = withContext(Dispatchers.IO) {
-                        when (tab) {
-                            Tab.MOVIES -> {
-                                val movies = api.vodStreams(profile, cat.id)
-                                PlaylistRepository.cacheVod(cat.id, movies)
-                                movies.size
+            coroutineScope {
+                val semaphore = Semaphore(4)
+                val loaded = targets.map { cat ->
+                    async {
+                        semaphore.withPermit {
+                            if (token != catalogPrefetchToken || currentTab != tab) return@async null
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    when (tab) {
+                                        Tab.MOVIES -> {
+                                            val movies = api.vodStreams(profile, cat.id)
+                                            PlaylistRepository.cacheVod(cat.id, movies)
+                                            cat.id to movies.size
+                                        }
+                                        Tab.SERIES -> {
+                                            val series = api.seriesList(profile, cat.id)
+                                            PlaylistRepository.cacheSeries(cat.id, series)
+                                            cat.id to series.size
+                                        }
+                                        else -> null
+                                    }
+                                }
+                            } catch (_: Exception) {
+                                null
                             }
-                            Tab.SERIES -> {
-                                val series = api.seriesList(profile, cat.id)
-                                PlaylistRepository.cacheSeries(cat.id, series)
-                                series.size
-                            }
-                            else -> return@withContext null
                         }
-                    } ?: continue
-                    if (token != catalogPrefetchToken || currentTab != tab) return@launch
-                    catalogCategoryCounts[cat.id] = count
-                    catalogCategoryAdapter?.refreshSelection()
-                } catch (_: Exception) {
+                    }
+                }.awaitAll().filterNotNull()
+                if (token != catalogPrefetchToken || currentTab != tab) return@coroutineScope
+                loaded.forEach { (catId, count) ->
+                    catalogCategoryCounts[catId] = count
                 }
+                catalogCategoryAdapter?.refreshSelection()
             }
         }
     }
@@ -2399,7 +2409,11 @@ class MainActivity : BaseLocaleActivity() {
             Tab.LIVE -> {
                 ensureLiveTabReady()
                 when (liveBrowseLevel) {
-                    TvBrowseNav.Level.TAB -> livePanel().post { enterLiveTabFromTabBar() }
+                    TvBrowseNav.Level.TAB -> livePanel().post {
+                        ensurePreviewPlayer()
+                        attachPreviewPlayersToSurface()
+                        enterLiveTabFromTabBar()
+                    }
                     TvBrowseNav.Level.GROUP -> focusCategoryList()
                     TvBrowseNav.Level.CONTENT -> exitLiveContentToGroup()
                 }
@@ -2464,17 +2478,16 @@ class MainActivity : BaseLocaleActivity() {
                 stopHeroRotation()
                 com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
                 livePreviewPaused = false
+                if (enteringFromOtherTab) {
+                    liveBrowseLevel = TvBrowseNav.Level.TAB
+                }
                 syncLivePlaylistUi()
                 livePanel().post {
                     if (currentTab != Tab.LIVE) return@post
                     if (DeviceUi.useDpadFocus(this)) {
-                        ensurePreviewPlayer()
-                        attachPreviewPlayersToSurface()
-                        warmupPreviewPlayer()
-                        if (PlaylistRepository.bootstrapReady && liveBrowseLevel == TvBrowseNav.Level.TAB) {
-                            enterLiveTabFromTabBar()
-                        } else {
-                            applyLiveBrowseLevel()
+                        applyLiveBrowseLevel()
+                        if (liveBrowseLevel == TvBrowseNav.Level.TAB) {
+                            tabLive.requestFocus()
                         }
                     } else {
                         ensurePreviewPlayer()
@@ -2490,14 +2503,16 @@ class MainActivity : BaseLocaleActivity() {
                 stopHeroRotation()
                 com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
                 if (DeviceUi.useDpadFocus(this)) {
-                    catalogBrowseLevel = TvBrowseNav.Level.TAB
+                    if (enteringFromOtherTab) {
+                        catalogBrowseLevel = TvBrowseNav.Level.TAB
+                    }
                     panelCatalog.post { applyCatalogBrowseLevel(tab) }
-                    warmFirstCatalogGroup(tab)
                 }
                 val switchingBetweenCatalog =
                     (previousTab == Tab.MOVIES || previousTab == Tab.SERIES) && previousTab != tab
                 val ready = if (tab == Tab.MOVIES) moviesCatalogReady else seriesCatalogReady
                 ensureCatalogTabReady(tab)
+                warmCatalogCategoryCounts(tab)
                 if (!ready || switchingBetweenCatalog || catalogPosterTab != tab) {
                     setupCatalogTab(tab)
                     if (catalogCategories.isNotEmpty()) {
@@ -5449,6 +5464,9 @@ class MainActivity : BaseLocaleActivity() {
         com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
         ContentPreloader.cancelBackgroundPreload()
         finishAffinity()
+        Handler(Looper.getMainLooper()).postDelayed({
+            android.os.Process.killProcess(android.os.Process.myPid())
+        }, 500L)
     }
 
     private fun isFocusInLivePreviewControls(): Boolean {

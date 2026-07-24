@@ -691,6 +691,15 @@ class PlayerActivity : BaseLocaleActivity() {
         return super.dispatchKeyEvent(event)
     }
 
+    private fun finishVodAndClose() {
+        releaseVodPlayerFully()
+        com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
+        hideHandler.postDelayed({
+            com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
+            if (!isDestroyed) finish()
+        }, VOD_FINISH_DELAY_MS)
+    }
+
     override fun onBackPressed() {
         if (isLive) {
             if (liveOverlaysVisible && !DeviceUi.isTvUi(this)) {
@@ -712,7 +721,7 @@ class PlayerActivity : BaseLocaleActivity() {
     private fun promptVodExit() {
         val exo = player
         if (exo == null) {
-            finish()
+            finishVodAndClose()
             return
         }
         val positionMs = exo.currentPosition
@@ -720,9 +729,7 @@ class PlayerActivity : BaseLocaleActivity() {
         val nearEnd = durationMs > 0 && positionMs >= durationMs - 30_000L
         if (positionMs < 90_000L || nearEnd) {
             saveProgress()
-            releaseVodPlayerFully()
-            com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
-            finish()
+            finishVodAndClose()
             return
         }
         val kind = intent.getStringExtra(EXTRA_KIND).orEmpty()
@@ -732,17 +739,13 @@ class PlayerActivity : BaseLocaleActivity() {
             .setMessage(R.string.playback_exit_message)
             .setPositiveButton(R.string.playback_continue) { _, _ ->
                 saveProgress()
-                releaseVodPlayerFully()
-                com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
-                finish()
+                finishVodAndClose()
             }
             .setNegativeButton(R.string.playback_restart) { _, _ ->
                 if (kind.isNotEmpty() && contentId.isNotEmpty()) {
                     resumeStore.remove(kind, contentId)
                 }
-                releaseVodPlayerFully()
-                com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
-                finish()
+                finishVodAndClose()
             }
             .setNeutralButton(R.string.playback_cancel, null)
             .show()
@@ -896,6 +899,7 @@ class PlayerActivity : BaseLocaleActivity() {
         private const val CONTROLS_HIDE_MS = 4_000L
         private const val LIVE_EPG_SHOW_MS = 3_000L
         private const val ZAP_RECONNECT_DELAY_MS = 500L
+        private const val VOD_FINISH_DELAY_MS = 550L
 
         fun intent(
             context: Context,

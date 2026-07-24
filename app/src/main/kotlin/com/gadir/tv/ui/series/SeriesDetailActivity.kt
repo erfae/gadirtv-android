@@ -137,6 +137,11 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         loadSeriesDetail()
     }
 
+    override fun onResume() {
+        super.onResume()
+        com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
+    }
+
     override fun onDestroy() {
         com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
         super.onDestroy()

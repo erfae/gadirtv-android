@@ -203,6 +203,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         vlcPlaybackToken++
         vlcUsesSoftwareDecode = preferSoftware
         val options = when {
+            preferSoftware && !isLivePlayback ->
+                com.gadir.tv.player.VlcAudioOptions.vodSoftwareOptions(bufferMs)
             preferSoftware -> com.gadir.tv.player.VlcAudioOptions.softwareOptions(bufferMs)
             isLivePlayback -> com.gadir.tv.player.VlcAudioOptions.liveFullscreenOptions(bufferMs)
             else -> com.gadir.tv.player.VlcAudioOptions.vodOptions(bufferMs)
@@ -309,6 +311,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         if (vod) {
             com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
             hideHandler.postDelayed({
+                com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
                 if (!isDestroyed) finish()
             }, VOD_FINISH_DELAY_MS)
         } else {
@@ -605,6 +608,10 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private fun fallbackToExoPlayer(): Boolean {
         if (!allowExoFallback || exoFallbackLaunched) return false
         exoFallbackLaunched = true
+        releaseVlcPlayer(immediate = true)
+        if (!isLivePlayback) {
+            com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
+        }
         // Use the CURRENTLY playing channel's state, not the original launch intent — after
         // zapping, the intent still refers to whichever channel was opened first, which would
         // hand off to the wrong channel (or a stale EPG id) if VLC fails mid-zap.
@@ -902,7 +909,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val CONTROLS_HIDE_MS = 5_000L
         private const val LIVE_EPG_SHOW_MS = 3_000L
         private const val LIVE_VLC_COOLDOWN_MS = 1_200L
-        private const val VOD_FINISH_DELAY_MS = 280L
+        private const val VOD_FINISH_DELAY_MS = 550L
         private const val ZAP_RECONNECT_DELAY_MS = 500L
 
         fun intent(
