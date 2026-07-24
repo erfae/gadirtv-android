@@ -20,12 +20,13 @@ import com.gadir.tv.util.DailymotionStreamResolver
 import com.gadir.tv.util.TrailerResolver
 import com.gadir.tv.util.TrailerSearch
 import com.gadir.tv.util.TrailerSource
+import com.gadir.tv.util.TrailerStreamResolver
 import com.gadir.tv.util.VimeoStreamResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Tráilers 100% in-app con ExoPlayer. Nunca abre YouTube ni WebView. */
+/** Tráilers in-app con ExoPlayer. Usa IDs YouTube/TMDB pero NUNCA abre la app YouTube. */
 class TrailerActivity : BaseLocaleActivity() {
     private lateinit var playerView: PlayerView
     private lateinit var statusView: TextView
@@ -168,6 +169,7 @@ class TrailerActivity : BaseLocaleActivity() {
     private fun resolvePlayableUrl(source: TrailerSource): String? {
         return when (source) {
             is TrailerSource.DirectVideo -> source.url
+            is TrailerSource.StreamVideo -> TrailerStreamResolver.directPlayUrl(source.videoId)
             is TrailerSource.Vimeo ->
                 VimeoStreamResolver.directPlayUrl(source.videoId)
                     ?: VimeoStreamResolver.directPlayUrl(source.pageUrl)
