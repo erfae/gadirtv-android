@@ -4775,7 +4775,7 @@ class MainActivity : BaseLocaleActivity() {
         suspendLivePreview()
     }
 
-    /** NetTV-style: focus = EPG + logo only; stream opens on OK (or autoplay on phone). */
+    /** Focus = EPG + preview (debounced). OK abre pantalla completa si ya reproduce. */
     private fun onLiveChannelFocused(channel: LiveChannel) {
         updatePreviewInfo(channel)
         if (reloadingChannels) return
@@ -4783,14 +4783,13 @@ class MainActivity : BaseLocaleActivity() {
             stopPreviewForZap()
         }
         scheduleDebouncedEpg(channel)
-        if (DeviceUi.isTvUi(this) || !appSettings.autoplayPreview) return
         if (previewingStreamId == channel.streamId && previewIsSettled()) return
         if (channel.streamId == previewFocusStreamId && pendingPreview != null) return
         previewFocusStreamId = channel.streamId
         schedulePreviewPlayback(channel)
     }
 
-    /** NetTV-style: first OK plays preview; second OK (when playing) goes fullscreen. */
+    /** OK: pantalla completa si el preview ya va; si no, fuerza preview al instante. */
     private fun onLiveChannelOpen(channel: LiveChannel) {
         if (DeviceUi.useDpadFocus(this)) {
             if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
@@ -5139,11 +5138,6 @@ class MainActivity : BaseLocaleActivity() {
         forcePlay: Boolean = false,
     ) {
         if (token != previewToken || livePreviewPaused) return
-        if (!appSettings.autoplayPreview && !forcePlay) {
-            cancelMiniPreviewPlayback()
-            setPreviewVideoVisible(false)
-            return
-        }
         val channelChanged = previewingStreamId != channel.streamId
         if (channelChanged || previewUrls.isEmpty()) {
             previewUrls = orderPreviewUrls(LivePreviewStreamUrls.candidates(api, profile, channel))
