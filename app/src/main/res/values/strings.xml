@@ -132,6 +132,9 @@
     <string name="trailer_playback_failed">No se pudo reproducir el tráiler. Pulsa «Reintentar» o Atrás.</string>
     <string name="trailer_loading">Cargando tráiler…</string>
     <string name="trailer_retry">Reintentar</string>
+    <string name="trailer_replay">Reproducir de nuevo</string>
+    <string name="trailer_exit">Salir</string>
+    <string name="trailer_finished">Tráiler finalizado</string>
     <string name="no_signal_title">SIN SEÑAL</string>
     <string name="no_signal_message">No se pudo reproducir este canal. Revisa tu conexión o los ajustes del reproductor.</string>
     <string name="no_signal_settings">Ir a Ajustes</string>
