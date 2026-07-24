@@ -44,6 +44,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
     private var addedTimestamp = 0L
     private var trailerUrl = ""
     private var releaseDate = ""
+    private var tmdbId = 0
     private var loadToken = 0
 
     private lateinit var loadingView: View
@@ -280,6 +281,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
 
         trailerUrl = info.trailerUrl
         releaseDate = info.releaseDate
+        tmdbId = info.tmdbId
         btnMovieTrailer.visibility =
             if (trailerUrl.isNotBlank() || TmdbApi.isConfigured()) View.VISIBLE else View.GONE
 
@@ -309,6 +311,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
             title = title,
             isSeries = false,
             releaseDate = releaseDate,
+            tmdbId = tmdbId,
         )
     }
 

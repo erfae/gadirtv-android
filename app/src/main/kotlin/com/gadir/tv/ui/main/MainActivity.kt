@@ -105,8 +105,8 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
         private const val CHANNEL_PREVIEW_DELAY_MS = 0L
-        private const val PREVIEW_DEBOUNCE_MS = 280L
-        private const val PREVIEW_ZAP_DELAY_MS = 120L
+        private const val PREVIEW_DEBOUNCE_MS = 400L
+        private const val PREVIEW_ZAP_DELAY_MS = 500L
         private const val PREVIEW_TIMEOUT_MS = 6_000L
         private const val PREVIEW_RETRY_DELAY_MS = 600L
         private const val PREVIEW_RETRY_MAX_CYCLES = 2
@@ -114,7 +114,7 @@ class MainActivity : BaseLocaleActivity() {
         private const val PREVIEW_STALL_TIMEOUT_MS = 14_000L
         private const val PREVIEW_SURFACE_MAX_ATTEMPTS = 4
         private const val CATALOG_PREFETCH_DELAY_MS = 400L
-        private const val EPG_FOCUS_DELAY_MS = 350L
+        private const val EPG_FOCUS_DELAY_MS = 0L
         private const val FULLSCREEN_LAUNCH_DELAY_MS = 700L
         private const val LIVE_VLC_COOLDOWN_MS = 600L
     }
@@ -260,6 +260,7 @@ class MainActivity : BaseLocaleActivity() {
     private var livePreviewResumeToken = 0
     private var previewGateHeld = false
     private var epgLoadToken = 0
+    private var epgLoadJob: Job? = null
     private var pendingEpg: Runnable? = null
     private var epgFocusStreamId = 0
     private var liveTabReady = false
@@ -298,7 +299,7 @@ class MainActivity : BaseLocaleActivity() {
         livePreviewResumeToken++
         fullscreenWaitToken++
         previewToken++
-        epgLoadToken++
+        cancelEpgLoad()
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
         pendingEpg?.let { previewHandler.removeCallbacks(it) }
@@ -4682,7 +4683,8 @@ class MainActivity : BaseLocaleActivity() {
                             schedulePreviewAfterChannelFocus(previewIndex)
                         }
                         else -> {
-                            channels.getOrNull(previewIndex)?.let { schedulePreview(it) }
+                            // Do not auto-preview channel 0 on reload — that opens a phantom
+                            // panel connection while the user is focused on another channel.
                         }
                     }
                 }
@@ -4825,6 +4827,7 @@ class MainActivity : BaseLocaleActivity() {
         val channelChanged = previousStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) return
         if (channelChanged || !previewIsSettled() || previewHasNoSignal()) {
+            cancelEpgLoad()
             if (channelChanged) {
                 previewToken++
                 stopPreviewForZap()
@@ -4999,21 +5002,32 @@ class MainActivity : BaseLocaleActivity() {
         EpgCache.get(channel.streamId)?.takeIf { it.isNotEmpty() }?.let { applyEpg(channel, it) } ?: run {
             epgPreviewAdapter?.submit(emptyList())
         }
-        scheduleEpgLoad(channel)
     }
 
-    private fun scheduleEpgLoad(channel: LiveChannel) {
+    private fun cancelEpgLoad() {
+        epgLoadToken++
+        epgLoadJob?.cancel()
+        epgLoadJob = null
+        pendingEpg?.let { previewHandler.removeCallbacks(it) }
+        pendingEpg = null
+    }
+
+    /** Load EPG only for the channel whose preview stream is actually playing. */
+    private fun scheduleEpgForPlayingChannel() {
+        val channel = currentPreviewChannel ?: return
         if (epgFocusStreamId == channel.streamId && EpgCache.get(channel.streamId) != null) return
         epgFocusStreamId = channel.streamId
-        pendingEpg?.let { previewHandler.removeCallbacks(it) }
+        cancelEpgLoad()
         val streamId = channel.streamId
         val task = Runnable {
-            if (currentPreviewChannel?.streamId != streamId) return@Runnable
+            if (currentPreviewChannel?.streamId != streamId || !previewIsSettled()) return@Runnable
             val profile = PlaylistRepository.profile ?: return@Runnable
-            val token = ++epgLoadToken
-            lifecycleScope.launch {
+            val token = epgLoadToken
+            epgLoadJob = lifecycleScope.launch {
+                if (token != epgLoadToken) return@launch
+                if (currentPreviewChannel?.streamId != streamId || !previewIsSettled()) return@launch
                 val epg = withContext(Dispatchers.IO) {
-                    api.shortEpg(
+                    api.shortEpgFast(
                         profile,
                         streamId = streamId,
                         epgChannelId = channel.epgChannelId,
@@ -5029,11 +5043,7 @@ class MainActivity : BaseLocaleActivity() {
             }
         }
         pendingEpg = task
-        if (EPG_FOCUS_DELAY_MS > 0L) {
-            previewHandler.postDelayed(task, EPG_FOCUS_DELAY_MS)
-        } else {
-            previewHandler.post(task)
-        }
+        previewHandler.postDelayed(task, EPG_FOCUS_DELAY_MS)
     }
 
     private fun cancelMiniPreviewPlayback() {
@@ -5731,6 +5741,7 @@ class MainActivity : BaseLocaleActivity() {
             onPlaying = {
                 if (!isLivePreviewContext()) return@LiveExoPreviewPlayer
                 if (previewPlaybackToken != previewToken) return@LiveExoPreviewPlayer
+                acquirePreviewGate()
                 cancelPreviewTimeout()
                 previewRetryCycleCount = 0
                 if (previewUrlIndex in previewUrls.indices) {
@@ -5741,6 +5752,7 @@ class MainActivity : BaseLocaleActivity() {
                 if (DeviceUi.useDpadFocus(this)) showMiniPreviewControls()
                 notePreviewPlaybackProgress()
                 armPreviewStallWatchdog()
+                scheduleEpgForPlayingChannel()
             },
         )
     }
@@ -5766,6 +5778,7 @@ class MainActivity : BaseLocaleActivity() {
             onPlaying = {
                 if (!isLivePreviewContext()) return@LiveVlcPlayer
                 if (previewPlaybackToken != previewToken) return@LiveVlcPlayer
+                acquirePreviewGate()
                 cancelPreviewTimeout()
                 previewRetryCycleCount = 0
                 if (previewUrlIndex in previewUrls.indices) {
@@ -5776,6 +5789,7 @@ class MainActivity : BaseLocaleActivity() {
                 if (DeviceUi.useDpadFocus(this)) showMiniPreviewControls()
                 notePreviewPlaybackProgress()
                 armPreviewStallWatchdog()
+                scheduleEpgForPlayingChannel()
             },
         )
     }

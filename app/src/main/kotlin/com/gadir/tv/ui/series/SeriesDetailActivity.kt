@@ -50,6 +50,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
     private var addedTimestamp = 0L
     private var trailerUrl = ""
     private var releaseDate = ""
+    private var tmdbId = 0
     private var loadToken = 0
     private var seasonAdapter: SeasonAdapter? = null
 
@@ -158,6 +159,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             title = title,
             isSeries = true,
             releaseDate = releaseDate,
+            tmdbId = tmdbId,
         )
     }
 
@@ -290,6 +292,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         )
         trailerUrl = detail.trailerUrl
         releaseDate = detail.releaseDate
+        tmdbId = detail.tmdbId
         btnSeriesTrailer.visibility =
             if (trailerUrl.isNotBlank() || TmdbApi.isConfigured()) View.VISIBLE else View.GONE
         PlotCache.put(

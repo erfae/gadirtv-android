@@ -2,6 +2,7 @@ package com.gadir.tv.ui.player
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -59,6 +60,8 @@ class TrailerActivity : BaseLocaleActivity() {
     private var tmdbLookupStarted = false
     private var isSeriesContent = false
     private var releaseDateHint = ""
+    private var tmdbContentId = 0
+    private var waitingForTmdbOnTv = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,6 +73,7 @@ class TrailerActivity : BaseLocaleActivity() {
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         isSeriesContent = intent.getBooleanExtra(EXTRA_IS_SERIES, false)
         releaseDateHint = intent.getStringExtra(EXTRA_RELEASE_DATE).orEmpty()
+        tmdbContentId = intent.getIntExtra(EXTRA_TMDB_ID, 0)
         findViewById<TextView>(R.id.trailerTitle).text = title
         statusView = findViewById(R.id.trailerStatus)
         btnBack = findViewById(R.id.btnTrailerBack)
@@ -79,6 +83,9 @@ class TrailerActivity : BaseLocaleActivity() {
         webView = findViewById(R.id.trailerWebView)
 
         sources = TrailerResolver.resolveAll(rawUrl, title)
+        if (DeviceUi.isTvUi(this)) {
+            sources = sources.filterNot { it is TrailerSource.WebPage || it is TrailerSource.ExternalLink }
+        }
 
         configureWebView(webView)
 
@@ -90,21 +97,32 @@ class TrailerActivity : BaseLocaleActivity() {
         if (sources.isEmpty()) {
             statusView.visibility = View.VISIBLE
             statusView.text = getString(R.string.trailer_loading)
-            lookupTmdbTrailer(title)
+            lookupTmdbTrailer(title, preferFirst = true, startWhenReady = true)
             return
         }
 
-        if (DeviceUi.isTvUi(this)) {
-            // On TV prefer TMDB + direct ExoPlayer stream; panel WebView embeds crash after a while.
-            lookupTmdbTrailer(title, preferFirst = true)
-        } else {
-            lookupTmdbTrailer(title)
+        if (DeviceUi.isTvUi(this) && TmdbApi.isConfigured()) {
+            waitingForTmdbOnTv = true
+            lookupTmdbTrailer(title, preferFirst = true, startWhenReady = true)
+            return
         }
+
+        lookupTmdbTrailer(title)
         startCurrentSource()
     }
 
-    private fun lookupTmdbTrailer(title: String, preferFirst: Boolean = false) {
-        if (title.isBlank() || tmdbLookupStarted || !TmdbApi.isConfigured()) return
+    private fun lookupTmdbTrailer(
+        title: String,
+        preferFirst: Boolean = false,
+        startWhenReady: Boolean = false,
+    ) {
+        if (title.isBlank() || tmdbLookupStarted || !TmdbApi.isConfigured()) {
+            if (startWhenReady && waitingForTmdbOnTv) {
+                waitingForTmdbOnTv = false
+                if (sources.isNotEmpty()) startCurrentSource() else showFailed()
+            }
+            return
+        }
         tmdbLookupStarted = true
         lifecycleScope.launch {
             val lookupTitle = findViewById<TextView>(R.id.trailerTitle).text.toString()
@@ -113,21 +131,27 @@ class TrailerActivity : BaseLocaleActivity() {
                     title = lookupTitle,
                     releaseDate = releaseDateHint,
                     isSeries = isSeriesContent,
+                    tmdbId = tmdbContentId.takeIf { it > 0 },
                 )
             }
             if (isFinishing) return@launch
+            waitingForTmdbOnTv = false
             if (youtubeId.isNullOrBlank()) {
                 if (sources.isEmpty()) showFailed()
+                else if (startWhenReady) startCurrentSource()
                 return@launch
             }
-            if (sources.any { it is TrailerSource.Youtube && it.videoId == youtubeId }) return@launch
+            if (sources.any { it is TrailerSource.Youtube && it.videoId == youtubeId }) {
+                if (startWhenReady && !playbackStarted) startCurrentSource()
+                return@launch
+            }
             val tmdbSource = TrailerSource.Youtube(youtubeId)
             sources = if (preferFirst) {
                 listOf(tmdbSource)
             } else {
                 listOf(tmdbSource) + sources
             }
-            if (!playbackStarted) {
+            if (startWhenReady || !playbackStarted) {
                 sourceIndex = 0
                 youtubeStep = 0
                 youtubeStreamTried = false
@@ -342,6 +366,9 @@ class TrailerActivity : BaseLocaleActivity() {
                 if (direct != null) {
                     playDirectVideo(direct)
                 } else if (DeviceUi.isTvUi(this@TrailerActivity)) {
+                    if (openYoutubeTvApp(videoId) || playYoutubeEmbedOnTv(videoId)) {
+                        return@launch
+                    }
                     advancePlayback()
                 } else {
                     playYoutubeEmbed(videoId)
@@ -350,10 +377,51 @@ class TrailerActivity : BaseLocaleActivity() {
             return
         }
         if (DeviceUi.isTvUi(this)) {
+            if (openYoutubeTvApp(videoId) || playYoutubeEmbedOnTv(videoId)) return
             advancePlayback()
             return
         }
         playYoutubeEmbed(videoId)
+    }
+
+    private fun playYoutubeEmbedOnTv(videoId: String): Boolean {
+        showWebView()
+        webView.loadDataWithBaseURL(
+            "https://www.youtube-nocookie.com",
+            YoutubeTrailerHelper.iframeApiHtml(
+                videoId,
+                "https://www.youtube-nocookie.com",
+                "https://www.youtube.com",
+            ),
+            "text/html",
+            "UTF-8",
+            null,
+        )
+        scheduleLoadTimeout()
+        return true
+    }
+
+    private fun openYoutubeTvApp(videoId: String): Boolean {
+        val packages = listOf(
+            "com.google.android.youtube.tv",
+            "com.google.android.youtube",
+        )
+        for (pkg in packages) {
+            val intent = Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse("https://www.youtube.com/watch?v=$videoId"),
+            ).setPackage(pkg)
+            if (intent.resolveActivity(packageManager) != null) {
+                return try {
+                    startActivity(intent)
+                    finish()
+                    true
+                } catch (_: Exception) {
+                    false
+                }
+            }
+        }
+        return false
     }
 
     private fun playYoutubeEmbed(videoId: String) {
@@ -618,6 +686,7 @@ class TrailerActivity : BaseLocaleActivity() {
         private const val EXTRA_TITLE = "trailer_title"
         private const val EXTRA_IS_SERIES = "trailer_is_series"
         private const val EXTRA_RELEASE_DATE = "trailer_release_date"
+        private const val EXTRA_TMDB_ID = "trailer_tmdb_id"
         private const val LOAD_TIMEOUT_MS = 18_000L
         private const val YOUTUBE_STEPS_LAST = 6
         private const val EMBED_USER_AGENT =
@@ -629,10 +698,12 @@ class TrailerActivity : BaseLocaleActivity() {
             title: String = "",
             isSeries: Boolean = false,
             releaseDate: String = "",
+            tmdbId: Int = 0,
         ) = android.content.Intent(context, TrailerActivity::class.java)
             .putExtra(EXTRA_URL, url)
             .putExtra(EXTRA_TITLE, title)
             .putExtra(EXTRA_IS_SERIES, isSeries)
             .putExtra(EXTRA_RELEASE_DATE, releaseDate)
+            .putExtra(EXTRA_TMDB_ID, tmdbId)
     }
 }
