@@ -87,7 +87,11 @@ class TrailerActivity : BaseLocaleActivity() {
             sources = sources.filterNot { it is TrailerSource.WebPage || it is TrailerSource.ExternalLink }
         }
 
-        configureWebView(webView)
+        if (DeviceUi.isTvUi(this)) {
+            webView.visibility = View.GONE
+        } else {
+            configureWebView(webView)
+        }
 
         btnBack.setOnClickListener { finish() }
         btnRetry.setOnClickListener { retryPlayback() }
@@ -366,10 +370,8 @@ class TrailerActivity : BaseLocaleActivity() {
                 if (direct != null) {
                     playDirectVideo(direct)
                 } else if (DeviceUi.isTvUi(this@TrailerActivity)) {
-                    if (openYoutubeTvApp(videoId) || playYoutubeEmbedOnTv(videoId)) {
-                        return@launch
-                    }
-                    advancePlayback()
+                    if (openYoutubeTvApp(videoId)) return@launch
+                    showFailed()
                 } else {
                     playYoutubeEmbed(videoId)
                 }
@@ -377,28 +379,11 @@ class TrailerActivity : BaseLocaleActivity() {
             return
         }
         if (DeviceUi.isTvUi(this)) {
-            if (openYoutubeTvApp(videoId) || playYoutubeEmbedOnTv(videoId)) return
-            advancePlayback()
+            if (openYoutubeTvApp(videoId)) return
+            showFailed()
             return
         }
         playYoutubeEmbed(videoId)
-    }
-
-    private fun playYoutubeEmbedOnTv(videoId: String): Boolean {
-        showWebView()
-        webView.loadDataWithBaseURL(
-            "https://www.youtube-nocookie.com",
-            YoutubeTrailerHelper.iframeApiHtml(
-                videoId,
-                "https://www.youtube-nocookie.com",
-                "https://www.youtube.com",
-            ),
-            "text/html",
-            "UTF-8",
-            null,
-        )
-        scheduleLoadTimeout()
-        return true
     }
 
     private fun openYoutubeTvApp(videoId: String): Boolean {
@@ -474,6 +459,17 @@ class TrailerActivity : BaseLocaleActivity() {
             playDirectVideo(url)
             return
         }
+        if (DeviceUi.isTvUi(this)) {
+            YoutubeTrailerHelper.extractId(url)?.let {
+                currentYoutubeId = it
+                youtubeStep = 0
+                youtubeStreamTried = false
+                playYoutube(it)
+                return
+            }
+            showFailed()
+            return
+        }
         YoutubeTrailerHelper.vimeoEmbedUrl(url)?.let {
             loadWebEmbed(it)
             return
@@ -494,6 +490,17 @@ class TrailerActivity : BaseLocaleActivity() {
     private fun playWebPage(url: String) {
         if (MetaExtractor.isDirectVideoUrl(url)) {
             playDirectVideo(url)
+            return
+        }
+        if (DeviceUi.isTvUi(this)) {
+            YoutubeTrailerHelper.extractId(url)?.let {
+                currentYoutubeId = it
+                youtubeStep = 0
+                youtubeStreamTried = false
+                playYoutube(it)
+                return
+            }
+            showFailed()
             return
         }
         YoutubeTrailerHelper.extractId(url)?.let {

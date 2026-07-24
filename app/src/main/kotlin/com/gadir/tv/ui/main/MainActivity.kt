@@ -105,8 +105,8 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
         private const val CHANNEL_PREVIEW_DELAY_MS = 0L
-        private const val PREVIEW_DEBOUNCE_MS = 400L
-        private const val PREVIEW_ZAP_DELAY_MS = 500L
+        private const val PREVIEW_DEBOUNCE_MS = 260L
+        private const val PREVIEW_ZAP_DELAY_MS = 140L
         private const val PREVIEW_TIMEOUT_MS = 6_000L
         private const val PREVIEW_RETRY_DELAY_MS = 600L
         private const val PREVIEW_RETRY_MAX_CYCLES = 2
@@ -714,23 +714,12 @@ class MainActivity : BaseLocaleActivity() {
         channelAdapter = ChannelAdapter(
             items = channels,
             onFocus = if (DeviceUi.useDpadFocus(this)) {
-                { channel -> schedulePreview(channel) }
+                { channel -> onLiveChannelFocused(channel) }
             } else {
                 { }
             },
             onOpen = { channel ->
-                if (DeviceUi.useDpadFocus(this)) {
-                    if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
-                        openFullscreen(channel)
-                    } else {
-                        schedulePreview(channel)
-                        openFullscreenWhenPreviewReady(channel)
-                    }
-                } else if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
-                    openFullscreen(channel)
-                } else {
-                    selectChannelPreview(channel)
-                }
+                openFullscreen(channel)
             },
             onMoveLeft = if (DeviceUi.useDpadFocus(this)) {
                 { exitLiveContentToGroup() }
@@ -1205,7 +1194,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun prefetchLiveChannelIcons(channelBatch: List<LiveChannel>) {
-        if (channelBatch.isEmpty()) return
+        if (channelBatch.isEmpty() || DeviceUi.isTvUi(this)) return
         lifecycleScope.launch {
             val batchSize = 24
             channelBatch.chunked(batchSize).forEach { chunk ->
@@ -1499,7 +1488,7 @@ class MainActivity : BaseLocaleActivity() {
             val focusedIndex = channelList.focusedChild?.let { child ->
                 channelList.getChildAdapterPosition(child).takeIf { it >= 0 }
             } ?: index
-            channels.getOrNull(focusedIndex)?.let { schedulePreview(it) }
+            channels.getOrNull(focusedIndex)?.let { onLiveChannelFocused(it) }
         }
     }
 
@@ -1540,7 +1529,7 @@ class MainActivity : BaseLocaleActivity() {
         val channel = channels[next]
         channelList.scrollToPosition(next)
         if (keepPreviewFocus) {
-            schedulePreview(channel)
+            onLiveChannelFocused(channel)
             previewContainer?.post { previewContainer?.requestFocus() }
         } else {
             TvNavHelper.focusItem(channelList, next)
@@ -1551,7 +1540,7 @@ class MainActivity : BaseLocaleActivity() {
         val channel = currentPreviewChannel ?: return
         clearLiveCategoryFocusRing()
         livePreviewPaused = false
-        schedulePreviewPlayback(channel)
+        onLiveChannelFocused(channel)
         previewContainer?.requestFocus()
     }
 
@@ -2833,7 +2822,7 @@ class MainActivity : BaseLocaleActivity() {
                             openCatalogTabAtFirstGroup(currentTab)
                         }
                     }
-                    Tab.LIVE -> currentPreviewChannel?.let { schedulePreview(it) }
+                    Tab.LIVE -> currentPreviewChannel?.let { onLiveChannelFocused(it) }
                     Tab.HOME -> Unit
                 }
                 android.widget.Toast.makeText(
@@ -4701,7 +4690,7 @@ class MainActivity : BaseLocaleActivity() {
         if (reloadingChannels || livePreviewPaused) return
         livePreviewPaused = false
         teardownLivePreviewPlayback()
-        schedulePreview(channel)
+        onLiveChannelFocused(channel)
     }
 
     private fun teardownLivePreviewPlayback() {
@@ -4780,17 +4769,23 @@ class MainActivity : BaseLocaleActivity() {
         suspendLivePreview()
     }
 
+    private fun onLiveChannelFocused(channel: LiveChannel) {
+        val sameChannel = currentPreviewChannel?.streamId == channel.streamId
+        updatePreviewInfo(channel)
+        if (reloadingChannels) return
+        if (sameChannel && previewIsSettled()) return
+        if (channel.streamId == previewFocusStreamId && pendingPreview != null) return
+        previewFocusStreamId = channel.streamId
+        schedulePreviewPlayback(channel)
+    }
+
     private fun schedulePreview(channel: LiveChannel) {
         if (currentTab != Tab.LIVE) return
         if (liveBrowseLevel != TvBrowseNav.Level.CONTENT) return
         val browseId = selectedLiveCategoryId
         if (parentalStore.requiresPinForLiveCategory(browseId)) return
         livePreviewPaused = false
-        updatePreviewInfo(channel)
-        if (reloadingChannels) return
-        if (channel.streamId == previewFocusStreamId && pendingPreview != null) return
-        previewFocusStreamId = channel.streamId
-        schedulePreviewPlayback(channel)
+        onLiveChannelFocused(channel)
     }
 
     /** Stops preview A/V without tearing down the player instance. */
@@ -4855,6 +4850,8 @@ class MainActivity : BaseLocaleActivity() {
         }
         val task = Runnable {
             if (token != previewToken || reloadingChannels || livePreviewPaused) return@Runnable
+            if (currentPreviewChannel?.streamId != channel.streamId) return@Runnable
+            scheduleEpgBrowse(channel, token)
             if (parentalStore.requiresPinForChannel(channel, selectedLiveCategoryId)) {
                 withChannelAccess(channel) {
                     if (token == previewToken) previewChannel(channel, token)
@@ -5020,6 +5017,28 @@ class MainActivity : BaseLocaleActivity() {
         pendingEpg = null
     }
 
+    /** EPG via epg_channel_id only — avoids an extra stream_id panel connection while browsing. */
+    private fun scheduleEpgBrowse(channel: LiveChannel, previewToken: Int) {
+        if (EpgCache.get(channel.streamId)?.isNotEmpty() == true) return
+        val streamId = channel.streamId
+        val epgId = channel.epgChannelId
+        if (epgId.isBlank()) return
+        val token = ++epgLoadToken
+        epgLoadJob?.cancel()
+        epgLoadJob = lifecycleScope.launch {
+            val profile = PlaylistRepository.profile ?: return@launch
+            val epg = withContext(Dispatchers.IO) {
+                api.shortEpgBrowse(profile, epgId, limit = 6)
+            }
+            if (token != epgLoadToken || previewToken != this@MainActivity.previewToken) return@launch
+            if (currentPreviewChannel?.streamId != streamId) return@launch
+            if (epg.isNotEmpty()) {
+                EpgCache.put(streamId, epg)
+                applyEpg(channel, epg)
+            }
+        }
+    }
+
     /** Load EPG only for the channel whose preview stream is actually playing. */
     private fun scheduleEpgForPlayingChannel() {
         val channel = currentPreviewChannel ?: return
@@ -5051,7 +5070,7 @@ class MainActivity : BaseLocaleActivity() {
             }
         }
         pendingEpg = task
-        previewHandler.postDelayed(task, EPG_FOCUS_DELAY_MS)
+        previewHandler.post(task)
     }
 
     private fun cancelMiniPreviewPlayback() {
@@ -5215,11 +5234,6 @@ class MainActivity : BaseLocaleActivity() {
         val previewStreamId = previewingStreamId
         val handedOffUrl = previewWorkingUrl
             ?.takeIf { previewStreamId == channel.streamId && it.isNotBlank() }
-        val previewUrlSnapshot = if (previewStreamId == channel.streamId) {
-            previewUrls.toList()
-        } else {
-            emptyList()
-        }
         LiveChannelNavigator.setPlaybackContext(
             this,
             channel,
@@ -5229,20 +5243,11 @@ class MainActivity : BaseLocaleActivity() {
         livePreviewPaused = true
         releaseMiniPreviewForFullscreen()
         val previewCandidates = LivePreviewStreamUrls.candidates(api, profile, channel)
-        val fallbackCandidates = if (DeviceUi.isTvUi(this)) {
-            LiveStreamUrls.tvCandidates(api, profile, channel)
-        } else {
-            LiveStreamUrls.candidates(api, profile, channel)
-        }
         val urls = if (handedOffUrl != null) {
-            listOf(handedOffUrl).filter { it.isNotBlank() }.distinct()
+            listOf(handedOffUrl)
         } else {
-            buildList {
-                addAll(previewUrlSnapshot)
-                addAll(previewCandidates)
-                if (isEmpty()) addAll(fallbackCandidates.take(1))
-            }.filter { it.isNotBlank() }.distinct().take(2)
-        }
+            previewCandidates.take(1)
+        }.filter { it.isNotBlank() }.distinct()
         if (urls.isEmpty()) {
             Toast.makeText(this, R.string.connection_failed, Toast.LENGTH_SHORT).show()
             livePreviewPaused = false
@@ -5257,7 +5262,7 @@ class MainActivity : BaseLocaleActivity() {
             streamId = channel.streamId,
             epgChannelId = channel.epgChannelId,
             extension = channel.extension,
-            alternateUrls = urls.drop(1),
+            alternateUrls = emptyList(),
         )
         val launchDelayMs = if (DeviceUi.isTvUi(this)) {
             FULLSCREEN_LAUNCH_DELAY_MS + VlcInstanceGuard.cooldownRemainingMs(LIVE_VLC_COOLDOWN_MS)
@@ -5544,14 +5549,7 @@ class MainActivity : BaseLocaleActivity() {
                 livePreviewPaused = false
                 ensurePreviewPlayer()
                 attachPreviewPlayersToSurface()
-                if (DeviceUi.useDpadFocus(this)) {
-                    currentPreviewChannel?.let { schedulePreview(it) }
-                } else {
-                    focusChannelAt(currentPreviewChannel)
-                    if (appSettings.autoplayPreview && currentPreviewChannel != null) {
-                        currentPreviewChannel?.let { schedulePreview(it) }
-                    }
-                }
+                currentPreviewChannel?.let { onLiveChannelFocused(it) }
             }, resumeDelay)
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
             if (!DeviceUi.useDpadFocus(this)) {
