@@ -23,6 +23,7 @@ import com.gadir.tv.player.VodStreamUrls
 import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.ui.detail.DetailTvNav
 import com.gadir.tv.ui.detail.VodDetailUi
+import com.gadir.tv.data.TmdbApi
 import com.gadir.tv.util.TrailerLauncher
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +43,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
     private var movieName = ""
     private var addedTimestamp = 0L
     private var trailerUrl = ""
+    private var releaseDate = ""
     private var loadToken = 0
 
     private lateinit var loadingView: View
@@ -277,7 +279,9 @@ class MovieDetailActivity : BaseLocaleActivity() {
         )
 
         trailerUrl = info.trailerUrl
-        btnMovieTrailer.visibility = if (trailerUrl.isNotBlank()) View.VISIBLE else View.GONE
+        releaseDate = info.releaseDate
+        btnMovieTrailer.visibility =
+            if (trailerUrl.isNotBlank() || TmdbApi.isConfigured()) View.VISIBLE else View.GONE
 
         btnMoviePlay.visibility = View.VISIBLE
         extension = info.extension.ifBlank { extension }
@@ -297,8 +301,15 @@ class MovieDetailActivity : BaseLocaleActivity() {
     }
 
     private fun openTrailer() {
-        if (trailerUrl.isBlank()) return
-        TrailerLauncher.open(this, trailerUrl, findViewById<TextView>(R.id.movieTitle).text.toString())
+        val title = findViewById<TextView>(R.id.movieTitle).text.toString()
+        if (trailerUrl.isBlank() && !TmdbApi.isConfigured()) return
+        TrailerLauncher.open(
+            context = this,
+            rawUrl = trailerUrl,
+            title = title,
+            isSeries = false,
+            releaseDate = releaseDate,
+        )
     }
 
     private fun playMovie() {
