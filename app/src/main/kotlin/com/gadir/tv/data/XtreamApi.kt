@@ -205,8 +205,12 @@ class XtreamApi(
                 extension = row.get("container_extension")?.asStringOrNull()?.ifBlank { "mp4" } ?: "mp4",
                 added = row.addedTimestamp(),
                 directSource = row.get("direct_source")?.asStringOrNull().orEmpty().trim(),
+                num = row.get("num")?.asIntOrZero() ?: 0,
             )
         }.filter { it.streamId > 0 }
+            // Xtream panels expose the playlist's own ordering via "num" — respect it instead
+            // of trusting the JSON array order (some panels don't guarantee it matches).
+            .sortedBy { it.num.takeIf { n -> n > 0 } ?: Int.MAX_VALUE }
     }
 
     fun seriesCategories(profile: Profile): List<Category> =
@@ -227,8 +231,10 @@ class XtreamApi(
                     },
                 categoryId = row.get("category_id")?.asStringOrNull() ?: "",
                 added = row.addedTimestamp(),
+                num = row.get("num")?.asIntOrZero() ?: 0,
             )
         }.filter { it.seriesId > 0 }
+            .sortedBy { it.num.takeIf { n -> n > 0 } ?: Int.MAX_VALUE }
     }
 
     fun seriesInfo(profile: Profile, seriesId: Int): SeriesDetail? {

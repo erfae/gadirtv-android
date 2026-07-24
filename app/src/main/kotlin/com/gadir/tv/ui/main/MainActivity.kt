@@ -4988,6 +4988,12 @@ class MainActivity : BaseLocaleActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             neighbors.forEach { neighbor ->
                 if (EpgCache.get(neighbor.streamId)?.isNotEmpty() == true) return@forEach
+                // lifecycleScope is only cancelled on destroy, not on stop — without this
+                // gate, opening a channel in fullscreen right after focusing it here would
+                // leave this coroutine running and hitting the panel with a stream_id-
+                // tagged request for a DIFFERENT (neighbor) channel while fullscreen plays,
+                // which shows up on some panels as "connected to another channel".
+                com.gadir.tv.data.LivePlaybackGate.awaitIdle()
                 runCatching {
                     val epg = api.shortEpgFast(
                         profile,
@@ -5011,6 +5017,7 @@ class MainActivity : BaseLocaleActivity() {
                         async {
                             semaphore.withPermit {
                                 if (EpgCache.get(channel.streamId)?.isNotEmpty() == true) return@withPermit
+                                com.gadir.tv.data.LivePlaybackGate.awaitIdle()
                                 runCatching {
                                     val epg = api.shortEpgFast(
                                         profile,
@@ -5039,6 +5046,7 @@ class MainActivity : BaseLocaleActivity() {
             val token = ++epgLoadToken
             lifecycleScope.launch {
                 val epg = withContext(Dispatchers.IO) {
+                    com.gadir.tv.data.LivePlaybackGate.awaitIdle()
                     api.shortEpgFast(
                         profile,
                         streamId = streamId,
