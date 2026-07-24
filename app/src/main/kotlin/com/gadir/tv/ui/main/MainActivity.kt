@@ -3178,7 +3178,7 @@ class MainActivity : BaseLocaleActivity() {
         extension: String = "mp4",
         added: Long = 0L,
     ) {
-        com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
+        com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
         prefetchMovieDetail(streamId, title, cover)
         startActivity(
             MovieDetailActivity.intent(
@@ -3223,7 +3223,7 @@ class MainActivity : BaseLocaleActivity() {
         added: Long = 0L,
     ) {
         val open = {
-            com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
+            com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
             prefetchSeriesDetail(seriesId, title, cover)
             startActivity(
                 SeriesDetailActivity.intent(
@@ -5594,7 +5594,7 @@ class MainActivity : BaseLocaleActivity() {
         } else if (currentTab == Tab.LIVE) {
             ensureLiveTabReady()
             syncLivePlaylistUi()
-            com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
+            com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
             val resumeToken = ++livePreviewResumeToken
             val resumeDelay = VlcInstanceGuard.cooldownRemainingMs(LIVE_VLC_COOLDOWN_MS)
             livePanel().postDelayed({
