@@ -9,26 +9,32 @@ data class TrailerMatch(
 
 object TrailerAvailability {
     fun resolveLocal(title: String, serverUrl: String = ""): TrailerMatch? {
-        if (serverUrl.isNotBlank()) {
-            MetaExtractor.normalizeTrailerUrl(serverUrl)?.let {
-                return TrailerMatch(it, title)
-            }
+        TrailerResolver.firstPlayableUrl(TrailerResolver.resolveAll(serverUrl, title))?.let {
+            return TrailerMatch(it, title)
         }
-        val sources = TrailerResolver.resolveAll(serverUrl, title)
-        TrailerResolver.firstPlayableUrl(sources)?.let { return TrailerMatch(it, title) }
         return null
     }
 
-    fun resolve(title: String, serverUrl: String = "", isSeries: Boolean = false, releaseDate: String = ""): TrailerMatch? {
+    fun resolve(
+        title: String,
+        serverUrl: String = "",
+        isSeries: Boolean = false,
+        releaseDate: String = "",
+    ): TrailerMatch? {
         resolveLocal(title, serverUrl)?.let { return it }
-        if (title.isBlank() || !TmdbApi.isConfigured()) return null
-        val tmdbUrl = TmdbApi.fetchTrailerUrl(
-            title = title,
-            releaseDate = releaseDate,
-            isSeries = isSeries,
-        )
-        if (tmdbUrl.isNullOrBlank()) return null
-        return TrailerMatch(tmdbUrl, title)
+        if (title.isBlank()) return null
+        if (TmdbApi.isConfigured()) {
+            TmdbApi.fetchTrailerUrl(title, releaseDate, isSeries)?.let {
+                return TrailerMatch(it, title)
+            }
+        }
+        TrailerSearch.findFallbackSource(title)?.let {
+            return TrailerMatch(
+                url = "https://www.dailymotion.com/video/${(it as TrailerSource.Dailymotion).videoId}",
+                title = title,
+            )
+        }
+        return null
     }
 
     fun hasTrailer(

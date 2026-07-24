@@ -32,6 +32,7 @@ import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.RecyclerViewUtil
 import com.gadir.tv.data.TmdbApi
 import com.gadir.tv.util.TrailerLauncher
+import com.gadir.tv.util.TrailerAvailability
 import com.gadir.tv.util.TvFocusHelper
 import com.gadir.tv.util.TvNavHelper
 import kotlinx.coroutines.Dispatchers
@@ -152,7 +153,6 @@ class SeriesDetailActivity : BaseLocaleActivity() {
 
     private fun openTrailer() {
         val title = findViewById<TextView>(R.id.seriesTitle).text.toString()
-        if (trailerUrl.isBlank() && !TmdbApi.isConfigured()) return
         TrailerLauncher.open(
             context = this,
             rawUrl = trailerUrl,
@@ -294,7 +294,17 @@ class SeriesDetailActivity : BaseLocaleActivity() {
         releaseDate = detail.releaseDate
         tmdbId = detail.tmdbId
         btnSeriesTrailer.visibility =
-            if (trailerUrl.isNotBlank() || TmdbApi.isConfigured()) View.VISIBLE else View.GONE
+            if (TrailerAvailability.hasTrailer(
+                    title = detail.name.ifEmpty { seriesName },
+                    serverUrl = detail.trailerUrl,
+                    isSeries = true,
+                    releaseDate = detail.releaseDate,
+                )
+            ) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
         PlotCache.put(
             "series",
             seriesId,

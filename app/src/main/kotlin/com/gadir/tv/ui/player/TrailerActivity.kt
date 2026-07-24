@@ -18,14 +18,14 @@ import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.DailymotionStreamResolver
 import com.gadir.tv.util.TrailerResolver
+import com.gadir.tv.util.TrailerSearch
 import com.gadir.tv.util.TrailerSource
-import com.gadir.tv.util.TrailerStreamResolver
 import com.gadir.tv.util.VimeoStreamResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** ExoPlayer-only trailers — no YouTube app, no WebView. Streams resolved to direct MP4/HLS. */
+/** Tráilers 100% in-app con ExoPlayer. Nunca abre YouTube ni WebView. */
 class TrailerActivity : BaseLocaleActivity() {
     private lateinit var playerView: PlayerView
     private lateinit var statusView: TextView
@@ -39,11 +39,12 @@ class TrailerActivity : BaseLocaleActivity() {
 
     private var sources: List<TrailerSource> = emptyList()
     private var sourceIndex = 0
-    private var tmdbLookupStarted = false
+    private var remoteLookupStarted = false
     private var playbackStartedOnce = false
     private var isSeriesContent = false
     private var releaseDateHint = ""
     private var tmdbContentId = 0
+    private var contentTitle = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,11 +52,11 @@ class TrailerActivity : BaseLocaleActivity() {
         enterImmersiveMode()
 
         val rawUrl = intent.getStringExtra(EXTRA_URL).orEmpty()
-        val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+        contentTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         isSeriesContent = intent.getBooleanExtra(EXTRA_IS_SERIES, false)
         releaseDateHint = intent.getStringExtra(EXTRA_RELEASE_DATE).orEmpty()
         tmdbContentId = intent.getIntExtra(EXTRA_TMDB_ID, 0)
-        findViewById<TextView>(R.id.trailerTitle).text = title
+        findViewById<TextView>(R.id.trailerTitle).text = contentTitle
         statusView = findViewById(R.id.trailerStatus)
         btnBack = findViewById(R.id.btnTrailerBack)
         trailerHeader = findViewById(R.id.trailerHeader)
@@ -63,9 +64,9 @@ class TrailerActivity : BaseLocaleActivity() {
         playerView = findViewById(R.id.trailerPlayerView)
         findViewById<View>(R.id.trailerWebView).visibility = View.GONE
 
-        sources = TrailerResolver.resolveAll(rawUrl, title)
+        sources = TrailerResolver.resolveAll(rawUrl, contentTitle)
 
-        btnBack.setOnClickListener { finish() }
+        btnBack.setOnClickListener { closeTrailer() }
         btnRetry.setOnClickListener { retryPlayback() }
         btnRetry.visibility = View.GONE
         btnBack.requestFocus()
@@ -73,35 +74,36 @@ class TrailerActivity : BaseLocaleActivity() {
         if (sources.isNotEmpty()) {
             startCurrentSource()
         }
-        lookupTmdbTrailer(title, preferFirst = true)
+        lookupRemoteTrailers()
     }
 
-    private fun lookupTmdbTrailer(title: String, preferFirst: Boolean = false) {
-        if (title.isBlank() || tmdbLookupStarted || !TmdbApi.isConfigured()) {
-            if (sources.isEmpty() && !playbackStartedOnce) showFailed()
-            return
-        }
-        tmdbLookupStarted = true
+    private fun lookupRemoteTrailers() {
+        if (remoteLookupStarted) return
+        remoteLookupStarted = true
         lifecycleScope.launch {
-            val lookupTitle = findViewById<TextView>(R.id.trailerTitle).text.toString()
-            val tmdbTrailer = withContext(Dispatchers.IO) {
-                TmdbApi.fetchTrailer(
-                    title = lookupTitle,
-                    releaseDate = releaseDateHint,
-                    isSeries = isSeriesContent,
-                    tmdbId = tmdbContentId.takeIf { it > 0 },
-                )
+            val remoteSources = withContext(Dispatchers.IO) {
+                buildList {
+                    if (TmdbApi.isConfigured() && contentTitle.isNotBlank()) {
+                        val tmdb = TmdbApi.fetchTrailer(
+                            title = contentTitle,
+                            releaseDate = releaseDateHint,
+                            isSeries = isSeriesContent,
+                            tmdbId = tmdbContentId.takeIf { it > 0 },
+                        )
+                        tmdb?.let { addAll(TrailerResolver.resolveFromTmdb(it.site, it.key)) }
+                    }
+                    if (contentTitle.isNotBlank()) {
+                        TrailerSearch.findFallbackSource(contentTitle)?.let { add(it) }
+                    }
+                }
             }
             if (isFinishing) return@launch
-            val tmdbSources = tmdbTrailer?.let {
-                TrailerResolver.resolveFromTmdb(it.site, it.key)
-            }.orEmpty()
-            if (tmdbSources.isEmpty()) {
+            if (remoteSources.isEmpty()) {
                 if (sources.isEmpty() && !playbackStartedOnce) showFailed()
                 return@launch
             }
             val hadSources = sources.isNotEmpty()
-            sources = mergeSources(preferFirst, tmdbSources, sources)
+            sources = mergeSources(remoteSources, sources)
             if (!hadSources && !playbackStartedOnce) {
                 sourceIndex = 0
                 startCurrentSource()
@@ -109,22 +111,26 @@ class TrailerActivity : BaseLocaleActivity() {
         }
     }
 
-    override fun onBackPressed() {
+    private fun closeTrailer() {
+        releasePlayer()
         finish()
+    }
+
+    override fun onBackPressed() {
+        closeTrailer()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_BACK) {
-            finish()
+            closeTrailer()
             return true
         }
         return super.dispatchKeyEvent(event)
     }
 
-    private fun mergeSources(preferFirst: Boolean, vararg lists: List<TrailerSource>): List<TrailerSource> {
+    private fun mergeSources(vararg lists: List<TrailerSource>): List<TrailerSource> {
         val merged = LinkedHashSet<TrailerSource>()
-        val ordered = if (preferFirst) lists.toList() else lists.reversed()
-        ordered.forEach { merged.addAll(it) }
+        lists.forEach { merged.addAll(it) }
         return merged.toList()
     }
 
@@ -162,7 +168,6 @@ class TrailerActivity : BaseLocaleActivity() {
     private fun resolvePlayableUrl(source: TrailerSource): String? {
         return when (source) {
             is TrailerSource.DirectVideo -> source.url
-            is TrailerSource.StreamVideo -> TrailerStreamResolver.directPlayUrl(source.videoId)
             is TrailerSource.Vimeo ->
                 VimeoStreamResolver.directPlayUrl(source.videoId)
                     ?: VimeoStreamResolver.directPlayUrl(source.pageUrl)
@@ -187,7 +192,7 @@ class TrailerActivity : BaseLocaleActivity() {
                     if (state == Player.STATE_READY && player.isPlaying) {
                         markPlaybackStarted()
                     } else if (state == Player.STATE_ENDED) {
-                        finish()
+                        closeTrailer()
                     }
                 }
 
@@ -200,9 +205,7 @@ class TrailerActivity : BaseLocaleActivity() {
             player.playWhenReady = true
         }
         enterImmersiveMode()
-        if (DeviceUi.isTvUi(this)) {
-            playerView.post { playerView.requestFocus() }
-        }
+        playerView.requestFocus()
     }
 
     private fun advancePlayback() {
@@ -227,10 +230,8 @@ class TrailerActivity : BaseLocaleActivity() {
         cancelLoadTimeout()
         statusView.visibility = View.GONE
         btnRetry.visibility = View.GONE
-        if (DeviceUi.isTvUi(this) && playerView.visibility == View.VISIBLE) {
-            trailerHeader.visibility = View.GONE
-            enterImmersiveMode()
-        }
+        trailerHeader.visibility = View.GONE
+        enterImmersiveMode()
     }
 
     private fun showFailed() {
@@ -245,7 +246,11 @@ class TrailerActivity : BaseLocaleActivity() {
     }
 
     private fun releasePlayer() {
-        exoPlayer?.release()
+        exoPlayer?.let { player ->
+            player.playWhenReady = false
+            player.stop()
+            player.release()
+        }
         exoPlayer = null
         playerView.player = null
     }
@@ -269,9 +274,13 @@ class TrailerActivity : BaseLocaleActivity() {
             )
     }
 
-    override fun onStop() {
-        exoPlayer?.pause()
-        super.onStop()
+    override fun onPause() {
+        if (isFinishing) {
+            releasePlayer()
+        } else {
+            exoPlayer?.pause()
+        }
+        super.onPause()
     }
 
     override fun onDestroy() {

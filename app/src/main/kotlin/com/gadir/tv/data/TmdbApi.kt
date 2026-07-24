@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-/** TMDB lookups for cast photos and official trailers (YouTube/Vimeo/Dailymotion → ExoPlayer). */
+/** TMDB cast photos + trailers Vimeo/Dailymotion/direct (never YouTube). */
 object TmdbApi {
     private const val TAG = "GadirIPTV-Tmdb"
     private const val BASE = "https://api.themoviedb.org/3"
@@ -142,8 +142,6 @@ object TmdbApi {
     ): String? {
         val trailer = fetchTrailer(title, releaseDate, isSeries, tmdbId) ?: return null
         return when {
-            trailer.site.equals("YouTube", ignoreCase = true) ->
-                "https://www.youtube.com/watch?v=${trailer.key}"
             trailer.site.equals("Vimeo", ignoreCase = true) ->
                 "https://vimeo.com/${trailer.key}"
             trailer.site.equals("Dailymotion", ignoreCase = true) ->
@@ -163,8 +161,8 @@ object TmdbApi {
                 val type = obj.get("type")?.asString?.lowercase().orEmpty()
                 val key = obj.get("key")?.asString?.trim().orEmpty()
                 if (key.isBlank()) continue
+                if (site.equals("YouTube", ignoreCase = true)) continue
                 val trailer = when {
-                    site.equals("YouTube", ignoreCase = true) -> TmdbTrailer(site = "YouTube", key = key)
                     site.equals("Vimeo", ignoreCase = true) -> TmdbTrailer(site = "Vimeo", key = key)
                     site.equals("Dailymotion", ignoreCase = true) -> TmdbTrailer(site = "Dailymotion", key = key)
                     site.equals("Direct", ignoreCase = true) && key.startsWith("http") ->
