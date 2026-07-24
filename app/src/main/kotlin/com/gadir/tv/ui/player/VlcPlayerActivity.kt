@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.data.AppSettings
 import com.gadir.tv.data.LiveChannelStore
+import com.gadir.tv.data.EpgCache
 import com.gadir.tv.data.PlaylistRepository
 import com.gadir.tv.data.ResumeStore
 import com.gadir.tv.data.XtreamApi
@@ -113,7 +114,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         vodControls = findViewById(R.id.vlcVodControls)
         epgPanel = findViewById(R.id.vlcEpgPanel)
 
-        btnBack.setOnClickListener { finish() }
+        btnBack.setOnClickListener { closePlayback() }
         findViewById<VLCVideoLayout>(R.id.vlcVideo).setOnClickListener { showControls() }
 
         currentStreamId = intent.getIntExtra(EXTRA_STREAM_ID, 0)
@@ -300,17 +301,35 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         }
     }
 
+    private fun closePlayback() {
+        if (isLivePlayback) {
+            releaseVlcPlayer()
+        } else {
+            releaseVlcPlayer()
+            com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
+        }
+        finish()
+    }
+
+    override fun onBackPressed() {
+        closePlayback()
+    }
+
     private fun releaseVlcPlayer() {
         vlcReleased = true
         vlcPlaybackToken++
         disarmLiveStallWatchdog()
+        hideHandler.removeCallbacksAndMessages(null)
         val player = mediaPlayer
         val vlc = libVlc
         mediaPlayer = null
         libVlc = null
         try {
             player?.setEventListener(null)
+            val media = player?.media
             player?.stop()
+            player?.media = null
+            media?.release()
             player?.detachViews()
             player?.release()
         } catch (_: Throwable) {
@@ -319,10 +338,6 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             vlc?.release()
         } catch (_: Throwable) {
         }
-        // Only release the shared guard if THIS instance actually acquired it — this is
-        // also called defensively at the top of initVlcPlayer() before any acquire attempt,
-        // and releasing unconditionally there could free a guard held by another active
-        // player (e.g. a live preview), letting two libVLC instances run at once.
         if (vlcGuardHeld) {
             vlcGuardHeld = false
             VlcInstanceGuard.release()
@@ -331,10 +346,15 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
     private fun setupLiveUi(channelTitle: String) {
         vodControls.visibility = View.GONE
-        epgPanel.visibility = View.GONE
         currentChannelTitle = channelTitle
         currentEpgChannelId = intent.getStringExtra(EXTRA_EPG_CHANNEL_ID).orEmpty()
         findViewById<TextView>(R.id.playerChannelTitle).text = channelTitle
+        if (DeviceUi.isTvUi(this)) {
+            epgPanel.visibility = View.VISIBLE
+            controlsVisible = true
+        } else {
+            epgPanel.visibility = View.GONE
+        }
         loadFullscreenEpg(currentStreamId, currentEpgChannelId)
     }
 
@@ -403,10 +423,18 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         val loading = findViewById<TextView>(R.id.epgLoadingLabel)
         val list = findViewById<RecyclerView>(R.id.epgList)
         list.layoutManager = LinearLayoutManager(this)
+        EpgCache.get(streamId)?.takeIf { it.isNotEmpty() }?.let { cached ->
+            loading.visibility = View.GONE
+            val now = System.currentTimeMillis() / 1000L
+            list.adapter = EpgAdapter(cached, now)
+            epgLoaded = true
+            return
+        }
         loading.visibility = View.VISIBLE
+        loading.text = getString(R.string.epg_loading)
         lifecycleScope.launch {
             val epg = withContext(Dispatchers.IO) {
-                api.shortEpgFast(profile, streamId, epgChannelId = epgChannelId, limit = 10)
+                api.shortEpg(profile, streamId, epgChannelId, limit = 10)
             }
             if (streamId != currentStreamId) return@launch
             loading.visibility = View.GONE
@@ -415,6 +443,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                 loading.text = getString(R.string.epg_unavailable)
                 return@launch
             }
+            EpgCache.put(streamId, epg)
             val now = System.currentTimeMillis() / 1000L
             list.adapter = EpgAdapter(epg, now)
             epgLoaded = true
@@ -664,7 +693,9 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         btnBack.visibility = View.GONE
         volumeControls.visibility = View.GONE
         vodControls.visibility = View.GONE
-        epgPanel.visibility = View.GONE
+        if (!isLivePlayback || !DeviceUi.isTvUi(this)) {
+            epgPanel.visibility = View.GONE
+        }
         hideHandler.removeCallbacks(hideControlsRunnable)
         hideHandler.removeCallbacks(progressRunnable)
     }
@@ -678,11 +709,6 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         super.onResume()
         if (isLivePlayback && liveStoppedInBackground) {
             liveStoppedInBackground = false
-            // The surface behind VLCVideoLayout gets torn down and recreated by Android
-            // while backgrounded — reusing the old MediaPlayer's stale attachViews() binding
-            // just spins forever on "video output creation failed". Recreate the whole VLC
-            // instance fresh, exactly like the very first launch in onCreate() (which always
-            // works), instead of trying to resume the old one.
             val settings = AppSettings(this)
             val bufferMs = settings.networkBufferMs.coerceIn(AppSettings.BUFFER_NORMAL_MS, AppSettings.BUFFER_STABLE_MS)
             startVlcPlayback(bufferMs)
@@ -690,12 +716,14 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             return
         }
         if (!vlcAlive()) return
-        try {
-            mediaPlayer?.play()
-            mediaPlayer?.volume = VLC_VOLUME
-        } catch (_: Throwable) {
+        if (isLivePlayback) {
+            try {
+                mediaPlayer?.play()
+                mediaPlayer?.volume = VLC_VOLUME
+            } catch (_: Throwable) {
+            }
+            VolumeHelper.boostOnPlaybackStart(this)
         }
-        VolumeHelper.boostOnPlaybackStart(this)
     }
 
     private val liveStreamStopAction = {
@@ -709,6 +737,13 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         if (!isLivePlayback) {
             releaseVlcPlayer()
         }
+    }
+
+    override fun onPause() {
+        if (isFinishing && !isLivePlayback) {
+            releaseVlcPlayer()
+        }
+        super.onPause()
     }
 
     override fun onStop() {
