@@ -86,7 +86,20 @@ object TmdbApi {
         isSeries: Boolean,
     ): List<CastMember> {
         if (!isConfigured()) return members
-        val photos = fetchCast(title, releaseDate, isSeries, tmdbId)
+        val id = tmdbId?.takeIf { it > 0 }
+        if (id != null && members.none { isTrustedCastPhoto(it.imageUrl) }) {
+            val tmdbCast = creditsFor(id, isSeries)
+            if (tmdbCast.isNotEmpty()) {
+                if (members.none { it.name.isNotBlank() }) return tmdbCast
+                val photos = tmdbCast.associate { normalizeName(it.name) to it.imageUrl }
+                return members.map { member ->
+                    if (isTrustedCastPhoto(member.imageUrl)) return@map member
+                    val url = matchProfileUrl(member.name, photos) ?: return@map member
+                    member.copy(imageUrl = url)
+                }
+            }
+        }
+        val photos = fetchCast(title, releaseDate, isSeries, id)
             .associate { normalizeName(it.name) to it.imageUrl }
         if (photos.isEmpty()) return members
 

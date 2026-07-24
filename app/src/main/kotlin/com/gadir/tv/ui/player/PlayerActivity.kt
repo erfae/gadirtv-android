@@ -141,7 +141,9 @@ class PlayerActivity : BaseLocaleActivity() {
             pendingLiveUrls.clear()
             pendingLiveUrls.add(url)
             intent.getStringArrayListExtra(EXTRA_ALTERNATE_URLS)?.forEach { alt ->
-                if (alt.isNotBlank() && alt !in pendingLiveUrls) pendingLiveUrls.add(alt)
+                if (alt.isNotBlank() && alt !in pendingLiveUrls && pendingLiveUrls.size < 2) {
+                    pendingLiveUrls.add(alt)
+                }
             }
         } else {
             pendingVodUrls.clear()
@@ -543,7 +545,7 @@ class PlayerActivity : BaseLocaleActivity() {
             LiveStreamUrls.candidates(api, profile, channel)
         }
         pendingLiveUrls.clear()
-        pendingLiveUrls.addAll(urls.filter { it.isNotBlank() }.distinct())
+        pendingLiveUrls.addAll(urls.filter { it.isNotBlank() }.distinct().take(2))
         val next = pendingLiveUrls.firstOrNull() ?: return
         val exo = player ?: return
         liveUrlSettled = false
