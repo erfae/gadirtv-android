@@ -78,82 +78,7 @@ class TrailerActivity : BaseLocaleActivity() {
             return
         }
 
-        webView.setBackgroundColor(Color.BLACK)
-        webView.isFocusable = false
-        webView.isFocusableInTouchMode = false
-        webView.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            mediaPlaybackRequiresUserGesture = false
-            javaScriptCanOpenWindowsAutomatically = false
-            setSupportMultipleWindows(false)
-            loadWithOverviewMode = true
-            useWideViewPort = true
-            userAgentString = EMBED_USER_AGENT
-        }
-        CookieManager.getInstance().apply {
-            setAcceptCookie(true)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                setAcceptThirdPartyCookies(webView, true)
-            }
-        }
-        webView.addJavascriptInterface(TrailerBridge(), "TrailerBridge")
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onShowCustomView(view: View, callback: CustomViewCallback) {
-                if (customView != null) {
-                    callback.onCustomViewHidden()
-                    return
-                }
-                markPlaybackStarted()
-                customView = view
-                customCallback = callback
-                val decor = window.decorView as FrameLayout
-                decor.addView(
-                    view,
-                    FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                    ),
-                )
-                webView.visibility = View.GONE
-                enterImmersiveMode()
-            }
-
-            override fun onHideCustomView() {
-                customView?.let { (window.decorView as FrameLayout).removeView(it) }
-                customView = null
-                customCallback?.onCustomViewHidden()
-                customCallback = null
-                webView.visibility = View.VISIBLE
-                btnBack.requestFocus()
-            }
-        }
-        webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                return blockNavigation(request.url?.toString().orEmpty())
-            }
-
-            @Deprecated("Deprecated in Java")
-            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                return blockNavigation(url)
-            }
-
-            override fun onPageFinished(view: WebView?, url: String?) {
-                cancelLoadTimeout()
-                if (!playbackStarted) {
-                    statusView.visibility = View.GONE
-                }
-            }
-
-            override fun onReceivedError(
-                view: WebView,
-                request: WebResourceRequest,
-                error: android.webkit.WebResourceError,
-            ) {
-                if (!request.isForMainFrame) return
-                advancePlayback()
-            }
-        }
+        configureWebView(webView)
 
         btnBack.setOnClickListener { finish() }
         btnRetry.setOnClickListener { retryPlayback() }
@@ -174,6 +99,123 @@ class TrailerActivity : BaseLocaleActivity() {
             return true
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun configureWebView(view: WebView) {
+        view.setBackgroundColor(Color.BLACK)
+        view.isFocusable = false
+        view.isFocusableInTouchMode = false
+        view.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            mediaPlaybackRequiresUserGesture = false
+            javaScriptCanOpenWindowsAutomatically = false
+            setSupportMultipleWindows(false)
+            loadWithOverviewMode = true
+            useWideViewPort = true
+            userAgentString = EMBED_USER_AGENT
+        }
+        CookieManager.getInstance().apply {
+            setAcceptCookie(true)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                setAcceptThirdPartyCookies(view, true)
+            }
+        }
+        view.addJavascriptInterface(TrailerBridge(), "TrailerBridge")
+        view.webChromeClient = object : WebChromeClient() {
+            override fun onShowCustomView(customized: View, callback: CustomViewCallback) {
+                if (customView != null) {
+                    callback.onCustomViewHidden()
+                    return
+                }
+                markPlaybackStarted()
+                customView = customized
+                customCallback = callback
+                val decor = window.decorView as FrameLayout
+                decor.addView(
+                    customized,
+                    FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                    ),
+                )
+                webView.visibility = View.GONE
+                enterImmersiveMode()
+            }
+
+            override fun onHideCustomView() {
+                customView?.let { (window.decorView as FrameLayout).removeView(it) }
+                customView = null
+                customCallback?.onCustomViewHidden()
+                customCallback = null
+                webView.visibility = View.VISIBLE
+                btnBack.requestFocus()
+            }
+        }
+        view.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(v: WebView, request: WebResourceRequest): Boolean {
+                return blockNavigation(request.url?.toString().orEmpty())
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun shouldOverrideUrlLoading(v: WebView, url: String): Boolean {
+                return blockNavigation(url)
+            }
+
+            override fun onPageFinished(v: WebView?, url: String?) {
+                cancelLoadTimeout()
+                if (!playbackStarted) {
+                    statusView.visibility = View.GONE
+                }
+            }
+
+            override fun onReceivedError(
+                v: WebView,
+                request: WebResourceRequest,
+                error: android.webkit.WebResourceError,
+            ) {
+                if (!request.isForMainFrame) return
+                advancePlayback()
+            }
+
+            override fun onRenderProcessGone(v: WebView, detail: android.webkit.RenderProcessGoneDetail): Boolean {
+                // Android requires this to be handled (API 26+): if the sandboxed WebView
+                // renderer crashes or is killed under memory pressure and no app callback
+                // handles it, the OS kills the WHOLE app. Recreate the WebView (the crashed
+                // one can never be reused) — then either close (if the trailer was already
+                // playing, same as reaching the end) or move on to the next source (if it
+                // crashed before ever starting).
+                val wasPlaying = playbackStarted
+                recreateWebView()
+                if (wasPlaying) {
+                    finish()
+                } else {
+                    advancePlayback()
+                }
+                return true
+            }
+        }
+    }
+
+    /** Swaps in a brand-new WebView after the renderer process died — the old instance is unusable. */
+    private fun recreateWebView() {
+        val old = webView
+        val parent = old.parent as? ViewGroup ?: return
+        val index = parent.indexOfChild(old)
+        val params = old.layoutParams
+        val wasVisible = old.visibility
+        parent.removeView(old)
+        try {
+            old.destroy()
+        } catch (_: Throwable) {
+        }
+        val fresh = WebView(this)
+        fresh.id = old.id
+        fresh.visibility = wasVisible
+        configureWebView(fresh)
+        webView = fresh
+        parent.addView(fresh, index, params)
     }
 
     private fun retryPlayback() {

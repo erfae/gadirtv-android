@@ -53,6 +53,7 @@ data class VodMovie(
     val extension: String,
     val added: Long = 0,
     val directSource: String = "",
+    val num: Int = 0,
 )
 
 data class SeriesItem(
@@ -61,6 +62,7 @@ data class SeriesItem(
     val cover: String,
     val categoryId: String,
     val added: Long = 0,
+    val num: Int = 0,
 )
 
 data class SeriesEpisode(

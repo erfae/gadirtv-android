@@ -7,8 +7,11 @@ import com.gadir.tv.model.Profile
 import com.gadir.tv.util.NetworkUrlResolver
 
 object VodStreamUrls {
-    /** mp4 primero: muchos grupos del panel son solo MP4. */
-    private val EXTENSIONS = listOf("mp4", "mkv", "ts", "avi", "mov", "m3u8")
+    // mp4 primero: muchos grupos del panel son solo MP4. Limitado a los 3 contenedores
+    // reales más comunes en VOD — avi/mov/m3u8 casi nunca aciertan y cada intento fallido
+    // cuesta ~10s de timeout de red; con 6 extensiones x 2 formas de URL, un título con el
+    // enlace roto podía tardar más de 2 minutos en agotar los 13 intentos antes de rendirse.
+    private val EXTENSIONS = listOf("mp4", "mkv", "ts")
 
     private fun addDirectSource(urls: LinkedHashSet<String>, directSource: String) {
         val direct = directSource.trim()
