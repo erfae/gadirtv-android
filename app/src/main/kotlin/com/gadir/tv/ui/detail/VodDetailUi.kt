@@ -136,6 +136,7 @@ object VodDetailUi {
         labelView: TextView,
         listView: RecyclerView,
         fallbackCast: String = "",
+        tmdbId: Int = 0,
         onCastMoveUp: (() -> Unit)? = null,
         onCastMoveDown: (() -> Unit)? = null,
     ) {
@@ -145,9 +146,9 @@ object VodDetailUi {
             val enriched = withContext(Dispatchers.IO) {
                 TmdbApi.enrichCastMembers(
                     members = members,
-                    title = title,
+                    title = TmdbApi.cleanTitle(title),
                     releaseDate = releaseDate,
-                    tmdbId = null,
+                    tmdbId = tmdbId.takeIf { it > 0 },
                     isSeries = isSeries,
                 )
             }

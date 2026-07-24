@@ -31,6 +31,19 @@ object TmdbApi {
     fun isConfigured(): Boolean =
         BuildConfig.TMDB_API_KEY.isNotBlank() || BuildConfig.TMDB_ACCESS_TOKEN.isNotBlank()
 
+    fun cleanTitle(title: String): String =
+        title
+            .substringBefore("(")
+            .substringBefore("|")
+            .replace(Regex("\\s*[-–—]\\s*\\d{4}\\s*$"), "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
+    fun extractYear(title: String, releaseDate: String = ""): String? {
+        releaseDate.trim().take(4).takeIf { it.length == 4 && it.all(Char::isDigit) }?.let { return it }
+        return Regex("(19|20)\\d{2}").findAll(title).map { it.value }.lastOrNull()
+    }
+
     fun enrichCastMembers(
         members: List<CastMember>,
         title: String,
@@ -57,11 +70,12 @@ object TmdbApi {
 
     fun trailerYoutubeId(title: String, releaseDate: String = "", isSeries: Boolean = false): String? {
         if (!isConfigured() || title.isBlank()) return null
-        val year = releaseDate.trim().take(4).takeIf { it.length == 4 && it.all(Char::isDigit) }
-        val cacheKey = "trailer|${if (isSeries) "tv" else "movie"}|$title|$year"
+        val cleaned = cleanTitle(title)
+        val year = extractYear(title, releaseDate)
+        val cacheKey = "trailer|${if (isSeries) "tv" else "movie"}|$cleaned|$year"
         trailerCache[cacheKey]?.let { return it.takeIf { id -> id.isNotBlank() } }
 
-        val contentId = searchContentId(title, releaseDate, isSeries) ?: return null
+        val contentId = searchContentId(cleaned, year.orEmpty(), isSeries) ?: return null
         val path = if (isSeries) "tv/$contentId/videos" else "movie/$contentId/videos"
         val body = get("$BASE/$path") ?: return null
         val id = parseTrailerId(body)
@@ -91,9 +105,9 @@ object TmdbApi {
     }
 
     private fun searchContentId(title: String, releaseDate: String, isSeries: Boolean): Int? {
-        val query = title.trim()
+        val query = cleanTitle(title).ifBlank { title.trim() }
         if (query.isBlank()) return null
-        val year = releaseDate.trim().take(4).takeIf { it.length == 4 && it.all(Char::isDigit) }
+        val year = extractYear(title, releaseDate)
         val cacheKey = "${if (isSeries) "tv" else "movie"}|$query|$year"
         searchCache[cacheKey]?.let { return it }
 

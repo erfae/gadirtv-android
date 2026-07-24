@@ -105,9 +105,10 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
         private const val CHANNEL_PREVIEW_DELAY_MS = 0L
-        private const val PREVIEW_TIMEOUT_MS = 4_500L
-        private const val PREVIEW_RETRY_DELAY_MS = 400L
-        private const val PREVIEW_RETRY_MAX_CYCLES = 4
+        private const val PREVIEW_ZAP_DELAY_MS = 500L
+        private const val PREVIEW_TIMEOUT_MS = 6_000L
+        private const val PREVIEW_RETRY_DELAY_MS = 600L
+        private const val PREVIEW_RETRY_MAX_CYCLES = 2
         private const val PREVIEW_STALL_CHECK_MS = 5_000L
         private const val PREVIEW_STALL_TIMEOUT_MS = 14_000L
         private const val PREVIEW_SURFACE_MAX_ATTEMPTS = 4
@@ -834,6 +835,10 @@ class MainActivity : BaseLocaleActivity() {
         cat: Category,
         refreshCategories: Boolean = false,
     ) {
+        abortPreviewPlayback()
+        pendingEpg?.let { previewHandler.removeCallbacks(it) }
+        pendingEpg = null
+        epgLoadToken++
         loadLiveCategoryChannels(cat, refreshCategories)
         liveBrowseLevel = TvBrowseNav.Level.GROUP
         liveBrowsingCategoryId = liveCategoryId(cat)
@@ -918,9 +923,6 @@ class MainActivity : BaseLocaleActivity() {
         channelList.visibility = View.VISIBLE
         prefetchLiveChannelIcons(loaded)
         channelList.scrollToPosition(0)
-        if (liveBrowseLevel == TvBrowseNav.Level.GROUP && !livePreviewPaused) {
-            loaded.firstOrNull()?.let { schedulePreview(it) }
-        }
     }
 
     private fun showLiveCategoryChannels(
@@ -4666,7 +4668,6 @@ class MainActivity : BaseLocaleActivity() {
                     channelList.visibility = View.VISIBLE
                     prefetchLiveChannelIcons(loaded)
                     ensurePreviewPlayer()
-                    prefetchEpgForChannels(loaded)
                     val previewIndex = 0
                     channelList.scrollToPosition(previewIndex)
                     when {
@@ -4773,12 +4774,8 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun schedulePreview(channel: LiveChannel) {
         if (currentTab != Tab.LIVE) return
-        if (liveBrowseLevel == TvBrowseNav.Level.TAB) return
-        val browseId = when (liveBrowseLevel) {
-            TvBrowseNav.Level.CONTENT -> selectedLiveCategoryId
-            TvBrowseNav.Level.GROUP -> liveBrowsingCategoryId
-            else -> null
-        }
+        if (liveBrowseLevel != TvBrowseNav.Level.CONTENT) return
+        val browseId = selectedLiveCategoryId
         if (parentalStore.requiresPinForLiveCategory(browseId)) return
         livePreviewPaused = false
         updatePreviewInfo(channel)
@@ -4819,12 +4816,8 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun schedulePreviewPlayback(channel: LiveChannel) {
         if (currentTab != Tab.LIVE || reloadingChannels) return
-        if (liveBrowseLevel == TvBrowseNav.Level.TAB) return
-        val browseId = when (liveBrowseLevel) {
-            TvBrowseNav.Level.CONTENT -> selectedLiveCategoryId
-            TvBrowseNav.Level.GROUP -> liveBrowsingCategoryId
-            else -> null
-        }
+        if (liveBrowseLevel != TvBrowseNav.Level.CONTENT) return
+        val browseId = selectedLiveCategoryId
         if (parentalStore.requiresPinForLiveCategory(browseId)) return
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         val previousStreamId = previewingStreamId
@@ -4842,12 +4835,11 @@ class MainActivity : BaseLocaleActivity() {
             ensurePreviewPlayer()
         }
         val token = previewToken
-        val delayMs = if (DeviceUi.useDpadFocus(this)) {
-            CHANNEL_PREVIEW_DELAY_MS
-        } else if (usesExoPreview()) {
-            120L
-        } else {
-            150L
+        val delayMs = when {
+            channelChanged -> PREVIEW_ZAP_DELAY_MS
+            DeviceUi.useDpadFocus(this) -> CHANNEL_PREVIEW_DELAY_MS
+            usesExoPreview() -> 120L
+            else -> 150L
         }
         val task = Runnable {
             if (token != previewToken || reloadingChannels || livePreviewPaused) return@Runnable
@@ -4981,12 +4973,8 @@ class MainActivity : BaseLocaleActivity() {
         }
         previewStallRecoverAttempts = 0
         previewWorkingUrl = null
-        if (!tryNextPreviewUrl(token)) {
-            showNoSignal()
-            schedulePreviewRetry(token)
-        } else {
-            armPreviewStallWatchdog()
-        }
+        showNoSignal()
+        schedulePreviewRetry(token)
     }
 
     private fun schedulePreviewInternal(channel: LiveChannel) {
@@ -5011,67 +4999,6 @@ class MainActivity : BaseLocaleActivity() {
             epgPreviewAdapter?.submit(emptyList())
         }
         scheduleEpgLoad(channel)
-        prefetchEpgNeighbors(channel)
-    }
-
-    private fun prefetchEpgNeighbors(channel: LiveChannel) {
-        if (com.gadir.tv.data.LivePlaybackGate.isLivePlaybackActive()) return
-        val profile = PlaylistRepository.profile ?: return
-        val index = channels.indexOfFirst { it.streamId == channel.streamId }
-        if (index < 0) return
-        val neighbors = buildList {
-            channels.getOrNull(index + 1)?.let { add(it) }
-        }
-        if (neighbors.isEmpty()) return
-        lifecycleScope.launch(Dispatchers.IO) {
-            neighbors.forEach { neighbor ->
-                if (EpgCache.get(neighbor.streamId)?.isNotEmpty() == true) return@forEach
-                // lifecycleScope is only cancelled on destroy, not on stop — without this
-                // gate, opening a channel in fullscreen right after focusing it here would
-                // leave this coroutine running and hitting the panel with a stream_id-
-                // tagged request for a DIFFERENT (neighbor) channel while fullscreen plays,
-                // which shows up on some panels as "connected to another channel".
-                com.gadir.tv.data.LivePlaybackGate.awaitIdle()
-                runCatching {
-                    val epg = api.shortEpgFast(
-                        profile,
-                        streamId = neighbor.streamId,
-                        epgChannelId = neighbor.epgChannelId,
-                        limit = 4,
-                    )
-                    if (epg.isNotEmpty()) EpgCache.put(neighbor.streamId, epg)
-                }
-            }
-        }
-    }
-
-    private fun prefetchEpgForChannels(channelBatch: List<LiveChannel>, limit: Int = 10) {
-        if (com.gadir.tv.data.LivePlaybackGate.isLivePlaybackActive()) return
-        val profile = PlaylistRepository.profile ?: return
-        lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
-                coroutineScope {
-                    val semaphore = Semaphore(2)
-                    channelBatch.take(limit).map { channel ->
-                        async {
-                            semaphore.withPermit {
-                                if (EpgCache.get(channel.streamId)?.isNotEmpty() == true) return@withPermit
-                                com.gadir.tv.data.LivePlaybackGate.awaitIdle()
-                                runCatching {
-                                    val epg = api.shortEpgFast(
-                                        profile,
-                                        streamId = channel.streamId,
-                                        epgChannelId = channel.epgChannelId,
-                                        limit = 4,
-                                    )
-                                    if (epg.isNotEmpty()) EpgCache.put(channel.streamId, epg)
-                                }
-                            }
-                        }
-                    }.awaitAll()
-                }
-            }
-        }
     }
 
     private fun scheduleEpgLoad(channel: LiveChannel) {
@@ -5085,7 +5012,6 @@ class MainActivity : BaseLocaleActivity() {
             val token = ++epgLoadToken
             lifecycleScope.launch {
                 val epg = withContext(Dispatchers.IO) {
-                    com.gadir.tv.data.LivePlaybackGate.awaitIdle()
                     api.shortEpgFast(
                         profile,
                         streamId = streamId,
@@ -5232,14 +5158,6 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun tryNextPreviewUrl(token: Int = previewToken): Boolean {
         if (token != previewToken) return false
-        while (previewUrlIndex < previewUrls.lastIndex) {
-            previewUrlIndex += 1
-            val url = previewUrls[previewUrlIndex]
-            hideNoSignal()
-            if (!ensurePreviewPlayer()) return false
-            playMiniPreviewUrl(url, token)
-            return true
-        }
         showNoSignal()
         return false
     }
@@ -5468,6 +5386,8 @@ class MainActivity : BaseLocaleActivity() {
 
     /** Tab focus first so Back/Left from group never escapes the activity. */
     private fun returnToLiveTab() {
+        abortPreviewPlayback()
+        releasePreviewGate()
         val index = focusedLiveCategoryIndex()
         if (index >= 0) liveCategoryFocusIndex = index
         liveCategories.getOrNull(liveCategoryFocusIndex)?.let { cat ->

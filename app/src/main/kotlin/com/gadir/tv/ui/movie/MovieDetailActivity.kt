@@ -256,6 +256,7 @@ class MovieDetailActivity : BaseLocaleActivity() {
             title = info.name.ifEmpty { movieName },
             releaseDate = info.releaseDate,
             isSeries = false,
+            tmdbId = info.tmdbId,
             labelView = findViewById(R.id.movieCastLabel),
             listView = castList,
             fallbackCast = info.cast,

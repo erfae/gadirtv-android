@@ -283,6 +283,7 @@ class XtreamApi(
                 cast = MetaExtractor.castFrom(info),
                 castMembers = MetaExtractor.castMembersFrom(info, root),
                 seasons = normalized,
+                tmdbId = MetaExtractor.tmdbIdFrom(info, root) ?: 0,
             )
         } catch (_: Exception) {
             null
@@ -398,6 +399,7 @@ class XtreamApi(
                     ?.ifBlank { movieData?.get("direct_source")?.asStringOrNull().orEmpty() }
                     .orEmpty()
                     .trim(),
+                tmdbId = MetaExtractor.tmdbIdFrom(info, movieData, root) ?: 0,
             )
         } catch (_: Exception) {
             null
@@ -496,15 +498,22 @@ class XtreamApi(
         limit: Int = 4,
     ): List<EpgEntry> {
         if (streamId <= 0 && epgChannelId.isBlank()) return emptyList()
+        // Prefer epg_channel_id — many panels only count stream_id URLs as live connections,
+        // not EPG lookups by epg id.
+        if (epgChannelId.isNotBlank()) {
+            fetchEpgListingsFast(profile, mapOf("epg_channel_id" to epgChannelId), limit)
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
+            fetchEpgListingsFast(profile, mapOf("channel_id" to epgChannelId), limit)
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
+        }
         if (streamId > 0) {
             fetchEpgListingsFast(profile, mapOf("stream_id" to streamId.toString()), limit)
                 ?.takeIf { it.isNotEmpty() }
                 ?.let { return it }
         }
         if (epgChannelId.isNotBlank()) {
-            fetchEpgListingsFast(profile, mapOf("epg_channel_id" to epgChannelId), limit)
-                ?.takeIf { it.isNotEmpty() }
-                ?.let { return it }
             fetchEpgListingsFast(profile, mapOf("stream_id" to epgChannelId), limit)
                 ?.takeIf { it.isNotEmpty() }
                 ?.let { return it }

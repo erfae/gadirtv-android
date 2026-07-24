@@ -98,8 +98,9 @@ class TrailerActivity : BaseLocaleActivity() {
         if (title.isBlank() || tmdbLookupStarted || !TmdbApi.isConfigured()) return
         tmdbLookupStarted = true
         lifecycleScope.launch {
+            val lookupTitle = findViewById<TextView>(R.id.trailerTitle).text.toString()
             val youtubeId = withContext(Dispatchers.IO) {
-                TmdbApi.trailerYoutubeId(title)
+                TmdbApi.trailerYoutubeId(lookupTitle)
             }
             if (isFinishing) return@launch
             if (youtubeId.isNullOrBlank()) {

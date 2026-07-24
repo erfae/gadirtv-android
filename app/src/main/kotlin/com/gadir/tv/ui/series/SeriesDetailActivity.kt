@@ -259,6 +259,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             title = detail.name.ifEmpty { seriesName },
             releaseDate = detail.releaseDate,
             isSeries = true,
+            tmdbId = detail.tmdbId,
             labelView = findViewById(R.id.seriesCastLabel),
             listView = castList,
             fallbackCast = detail.cast,

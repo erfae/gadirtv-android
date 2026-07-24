@@ -93,6 +93,7 @@ data class SeriesDetail(
     val cast: String = "",
     val castMembers: List<CastMember> = emptyList(),
     val seasons: Map<String, List<SeriesEpisode>>,
+    val tmdbId: Int = 0,
 )
 
 data class VodInfo(
@@ -109,6 +110,7 @@ data class VodInfo(
     val director: String = "",
     val extension: String = "mp4",
     val directSource: String = "",
+    val tmdbId: Int = 0,
 )
 
 data class VodPlaybackMeta(
