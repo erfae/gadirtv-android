@@ -308,8 +308,12 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         releaseVlcPlayer(immediate = true)
         if (vod) {
             com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
+            hideHandler.postDelayed({
+                if (!isDestroyed) finish()
+            }, VOD_FINISH_DELAY_MS)
+        } else {
+            finish()
         }
-        finish()
     }
 
     override fun onBackPressed() {
@@ -898,6 +902,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val CONTROLS_HIDE_MS = 5_000L
         private const val LIVE_EPG_SHOW_MS = 3_000L
         private const val LIVE_VLC_COOLDOWN_MS = 1_200L
+        private const val VOD_FINISH_DELAY_MS = 280L
         private const val ZAP_RECONNECT_DELAY_MS = 500L
 
         fun intent(

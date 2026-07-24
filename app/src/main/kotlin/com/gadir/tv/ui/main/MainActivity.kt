@@ -582,16 +582,6 @@ class MainActivity : BaseLocaleActivity() {
         tabLive.nextFocusUpId = R.id.btnSearch
         tabMovies.nextFocusUpId = R.id.btnSearch
         tabSeries.nextFocusUpId = R.id.btnSearch
-        tabHome.setOnKeyListener { _, keyCode, event ->
-            if (event.action != KeyEvent.ACTION_DOWN || currentTab != Tab.HOME) {
-                return@setOnKeyListener false
-            }
-            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                focusHeroOnStart()
-                return@setOnKeyListener true
-            }
-            false
-        }
 
         setupHeaderFocusChain()
         configureHeroLayout()
@@ -1064,6 +1054,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun liveCategoryCount(cat: Category): Int? {
+        if (PlaylistRepository.allChannels.isEmpty()) return null
         val id = liveCategoryId(cat)
         liveCategoryCounts[id]?.let { return it }
         liveCategoryPrefetch[id]?.size?.let { size ->
@@ -1082,7 +1073,6 @@ class MainActivity : BaseLocaleActivity() {
             }
             return resumeStore.loadAll().count { it.kind == kind }
         }
-        catalogCategoryCounts[cat.id]?.let { return it }
         return when (tab) {
             Tab.MOVIES -> PlaylistRepository.cachedVod(cat.id)?.size
             Tab.SERIES -> PlaylistRepository.cachedSeries(cat.id)?.size
@@ -1594,6 +1584,10 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun setupHeaderFocusChain() {
+        btnSearch.nextFocusRightId = R.id.btnReload
+        btnReload.nextFocusRightId = R.id.btnSettings
+        btnSettings.nextFocusRightId = R.id.btnLogout
+        btnLogout.nextFocusRightId = R.id.btnExit
         val headerButtons = listOf(btnSearch, btnReload, btnSettings, btnLogout, btnExit)
         headerButtons.forEach { button ->
             button.setOnKeyListener { _, keyCode, event ->
@@ -1603,26 +1597,57 @@ class MainActivity : BaseLocaleActivity() {
                         focusContentFromHeader()
                         true
                     }
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        if (button === btnExit) {
+                            focusCurrentTabBar()
+                            true
+                        } else {
+                            false
+                        }
+                    }
                     else -> false
                 }
             }
         }
         updateHeaderDownFocus()
+        updateHeaderHorizontalFocus(currentTab)
     }
 
     private fun updateHeaderFocusForTab(tab: Tab) {
-        val headerFocusable = !DeviceUi.useDpadFocus(this) || tab == Tab.HOME
-        val searchFocusable = !DeviceUi.useDpadFocus(this) || true
-        btnSearch.isFocusable = searchFocusable
-        btnSearch.isFocusableInTouchMode = searchFocusable
-        listOf(btnReload, btnSettings, btnLogout, btnExit).forEach { button ->
-            button.isFocusable = headerFocusable
-            button.isFocusableInTouchMode = headerFocusable
-            if (!headerFocusable && button.hasFocus()) button.clearFocus()
+        if (!DeviceUi.useDpadFocus(this)) return
+        listOf(btnSearch, btnReload, btnSettings, btnLogout, btnExit).forEach { button ->
+            button.isFocusable = true
+            button.isFocusableInTouchMode = true
         }
-        if (DeviceUi.useDpadFocus(this)) {
-            catalogCategoryList.nextFocusUpId = View.NO_ID
+        catalogCategoryList.nextFocusUpId = View.NO_ID
+        updateHeaderHorizontalFocus(tab)
+    }
+
+    private fun updateHeaderHorizontalFocus(tab: Tab) {
+        if (!DeviceUi.useDpadFocus(this)) return
+        btnExit.nextFocusRightId = when (tab) {
+            Tab.HOME -> R.id.tabHome
+            Tab.LIVE -> R.id.tabLive
+            Tab.MOVIES -> R.id.tabMovies
+            Tab.SERIES -> R.id.tabSeries
         }
+    }
+
+    private fun focusCurrentTabBar() {
+        val tabView = when (currentTab) {
+            Tab.HOME -> tabHome
+            Tab.LIVE -> tabLive
+            Tab.MOVIES -> tabMovies
+            Tab.SERIES -> tabSeries
+        }
+        tabView.requestFocus()
+    }
+
+    private fun returnToHomeTab() {
+        openTab(Tab.HOME)
+        suppressTabFocusNavigation = true
+        tabHome.requestFocus()
+        tabHome.post { suppressTabFocusNavigation = false }
     }
 
     private fun openSearch() {
@@ -1760,7 +1785,11 @@ class MainActivity : BaseLocaleActivity() {
                 tab == Tab.SERIES -> PlaylistRepository.cachedSeries(cat.id)?.size
                 else -> null
             }
-            if (size != null) catalogCategoryCounts[cat.id] = size
+            if (size != null) {
+                catalogCategoryCounts[cat.id] = size
+            } else {
+                catalogCategoryCounts.remove(cat.id)
+            }
         }
     }
 
@@ -2056,6 +2085,47 @@ class MainActivity : BaseLocaleActivity() {
     private fun warmCatalogCategoryCounts(tab: Tab) {
         syncCatalogCategoryCounts(tab)
         catalogCategoryAdapter?.refreshSelection()
+        prefetchAllCatalogCategoryCounts(tab)
+    }
+
+    private fun prefetchAllCatalogCategoryCounts(tab: Tab) {
+        val profile = PlaylistRepository.profile ?: return
+        val targets = catalogCategoriesFor(tab).filter { cat ->
+            if (cat.id == ResumeStore.RESUME_CATEGORY_ID) return@filter false
+            when (tab) {
+                Tab.MOVIES -> PlaylistRepository.cachedVod(cat.id) == null
+                Tab.SERIES -> PlaylistRepository.cachedSeries(cat.id) == null
+                else -> false
+            }
+        }
+        if (targets.isEmpty()) return
+        val token = ++catalogPrefetchToken
+        lifecycleScope.launch {
+            for (cat in targets) {
+                if (token != catalogPrefetchToken || currentTab != tab) return@launch
+                try {
+                    val count = withContext(Dispatchers.IO) {
+                        when (tab) {
+                            Tab.MOVIES -> {
+                                val movies = api.vodStreams(profile, cat.id)
+                                PlaylistRepository.cacheVod(cat.id, movies)
+                                movies.size
+                            }
+                            Tab.SERIES -> {
+                                val series = api.seriesList(profile, cat.id)
+                                PlaylistRepository.cacheSeries(cat.id, series)
+                                series.size
+                            }
+                            else -> return@withContext null
+                        }
+                    } ?: continue
+                    if (token != catalogPrefetchToken || currentTab != tab) return@launch
+                    catalogCategoryCounts[cat.id] = count
+                    catalogCategoryAdapter?.refreshSelection()
+                } catch (_: Exception) {
+                }
+            }
+        }
     }
 
     private fun scheduleCatalogPrefetch(tab: Tab, catId: String) {
@@ -2266,7 +2336,7 @@ class MainActivity : BaseLocaleActivity() {
             tabMovies.nextFocusLeftId = R.id.tabLive
             tabMovies.nextFocusRightId = R.id.tabSeries
             tabSeries.nextFocusLeftId = R.id.tabMovies
-            tabSeries.nextFocusRightId = R.id.tabHome
+            tabSeries.nextFocusRightId = View.NO_ID
             heroPlay.nextFocusRightId = R.id.tabLive
             updateTabDownFocus()
         }
@@ -2303,6 +2373,7 @@ class MainActivity : BaseLocaleActivity() {
                     }
                     KeyEvent.KEYCODE_DPAD_RIGHT -> {
                         if (currentTab == tab && isBrowseTabLocked(tab)) {
+                            if (tab == Tab.SERIES) return@setOnKeyListener true
                             focusAdjacentTab(tab, +1)
                             return@setOnKeyListener true
                         }
@@ -2417,6 +2488,7 @@ class MainActivity : BaseLocaleActivity() {
                 panelLive?.visibility = View.GONE
                 panelCatalog.visibility = View.VISIBLE
                 stopHeroRotation()
+                com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
                 if (DeviceUi.useDpadFocus(this)) {
                     catalogBrowseLevel = TvBrowseNav.Level.TAB
                     panelCatalog.post { applyCatalogBrowseLevel(tab) }
@@ -4093,13 +4165,11 @@ class MainActivity : BaseLocaleActivity() {
                         when (tab) {
                             Tab.MOVIES -> {
                                 val movies = api.vodStreams(profile, categoryId)
-                                if (movies.isEmpty()) throw IllegalStateException("empty vod")
                                 PlaylistRepository.cacheVod(categoryId, movies)
                                 movies
                             }
                             Tab.SERIES -> {
                                 val series = api.seriesList(profile, categoryId)
-                                if (series.isEmpty()) throw IllegalStateException("empty series")
                                 PlaylistRepository.cacheSeries(categoryId, series)
                                 series
                             }
@@ -5403,6 +5473,10 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun handleTvBack(): Boolean {
+        if (DeviceUi.useDpadFocus(this) && isFocusInHeader()) {
+            returnToHomeTab()
+            return true
+        }
         return when (currentTab) {
             Tab.HOME -> {
                 if (DeviceUi.useDpadFocus(this) && isFocusInBottomNav()) {
@@ -5446,7 +5520,10 @@ class MainActivity : BaseLocaleActivity() {
         val tabs = listOf(Tab.HOME, Tab.LIVE, Tab.MOVIES, Tab.SERIES)
         val index = tabs.indexOf(tab)
         if (index < 0) return
-        val next = tabs[(index + direction + tabs.size) % tabs.size]
+        if (direction > 0 && tab == Tab.SERIES) return
+        val nextIndex = index + direction
+        if (nextIndex !in tabs.indices) return
+        val next = tabs[nextIndex]
         val tabView = when (next) {
             Tab.HOME -> tabHome
             Tab.LIVE -> tabLive
@@ -5603,6 +5680,7 @@ class MainActivity : BaseLocaleActivity() {
                 currentPreviewChannel?.let { onLiveChannelFocused(it) }
             }, resumeDelay)
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
+            com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
             if (!DeviceUi.useDpadFocus(this)) {
                 refreshCatalogResumeCategory(currentTab)
             }

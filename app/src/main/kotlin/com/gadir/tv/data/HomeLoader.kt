@@ -144,7 +144,11 @@ object CatalogPreloader {
         repeat(MAX_RETRIES) { attempt ->
             val movies = runCatching { api.vodStreams(profile, categoryId) }.getOrNull()
             if (movies != null) {
-                PlaylistRepository.cacheVod(categoryId, movies)
+                if (movies.isNotEmpty() || attempt == MAX_RETRIES - 1) {
+                    PlaylistRepository.cacheVod(categoryId, movies)
+                } else {
+                    Thread.sleep(800L * (attempt + 1))
+                }
                 return
             }
             if (attempt < MAX_RETRIES - 1) Thread.sleep(800L * (attempt + 1))
@@ -155,7 +159,11 @@ object CatalogPreloader {
         repeat(MAX_RETRIES) { attempt ->
             val series = runCatching { api.seriesList(profile, categoryId) }.getOrNull()
             if (series != null) {
-                PlaylistRepository.cacheSeries(categoryId, series)
+                if (series.isNotEmpty() || attempt == MAX_RETRIES - 1) {
+                    PlaylistRepository.cacheSeries(categoryId, series)
+                } else {
+                    Thread.sleep(800L * (attempt + 1))
+                }
                 return
             }
             if (attempt < MAX_RETRIES - 1) Thread.sleep(800L * (attempt + 1))

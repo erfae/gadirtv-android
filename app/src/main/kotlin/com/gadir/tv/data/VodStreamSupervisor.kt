@@ -36,7 +36,15 @@ object VodStreamSupervisor {
 
     /** App/process exit — always tear down even if players already reported released. */
     fun hardStopAll() {
-        stopAllVodStreams()
+        stopActions.forEach { action ->
+            runCatching { action.invoke() }
+        }
+        VlcInstanceGuard.forceRelease()
         activeStreamUrl = null
+        // Second pass catches players that unregister during the first stop.
+        stopActions.forEach { action ->
+            runCatching { action.invoke() }
+        }
+        VlcInstanceGuard.forceRelease()
     }
 }
