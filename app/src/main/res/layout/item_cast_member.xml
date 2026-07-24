@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="96dp"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/cast_item_focus"
-    android:focusable="true"
-    android:focusableInTouchMode="true"
+    android:background="@android:color/transparent"
+    android:focusable="false"
+    android:focusableInTouchMode="false"
     android:gravity="center_horizontal"
     android:orientation="vertical"
     android:padding="6dp">
 
     <ImageView
         android:id="@+id/castAvatar"
-        android:layout_width="72dp"
-        android:layout_height="72dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
         android:background="@drawable/cast_avatar_circle"
         android:contentDescription="@null"
         android:padding="2dp"
@@ -23,10 +23,10 @@
         android:id="@+id/castName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="4dp"
         android:ellipsize="end"
         android:gravity="center"
         android:maxLines="2"
         android:textColor="@android:color/white"
-        android:textSize="11sp" />
+        android:textSize="10sp" />
 </LinearLayout>

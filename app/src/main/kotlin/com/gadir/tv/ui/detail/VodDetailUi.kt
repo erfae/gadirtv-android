@@ -4,7 +4,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.gadir.tv.R
 import com.gadir.tv.model.CastMember
@@ -116,15 +116,24 @@ object VodDetailUi {
         }
         labelView.visibility = View.VISIBLE
         listView.visibility = View.VISIBLE
-        listView.layoutManager = LinearLayoutManager(listView.context, LinearLayoutManager.HORIZONTAL, false)
+        val density = listView.resources.displayMetrics.density
+        val itemWidthPx = (52 * density).toInt()
+        val gapPx = (4 * density).toInt()
+        val availableWidth = listView.width.takeIf { it > 0 }
+            ?: listView.resources.displayMetrics.widthPixels
+        val columns = ((availableWidth - listView.paddingLeft - listView.paddingRight) / (itemWidthPx + gapPx))
+            .coerceAtLeast(1)
+            .coerceAtMost(members.size.coerceAtLeast(1))
+        listView.layoutManager = GridLayoutManager(listView.context, columns)
         listView.adapter = CastMemberAdapter(
             items = members,
-            onMoveUp = onCastMoveUp,
-            onMoveDown = onCastMoveDown,
+            displayOnly = true,
         )
         listView.isFocusable = false
-        listView.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-        RecyclerViewUtil.expandHorizontalList(listView)
+        listView.isFocusableInTouchMode = false
+        listView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        listView.isNestedScrollingEnabled = false
+        RecyclerViewUtil.expandCastGrid(listView, columns)
     }
 
     fun enrichCastAsync(

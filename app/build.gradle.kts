@@ -23,8 +23,8 @@ android {
         targetSdk = 33
         // Must exceed Flutter v2.5.8 (versionCode 84) so native can replace it.
         // TV release track (android-native). v1.45.4 detail metadata + live fullscreen.
-        versionCode = 331
-        versionName = "1.46.27"
+        versionCode = 332
+        versionName = "1.46.28"
         buildConfigField("String", "TMDB_API_KEY", "\"5b79b6d24afbf09703fd842a2f794937\"")
         buildConfigField(
             "String",
