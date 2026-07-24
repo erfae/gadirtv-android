@@ -491,6 +491,21 @@ class XtreamApi(
         )
     }
 
+    fun shortEpgBrowse(
+        profile: Profile,
+        epgChannelId: String,
+        limit: Int = 6,
+    ): List<EpgEntry> {
+        if (epgChannelId.isBlank()) return emptyList()
+        fetchEpgListingsFast(profile, mapOf("epg_channel_id" to epgChannelId), limit)
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+        fetchEpgListingsFast(profile, mapOf("channel_id" to epgChannelId), limit)
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+        return emptyList()
+    }
+
     fun shortEpgFast(
         profile: Profile,
         streamId: Int,

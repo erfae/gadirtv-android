@@ -141,26 +141,27 @@ object VodDetailUi {
         onCastMoveDown: (() -> Unit)? = null,
     ) {
         if (!TmdbApi.isConfigured()) return
-        val needsEnrich = members.any { it.name.isNotBlank() && !TmdbApi.isTrustedCastPhoto(it.imageUrl) }
-        val needsFetch = members.none { it.name.isNotBlank() } && fallbackCast.isNotBlank()
-        if (!needsEnrich && !needsFetch) return
         scope.launch {
             val enriched = withContext(Dispatchers.IO) {
-                if (needsFetch) {
-                    TmdbApi.fetchCast(
-                        title = TmdbApi.cleanTitle(title),
-                        releaseDate = releaseDate,
-                        isSeries = isSeries,
-                        tmdbId = tmdbId.takeIf { it > 0 },
-                    )
-                } else {
-                    TmdbApi.enrichCastMembers(
-                        members = members,
-                        title = TmdbApi.cleanTitle(title),
-                        releaseDate = releaseDate,
-                        tmdbId = tmdbId.takeIf { it > 0 },
-                        isSeries = isSeries,
-                    )
+                val cleanedTitle = TmdbApi.cleanTitle(title)
+                val fromTmdb = TmdbApi.fetchCast(
+                    title = cleanedTitle,
+                    releaseDate = releaseDate,
+                    isSeries = isSeries,
+                    tmdbId = tmdbId.takeIf { it > 0 },
+                )
+                when {
+                    fromTmdb.isNotEmpty() -> fromTmdb
+                    members.any { it.name.isNotBlank() } ->
+                        TmdbApi.enrichCastMembers(
+                            members = members,
+                            title = cleanedTitle,
+                            releaseDate = releaseDate,
+                            tmdbId = tmdbId.takeIf { it > 0 },
+                            isSeries = isSeries,
+                        )
+                    fallbackCast.isNotBlank() -> fromTmdb
+                    else -> emptyList()
                 }
             }
             if (!listView.isAttachedToWindow) return@launch
