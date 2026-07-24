@@ -46,6 +46,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     private val allPlaybackUrls = ArrayList<String>()
     private val hideHandler = Handler(Looper.getMainLooper())
     private val hideControlsRunnable = Runnable { hideControls() }
+    private val hideLiveEpgRunnable = Runnable { hideLiveEpgPanel() }
+    private var finalizeReleaseRunnable: Runnable? = null
     private val progressRunnable = object : Runnable {
         override fun run() {
             updateVodProgress()
@@ -302,11 +304,10 @@ class VlcPlayerActivity : BaseLocaleActivity() {
     }
 
     private fun closePlayback() {
-        if (isLivePlayback) {
-            releaseVlcPlayer()
-        } else {
-            releaseVlcPlayer()
-            com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
+        val vod = !isLivePlayback
+        releaseVlcPlayer(immediate = true)
+        if (vod) {
+            com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
         }
         finish()
     }
@@ -315,11 +316,15 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         closePlayback()
     }
 
-    private fun releaseVlcPlayer() {
+    private fun releaseVlcPlayer(immediate: Boolean = false) {
         vlcReleased = true
         vlcPlaybackToken++
         disarmLiveStallWatchdog()
-        hideHandler.removeCallbacksAndMessages(null)
+        hideHandler.removeCallbacks(hideControlsRunnable)
+        hideHandler.removeCallbacks(hideLiveEpgRunnable)
+        hideHandler.removeCallbacks(progressRunnable)
+        finalizeReleaseRunnable?.let { hideHandler.removeCallbacks(it) }
+
         val player = mediaPlayer
         val vlc = libVlc
         mediaPlayer = null
@@ -331,16 +336,27 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             player?.media = null
             media?.release()
             player?.detachViews()
-            player?.release()
         } catch (_: Throwable) {
         }
-        try {
-            vlc?.release()
-        } catch (_: Throwable) {
+
+        val finalize = Runnable {
+            try {
+                player?.release()
+                vlc?.release()
+            } catch (_: Throwable) {
+            }
+            if (vlcGuardHeld) {
+                vlcGuardHeld = false
+                VlcInstanceGuard.release()
+            }
+            com.gadir.tv.data.VodStreamSupervisor.clearStreamUrl()
+            finalizeReleaseRunnable = null
         }
-        if (vlcGuardHeld) {
-            vlcGuardHeld = false
-            VlcInstanceGuard.release()
+        finalizeReleaseRunnable = finalize
+        if (immediate) {
+            finalize.run()
+        } else {
+            hideHandler.postDelayed(finalize, 300L)
         }
     }
 
@@ -349,13 +365,27 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         currentChannelTitle = channelTitle
         currentEpgChannelId = intent.getStringExtra(EXTRA_EPG_CHANNEL_ID).orEmpty()
         findViewById<TextView>(R.id.playerChannelTitle).text = channelTitle
-        if (DeviceUi.isTvUi(this)) {
-            epgPanel.visibility = View.VISIBLE
-            controlsVisible = true
-        } else {
-            epgPanel.visibility = View.GONE
+        showLiveEpgPanel(reload = true)
+    }
+
+    private fun showLiveEpgPanel(reload: Boolean = false) {
+        epgPanel.visibility = View.VISIBLE
+        controlsVisible = true
+        if (reload || !epgLoaded) {
+            epgLoaded = false
+            loadFullscreenEpg(currentStreamId, currentEpgChannelId)
         }
-        loadFullscreenEpg(currentStreamId, currentEpgChannelId)
+        scheduleHideLiveEpg()
+    }
+
+    private fun scheduleHideLiveEpg() {
+        hideHandler.removeCallbacks(hideLiveEpgRunnable)
+        hideHandler.postDelayed(hideLiveEpgRunnable, LIVE_EPG_SHOW_MS)
+    }
+
+    private fun hideLiveEpgPanel() {
+        if (!isLivePlayback) return
+        epgPanel.visibility = View.GONE
     }
 
     private fun setupVodControls(title: String) {
@@ -489,10 +519,12 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             }
             media.addOption(":http-user-agent=${PlaylistRepository.userAgent}")
             if (!isLivePlayback) {
+                com.gadir.tv.data.VodStreamSupervisor.noteStreamUrl(resolved.url)
                 val cache = AppSettings(this).networkBufferMs.coerceIn(2_000, 8_000)
                 media.addOption(":network-caching=$cache")
                 media.addOption(":file-caching=${(cache * 3).coerceIn(8_000, 24_000)}")
                 media.addOption(":clock-jitter=0")
+                media.addOption(":http-reconnect=0")
             }
             if (!vlcAlive() || token != vlcPlaybackToken) {
                 media.release()
@@ -657,7 +689,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         LiveChannelStore(this).lastStreamId = channel.streamId
         findViewById<TextView>(R.id.playerChannelTitle).text = channel.name
         epgLoaded = false
-        loadFullscreenEpg(channel.streamId, channel.epgChannelId)
+        showLiveEpgPanel(reload = true)
         val urls = if (com.gadir.tv.util.DeviceUi.isTvUi(this)) {
             LiveStreamUrls.tvCandidates(api, profile, channel)
         } else {
@@ -676,6 +708,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         if (isLivePlayback) {
             epgPanel.visibility = View.VISIBLE
             vodControls.visibility = View.GONE
+            scheduleHideLiveEpg()
         } else {
             vodControls.visibility = View.VISIBLE
             epgPanel.visibility = View.GONE
@@ -693,9 +726,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         btnBack.visibility = View.GONE
         volumeControls.visibility = View.GONE
         vodControls.visibility = View.GONE
-        if (!isLivePlayback || !DeviceUi.isTvUi(this)) {
-            epgPanel.visibility = View.GONE
-        }
+        hideLiveEpgPanel()
         hideHandler.removeCallbacks(hideControlsRunnable)
         hideHandler.removeCallbacks(progressRunnable)
     }
@@ -728,20 +759,20 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
     private val liveStreamStopAction = {
         if (isLivePlayback && !isFinishing) {
-            releaseVlcPlayer()
+            releaseVlcPlayer(immediate = true)
             liveStoppedInBackground = true
         }
     }
 
     private val vodStreamStopAction = {
         if (!isLivePlayback) {
-            releaseVlcPlayer()
+            releaseVlcPlayer(immediate = true)
         }
     }
 
     override fun onPause() {
         if (isFinishing && !isLivePlayback) {
-            releaseVlcPlayer()
+            releaseVlcPlayer(immediate = true)
         }
         super.onPause()
     }
@@ -750,10 +781,10 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         try {
             when {
                 isLivePlayback -> {
-                    releaseVlcPlayer()
+                    releaseVlcPlayer(immediate = true)
                     liveStoppedInBackground = true
                 }
-                else -> releaseVlcPlayer()
+                else -> releaseVlcPlayer(immediate = true)
             }
         } catch (_: Throwable) {
         }
@@ -768,7 +799,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             com.gadir.tv.data.VodStreamSupervisor.unregister(vodStreamStopAction)
         }
         hideHandler.removeCallbacksAndMessages(null)
-        releaseVlcPlayer()
+        finalizeReleaseRunnable = null
+        releaseVlcPlayer(immediate = true)
         super.onDestroy()
     }
 
@@ -864,6 +896,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         private const val VLC_VOLUME = com.gadir.tv.player.VlcAudioOptions.VOLUME_FULLSCREEN
         private const val SEEK_STEP_MS = 10_000L
         private const val CONTROLS_HIDE_MS = 5_000L
+        private const val LIVE_EPG_SHOW_MS = 3_000L
         private const val LIVE_VLC_COOLDOWN_MS = 1_200L
         private const val ZAP_RECONNECT_DELAY_MS = 500L
 

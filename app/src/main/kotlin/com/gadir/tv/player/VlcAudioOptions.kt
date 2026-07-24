@@ -26,7 +26,7 @@ object VlcAudioOptions {
         )
     }
 
-    /** VOD: larger cache for progressive HTTP streams. */
+    /** VOD: larger cache for progressive HTTP streams. No http-reconnect — keeps panel slot open after exit. */
     fun vodOptions(networkBufferMs: Int): ArrayList<String> {
         val network = networkBufferMs.coerceIn(2_000, 8_000)
         val file = (network * 3).coerceIn(8_000, 24_000)
@@ -37,7 +37,7 @@ object VlcAudioOptions {
             "--file-caching=$file",
             "--no-video-title-show",
             "--avcodec-hw=any",
-            "--http-reconnect",
+            "--no-http-reconnect",
         )
     }
 

@@ -37,6 +37,11 @@ object VlcInstanceGuard {
         }
     }
 
+    /** Force-free the guard when tearing down VOD outside the normal player lifecycle. */
+    fun forceRelease() {
+        release()
+    }
+
     fun cooldownRemainingMs(minGapMs: Long): Long {
         synchronized(monitor) {
             if (active) return minGapMs

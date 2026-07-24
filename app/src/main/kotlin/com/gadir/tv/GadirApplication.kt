@@ -7,6 +7,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.gadir.tv.data.ContentPreloader
 import com.gadir.tv.data.LiveStreamSupervisor
+import com.gadir.tv.data.VodStreamSupervisor
 import com.gadir.tv.data.ParentalSession
 import com.gadir.tv.data.ProfileStore
 import com.gadir.tv.util.LocaleHelper
@@ -30,6 +31,7 @@ class GadirApplication : Application() {
                 override fun onStop(owner: LifecycleOwner) {
                     ParentalSession.clear()
                     LiveStreamSupervisor.stopAllLiveStreams()
+                    VodStreamSupervisor.hardStopAll()
                     ContentPreloader.cancelBackgroundPreload()
                 }
             },

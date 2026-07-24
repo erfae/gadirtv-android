@@ -75,6 +75,7 @@ class PlayerActivity : BaseLocaleActivity() {
 
     private val hideControlsRunnable = Runnable { hideVodControls() }
     private val hideLiveOverlaysRunnable = Runnable { hideLiveOverlays() }
+    private val hideLiveEpgRunnable = Runnable { hideLiveEpgPanel() }
     private val progressRunnable = object : Runnable {
         override fun run() {
             updateVodProgress()
@@ -150,6 +151,7 @@ class PlayerActivity : BaseLocaleActivity() {
         } else {
             pendingVodUrls.clear()
             pendingVodUrls.add(url)
+            com.gadir.tv.data.VodStreamSupervisor.noteStreamUrl(url)
             intent.getStringArrayListExtra(EXTRA_ALTERNATE_URLS)?.forEach { alt ->
                 if (alt.isNotBlank() && alt !in pendingVodUrls) pendingVodUrls.add(alt)
             }
@@ -370,15 +372,30 @@ class PlayerActivity : BaseLocaleActivity() {
         }
     }
 
-    /** Live TV fullscreen on Android TV: show EPG immediately under the channel title. */
+    /** Live TV fullscreen on Android TV: show EPG briefly, then auto-hide. */
     private fun enterLiveFullscreenWithEpg() {
         liveOverlaysVisible = true
         volumeControls.visibility = View.GONE
+        showLiveEpgPanel(reload = true)
+    }
+
+    private fun showLiveEpgPanel(reload: Boolean = false) {
         epgPanel.visibility = View.VISIBLE
-        if (!epgLoaded) {
+        if (reload || !epgLoaded) {
             epgLoaded = true
             loadFullscreenEpg(liveStreamId)
         }
+        scheduleHideLiveEpg()
+    }
+
+    private fun scheduleHideLiveEpg() {
+        hideHandler.removeCallbacks(hideLiveEpgRunnable)
+        hideHandler.postDelayed(hideLiveEpgRunnable, LIVE_EPG_SHOW_MS)
+    }
+
+    private fun hideLiveEpgPanel() {
+        if (!isLive) return
+        epgPanel.visibility = View.GONE
     }
 
     private fun enableImmersiveMode() {
@@ -400,11 +417,7 @@ class PlayerActivity : BaseLocaleActivity() {
         if (!isLive) return
         liveOverlaysVisible = true
         volumeControls.visibility = View.VISIBLE
-        epgPanel.visibility = View.VISIBLE
-        if (!epgLoaded) {
-            epgLoaded = true
-            loadFullscreenEpg(liveStreamId)
-        }
+        showLiveEpgPanel(reload = !epgLoaded)
         hideHandler.removeCallbacks(hideLiveOverlaysRunnable)
         hideHandler.postDelayed(hideLiveOverlaysRunnable, CONTROLS_HIDE_MS)
     }
@@ -413,10 +426,9 @@ class PlayerActivity : BaseLocaleActivity() {
         if (!isLive) return
         liveOverlaysVisible = false
         volumeControls.visibility = View.GONE
-        if (!DeviceUi.isTvUi(this)) {
-            epgPanel.visibility = View.GONE
-        }
+        hideLiveEpgPanel()
         hideHandler.removeCallbacks(hideLiveOverlaysRunnable)
+        hideHandler.removeCallbacks(hideLiveEpgRunnable)
     }
 
     private fun scheduleHideLiveOverlays() {
@@ -562,10 +574,7 @@ class PlayerActivity : BaseLocaleActivity() {
         LiveChannelStore(this).lastStreamId = channel.streamId
         findViewById<TextView>(R.id.playerChannelTitle).text = channel.name
         epgLoaded = false
-        if (DeviceUi.isTvUi(this)) {
-            epgPanel.visibility = View.VISIBLE
-        }
-        loadFullscreenEpg(channel.streamId)
+        showLiveEpgPanel(reload = true)
         val urls = if (DeviceUi.isTvUi(this)) {
             LiveStreamUrls.tvCandidates(api, profile, channel)
         } else {
@@ -692,7 +701,7 @@ class PlayerActivity : BaseLocaleActivity() {
             return
         }
         releaseVodPlayerFully()
-        com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
+        com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
         if (controlsVisible) {
             hideVodControls()
             return
@@ -712,7 +721,7 @@ class PlayerActivity : BaseLocaleActivity() {
         if (positionMs < 90_000L || nearEnd) {
             saveProgress()
             releaseVodPlayerFully()
-            com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
+            com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
             finish()
             return
         }
@@ -724,7 +733,7 @@ class PlayerActivity : BaseLocaleActivity() {
             .setPositiveButton(R.string.playback_continue) { _, _ ->
                 saveProgress()
                 releaseVodPlayerFully()
-                com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
+                com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
                 finish()
             }
             .setNegativeButton(R.string.playback_restart) { _, _ ->
@@ -732,7 +741,7 @@ class PlayerActivity : BaseLocaleActivity() {
                     resumeStore.remove(kind, contentId)
                 }
                 releaseVodPlayerFully()
-                com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
+                com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
                 finish()
             }
             .setNeutralButton(R.string.playback_cancel, null)
@@ -787,7 +796,6 @@ class PlayerActivity : BaseLocaleActivity() {
     }
 
     private fun releaseVodPlayerFully() {
-        if (vodReleased) return
         vodReleased = true
         stopVodPlaybackNow()
         hideHandler.removeCallbacksAndMessages(null)
@@ -800,6 +808,7 @@ class PlayerActivity : BaseLocaleActivity() {
         } catch (_: Throwable) {
         }
         player = null
+        com.gadir.tv.data.VodStreamSupervisor.clearStreamUrl()
     }
 
     private fun stopVodPlaybackNow() {
@@ -885,6 +894,7 @@ class PlayerActivity : BaseLocaleActivity() {
         private const val EXTRA_DISABLE_VLC_FALLBACK = "disable_vlc_fallback"
         private const val SEEK_STEP_MS = 10_000L
         private const val CONTROLS_HIDE_MS = 4_000L
+        private const val LIVE_EPG_SHOW_MS = 3_000L
         private const val ZAP_RECONNECT_DELAY_MS = 500L
 
         fun intent(

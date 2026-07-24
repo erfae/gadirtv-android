@@ -2391,7 +2391,7 @@ class MainActivity : BaseLocaleActivity() {
                 livePanel().visibility = View.VISIBLE
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
-                com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
+                com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
                 livePreviewPaused = false
                 syncLivePlaylistUi()
                 livePanel().post {
@@ -5376,6 +5376,7 @@ class MainActivity : BaseLocaleActivity() {
     private fun exitApp() {
         ParentalSession.clear()
         com.gadir.tv.data.LiveStreamSupervisor.stopAllLiveStreams()
+        com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
         ContentPreloader.cancelBackgroundPreload()
         finishAffinity()
     }
@@ -5568,6 +5569,7 @@ class MainActivity : BaseLocaleActivity() {
             suspendLivePreview()
         }
         stopHeroRotation()
+        com.gadir.tv.data.VodStreamSupervisor.hardStopAll()
     }
 
     override fun onStart() {
