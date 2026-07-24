@@ -33,6 +33,9 @@ class TrailerActivity : BaseLocaleActivity() {
     private lateinit var trailerHeader: View
     private lateinit var btnBack: TextView
     private lateinit var btnRetry: TextView
+    private lateinit var trailerEndOverlay: View
+    private lateinit var btnTrailerReplay: TextView
+    private lateinit var btnTrailerExit: TextView
     private var exoPlayer: ExoPlayer? = null
     private var playbackStarted = false
     private val handler = Handler(Looper.getMainLooper())
@@ -46,6 +49,8 @@ class TrailerActivity : BaseLocaleActivity() {
     private var releaseDateHint = ""
     private var tmdbContentId = 0
     private var contentTitle = ""
+    private var lastPlayableUrl = ""
+    private var endMenuVisible = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,6 +67,9 @@ class TrailerActivity : BaseLocaleActivity() {
         btnBack = findViewById(R.id.btnTrailerBack)
         trailerHeader = findViewById(R.id.trailerHeader)
         btnRetry = findViewById(R.id.btnTrailerRetry)
+        trailerEndOverlay = findViewById(R.id.trailerEndOverlay)
+        btnTrailerReplay = findViewById(R.id.btnTrailerReplay)
+        btnTrailerExit = findViewById(R.id.btnTrailerExit)
         playerView = findViewById(R.id.trailerPlayerView)
         findViewById<View>(R.id.trailerWebView).visibility = View.GONE
 
@@ -69,7 +77,10 @@ class TrailerActivity : BaseLocaleActivity() {
 
         btnBack.setOnClickListener { closeTrailer() }
         btnRetry.setOnClickListener { retryPlayback() }
+        btnTrailerReplay.setOnClickListener { replayTrailer() }
+        btnTrailerExit.setOnClickListener { closeTrailer() }
         btnRetry.visibility = View.GONE
+        trailerEndOverlay.visibility = View.GONE
         btnBack.requestFocus()
 
         if (sources.isNotEmpty()) {
@@ -118,11 +129,19 @@ class TrailerActivity : BaseLocaleActivity() {
     }
 
     override fun onBackPressed() {
+        if (endMenuVisible) {
+            closeTrailer()
+            return
+        }
         closeTrailer()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (endMenuVisible) {
+                closeTrailer()
+                return true
+            }
             closeTrailer()
             return true
         }
@@ -136,10 +155,42 @@ class TrailerActivity : BaseLocaleActivity() {
     }
 
     private fun retryPlayback() {
+        hideTrailerEndMenu()
         sourceIndex = 0
         playbackStartedOnce = false
+        lastPlayableUrl = ""
         releasePlayer()
         startCurrentSource()
+    }
+
+    private fun replayTrailer() {
+        hideTrailerEndMenu()
+        val player = exoPlayer
+        if (player != null) {
+            player.seekTo(0)
+            player.playWhenReady = true
+            playbackStarted = true
+            playerView.requestFocus()
+            return
+        }
+        if (lastPlayableUrl.isNotBlank()) {
+            playDirectVideo(lastPlayableUrl)
+            return
+        }
+        retryPlayback()
+    }
+
+    private fun showTrailerEndMenu() {
+        endMenuVisible = true
+        exoPlayer?.pause()
+        playerView.useController = false
+        trailerEndOverlay.visibility = View.VISIBLE
+        btnTrailerReplay.requestFocus()
+    }
+
+    private fun hideTrailerEndMenu() {
+        endMenuVisible = false
+        trailerEndOverlay.visibility = View.GONE
     }
 
     private fun startCurrentSource() {
@@ -148,6 +199,7 @@ class TrailerActivity : BaseLocaleActivity() {
             return
         }
         playbackStarted = false
+        hideTrailerEndMenu()
         statusView.visibility = View.VISIBLE
         statusView.text = getString(R.string.trailer_loading)
         btnRetry.visibility = View.GONE
@@ -179,6 +231,8 @@ class TrailerActivity : BaseLocaleActivity() {
 
     private fun playDirectVideo(url: String) {
         playbackStartedOnce = true
+        lastPlayableUrl = url
+        hideTrailerEndMenu()
         if (DeviceUi.isTvUi(this)) {
             trailerHeader.visibility = View.GONE
             playerView.useController = true
@@ -194,7 +248,7 @@ class TrailerActivity : BaseLocaleActivity() {
                     if (state == Player.STATE_READY && player.isPlaying) {
                         markPlaybackStarted()
                     } else if (state == Player.STATE_ENDED) {
-                        closeTrailer()
+                        showTrailerEndMenu()
                     }
                 }
 
@@ -238,6 +292,7 @@ class TrailerActivity : BaseLocaleActivity() {
 
     private fun showFailed() {
         cancelLoadTimeout()
+        hideTrailerEndMenu()
         releasePlayer()
         playerView.visibility = View.GONE
         statusView.visibility = View.VISIBLE
