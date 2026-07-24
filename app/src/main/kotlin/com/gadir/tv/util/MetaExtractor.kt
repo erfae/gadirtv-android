@@ -472,8 +472,10 @@ object MetaExtractor {
         val value = raw?.trim().orEmpty()
         if (value.isEmpty() || isImageUrl(value)) return null
         if (isDirectVideoUrl(value)) return value
+        val lower = value.lowercase()
+        if (lower.contains("youtube.com") || lower.contains("youtu.be")) return null
+        if (VimeoStreamResolver.extractId(value) != null) return value
         if (value.startsWith("http")) return value
-        if (value.length >= 8) return "https://www.youtube.com/watch?v=$value"
         return null
     }
 

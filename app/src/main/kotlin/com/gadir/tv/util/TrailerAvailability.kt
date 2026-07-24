@@ -1,5 +1,7 @@
 package com.gadir.tv.util
 
+import com.gadir.tv.data.TmdbApi
+
 data class TrailerMatch(
     val url: String,
     val title: String,
@@ -9,26 +11,37 @@ object TrailerAvailability {
     fun resolveLocal(title: String, serverUrl: String = ""): TrailerMatch? {
         if (serverUrl.isNotBlank()) {
             MetaExtractor.normalizeTrailerUrl(serverUrl)?.let {
-                return TrailerMatch(it, title)
+                if (!isBlockedUrl(it)) return TrailerMatch(it, title)
             }
         }
-        if (title.isNotBlank()) {
-            TrailerCatalog.find(title)?.let { catalog ->
-                MetaExtractor.normalizeTrailerUrl(catalog)?.let {
-                    return TrailerMatch(it, title)
-                }
-            }
-        }
+        val sources = TrailerResolver.resolveAll(serverUrl, title)
+        TrailerResolver.firstPlayableUrl(sources)?.let { return TrailerMatch(it, title) }
         return null
     }
 
-    fun resolve(title: String, serverUrl: String = ""): TrailerMatch? {
+    fun resolve(title: String, serverUrl: String = "", isSeries: Boolean = false, releaseDate: String = ""): TrailerMatch? {
         resolveLocal(title, serverUrl)?.let { return it }
-        if (title.isBlank()) return null
-        val id = TrailerSearch.findYoutubeId(title) ?: return null
-        return TrailerMatch("https://www.youtube.com/watch?v=$id", title)
+        if (title.isBlank() || !TmdbApi.isConfigured()) return null
+        val tmdbUrl = TmdbApi.fetchTrailerUrl(
+            title = title,
+            releaseDate = releaseDate,
+            isSeries = isSeries,
+        )
+        if (tmdbUrl.isNullOrBlank()) return null
+        return TrailerMatch(tmdbUrl, title)
     }
 
-    fun hasTrailer(title: String, serverUrl: String = ""): Boolean =
-        resolve(title, serverUrl) != null
+    fun hasTrailer(
+        title: String,
+        serverUrl: String = "",
+        isSeries: Boolean = false,
+        releaseDate: String = "",
+    ): Boolean = resolve(title, serverUrl, isSeries, releaseDate) != null
+
+    private fun isBlockedUrl(url: String): Boolean {
+        val lower = url.lowercase()
+        return lower.contains("youtube.com") ||
+            lower.contains("youtu.be") ||
+            lower.contains("youtube-nocookie.com")
+    }
 }

@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-/** TMDB lookups for cast profile photos and official YouTube trailers. */
+/** TMDB lookups for cast profile photos and official Vimeo/direct trailers. */
 object TmdbApi {
     private const val TAG = "GadirIPTV-Tmdb"
     private const val BASE = "https://api.themoviedb.org/3"
@@ -26,7 +26,9 @@ object TmdbApi {
 
     private val searchCache = ConcurrentHashMap<String, Int>()
     private val creditsCache = ConcurrentHashMap<String, List<CastMember>>()
-    private val trailerCache = ConcurrentHashMap<String, String>()
+    private val trailerCache = ConcurrentHashMap<String, TmdbTrailer>()
+
+    data class TmdbTrailer(val url: String, val site: String = "Vimeo")
 
     fun isConfigured(): Boolean =
         BuildConfig.TMDB_API_KEY.isNotBlank() || BuildConfig.TMDB_ACCESS_TOKEN.isNotBlank()
@@ -53,9 +55,7 @@ object TmdbApi {
         val trimmed = url.trim()
         if (trimmed.isBlank()) return false
         val lower = trimmed.lowercase()
-        return lower.contains("image.tmdb.org") ||
-            lower.contains("themoviedb.org") ||
-            (lower.startsWith("https://") && !lower.contains("/images/") && !lower.contains("xtream"))
+        return lower.contains("image.tmdb.org") || lower.contains("themoviedb.org")
     }
 
     fun extractYear(title: String, releaseDate: String = ""): String? {
@@ -110,40 +110,56 @@ object TmdbApi {
         }
     }
 
-    fun trailerYoutubeId(
+    fun fetchTrailer(
         title: String,
         releaseDate: String = "",
         isSeries: Boolean = false,
         tmdbId: Int? = null,
-    ): String? {
+    ): TmdbTrailer? {
         if (!isConfigured() || title.isBlank()) return null
         val cleaned = cleanTitle(title)
         val year = extractYear(title, releaseDate)
         val cacheKey = "trailer|${if (isSeries) "tv" else "movie"}|$cleaned|$year|${tmdbId ?: 0}"
-        trailerCache[cacheKey]?.let { return it.takeIf { id -> id.isNotBlank() } }
+        trailerCache[cacheKey]?.let { cached ->
+            return cached.takeIf { it.url.isNotBlank() }
+        }
 
         val contentId = tmdbId?.takeIf { it > 0 }
             ?: searchContentId(cleaned, year.orEmpty(), isSeries)
             ?: return null
         val path = if (isSeries) "tv/$contentId/videos" else "movie/$contentId/videos"
         val body = get("$BASE/$path") ?: return null
-        val id = parseTrailerId(body)
-        if (id != null) trailerCache[cacheKey] = id
-        return id
+        val trailer = parseTrailer(body)
+        if (trailer != null) trailerCache[cacheKey] = trailer
+        return trailer
     }
 
-    private fun parseTrailerId(body: String): String? {
+    fun fetchTrailerUrl(
+        title: String,
+        releaseDate: String = "",
+        isSeries: Boolean = false,
+        tmdbId: Int? = null,
+    ): String? = fetchTrailer(title, releaseDate, isSeries, tmdbId)?.url
+
+    private fun parseTrailer(body: String): TmdbTrailer? {
         return try {
             val results = JsonParser.parseString(body).asJsonObject.getAsJsonArray("results") ?: return null
-            var fallback: String? = null
+            var fallback: TmdbTrailer? = null
             for (element in results) {
                 val obj = element.asJsonObject
-                if (obj.get("site")?.asString?.equals("YouTube", ignoreCase = true) != true) continue
+                val site = obj.get("site")?.asString?.trim().orEmpty()
                 val type = obj.get("type")?.asString?.lowercase().orEmpty()
                 val key = obj.get("key")?.asString?.trim().orEmpty()
                 if (key.isBlank()) continue
-                if (type.contains("trailer") || type.contains("teaser")) return key
-                if (fallback == null) fallback = key
+                val trailer = when {
+                    site.equals("Vimeo", ignoreCase = true) ->
+                        TmdbTrailer(url = "https://vimeo.com/$key", site = "Vimeo")
+                    site.equals("Direct", ignoreCase = true) && key.startsWith("http") ->
+                        TmdbTrailer(url = key, site = "Direct")
+                    else -> null
+                } ?: continue
+                if (type.contains("trailer") || type.contains("teaser")) return trailer
+                if (fallback == null) fallback = trailer
             }
             fallback
         } catch (e: Exception) {
@@ -185,7 +201,9 @@ object TmdbApi {
         val path = if (isSeries) "tv/$contentId/credits" else "movie/$contentId/credits"
         val body = get("$BASE/$path") ?: return emptyList()
         val cast = parseCreditsList(body)
-        if (cast.isNotEmpty()) creditsCache[cacheKey] = cast
+        if (cast.isNotEmpty() && cast.any { it.imageUrl.isNotBlank() }) {
+            creditsCache[cacheKey] = cast
+        }
         return cast
     }
 
