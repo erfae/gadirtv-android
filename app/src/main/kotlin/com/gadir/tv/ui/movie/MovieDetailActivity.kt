@@ -121,6 +121,11 @@ class MovieDetailActivity : BaseLocaleActivity() {
         loadMovieDetail()
     }
 
+    override fun onDestroy() {
+        com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
+        super.onDestroy()
+    }
+
     private fun bindFavoriteButton() {
         VodDetailUi.updateFavoriteButton(
             btnMovieFavorite,

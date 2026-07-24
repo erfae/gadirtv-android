@@ -151,6 +151,7 @@ class PlayerActivity : BaseLocaleActivity() {
             intent.getStringArrayListExtra(EXTRA_ALTERNATE_URLS)?.forEach { alt ->
                 if (alt.isNotBlank() && alt !in pendingVodUrls) pendingVodUrls.add(alt)
             }
+            com.gadir.tv.data.VodStreamSupervisor.register(vodStreamStopAction)
         }
 
         findViewById<androidx.media3.ui.PlayerView>(R.id.playerView).apply {
@@ -737,8 +738,7 @@ class PlayerActivity : BaseLocaleActivity() {
         saveProgress()
         when {
             isLive -> stopLivePlaybackNow()
-            isFinishing -> stopVodPlaybackNow()
-            else -> player?.pause()
+            else -> stopVodPlaybackNow()
         }
         super.onStop()
     }
@@ -768,10 +768,18 @@ class PlayerActivity : BaseLocaleActivity() {
         }
     }
 
+    private val vodStreamStopAction = {
+        if (!isLive) {
+            stopVodPlaybackNow()
+        }
+    }
+
     override fun onDestroy() {
         if (isLive) {
             com.gadir.tv.data.LiveStreamSupervisor.unregister(liveStreamStopAction)
             com.gadir.tv.data.LivePlaybackGate.release()
+        } else {
+            com.gadir.tv.data.VodStreamSupervisor.unregister(vodStreamStopAction)
         }
         hideHandler.removeCallbacksAndMessages(null)
         playbackMonitor?.stop()

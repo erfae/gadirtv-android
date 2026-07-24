@@ -124,6 +124,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         if (isLivePlayback) {
             com.gadir.tv.data.LivePlaybackGate.acquire()
             com.gadir.tv.data.LiveStreamSupervisor.register(liveStreamStopAction)
+        } else {
+            com.gadir.tv.data.VodStreamSupervisor.register(vodStreamStopAction)
         }
 
         if (isLivePlayback) {
@@ -703,6 +705,12 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         }
     }
 
+    private val vodStreamStopAction = {
+        if (!isLivePlayback) {
+            releaseVlcPlayer()
+        }
+    }
+
     override fun onStop() {
         try {
             when {
@@ -710,8 +718,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
                     releaseVlcPlayer()
                     liveStoppedInBackground = true
                 }
-                isFinishing -> releaseVlcPlayer()
-                else -> mediaPlayer?.pause()
+                else -> releaseVlcPlayer()
             }
         } catch (_: Throwable) {
         }
@@ -722,6 +729,8 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         if (isLivePlayback) {
             com.gadir.tv.data.LiveStreamSupervisor.unregister(liveStreamStopAction)
             com.gadir.tv.data.LivePlaybackGate.release()
+        } else {
+            com.gadir.tv.data.VodStreamSupervisor.unregister(vodStreamStopAction)
         }
         hideHandler.removeCallbacksAndMessages(null)
         releaseVlcPlayer()

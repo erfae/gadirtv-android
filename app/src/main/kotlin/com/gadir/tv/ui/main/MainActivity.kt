@@ -107,6 +107,7 @@ class MainActivity : BaseLocaleActivity() {
         private const val CHANNEL_PREVIEW_DELAY_MS = 0L
         private const val PREVIEW_DEBOUNCE_MS = 60L
         private const val PREVIEW_ZAP_DELAY_MS = 40L
+        private const val PREVIEW_EPG_WAIT_MS = 350L
         private const val PREVIEW_TIMEOUT_MS = 6_000L
         private const val PREVIEW_RETRY_DELAY_MS = 600L
         private const val PREVIEW_RETRY_MAX_CYCLES = 2
@@ -265,6 +266,8 @@ class MainActivity : BaseLocaleActivity() {
     private var epgLoadJob: Job? = null
     private var pendingEpg: Runnable? = null
     private var epgFocusStreamId = 0
+    private var previewAfterEpgToken = 0
+    private var pendingPreviewAfterEpg: Runnable? = null
     private var liveTabReady = false
     private var miniPreviewControls: View? = null
     private var previewContainer: View? = null
@@ -2388,6 +2391,7 @@ class MainActivity : BaseLocaleActivity() {
                 livePanel().visibility = View.VISIBLE
                 panelCatalog.visibility = View.GONE
                 stopHeroRotation()
+                com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
                 livePreviewPaused = false
                 syncLivePlaylistUi()
                 livePanel().post {
@@ -3174,6 +3178,7 @@ class MainActivity : BaseLocaleActivity() {
         extension: String = "mp4",
         added: Long = 0L,
     ) {
+        com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
         prefetchMovieDetail(streamId, title, cover)
         startActivity(
             MovieDetailActivity.intent(
@@ -3218,6 +3223,7 @@ class MainActivity : BaseLocaleActivity() {
         added: Long = 0L,
     ) {
         val open = {
+            com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
             prefetchSeriesDetail(seriesId, title, cover)
             startActivity(
                 SeriesDetailActivity.intent(
@@ -4699,6 +4705,9 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun teardownLivePreviewPlayback() {
+        pendingPreviewAfterEpg?.let { previewHandler.removeCallbacks(it) }
+        pendingPreviewAfterEpg = null
+        previewAfterEpgToken++
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
         disarmPreviewStallWatchdog()
@@ -4708,8 +4717,6 @@ class MainActivity : BaseLocaleActivity() {
         miniExoPlayer?.stop()
         previewingStreamId = null
         previewWorkingUrl = null
-        currentPreviewEpg = emptyList()
-        epgPreviewAdapter?.submit(emptyList())
     }
 
     /** Libera el mini-player antes de pantalla completa (evita dos ExoPlayer/LibVLC en TV). */
@@ -4782,11 +4789,16 @@ class MainActivity : BaseLocaleActivity() {
         if (previewingStreamId != null && previewingStreamId != channel.streamId) {
             stopPreviewForZap()
         }
-        scheduleDebouncedEpg(channel)
-        if (previewingStreamId == channel.streamId && previewIsSettled()) return
-        if (channel.streamId == previewFocusStreamId && pendingPreview != null) return
+        if (previewingStreamId == channel.streamId && previewIsSettled()) {
+            scheduleDebouncedEpg(channel)
+            return
+        }
+        if (channel.streamId == previewFocusStreamId && pendingPreview != null) {
+            scheduleDebouncedEpg(channel)
+            return
+        }
         previewFocusStreamId = channel.streamId
-        schedulePreviewPlayback(channel)
+        schedulePreviewAfterEpg(channel)
     }
 
     /** OK: pantalla completa si el preview ya va; si no, fuerza preview al instante. */
@@ -4796,8 +4808,8 @@ class MainActivity : BaseLocaleActivity() {
                 openFullscreen(channel)
             } else {
                 updatePreviewInfo(channel)
-                scheduleDebouncedEpg(channel)
-                schedulePreviewPlayback(channel, immediate = true)
+                previewFocusStreamId = channel.streamId
+                schedulePreviewAfterEpg(channel, immediate = true)
             }
         } else {
             openFullscreen(channel)
@@ -5047,26 +5059,50 @@ class MainActivity : BaseLocaleActivity() {
         pendingEpg = null
     }
 
+    /** Start preview after EPG fetch completes or a short timeout (EPG gets first panel slot). */
+    private fun schedulePreviewAfterEpg(channel: LiveChannel, immediate: Boolean = false) {
+        pendingPreviewAfterEpg?.let { previewHandler.removeCallbacks(it) }
+        val waitToken = ++previewAfterEpgToken
+        val streamId = channel.streamId
+        var previewScheduled = false
+        fun startPreview() {
+            if (previewScheduled || waitToken != previewAfterEpgToken) return
+            if (currentPreviewChannel?.streamId != streamId) return
+            previewScheduled = true
+            schedulePreviewPlayback(channel, immediate = immediate)
+        }
+        val timeoutTask = Runnable {
+            if (waitToken != previewAfterEpgToken) return@Runnable
+            startPreview()
+        }
+        pendingPreviewAfterEpg = timeoutTask
+        val waitMs = if (immediate) {
+            PREVIEW_ZAP_DELAY_MS
+        } else {
+            PREVIEW_EPG_WAIT_MS
+        }
+        previewHandler.postDelayed(timeoutTask, waitMs)
+        scheduleDebouncedEpg(channel, onLoaded = { startPreview() })
+    }
+
     /** EPG on channel focus — fast debounce, never cancelled by preview start. */
-    private fun scheduleDebouncedEpg(channel: LiveChannel) {
+    private fun scheduleDebouncedEpg(channel: LiveChannel, onLoaded: (() -> Unit)? = null) {
         EpgCache.get(channel.streamId)?.takeIf { it.isNotEmpty() }?.let { cached ->
             applyEpg(channel, cached)
+            onLoaded?.invoke()
             return
         }
         cancelEpgLoad()
         val streamId = channel.streamId
         val epgId = channel.epgChannelId
+        val notifyLoaded = onLoaded
         val task = Runnable {
             if (currentPreviewChannel?.streamId != streamId) return@Runnable
             val profile = PlaylistRepository.profile ?: return@Runnable
             val token = ++epgLoadToken
             epgLoadJob = lifecycleScope.launch {
                 val epg = withContext(Dispatchers.IO) {
-                    when {
-                        epgId.isNotBlank() -> api.shortEpgBrowse(profile, epgId, limit = 6)
-                        streamId > 0 -> api.shortEpgFast(profile, streamId, epgId, limit = 6)
-                        else -> emptyList()
-                    }
+                    api.shortEpg(profile, streamId, epgId, limit = 6)
                 }
                 if (token != epgLoadToken) return@launch
                 if (currentPreviewChannel?.streamId != streamId) return@launch
@@ -5074,6 +5110,7 @@ class MainActivity : BaseLocaleActivity() {
                     EpgCache.put(streamId, epg)
                 }
                 applyEpg(channel, epg)
+                notifyLoaded?.invoke()
             }
         }
         pendingEpg = task
@@ -5217,13 +5254,14 @@ class MainActivity : BaseLocaleActivity() {
         if (currentPreviewChannel?.streamId != channel.streamId) return
         currentPreviewEpg = epg
         updatePreviewActions(channel)
-        epgNow.visibility = View.GONE
         epgNext.visibility = View.GONE
         if (epg.isEmpty()) {
             epgPreviewAdapter?.submit(emptyList())
             epgNow.text = getString(R.string.epg_unavailable)
+            epgNow.visibility = View.VISIBLE
             return
         }
+        epgNow.visibility = View.GONE
         epgPreviewAdapter?.submit(dedupeEpgPreview(epg).take(4))
     }
 
@@ -5554,12 +5592,13 @@ class MainActivity : BaseLocaleActivity() {
         } else if (currentTab == Tab.LIVE) {
             ensureLiveTabReady()
             syncLivePlaylistUi()
+            com.gadir.tv.data.VodStreamSupervisor.stopAllVodStreams()
             val resumeToken = ++livePreviewResumeToken
             val resumeDelay = VlcInstanceGuard.cooldownRemainingMs(LIVE_VLC_COOLDOWN_MS)
             livePanel().postDelayed({
                 if (isDestroyed || currentTab != Tab.LIVE || resumeToken != livePreviewResumeToken) return@postDelayed
                 livePreviewPaused = false
-                currentPreviewChannel?.let { updatePreviewInfo(it) }
+                currentPreviewChannel?.let { onLiveChannelFocused(it) }
             }, resumeDelay)
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
             if (!DeviceUi.useDpadFocus(this)) {
