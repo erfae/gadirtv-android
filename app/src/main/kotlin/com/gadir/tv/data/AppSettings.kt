@@ -7,10 +7,7 @@ class AppSettings(context: Context) {
     private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     var autoplayPreview: Boolean
-        get() {
-            val default = !com.gadir.tv.util.DeviceUi.isTvUi(appContext)
-            return prefs.getBoolean(KEY_AUTOPLAY, default)
-        }
+        get() = prefs.getBoolean(KEY_AUTOPLAY, true)
         set(value) = prefs.edit().putBoolean(KEY_AUTOPLAY, value).apply()
 
     var playerMode: String
