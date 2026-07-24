@@ -23,6 +23,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.gadir.tv.R
+import com.gadir.tv.data.TmdbApi
 import com.gadir.tv.player.PlayerFactory
 import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.util.DeviceUi
@@ -55,6 +56,7 @@ class TrailerActivity : BaseLocaleActivity() {
     private var youtubeStep = 0
     private var currentYoutubeId: String? = null
     private var youtubeStreamTried = false
+    private var tmdbLookupStarted = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,10 +75,6 @@ class TrailerActivity : BaseLocaleActivity() {
         webView = findViewById(R.id.trailerWebView)
 
         sources = TrailerResolver.resolveAll(rawUrl, title)
-        if (sources.isEmpty()) {
-            showFailed()
-            return
-        }
 
         configureWebView(webView)
 
@@ -84,7 +82,39 @@ class TrailerActivity : BaseLocaleActivity() {
         btnRetry.setOnClickListener { retryPlayback() }
         btnRetry.visibility = View.GONE
         btnBack.requestFocus()
+
+        if (sources.isEmpty()) {
+            statusView.visibility = View.VISIBLE
+            statusView.text = getString(R.string.trailer_loading)
+            lookupTmdbTrailer(title)
+            return
+        }
+
+        lookupTmdbTrailer(title)
         startCurrentSource()
+    }
+
+    private fun lookupTmdbTrailer(title: String) {
+        if (title.isBlank() || tmdbLookupStarted || !TmdbApi.isConfigured()) return
+        tmdbLookupStarted = true
+        lifecycleScope.launch {
+            val youtubeId = withContext(Dispatchers.IO) {
+                TmdbApi.trailerYoutubeId(title)
+            }
+            if (isFinishing) return@launch
+            if (youtubeId.isNullOrBlank()) {
+                if (sources.isEmpty()) showFailed()
+                return@launch
+            }
+            if (sources.any { it is TrailerSource.Youtube && it.videoId == youtubeId }) return@launch
+            sources = listOf(TrailerSource.Youtube(youtubeId)) + sources
+            if (!playbackStarted) {
+                sourceIndex = 0
+                youtubeStep = 0
+                youtubeStreamTried = false
+                startCurrentSource()
+            }
+        }
     }
 
     override fun onBackPressed() {

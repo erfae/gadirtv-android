@@ -137,6 +137,7 @@ class PlayerActivity : BaseLocaleActivity() {
         liveStreamId = streamId
         if (isLive) {
             com.gadir.tv.data.LivePlaybackGate.acquire()
+            com.gadir.tv.data.LiveStreamSupervisor.register(liveStreamStopAction)
             pendingLiveUrls.clear()
             pendingLiveUrls.add(url)
             intent.getStringArrayListExtra(EXTRA_ALTERNATE_URLS)?.forEach { alt ->
@@ -732,26 +733,33 @@ class PlayerActivity : BaseLocaleActivity() {
 
     override fun onStop() {
         saveProgress()
-        super.onStop()
         if (isLive) {
-            // Live has no meaningful "resume position" — pausing just keeps the panel
-            // connection open in the background (sometimes for a long time, depending on
-            // how long Android keeps the backgrounded process alive), which looks to the
-            // panel like the account is still watching after the user left. Fully stop so
-            // the connection actually closes; onResume() reconnects fresh if the user comes
-            // back without the Activity being destroyed. Stop the stall/no-signal monitor
-            // too, otherwise it would see STATE_IDLE and try to auto-reconnect in the
-            // background on its own.
-            playbackMonitor?.stop()
-            player?.stop()
-            liveStoppedInBackground = true
+            stopLivePlaybackNow()
         } else {
             player?.pause()
+        }
+        super.onStop()
+    }
+
+    private fun stopLivePlaybackNow() {
+        playbackMonitor?.stop()
+        try {
+            player?.stop()
+            player?.clearMediaItems()
+        } catch (_: Throwable) {
+        }
+        liveStoppedInBackground = true
+    }
+
+    private val liveStreamStopAction = {
+        if (isLive && !isFinishing) {
+            stopLivePlaybackNow()
         }
     }
 
     override fun onDestroy() {
         if (isLive) {
+            com.gadir.tv.data.LiveStreamSupervisor.unregister(liveStreamStopAction)
             com.gadir.tv.data.LivePlaybackGate.release()
         }
         hideHandler.removeCallbacksAndMessages(null)

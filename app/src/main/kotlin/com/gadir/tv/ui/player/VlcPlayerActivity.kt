@@ -123,6 +123,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         resumeSeekPending = resumePositionMs > 0L && !isLivePlayback
         if (isLivePlayback) {
             com.gadir.tv.data.LivePlaybackGate.acquire()
+            com.gadir.tv.data.LiveStreamSupervisor.register(liveStreamStopAction)
         }
 
         if (isLivePlayback) {
@@ -695,6 +696,13 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         VolumeHelper.boostOnPlaybackStart(this)
     }
 
+    private val liveStreamStopAction = {
+        if (isLivePlayback && !isFinishing) {
+            releaseVlcPlayer()
+            liveStoppedInBackground = true
+        }
+    }
+
     override fun onStop() {
         try {
             if (isLivePlayback) {
@@ -716,6 +724,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
     override fun onDestroy() {
         if (isLivePlayback) {
+            com.gadir.tv.data.LiveStreamSupervisor.unregister(liveStreamStopAction)
             com.gadir.tv.data.LivePlaybackGate.release()
         }
         hideHandler.removeCallbacksAndMessages(null)

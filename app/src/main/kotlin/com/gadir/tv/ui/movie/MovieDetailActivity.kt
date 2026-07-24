@@ -250,6 +250,17 @@ class MovieDetailActivity : BaseLocaleActivity() {
             fallbackCast = info.cast,
             onCastMoveUp = { btnMoviePlay.requestFocus() },
         )
+        VodDetailUi.enrichCastAsync(
+            scope = lifecycleScope,
+            members = info.castMembers,
+            title = info.name.ifEmpty { movieName },
+            releaseDate = info.releaseDate,
+            isSeries = false,
+            labelView = findViewById(R.id.movieCastLabel),
+            listView = castList,
+            fallbackCast = info.cast,
+            onCastMoveUp = { btnMoviePlay.requestFocus() },
+        )
 
         val backdrop = info.backdrop.ifBlank { info.cover.ifBlank { fallbackCover } }
         val poster = info.cover.ifBlank { fallbackCover }

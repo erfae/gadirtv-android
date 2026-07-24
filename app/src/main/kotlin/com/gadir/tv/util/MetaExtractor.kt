@@ -425,6 +425,22 @@ object MetaExtractor {
         return CastMember(name = name, imageUrl = resolvedImage)
     }
 
+    fun tmdbIdFrom(vararg sources: JsonObject?): Int? {
+        val keys = listOf(
+            "tmdb_id", "tmdb", "tmdbId", "tmdbID", "themoviedb_id",
+            "movie_tmdb_id", "series_tmdb_id", "tmdb_movie_id", "tmdb_series_id",
+        )
+        for (source in sources) {
+            if (source == null) continue
+            for (key in keys) {
+                source.get(key)?.asStringOrNull()?.trim()?.toIntOrNull()
+                    ?.takeIf { it > 0 }
+                    ?.let { return it }
+            }
+        }
+        return null
+    }
+
     fun directorFrom(vararg sources: JsonObject?): String {
         val keys = listOf("director", "directors")
         for (source in sources) {

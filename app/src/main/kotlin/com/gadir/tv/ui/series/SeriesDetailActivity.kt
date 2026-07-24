@@ -253,6 +253,18 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             onCastMoveUp = { btnSeriesPlay.requestFocus() },
             onCastMoveDown = { focusSeasonList() },
         )
+        VodDetailUi.enrichCastAsync(
+            scope = lifecycleScope,
+            members = detail.castMembers,
+            title = detail.name.ifEmpty { seriesName },
+            releaseDate = detail.releaseDate,
+            isSeries = true,
+            labelView = findViewById(R.id.seriesCastLabel),
+            listView = castList,
+            fallbackCast = detail.cast,
+            onCastMoveUp = { btnSeriesPlay.requestFocus() },
+            onCastMoveDown = { focusSeasonList() },
+        )
 
         val backdrop = detail.backdrop.ifBlank { detail.cover.ifBlank { fallbackCover } }
         val poster = detail.cover.ifBlank { fallbackCover }

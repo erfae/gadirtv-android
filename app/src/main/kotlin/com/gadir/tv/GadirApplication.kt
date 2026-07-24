@@ -5,6 +5,8 @@ import android.content.Context
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.gadir.tv.data.ContentPreloader
+import com.gadir.tv.data.LiveStreamSupervisor
 import com.gadir.tv.data.ParentalSession
 import com.gadir.tv.data.ProfileStore
 import com.gadir.tv.util.LocaleHelper
@@ -27,6 +29,8 @@ class GadirApplication : Application() {
             object : DefaultLifecycleObserver {
                 override fun onStop(owner: LifecycleOwner) {
                     ParentalSession.clear()
+                    LiveStreamSupervisor.stopAllLiveStreams()
+                    ContentPreloader.cancelBackgroundPreload()
                 }
             },
         )

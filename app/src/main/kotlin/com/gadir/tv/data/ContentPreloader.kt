@@ -27,9 +27,7 @@ object ContentPreloader {
     // hit it at once, which was starving the hero's own plot fetch (see loadMoviePlot).
     private const val ICON_PARALLEL = 6
     private const val PLOT_PARALLEL = 2
-    private const val EPG_PARALLEL = 3
     private const val PRELOAD_START_DELAY_MS = 1_200L
-    private const val EPG_CHANNEL_LIMIT = 48
     private const val PLOT_LIMIT = 24
     private const val PRIORITY_CHANNEL_ICONS = 120
     private const val CHANNEL_ICON_BATCH = 200
@@ -66,10 +64,8 @@ object ContentPreloader {
         LivePlaybackGate.awaitIdle()
         coroutineScope {
             val catalogJob = async { CatalogPreloader.preloadRemaining(api, profile) }
-            val epgJob = async { preloadEpg(api, profile, prioritizedChannels(context)) }
             preloadHomeAssets(context, api, profile)
             preloadPrioritizedChannelIcons(context)
-            epgJob.await()
             catalogJob.await()
             preloadRemainingChannelIcons(context)
             preloadCatalogPosters(context)
@@ -283,33 +279,5 @@ object ContentPreloader {
             context.getString(R.string.season_label, key)
         }
         return context.getString(R.string.seasons_label) + ": " + labels.joinToString(" · ")
-    }
-
-    private suspend fun preloadEpg(
-        api: XtreamApi,
-        profile: Profile,
-        channels: List<LiveChannel>,
-    ) = coroutineScope {
-        val targets = channels.take(EPG_CHANNEL_LIMIT)
-        val semaphore = Semaphore(EPG_PARALLEL)
-        targets.map { channel ->
-            async {
-                semaphore.withPermit {
-                    if (EpgCache.get(channel.streamId) != null) return@withPermit
-                    // EPG requests carry stream_id and can appear as "active connections" on
-                    // some panels — don't fetch other channels' EPG while one is watching live.
-                    LivePlaybackGate.awaitIdle()
-                    val epg = runCatching {
-                        api.shortEpgFast(
-                            profile,
-                            streamId = channel.streamId,
-                            epgChannelId = channel.epgChannelId,
-                            limit = 4,
-                        )
-                    }.getOrDefault(emptyList())
-                    EpgCache.put(channel.streamId, epg)
-                }
-            }
-        }.awaitAll()
     }
 }

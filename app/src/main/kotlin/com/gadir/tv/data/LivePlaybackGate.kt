@@ -4,21 +4,10 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.delay
 
 /**
- * Pauses background panel traffic (EPG prefetch, catalog/icon prefetch) while a live
- * channel is actively playing in fullscreen.
+ * Pauses background panel traffic while ANY live stream is active (preview or fullscreen).
  *
- * Many Xtream-style panels log ANY authenticated request that references a stream_id
- * (including EPG queries like get_short_epg, not just the actual video stream) as an
- * "active connection" in the admin dashboard. ContentPreloader's background job walks
- * dozens of channels fetching EPG for all of them, completely independent of whatever
- * the user is actually watching — from the panel's point of view this can look like the
- * account is "connected to several channels at once" while the user is simply watching
- * one channel in fullscreen, which can trip max_connections limits or abuse detection.
- *
- * Reference-counted rather than a plain boolean: when live playback falls back between
- * VlcPlayerActivity and PlayerActivity (e.g. a decoder error), the new player's onCreate
- * acquires the gate before the old player's onDestroy releases it, so the count never
- * drops to zero during the handoff and background traffic doesn't briefly resume mid-swap.
+ * Many Xtream panels count get_short_epg and stream URLs as separate "connections".
+ * While one channel plays, background EPG/catalog prefetch must stay idle.
  */
 object LivePlaybackGate {
     private val holders = AtomicInteger(0)

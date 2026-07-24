@@ -10,6 +10,11 @@ import com.gadir.tv.R
 import com.gadir.tv.model.CastMember
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.RecyclerViewUtil
+import com.gadir.tv.data.TmdbApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -120,6 +125,41 @@ object VodDetailUi {
         listView.isFocusable = false
         listView.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         RecyclerViewUtil.expandHorizontalList(listView)
+    }
+
+    fun enrichCastAsync(
+        scope: CoroutineScope,
+        members: List<CastMember>,
+        title: String,
+        releaseDate: String,
+        isSeries: Boolean,
+        labelView: TextView,
+        listView: RecyclerView,
+        fallbackCast: String = "",
+        onCastMoveUp: (() -> Unit)? = null,
+        onCastMoveDown: (() -> Unit)? = null,
+    ) {
+        if (!TmdbApi.isConfigured()) return
+        if (members.none { it.name.isNotBlank() && it.imageUrl.isBlank() }) return
+        scope.launch {
+            val enriched = withContext(Dispatchers.IO) {
+                TmdbApi.enrichCastMembers(
+                    members = members,
+                    title = title,
+                    releaseDate = releaseDate,
+                    tmdbId = null,
+                    isSeries = isSeries,
+                )
+            }
+            bindCast(
+                labelView = labelView,
+                listView = listView,
+                castMembers = enriched,
+                fallbackCast = fallbackCast,
+                onCastMoveUp = onCastMoveUp,
+                onCastMoveDown = onCastMoveDown,
+            )
+        }
     }
 
     fun bindImages(

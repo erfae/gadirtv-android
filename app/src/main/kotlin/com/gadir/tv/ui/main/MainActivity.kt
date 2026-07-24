@@ -256,6 +256,7 @@ class MainActivity : BaseLocaleActivity() {
     private var channelsLoadToken = 0
     private var livePreviewPaused = false
     private var livePreviewResumeToken = 0
+    private var previewGateHeld = false
     private var epgLoadToken = 0
     private var pendingEpg: Runnable? = null
     private var epgFocusStreamId = 0
@@ -304,13 +305,45 @@ class MainActivity : BaseLocaleActivity() {
         pendingLiveCategoryPreview = null
         cancelPreviewTimeout()
         disarmPreviewStallWatchdog()
-        teardownLivePreviewPlayback()
-        detachPreviewPlayersFromSurface()
+        releaseLivePreviewPlayersFully()
         if (liveTabReady) {
             setPreviewVideoVisible(false)
             hideMiniPreviewControls()
         }
         livePreviewPaused = true
+    }
+
+    private fun acquirePreviewGate() {
+        if (!previewGateHeld) {
+            com.gadir.tv.data.LivePlaybackGate.acquire()
+            previewGateHeld = true
+        }
+    }
+
+    private fun releasePreviewGate() {
+        if (previewGateHeld) {
+            com.gadir.tv.data.LivePlaybackGate.release()
+            previewGateHeld = false
+        }
+    }
+
+    /** Fully closes the panel connection for live preview (not just pause). */
+    private fun releaseLivePreviewPlayersFully() {
+        releasePreviewGate()
+        teardownLivePreviewPlayback()
+        detachPreviewPlayersFromSurface()
+        try {
+            miniVlcPlayer?.release()
+        } catch (_: Throwable) {
+        }
+        miniVlcPlayer = null
+        releaseExoPreview()
+    }
+
+    private val liveStreamStopAction = {
+        if (!isDestroyed && currentTab == Tab.LIVE) {
+            leaveLiveTabSession()
+        }
     }
 
     private fun detachPreviewPlayersFromSurface() {
@@ -431,6 +464,7 @@ class MainActivity : BaseLocaleActivity() {
         appSettings = AppSettings(this)
         parentalStore = ParentalControlStore(this)
         parentalStore.ensureAdultDefaultsBlocked()
+        com.gadir.tv.data.LiveStreamSupervisor.register(liveStreamStopAction)
 
         headerClock = findViewById(R.id.headerClock)
         headerDate = findViewById(R.id.headerDate)
@@ -1478,7 +1512,7 @@ class MainActivity : BaseLocaleActivity() {
         if (currentTab == Tab.LIVE) {
             leaveLiveTabSession()
         } else {
-            detachPreviewPlayersFromSurface()
+            releaseLivePreviewPlayersFully()
             livePreviewPaused = true
         }
     }
@@ -4681,6 +4715,7 @@ class MainActivity : BaseLocaleActivity() {
         previewToken++
         cancelPreviewTimeout()
         disarmPreviewStallWatchdog()
+        releasePreviewGate()
         try {
             miniVlcPlayer?.stop()
             miniVlcPlayer?.release()
@@ -4757,6 +4792,7 @@ class MainActivity : BaseLocaleActivity() {
         disarmPreviewStallWatchdog()
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
+        releasePreviewGate()
         miniVlcPlayer?.stop()
         miniExoPlayer?.stop()
         previewWorkingUrl = null
@@ -4770,6 +4806,7 @@ class MainActivity : BaseLocaleActivity() {
         disarmPreviewStallWatchdog()
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
+        releasePreviewGate()
         miniVlcPlayer?.stop()
         miniExoPlayer?.stop()
         previewWorkingUrl = null
@@ -4978,6 +5015,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun prefetchEpgNeighbors(channel: LiveChannel) {
+        if (com.gadir.tv.data.LivePlaybackGate.isLivePlaybackActive()) return
         val profile = PlaylistRepository.profile ?: return
         val index = channels.indexOfFirst { it.streamId == channel.streamId }
         if (index < 0) return
@@ -5008,6 +5046,7 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     private fun prefetchEpgForChannels(channelBatch: List<LiveChannel>, limit: Int = 10) {
+        if (com.gadir.tv.data.LivePlaybackGate.isLivePlaybackActive()) return
         val profile = PlaylistRepository.profile ?: return
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
@@ -5347,6 +5386,8 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun exitApp() {
         ParentalSession.clear()
+        com.gadir.tv.data.LiveStreamSupervisor.stopAllLiveStreams()
+        ContentPreloader.cancelBackgroundPreload()
         finishAffinity()
     }
 
@@ -5530,7 +5571,11 @@ class MainActivity : BaseLocaleActivity() {
 
     override fun onStop() {
         super.onStop()
-        suspendLivePreview()
+        if (currentTab == Tab.LIVE) {
+            releaseLivePreviewPlayersFully()
+        } else {
+            suspendLivePreview()
+        }
         stopHeroRotation()
     }
 
@@ -5580,13 +5625,12 @@ class MainActivity : BaseLocaleActivity() {
     }
 
     override fun onDestroy() {
+        com.gadir.tv.data.LiveStreamSupervisor.unregister(liveStreamStopAction)
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         clockHandler.removeCallbacks(clockRunnable)
         miniControlsHandler.removeCallbacks(hideMiniControlsRunnable)
         stopHeroRotation()
-        releaseExoPreview()
-        miniVlcPlayer?.release()
-        miniVlcPlayer = null
+        releaseLivePreviewPlayersFully()
         super.onDestroy()
     }
 
@@ -5766,6 +5810,7 @@ class MainActivity : BaseLocaleActivity() {
             onPlaying = {
                 if (!isLivePreviewContext()) return@LiveExoPreviewPlayer
                 if (previewPlaybackToken != previewToken) return@LiveExoPreviewPlayer
+                acquirePreviewGate()
                 cancelPreviewTimeout()
                 previewRetryCycleCount = 0
                 if (previewUrlIndex in previewUrls.indices) {
@@ -5801,6 +5846,7 @@ class MainActivity : BaseLocaleActivity() {
             onPlaying = {
                 if (!isLivePreviewContext()) return@LiveVlcPlayer
                 if (previewPlaybackToken != previewToken) return@LiveVlcPlayer
+                acquirePreviewGate()
                 cancelPreviewTimeout()
                 previewRetryCycleCount = 0
                 if (previewUrlIndex in previewUrls.indices) {
