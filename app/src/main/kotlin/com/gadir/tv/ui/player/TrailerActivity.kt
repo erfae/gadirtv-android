@@ -367,10 +367,12 @@ class TrailerActivity : BaseLocaleActivity() {
                     TrailerStreamResolver.directPlayUrl(videoId)
                 }
                 if (isFinishing) return@launch
+                if (DeviceUi.isTvUi(this@TrailerActivity)) {
+                    if (openYoutubeTvApp(videoId)) return@launch
+                }
                 if (direct != null) {
                     playDirectVideo(direct)
                 } else if (DeviceUi.isTvUi(this@TrailerActivity)) {
-                    if (openYoutubeTvApp(videoId)) return@launch
                     showFailed()
                 } else {
                     playYoutubeEmbed(videoId)

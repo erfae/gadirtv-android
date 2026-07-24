@@ -114,6 +114,7 @@ class MainActivity : BaseLocaleActivity() {
         private const val PREVIEW_STALL_TIMEOUT_MS = 14_000L
         private const val PREVIEW_SURFACE_MAX_ATTEMPTS = 4
         private const val CATALOG_PREFETCH_DELAY_MS = 400L
+        private const val EPG_DEBOUNCE_MS = 500L
         private const val EPG_FOCUS_DELAY_MS = 0L
         private const val FULLSCREEN_LAUNCH_DELAY_MS = 700L
         private const val LIVE_VLC_COOLDOWN_MS = 600L
@@ -711,6 +712,7 @@ class MainActivity : BaseLocaleActivity() {
         refreshLiveCategoryList()
         syncLiveCategoryChannels()
         channelList.setItemViewCacheSize(48)
+        channelList.setPreserveFocusAfterLayout(true)
         channelAdapter = ChannelAdapter(
             items = channels,
             onFocus = if (DeviceUi.useDpadFocus(this)) {
@@ -719,7 +721,7 @@ class MainActivity : BaseLocaleActivity() {
                 { }
             },
             onOpen = { channel ->
-                openFullscreen(channel)
+                onLiveChannelOpen(channel)
             },
             onMoveLeft = if (DeviceUi.useDpadFocus(this)) {
                 { exitLiveContentToGroup() }
@@ -1540,7 +1542,9 @@ class MainActivity : BaseLocaleActivity() {
         val channel = currentPreviewChannel ?: return
         clearLiveCategoryFocusRing()
         livePreviewPaused = false
-        onLiveChannelFocused(channel)
+        if (!previewIsSettled()) {
+            schedulePreviewPlayback(channel, immediate = true)
+        }
         previewContainer?.requestFocus()
     }
 
@@ -4769,14 +4773,34 @@ class MainActivity : BaseLocaleActivity() {
         suspendLivePreview()
     }
 
+    /** NetTV-style: focus = EPG + logo only; stream opens on OK (or autoplay on phone). */
     private fun onLiveChannelFocused(channel: LiveChannel) {
-        val sameChannel = currentPreviewChannel?.streamId == channel.streamId
         updatePreviewInfo(channel)
         if (reloadingChannels) return
-        if (sameChannel && previewIsSettled()) return
+        if (previewingStreamId != null && previewingStreamId != channel.streamId) {
+            stopPreviewForZap()
+        }
+        scheduleDebouncedEpg(channel)
+        if (DeviceUi.isTvUi(this) || !appSettings.autoplayPreview) return
+        if (previewingStreamId == channel.streamId && previewIsSettled()) return
         if (channel.streamId == previewFocusStreamId && pendingPreview != null) return
         previewFocusStreamId = channel.streamId
         schedulePreviewPlayback(channel)
+    }
+
+    /** NetTV-style: first OK plays preview; second OK (when playing) goes fullscreen. */
+    private fun onLiveChannelOpen(channel: LiveChannel) {
+        if (DeviceUi.useDpadFocus(this)) {
+            if (currentPreviewChannel?.streamId == channel.streamId && previewIsSettled()) {
+                openFullscreen(channel)
+            } else {
+                updatePreviewInfo(channel)
+                scheduleDebouncedEpg(channel)
+                schedulePreviewPlayback(channel, immediate = true)
+            }
+        } else {
+            openFullscreen(channel)
+        }
     }
 
     private fun schedulePreview(channel: LiveChannel) {
@@ -4820,7 +4844,7 @@ class MainActivity : BaseLocaleActivity() {
         hideNoSignal()
     }
 
-    private fun schedulePreviewPlayback(channel: LiveChannel) {
+    private fun schedulePreviewPlayback(channel: LiveChannel, immediate: Boolean = false) {
         if (currentTab != Tab.LIVE || reloadingChannels) return
         if (liveBrowseLevel != TvBrowseNav.Level.CONTENT) return
         val browseId = selectedLiveCategoryId
@@ -4830,7 +4854,6 @@ class MainActivity : BaseLocaleActivity() {
         val channelChanged = previousStreamId != channel.streamId
         if (!channelChanged && previewIsSettled()) return
         if (channelChanged || !previewIsSettled() || previewHasNoSignal()) {
-            cancelEpgLoad()
             if (channelChanged) {
                 previewToken++
                 stopPreviewForZap()
@@ -4842,7 +4865,9 @@ class MainActivity : BaseLocaleActivity() {
             ensurePreviewPlayer()
         }
         val token = previewToken
-        val delayMs = when {
+        val delayMs = if (immediate) {
+            0L
+        } else when {
             channelChanged -> PREVIEW_DEBOUNCE_MS + PREVIEW_ZAP_DELAY_MS
             DeviceUi.useDpadFocus(this) -> CHANNEL_PREVIEW_DELAY_MS
             usesExoPreview() -> PREVIEW_ZAP_DELAY_MS
@@ -4851,7 +4876,6 @@ class MainActivity : BaseLocaleActivity() {
         val task = Runnable {
             if (token != previewToken || reloadingChannels || livePreviewPaused) return@Runnable
             if (currentPreviewChannel?.streamId != channel.streamId) return@Runnable
-            scheduleEpgBrowse(channel, token)
             if (parentalStore.requiresPinForChannel(channel, selectedLiveCategoryId)) {
                 withChannelAccess(channel) {
                     if (token == previewToken) previewChannel(channel, token)
@@ -4861,7 +4885,11 @@ class MainActivity : BaseLocaleActivity() {
             }
         }
         pendingPreview = task
-        previewHandler.postDelayed(task, delayMs)
+        if (delayMs > 0L) {
+            previewHandler.postDelayed(task, delayMs)
+        } else {
+            previewHandler.post(task)
+        }
     }
 
     private fun hideNoSignal() {
@@ -5017,26 +5045,34 @@ class MainActivity : BaseLocaleActivity() {
         pendingEpg = null
     }
 
-    /** EPG via epg_channel_id only — avoids an extra stream_id panel connection while browsing. */
-    private fun scheduleEpgBrowse(channel: LiveChannel, previewToken: Int) {
+    /** Debounced EPG on channel focus (NetTV epgTimer ~500 ms). No live stream URL. */
+    private fun scheduleDebouncedEpg(channel: LiveChannel) {
         if (EpgCache.get(channel.streamId)?.isNotEmpty() == true) return
+        cancelEpgLoad()
         val streamId = channel.streamId
         val epgId = channel.epgChannelId
-        if (epgId.isBlank()) return
-        val token = ++epgLoadToken
-        epgLoadJob?.cancel()
-        epgLoadJob = lifecycleScope.launch {
-            val profile = PlaylistRepository.profile ?: return@launch
-            val epg = withContext(Dispatchers.IO) {
-                api.shortEpgBrowse(profile, epgId, limit = 6)
-            }
-            if (token != epgLoadToken || previewToken != this@MainActivity.previewToken) return@launch
-            if (currentPreviewChannel?.streamId != streamId) return@launch
-            if (epg.isNotEmpty()) {
-                EpgCache.put(streamId, epg)
+        val task = Runnable {
+            if (currentPreviewChannel?.streamId != streamId) return@Runnable
+            val profile = PlaylistRepository.profile ?: return@Runnable
+            val token = ++epgLoadToken
+            epgLoadJob = lifecycleScope.launch {
+                val epg = withContext(Dispatchers.IO) {
+                    when {
+                        epgId.isNotBlank() -> api.shortEpgBrowse(profile, epgId, limit = 6)
+                        streamId > 0 -> api.shortEpgFast(profile, streamId, epgId, limit = 6)
+                        else -> emptyList()
+                    }
+                }
+                if (token != epgLoadToken) return@launch
+                if (currentPreviewChannel?.streamId != streamId) return@launch
+                if (epg.isNotEmpty()) {
+                    EpgCache.put(streamId, epg)
+                }
                 applyEpg(channel, epg)
             }
         }
+        pendingEpg = task
+        previewHandler.postDelayed(task, EPG_DEBOUNCE_MS)
     }
 
     /** Load EPG only for the channel whose preview stream is actually playing. */
@@ -5547,9 +5583,7 @@ class MainActivity : BaseLocaleActivity() {
             livePanel().postDelayed({
                 if (isDestroyed || currentTab != Tab.LIVE || resumeToken != livePreviewResumeToken) return@postDelayed
                 livePreviewPaused = false
-                ensurePreviewPlayer()
-                attachPreviewPlayersToSurface()
-                currentPreviewChannel?.let { onLiveChannelFocused(it) }
+                currentPreviewChannel?.let { updatePreviewInfo(it) }
             }, resumeDelay)
         } else if (currentTab == Tab.MOVIES || currentTab == Tab.SERIES) {
             if (!DeviceUi.useDpadFocus(this)) {
