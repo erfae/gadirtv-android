@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-/** TMDB lookups for cast profile photos and official Vimeo/direct trailers. */
+/** TMDB lookups for cast photos and official trailers (YouTube/Vimeo/Dailymotion → ExoPlayer). */
 object TmdbApi {
     private const val TAG = "GadirIPTV-Tmdb"
     private const val BASE = "https://api.themoviedb.org/3"
@@ -28,7 +28,7 @@ object TmdbApi {
     private val creditsCache = ConcurrentHashMap<String, List<CastMember>>()
     private val trailerCache = ConcurrentHashMap<String, TmdbTrailer>()
 
-    data class TmdbTrailer(val url: String, val site: String = "Vimeo")
+    data class TmdbTrailer(val site: String, val key: String)
 
     fun isConfigured(): Boolean =
         BuildConfig.TMDB_API_KEY.isNotBlank() || BuildConfig.TMDB_ACCESS_TOKEN.isNotBlank()
@@ -121,7 +121,7 @@ object TmdbApi {
         val year = extractYear(title, releaseDate)
         val cacheKey = "trailer|${if (isSeries) "tv" else "movie"}|$cleaned|$year|${tmdbId ?: 0}"
         trailerCache[cacheKey]?.let { cached ->
-            return cached.takeIf { it.url.isNotBlank() }
+            return cached.takeIf { it.key.isNotBlank() }
         }
 
         val contentId = tmdbId?.takeIf { it > 0 }
@@ -139,7 +139,19 @@ object TmdbApi {
         releaseDate: String = "",
         isSeries: Boolean = false,
         tmdbId: Int? = null,
-    ): String? = fetchTrailer(title, releaseDate, isSeries, tmdbId)?.url
+    ): String? {
+        val trailer = fetchTrailer(title, releaseDate, isSeries, tmdbId) ?: return null
+        return when {
+            trailer.site.equals("YouTube", ignoreCase = true) ->
+                "https://www.youtube.com/watch?v=${trailer.key}"
+            trailer.site.equals("Vimeo", ignoreCase = true) ->
+                "https://vimeo.com/${trailer.key}"
+            trailer.site.equals("Dailymotion", ignoreCase = true) ->
+                "https://www.dailymotion.com/video/${trailer.key}"
+            trailer.key.startsWith("http") -> trailer.key
+            else -> null
+        }
+    }
 
     private fun parseTrailer(body: String): TmdbTrailer? {
         return try {
@@ -152,10 +164,11 @@ object TmdbApi {
                 val key = obj.get("key")?.asString?.trim().orEmpty()
                 if (key.isBlank()) continue
                 val trailer = when {
-                    site.equals("Vimeo", ignoreCase = true) ->
-                        TmdbTrailer(url = "https://vimeo.com/$key", site = "Vimeo")
+                    site.equals("YouTube", ignoreCase = true) -> TmdbTrailer(site = "YouTube", key = key)
+                    site.equals("Vimeo", ignoreCase = true) -> TmdbTrailer(site = "Vimeo", key = key)
+                    site.equals("Dailymotion", ignoreCase = true) -> TmdbTrailer(site = "Dailymotion", key = key)
                     site.equals("Direct", ignoreCase = true) && key.startsWith("http") ->
-                        TmdbTrailer(url = key, site = "Direct")
+                        TmdbTrailer(site = "Direct", key = key)
                     else -> null
                 } ?: continue
                 if (type.contains("trailer") || type.contains("teaser")) return trailer

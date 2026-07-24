@@ -11,7 +11,7 @@ object TrailerAvailability {
     fun resolveLocal(title: String, serverUrl: String = ""): TrailerMatch? {
         if (serverUrl.isNotBlank()) {
             MetaExtractor.normalizeTrailerUrl(serverUrl)?.let {
-                if (!isBlockedUrl(it)) return TrailerMatch(it, title)
+                return TrailerMatch(it, title)
             }
         }
         val sources = TrailerResolver.resolveAll(serverUrl, title)
@@ -37,11 +37,4 @@ object TrailerAvailability {
         isSeries: Boolean = false,
         releaseDate: String = "",
     ): Boolean = resolve(title, serverUrl, isSeries, releaseDate) != null
-
-    private fun isBlockedUrl(url: String): Boolean {
-        val lower = url.lowercase()
-        return lower.contains("youtube.com") ||
-            lower.contains("youtu.be") ||
-            lower.contains("youtube-nocookie.com")
-    }
 }

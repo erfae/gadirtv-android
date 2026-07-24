@@ -16,15 +16,16 @@ import com.gadir.tv.data.TmdbApi
 import com.gadir.tv.player.PlayerFactory
 import com.gadir.tv.ui.BaseLocaleActivity
 import com.gadir.tv.util.DeviceUi
-import com.gadir.tv.util.MetaExtractor
+import com.gadir.tv.util.DailymotionStreamResolver
 import com.gadir.tv.util.TrailerResolver
 import com.gadir.tv.util.TrailerSource
+import com.gadir.tv.util.TrailerStreamResolver
 import com.gadir.tv.util.VimeoStreamResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** ExoPlayer-only trailer playback — no YouTube, no WebView. */
+/** ExoPlayer-only trailers — no YouTube app, no WebView. Streams resolved to direct MP4/HLS. */
 class TrailerActivity : BaseLocaleActivity() {
     private lateinit var playerView: PlayerView
     private lateinit var statusView: TextView
@@ -39,6 +40,7 @@ class TrailerActivity : BaseLocaleActivity() {
     private var sources: List<TrailerSource> = emptyList()
     private var sourceIndex = 0
     private var tmdbLookupStarted = false
+    private var playbackStartedOnce = false
     private var isSeriesContent = false
     private var releaseDateHint = ""
     private var tmdbContentId = 0
@@ -68,18 +70,15 @@ class TrailerActivity : BaseLocaleActivity() {
         btnRetry.visibility = View.GONE
         btnBack.requestFocus()
 
-        lookupTmdbTrailer(title, preferFirst = true, startWhenReady = true)
+        if (sources.isNotEmpty()) {
+            startCurrentSource()
+        }
+        lookupTmdbTrailer(title, preferFirst = true)
     }
 
-    private fun lookupTmdbTrailer(
-        title: String,
-        preferFirst: Boolean = false,
-        startWhenReady: Boolean = false,
-    ) {
+    private fun lookupTmdbTrailer(title: String, preferFirst: Boolean = false) {
         if (title.isBlank() || tmdbLookupStarted || !TmdbApi.isConfigured()) {
-            if (startWhenReady) {
-                if (sources.isNotEmpty()) startCurrentSource() else showFailed()
-            }
+            if (sources.isEmpty() && !playbackStartedOnce) showFailed()
             return
         }
         tmdbLookupStarted = true
@@ -94,21 +93,16 @@ class TrailerActivity : BaseLocaleActivity() {
                 )
             }
             if (isFinishing) return@launch
-            val tmdbSources = tmdbTrailer?.let { trailer ->
-                TrailerResolver.resolveAll(trailer.url, lookupTitle)
+            val tmdbSources = tmdbTrailer?.let {
+                TrailerResolver.resolveFromTmdb(it.site, it.key)
             }.orEmpty()
-            if (tmdbSources.isNotEmpty()) {
-                sources = if (preferFirst) {
-                    (tmdbSources + sources).distinct()
-                } else {
-                    (sources + tmdbSources).distinct()
-                }
-            }
-            if (sources.isEmpty()) {
-                showFailed()
+            if (tmdbSources.isEmpty()) {
+                if (sources.isEmpty() && !playbackStartedOnce) showFailed()
                 return@launch
             }
-            if (startWhenReady || !playbackStarted) {
+            val hadSources = sources.isNotEmpty()
+            sources = mergeSources(preferFirst, tmdbSources, sources)
+            if (!hadSources && !playbackStartedOnce) {
                 sourceIndex = 0
                 startCurrentSource()
             }
@@ -127,8 +121,16 @@ class TrailerActivity : BaseLocaleActivity() {
         return super.dispatchKeyEvent(event)
     }
 
+    private fun mergeSources(preferFirst: Boolean, vararg lists: List<TrailerSource>): List<TrailerSource> {
+        val merged = LinkedHashSet<TrailerSource>()
+        val ordered = if (preferFirst) lists.toList() else lists.reversed()
+        ordered.forEach { merged.addAll(it) }
+        return merged.toList()
+    }
+
     private fun retryPlayback() {
         sourceIndex = 0
+        playbackStartedOnce = false
         releasePlayer()
         startCurrentSource()
     }
@@ -160,16 +162,16 @@ class TrailerActivity : BaseLocaleActivity() {
     private fun resolvePlayableUrl(source: TrailerSource): String? {
         return when (source) {
             is TrailerSource.DirectVideo -> source.url
-            is TrailerSource.Vimeo -> VimeoStreamResolver.directPlayUrl(source.videoId)
-                ?: VimeoStreamResolver.directPlayUrl(source.pageUrl)
-            is TrailerSource.ExternalLink -> {
-                if (MetaExtractor.isDirectVideoUrl(source.url)) return source.url
-                VimeoStreamResolver.directPlayUrl(source.url)
-            }
+            is TrailerSource.StreamVideo -> TrailerStreamResolver.directPlayUrl(source.videoId)
+            is TrailerSource.Vimeo ->
+                VimeoStreamResolver.directPlayUrl(source.videoId)
+                    ?: VimeoStreamResolver.directPlayUrl(source.pageUrl)
+            is TrailerSource.Dailymotion -> DailymotionStreamResolver.directPlayUrl(source.videoId)
         }
     }
 
     private fun playDirectVideo(url: String) {
+        playbackStartedOnce = true
         if (DeviceUi.isTvUi(this)) {
             trailerHeader.visibility = View.GONE
             playerView.useController = true

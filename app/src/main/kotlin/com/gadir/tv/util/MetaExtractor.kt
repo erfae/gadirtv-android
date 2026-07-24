@@ -472,10 +472,13 @@ object MetaExtractor {
         val value = raw?.trim().orEmpty()
         if (value.isEmpty() || isImageUrl(value)) return null
         if (isDirectVideoUrl(value)) return value
-        val lower = value.lowercase()
-        if (lower.contains("youtube.com") || lower.contains("youtu.be")) return null
+        if (YoutubeTrailerHelper.extractId(value) != null) return value
         if (VimeoStreamResolver.extractId(value) != null) return value
+        if (DailymotionStreamResolver.extractId(value) != null) return value
         if (value.startsWith("http")) return value
+        if (value.length in 8..15 && value.all { it.isLetterOrDigit() || it == '-' || it == '_' }) {
+            return "https://www.youtube.com/watch?v=$value"
+        }
         return null
     }
 
