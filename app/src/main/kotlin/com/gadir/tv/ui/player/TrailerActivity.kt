@@ -15,13 +15,13 @@ import com.gadir.tv.R
 import com.gadir.tv.data.TmdbApi
 import com.gadir.tv.player.PlayerFactory
 import com.gadir.tv.ui.BaseLocaleActivity
-import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.DailymotionStreamResolver
 import com.gadir.tv.util.TrailerResolver
 import com.gadir.tv.util.TrailerSearch
 import com.gadir.tv.util.TrailerSource
 import com.gadir.tv.util.TrailerStreamResolver
 import com.gadir.tv.util.VimeoStreamResolver
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -51,6 +51,7 @@ class TrailerActivity : BaseLocaleActivity() {
     private var contentTitle = ""
     private var lastPlayableUrl = ""
     private var endMenuVisible = false
+    private val resolvedUrlCache = ConcurrentHashMap<Int, String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,6 +72,11 @@ class TrailerActivity : BaseLocaleActivity() {
         btnTrailerReplay = findViewById(R.id.btnTrailerReplay)
         btnTrailerExit = findViewById(R.id.btnTrailerExit)
         playerView = findViewById(R.id.trailerPlayerView)
+        playerView.useController = false
+        playerView.setControllerAutoShow(false)
+        playerView.controllerHideOnTouch = true
+        playerView.isFocusable = false
+        playerView.isFocusableInTouchMode = false
         findViewById<View>(R.id.trailerWebView).visibility = View.GONE
 
         sources = TrailerResolver.resolveAll(rawUrl, contentTitle)
@@ -83,10 +89,11 @@ class TrailerActivity : BaseLocaleActivity() {
         trailerEndOverlay.visibility = View.GONE
         btnBack.requestFocus()
 
+        prefetchAllSources()
+        lookupRemoteTrailers()
         if (sources.isNotEmpty()) {
             startCurrentSource()
         }
-        lookupRemoteTrailers()
     }
 
     private fun lookupRemoteTrailers() {
@@ -116,9 +123,20 @@ class TrailerActivity : BaseLocaleActivity() {
             }
             val hadSources = sources.isNotEmpty()
             sources = mergeSources(remoteSources, sources)
+            prefetchAllSources()
             if (!hadSources && !playbackStartedOnce) {
                 sourceIndex = 0
                 startCurrentSource()
+            }
+        }
+    }
+
+    private fun prefetchAllSources() {
+        val snapshot = sources
+        lifecycleScope.launch(Dispatchers.IO) {
+            snapshot.forEachIndexed { index, source ->
+                if (resolvedUrlCache.containsKey(index)) return@forEachIndexed
+                resolvePlayableUrl(source)?.let { resolvedUrlCache[index] = it }
             }
         }
     }
@@ -129,19 +147,11 @@ class TrailerActivity : BaseLocaleActivity() {
     }
 
     override fun onBackPressed() {
-        if (endMenuVisible) {
-            closeTrailer()
-            return
-        }
         closeTrailer()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_BACK) {
-            if (endMenuVisible) {
-                closeTrailer()
-                return true
-            }
             closeTrailer()
             return true
         }
@@ -159,7 +169,9 @@ class TrailerActivity : BaseLocaleActivity() {
         sourceIndex = 0
         playbackStartedOnce = false
         lastPlayableUrl = ""
+        resolvedUrlCache.clear()
         releasePlayer()
+        prefetchAllSources()
         startCurrentSource()
     }
 
@@ -170,7 +182,7 @@ class TrailerActivity : BaseLocaleActivity() {
             player.seekTo(0)
             player.playWhenReady = true
             playbackStarted = true
-            playerView.requestFocus()
+            hidePlayerChrome()
             return
         }
         if (lastPlayableUrl.isNotBlank()) {
@@ -184,6 +196,7 @@ class TrailerActivity : BaseLocaleActivity() {
         endMenuVisible = true
         exoPlayer?.pause()
         playerView.useController = false
+        playerView.hideController()
         trailerEndOverlay.visibility = View.VISIBLE
         btnTrailerReplay.requestFocus()
     }
@@ -205,9 +218,16 @@ class TrailerActivity : BaseLocaleActivity() {
         btnRetry.visibility = View.GONE
         scheduleLoadTimeout()
 
+        resolvedUrlCache[sourceIndex]?.let { cached ->
+            playDirectVideo(cached)
+            return
+        }
+
         lifecycleScope.launch {
             val directUrl = withContext(Dispatchers.IO) {
-                resolvePlayableUrl(sources[sourceIndex])
+                resolvePlayableUrl(sources[sourceIndex])?.also {
+                    resolvedUrlCache[sourceIndex] = it
+                }
             }
             if (isFinishing) return@launch
             if (directUrl.isNullOrBlank()) {
@@ -233,22 +253,20 @@ class TrailerActivity : BaseLocaleActivity() {
         playbackStartedOnce = true
         lastPlayableUrl = url
         hideTrailerEndMenu()
-        if (DeviceUi.isTvUi(this)) {
-            trailerHeader.visibility = View.GONE
-            playerView.useController = true
-            playerView.controllerShowTimeoutMs = 0
-            playerView.controllerHideOnTouch = false
-        }
+        trailerHeader.visibility = View.GONE
+        playerView.useController = false
+        playerView.hideController()
         playerView.visibility = View.VISIBLE
         releasePlayer()
         exoPlayer = PlayerFactory.create(this).also { player ->
             playerView.player = player
             player.addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(state: Int) {
-                    if (state == Player.STATE_READY && player.isPlaying) {
-                        markPlaybackStarted()
-                    } else if (state == Player.STATE_ENDED) {
-                        showTrailerEndMenu()
+                    when (state) {
+                        Player.STATE_READY -> {
+                            if (player.isPlaying) markPlaybackStarted()
+                        }
+                        Player.STATE_ENDED -> showTrailerEndMenu()
                     }
                 }
 
@@ -261,7 +279,14 @@ class TrailerActivity : BaseLocaleActivity() {
             player.playWhenReady = true
         }
         enterImmersiveMode()
-        playerView.requestFocus()
+    }
+
+    private fun hidePlayerChrome() {
+        playerView.useController = false
+        playerView.hideController()
+        trailerHeader.visibility = View.GONE
+        statusView.visibility = View.GONE
+        enterImmersiveMode()
     }
 
     private fun advancePlayback() {
@@ -284,10 +309,8 @@ class TrailerActivity : BaseLocaleActivity() {
     private fun markPlaybackStarted() {
         playbackStarted = true
         cancelLoadTimeout()
-        statusView.visibility = View.GONE
+        hidePlayerChrome()
         btnRetry.visibility = View.GONE
-        trailerHeader.visibility = View.GONE
-        enterImmersiveMode()
     }
 
     private fun showFailed() {
@@ -310,6 +333,7 @@ class TrailerActivity : BaseLocaleActivity() {
         }
         exoPlayer = null
         playerView.player = null
+        playerView.hideController()
     }
 
     private fun scheduleLoadTimeout() {

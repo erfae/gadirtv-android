@@ -9,12 +9,12 @@
         android:id="@+id/trailerPlayerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
+        android:focusable="false"
+        android:focusableInTouchMode="false"
         android:visibility="gone"
         app:resize_mode="fit"
         app:show_buffering="when_playing"
-        app:use_controller="true" />
+        app:use_controller="false" />
 
     <WebView
         android:id="@+id/trailerWebView"

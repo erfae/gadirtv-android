@@ -105,8 +105,8 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
         private const val CHANNEL_PREVIEW_DELAY_MS = 0L
-        private const val PREVIEW_DEBOUNCE_MS = 260L
-        private const val PREVIEW_ZAP_DELAY_MS = 140L
+        private const val PREVIEW_DEBOUNCE_MS = 60L
+        private const val PREVIEW_ZAP_DELAY_MS = 40L
         private const val PREVIEW_TIMEOUT_MS = 6_000L
         private const val PREVIEW_RETRY_DELAY_MS = 600L
         private const val PREVIEW_RETRY_MAX_CYCLES = 2
@@ -114,7 +114,7 @@ class MainActivity : BaseLocaleActivity() {
         private const val PREVIEW_STALL_TIMEOUT_MS = 14_000L
         private const val PREVIEW_SURFACE_MAX_ATTEMPTS = 4
         private const val CATALOG_PREFETCH_DELAY_MS = 400L
-        private const val EPG_DEBOUNCE_MS = 500L
+        private const val EPG_DEBOUNCE_MS = 0L
         private const val EPG_FOCUS_DELAY_MS = 0L
         private const val FULLSCREEN_LAUNCH_DELAY_MS = 700L
         private const val LIVE_VLC_COOLDOWN_MS = 600L
@@ -5047,7 +5047,7 @@ class MainActivity : BaseLocaleActivity() {
         pendingEpg = null
     }
 
-    /** Debounced EPG on channel focus (NetTV epgTimer ~500 ms). No live stream URL. */
+    /** EPG on channel focus — fast debounce, never cancelled by preview start. */
     private fun scheduleDebouncedEpg(channel: LiveChannel) {
         EpgCache.get(channel.streamId)?.takeIf { it.isNotEmpty() }?.let { cached ->
             applyEpg(channel, cached)
@@ -5077,41 +5077,11 @@ class MainActivity : BaseLocaleActivity() {
             }
         }
         pendingEpg = task
-        previewHandler.postDelayed(task, EPG_DEBOUNCE_MS)
-    }
-
-    /** Load EPG only for the channel whose preview stream is actually playing. */
-    private fun scheduleEpgForPlayingChannel() {
-        val channel = currentPreviewChannel ?: return
-        if (epgFocusStreamId == channel.streamId && EpgCache.get(channel.streamId) != null) return
-        epgFocusStreamId = channel.streamId
-        cancelEpgLoad()
-        val streamId = channel.streamId
-        val task = Runnable {
-            if (currentPreviewChannel?.streamId != streamId || !previewIsSettled()) return@Runnable
-            val profile = PlaylistRepository.profile ?: return@Runnable
-            val token = epgLoadToken
-            epgLoadJob = lifecycleScope.launch {
-                if (token != epgLoadToken) return@launch
-                if (currentPreviewChannel?.streamId != streamId || !previewIsSettled()) return@launch
-                val epg = withContext(Dispatchers.IO) {
-                    api.shortEpgFast(
-                        profile,
-                        streamId = streamId,
-                        epgChannelId = channel.epgChannelId,
-                        limit = 6,
-                    )
-                }
-                if (token != epgLoadToken) return@launch
-                if (currentPreviewChannel?.streamId != streamId) return@launch
-                if (epg.isNotEmpty()) {
-                    EpgCache.put(streamId, epg)
-                }
-                applyEpg(channel, epg)
-            }
+        if (EPG_DEBOUNCE_MS <= 0L) {
+            previewHandler.post(task)
+        } else {
+            previewHandler.postDelayed(task, EPG_DEBOUNCE_MS)
         }
-        pendingEpg = task
-        previewHandler.post(task)
     }
 
     private fun cancelMiniPreviewPlayback() {
@@ -5795,7 +5765,6 @@ class MainActivity : BaseLocaleActivity() {
                 if (DeviceUi.useDpadFocus(this)) showMiniPreviewControls()
                 notePreviewPlaybackProgress()
                 armPreviewStallWatchdog()
-                scheduleEpgForPlayingChannel()
             },
         )
     }
@@ -5832,7 +5801,6 @@ class MainActivity : BaseLocaleActivity() {
                 if (DeviceUi.useDpadFocus(this)) showMiniPreviewControls()
                 notePreviewPlaybackProgress()
                 armPreviewStallWatchdog()
-                scheduleEpgForPlayingChannel()
             },
         )
     }
