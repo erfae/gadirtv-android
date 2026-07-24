@@ -102,7 +102,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
         allPlaybackUrls.add(url)
         pendingUrls.add(url)
         intent.getStringArrayListExtra(EXTRA_ALTERNATE_URLS)?.forEach { alt ->
-            if (alt.isNotBlank() && alt !in allPlaybackUrls) {
+            if (alt.isNotBlank() && alt !in allPlaybackUrls && pendingUrls.size < 2) {
                 allPlaybackUrls.add(alt)
                 pendingUrls.add(alt)
             }
@@ -633,7 +633,7 @@ class VlcPlayerActivity : BaseLocaleActivity() {
             LiveStreamUrls.candidates(api, profile, channel)
         }
         pendingUrls.clear()
-        pendingUrls.addAll(urls)
+        pendingUrls.addAll(urls.filter { it.isNotBlank() }.distinct().take(2))
         playUrl(urls.first(), stopDelayMs = ZAP_RECONNECT_DELAY_MS)
         showControls()
     }

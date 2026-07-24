@@ -132,6 +132,7 @@ class MainActivity : BaseLocaleActivity() {
     private var channelAdapter: ChannelAdapter? = null
     private var currentPreviewChannel: LiveChannel? = null
     private var previewingStreamId: Int? = null
+    private var previewFocusStreamId = 0
     private var previewLogoStreamId = 0
     private var previewUrls = listOf<String>()
     private var previewUrlIndex = 0
@@ -1208,6 +1209,10 @@ class MainActivity : BaseLocaleActivity() {
         lifecycleScope.launch {
             val batchSize = 24
             channelBatch.chunked(batchSize).forEach { chunk ->
+                if (com.gadir.tv.data.LivePlaybackGate.isLivePlaybackActive()) {
+                    com.gadir.tv.data.LivePlaybackGate.awaitIdle()
+                }
+                if (isDestroyed) return@launch
                 withContext(Dispatchers.IO) {
                     coroutineScope {
                         val semaphore = Semaphore(8)
@@ -4783,6 +4788,8 @@ class MainActivity : BaseLocaleActivity() {
         livePreviewPaused = false
         updatePreviewInfo(channel)
         if (reloadingChannels) return
+        if (channel.streamId == previewFocusStreamId && pendingPreview != null) return
+        previewFocusStreamId = channel.streamId
         schedulePreviewPlayback(channel)
     }
 
@@ -4796,6 +4803,7 @@ class MainActivity : BaseLocaleActivity() {
         miniVlcPlayer?.stop()
         miniExoPlayer?.stop()
         previewWorkingUrl = null
+        previewingStreamId = null
         setPreviewVideoVisible(false)
     }
 
@@ -5110,6 +5118,7 @@ class MainActivity : BaseLocaleActivity() {
             0
         }
         armPreviewTimeout(token)
+        acquirePreviewGate()
         try {
             if (usesExoPreview()) {
                 miniExoPlayer?.play(url, volume)
@@ -5226,17 +5235,13 @@ class MainActivity : BaseLocaleActivity() {
             LiveStreamUrls.candidates(api, profile, channel)
         }
         val urls = if (handedOffUrl != null) {
-            buildList {
-                add(handedOffUrl)
-                addAll(previewUrlSnapshot)
-                addAll(previewCandidates)
-            }.filter { it.isNotBlank() }.distinct()
+            listOf(handedOffUrl).filter { it.isNotBlank() }.distinct()
         } else {
             buildList {
                 addAll(previewUrlSnapshot)
                 addAll(previewCandidates)
-                addAll(fallbackCandidates)
-            }.filter { it.isNotBlank() }.distinct()
+                if (isEmpty()) addAll(fallbackCandidates.take(1))
+            }.filter { it.isNotBlank() }.distinct().take(2)
         }
         if (urls.isEmpty()) {
             Toast.makeText(this, R.string.connection_failed, Toast.LENGTH_SHORT).show()
