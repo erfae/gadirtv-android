@@ -101,7 +101,7 @@ object VodDetailUi {
             castMembers.any { it.name.isNotBlank() } ->
                 castMembers
                     .filter { it.name.isNotBlank() }
-                    .sortedByDescending { it.imageUrl.isNotBlank() }
+                    .sortedByDescending { TmdbApi.isTrustedCastPhoto(it.imageUrl) }
             fallbackCast.isNotBlank() ->
                 fallbackCast.split(",")
                     .map { it.trim() }
@@ -141,7 +141,7 @@ object VodDetailUi {
         onCastMoveDown: (() -> Unit)? = null,
     ) {
         if (!TmdbApi.isConfigured()) return
-        val needsEnrich = members.any { it.name.isNotBlank() && it.imageUrl.isBlank() }
+        val needsEnrich = members.any { it.name.isNotBlank() && !TmdbApi.isTrustedCastPhoto(it.imageUrl) }
         val needsFetch = members.none { it.name.isNotBlank() } && fallbackCast.isNotBlank()
         if (!needsEnrich && !needsFetch) return
         scope.launch {

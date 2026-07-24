@@ -13,6 +13,7 @@ object TrailerLauncher {
         title: String = "",
         isSeries: Boolean = false,
         releaseDate: String = "",
+        tmdbId: Int = 0,
     ) {
         val hasPanelUrl = rawUrl.isNotBlank() && TrailerResolver.resolveAll(rawUrl, title).isNotEmpty()
         if (!hasPanelUrl && title.isBlank()) {
@@ -30,6 +31,7 @@ object TrailerLauncher {
                 title = title,
                 isSeries = isSeries,
                 releaseDate = releaseDate,
+                tmdbId = tmdbId,
             ),
         )
     }

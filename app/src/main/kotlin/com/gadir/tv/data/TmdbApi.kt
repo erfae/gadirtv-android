@@ -31,13 +31,32 @@ object TmdbApi {
     fun isConfigured(): Boolean =
         BuildConfig.TMDB_API_KEY.isNotBlank() || BuildConfig.TMDB_ACCESS_TOKEN.isNotBlank()
 
-    fun cleanTitle(title: String): String =
-        title
+    fun cleanTitle(title: String): String {
+        var cleaned = title
             .substringBefore("(")
-            .substringBefore("|")
             .replace(Regex("\\s*[-–—]\\s*\\d{4}\\s*$"), "")
             .replace(Regex("\\s+"), " ")
             .trim()
+        if ('|' in cleaned) {
+            val left = cleaned.substringBefore('|').trim()
+            val right = cleaned.substringAfter('|').trim()
+            cleaned = when {
+                right.isBlank() -> left
+                left.length <= 4 || left.matches(Regex("(?i)(es|en|fr|de|it|pt|4k|hd|fhd|uhd|lat|sub|dub|vod|tv).*")) -> right
+                else -> left
+            }
+        }
+        return cleaned.trim()
+    }
+
+    fun isTrustedCastPhoto(url: String): Boolean {
+        val trimmed = url.trim()
+        if (trimmed.isBlank()) return false
+        val lower = trimmed.lowercase()
+        return lower.contains("image.tmdb.org") ||
+            lower.contains("themoviedb.org") ||
+            (lower.startsWith("https://") && !lower.contains("/images/") && !lower.contains("xtream"))
+    }
 
     fun extractYear(title: String, releaseDate: String = ""): String? {
         releaseDate.trim().take(4).takeIf { it.length == 4 && it.all(Char::isDigit) }?.let { return it }
@@ -72,20 +91,27 @@ object TmdbApi {
         if (photos.isEmpty()) return members
 
         return members.map { member ->
-            if (member.imageUrl.isNotBlank()) return@map member
+            if (isTrustedCastPhoto(member.imageUrl)) return@map member
             val url = matchProfileUrl(member.name, photos) ?: return@map member
             member.copy(imageUrl = url)
         }
     }
 
-    fun trailerYoutubeId(title: String, releaseDate: String = "", isSeries: Boolean = false): String? {
+    fun trailerYoutubeId(
+        title: String,
+        releaseDate: String = "",
+        isSeries: Boolean = false,
+        tmdbId: Int? = null,
+    ): String? {
         if (!isConfigured() || title.isBlank()) return null
         val cleaned = cleanTitle(title)
         val year = extractYear(title, releaseDate)
-        val cacheKey = "trailer|${if (isSeries) "tv" else "movie"}|$cleaned|$year"
+        val cacheKey = "trailer|${if (isSeries) "tv" else "movie"}|$cleaned|$year|${tmdbId ?: 0}"
         trailerCache[cacheKey]?.let { return it.takeIf { id -> id.isNotBlank() } }
 
-        val contentId = searchContentId(cleaned, year.orEmpty(), isSeries) ?: return null
+        val contentId = tmdbId?.takeIf { it > 0 }
+            ?: searchContentId(cleaned, year.orEmpty(), isSeries)
+            ?: return null
         val path = if (isSeries) "tv/$contentId/videos" else "movie/$contentId/videos"
         val body = get("$BASE/$path") ?: return null
         val id = parseTrailerId(body)
