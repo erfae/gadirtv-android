@@ -498,8 +498,12 @@ class XtreamApi(
         limit: Int = 4,
     ): List<EpgEntry> {
         if (streamId <= 0 && epgChannelId.isBlank()) return emptyList()
-        // Prefer epg_channel_id — many panels only count stream_id URLs as live connections,
-        // not EPG lookups by epg id.
+        // Prefer stream_id — most Xtream panels map EPG listings by stream id.
+        if (streamId > 0) {
+            fetchEpgListingsFast(profile, mapOf("stream_id" to streamId.toString()), limit)
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { return it }
+        }
         if (epgChannelId.isNotBlank()) {
             fetchEpgListingsFast(profile, mapOf("epg_channel_id" to epgChannelId), limit)
                 ?.takeIf { it.isNotEmpty() }
@@ -507,13 +511,6 @@ class XtreamApi(
             fetchEpgListingsFast(profile, mapOf("channel_id" to epgChannelId), limit)
                 ?.takeIf { it.isNotEmpty() }
                 ?.let { return it }
-        }
-        if (streamId > 0) {
-            fetchEpgListingsFast(profile, mapOf("stream_id" to streamId.toString()), limit)
-                ?.takeIf { it.isNotEmpty() }
-                ?.let { return it }
-        }
-        if (epgChannelId.isNotBlank()) {
             fetchEpgListingsFast(profile, mapOf("stream_id" to epgChannelId), limit)
                 ?.takeIf { it.isNotEmpty() }
                 ?.let { return it }

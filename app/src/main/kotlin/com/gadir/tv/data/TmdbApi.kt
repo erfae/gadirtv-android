@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-/** TMDB lookups for cast photos and official YouTube trailers. Network calls are cached. */
+/** TMDB lookups for cast profile photos and official YouTube trailers. */
 object TmdbApi {
     private const val TAG = "GadirIPTV-Tmdb"
     private const val BASE = "https://api.themoviedb.org/3"
@@ -18,14 +18,14 @@ object TmdbApi {
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(6, TimeUnit.SECONDS)
-            .readTimeout(8, TimeUnit.SECONDS)
-            .writeTimeout(6, TimeUnit.SECONDS)
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(8, TimeUnit.SECONDS)
             .build()
     }
 
     private val searchCache = ConcurrentHashMap<String, Int>()
-    private val creditsCache = ConcurrentHashMap<String, Map<String, String>>()
+    private val creditsCache = ConcurrentHashMap<String, List<CastMember>>()
     private val trailerCache = ConcurrentHashMap<String, String>()
 
     fun isConfigured(): Boolean =
@@ -44,6 +44,21 @@ object TmdbApi {
         return Regex("(19|20)\\d{2}").findAll(title).map { it.value }.lastOrNull()
     }
 
+    /** Full cast list with photos from TMDB (used when the panel omits images). */
+    fun fetchCast(
+        title: String,
+        releaseDate: String,
+        isSeries: Boolean,
+        tmdbId: Int? = null,
+        limit: Int = 15,
+    ): List<CastMember> {
+        if (!isConfigured() || title.isBlank()) return emptyList()
+        val contentId = tmdbId?.takeIf { it > 0 }
+            ?: searchContentId(cleanTitle(title), releaseDate, isSeries)
+            ?: return emptyList()
+        return creditsFor(contentId, isSeries).take(limit)
+    }
+
     fun enrichCastMembers(
         members: List<CastMember>,
         title: String,
@@ -51,14 +66,9 @@ object TmdbApi {
         tmdbId: Int?,
         isSeries: Boolean,
     ): List<CastMember> {
-        if (members.isEmpty() || !isConfigured()) return members
-        if (members.all { it.imageUrl.isNotBlank() }) return members
-
-        val contentId = tmdbId?.takeIf { it > 0 }
-            ?: searchContentId(title, releaseDate, isSeries)
-            ?: return members
-
-        val photos = creditsFor(contentId, isSeries)
+        if (!isConfigured()) return members
+        val photos = fetchCast(title, releaseDate, isSeries, tmdbId)
+            .associate { normalizeName(it.name) to it.imageUrl }
         if (photos.isEmpty()) return members
 
         return members.map { member ->
@@ -89,8 +99,7 @@ object TmdbApi {
             var fallback: String? = null
             for (element in results) {
                 val obj = element.asJsonObject
-                val site = obj.get("site")?.asString?.equals("YouTube", ignoreCase = true) != true
-                if (site) continue
+                if (obj.get("site")?.asString?.equals("YouTube", ignoreCase = true) != true) continue
                 val type = obj.get("type")?.asString?.lowercase().orEmpty()
                 val key = obj.get("key")?.asString?.trim().orEmpty()
                 if (key.isBlank()) continue
@@ -130,34 +139,33 @@ object TmdbApi {
         }
     }
 
-    private fun creditsFor(contentId: Int, isSeries: Boolean): Map<String, String> {
+    private fun creditsFor(contentId: Int, isSeries: Boolean): List<CastMember> {
         val cacheKey = "${if (isSeries) "tv" else "movie"}|$contentId"
         creditsCache[cacheKey]?.let { return it }
 
         val path = if (isSeries) "tv/$contentId/credits" else "movie/$contentId/credits"
-        val body = get("$BASE/$path") ?: return emptyMap()
-        val photos = parseCredits(body)
-        if (photos.isNotEmpty()) creditsCache[cacheKey] = photos
-        return photos
+        val body = get("$BASE/$path") ?: return emptyList()
+        val cast = parseCreditsList(body)
+        if (cast.isNotEmpty()) creditsCache[cacheKey] = cast
+        return cast
     }
 
-    private fun parseCredits(body: String): Map<String, String> {
+    private fun parseCreditsList(body: String): List<CastMember> {
         return try {
-            val cast = JsonParser.parseString(body).asJsonObject.getAsJsonArray("cast") ?: return emptyMap()
-            buildMap {
-                for (element in cast) {
+            val arr = JsonParser.parseString(body).asJsonObject.getAsJsonArray("cast") ?: return emptyList()
+            buildList {
+                for (element in arr) {
                     val obj = element.asJsonObject
                     val name = obj.get("name")?.asString?.trim().orEmpty()
+                    if (name.isBlank()) continue
                     val profile = obj.get("profile_path")?.asString?.trim().orEmpty()
-                    if (name.isBlank() || profile.isBlank()) continue
-                    val key = normalizeName(name)
-                    if (key.isBlank() || key in this) continue
-                    put(key, "$IMAGE_BASE$profile")
+                    val image = if (profile.isNotBlank()) "$IMAGE_BASE$profile" else ""
+                    add(CastMember(name, image))
                 }
             }
         } catch (e: Exception) {
             Log.w(TAG, "credits parse failed: ${e.message}")
-            emptyMap()
+            emptyList()
         }
     }
 

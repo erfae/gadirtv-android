@@ -30,6 +30,7 @@ import com.gadir.tv.ui.detail.DetailTvNav
 import com.gadir.tv.util.ImageLoader
 import com.gadir.tv.util.DeviceUi
 import com.gadir.tv.util.RecyclerViewUtil
+import com.gadir.tv.data.TmdbApi
 import com.gadir.tv.util.TrailerLauncher
 import com.gadir.tv.util.TvFocusHelper
 import com.gadir.tv.util.TvNavHelper
@@ -48,6 +49,7 @@ class SeriesDetailActivity : BaseLocaleActivity() {
     private var seriesId = 0
     private var addedTimestamp = 0L
     private var trailerUrl = ""
+    private var releaseDate = ""
     private var loadToken = 0
     private var seasonAdapter: SeasonAdapter? = null
 
@@ -148,8 +150,15 @@ class SeriesDetailActivity : BaseLocaleActivity() {
     }
 
     private fun openTrailer() {
-        if (trailerUrl.isBlank()) return
-        TrailerLauncher.open(this, trailerUrl, findViewById<TextView>(R.id.seriesTitle).text.toString())
+        val title = findViewById<TextView>(R.id.seriesTitle).text.toString()
+        if (trailerUrl.isBlank() && !TmdbApi.isConfigured()) return
+        TrailerLauncher.open(
+            context = this,
+            rawUrl = trailerUrl,
+            title = title,
+            isSeries = true,
+            releaseDate = releaseDate,
+        )
     }
 
     private fun applyPlotCache() {
@@ -280,7 +289,9 @@ class SeriesDetailActivity : BaseLocaleActivity() {
             contentId = seriesId,
         )
         trailerUrl = detail.trailerUrl
-        btnSeriesTrailer.visibility = if (trailerUrl.isNotBlank()) View.VISIBLE else View.GONE
+        releaseDate = detail.releaseDate
+        btnSeriesTrailer.visibility =
+            if (trailerUrl.isNotBlank() || TmdbApi.isConfigured()) View.VISIBLE else View.GONE
         PlotCache.put(
             "series",
             seriesId,

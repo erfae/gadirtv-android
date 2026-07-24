@@ -105,7 +105,8 @@ class MainActivity : BaseLocaleActivity() {
         private const val HERO_ROTATE_MS = 10_000L
         private const val HERO_ROTATE_FIRST_MS = 10_000L
         private const val CHANNEL_PREVIEW_DELAY_MS = 0L
-        private const val PREVIEW_ZAP_DELAY_MS = 500L
+        private const val PREVIEW_DEBOUNCE_MS = 280L
+        private const val PREVIEW_ZAP_DELAY_MS = 120L
         private const val PREVIEW_TIMEOUT_MS = 6_000L
         private const val PREVIEW_RETRY_DELAY_MS = 600L
         private const val PREVIEW_RETRY_MAX_CYCLES = 2
@@ -113,7 +114,7 @@ class MainActivity : BaseLocaleActivity() {
         private const val PREVIEW_STALL_TIMEOUT_MS = 14_000L
         private const val PREVIEW_SURFACE_MAX_ATTEMPTS = 4
         private const val CATALOG_PREFETCH_DELAY_MS = 400L
-        private const val EPG_FOCUS_DELAY_MS = 0L
+        private const val EPG_FOCUS_DELAY_MS = 350L
         private const val FULLSCREEN_LAUNCH_DELAY_MS = 700L
         private const val LIVE_VLC_COOLDOWN_MS = 600L
     }
@@ -4836,9 +4837,9 @@ class MainActivity : BaseLocaleActivity() {
         }
         val token = previewToken
         val delayMs = when {
-            channelChanged -> PREVIEW_ZAP_DELAY_MS
+            channelChanged -> PREVIEW_DEBOUNCE_MS + PREVIEW_ZAP_DELAY_MS
             DeviceUi.useDpadFocus(this) -> CHANNEL_PREVIEW_DELAY_MS
-            usesExoPreview() -> 120L
+            usesExoPreview() -> PREVIEW_ZAP_DELAY_MS
             else -> 150L
         }
         val task = Runnable {
@@ -5012,7 +5013,7 @@ class MainActivity : BaseLocaleActivity() {
             val token = ++epgLoadToken
             lifecycleScope.launch {
                 val epg = withContext(Dispatchers.IO) {
-                    api.shortEpgFast(
+                    api.shortEpg(
                         profile,
                         streamId = streamId,
                         epgChannelId = channel.epgChannelId,
@@ -5730,7 +5731,6 @@ class MainActivity : BaseLocaleActivity() {
             onPlaying = {
                 if (!isLivePreviewContext()) return@LiveExoPreviewPlayer
                 if (previewPlaybackToken != previewToken) return@LiveExoPreviewPlayer
-                acquirePreviewGate()
                 cancelPreviewTimeout()
                 previewRetryCycleCount = 0
                 if (previewUrlIndex in previewUrls.indices) {
@@ -5766,7 +5766,6 @@ class MainActivity : BaseLocaleActivity() {
             onPlaying = {
                 if (!isLivePreviewContext()) return@LiveVlcPlayer
                 if (previewPlaybackToken != previewToken) return@LiveVlcPlayer
-                acquirePreviewGate()
                 cancelPreviewTimeout()
                 previewRetryCycleCount = 0
                 if (previewUrlIndex in previewUrls.indices) {

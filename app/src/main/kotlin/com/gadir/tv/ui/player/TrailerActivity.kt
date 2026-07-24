@@ -57,6 +57,8 @@ class TrailerActivity : BaseLocaleActivity() {
     private var currentYoutubeId: String? = null
     private var youtubeStreamTried = false
     private var tmdbLookupStarted = false
+    private var isSeriesContent = false
+    private var releaseDateHint = ""
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,6 +68,8 @@ class TrailerActivity : BaseLocaleActivity() {
 
         val rawUrl = intent.getStringExtra(EXTRA_URL).orEmpty()
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+        isSeriesContent = intent.getBooleanExtra(EXTRA_IS_SERIES, false)
+        releaseDateHint = intent.getStringExtra(EXTRA_RELEASE_DATE).orEmpty()
         findViewById<TextView>(R.id.trailerTitle).text = title
         statusView = findViewById(R.id.trailerStatus)
         btnBack = findViewById(R.id.btnTrailerBack)
@@ -90,17 +94,26 @@ class TrailerActivity : BaseLocaleActivity() {
             return
         }
 
-        lookupTmdbTrailer(title)
+        if (DeviceUi.isTvUi(this)) {
+            // On TV prefer TMDB + direct ExoPlayer stream; panel WebView embeds crash after a while.
+            lookupTmdbTrailer(title, preferFirst = true)
+        } else {
+            lookupTmdbTrailer(title)
+        }
         startCurrentSource()
     }
 
-    private fun lookupTmdbTrailer(title: String) {
+    private fun lookupTmdbTrailer(title: String, preferFirst: Boolean = false) {
         if (title.isBlank() || tmdbLookupStarted || !TmdbApi.isConfigured()) return
         tmdbLookupStarted = true
         lifecycleScope.launch {
             val lookupTitle = findViewById<TextView>(R.id.trailerTitle).text.toString()
             val youtubeId = withContext(Dispatchers.IO) {
-                TmdbApi.trailerYoutubeId(lookupTitle)
+                TmdbApi.trailerYoutubeId(
+                    title = lookupTitle,
+                    releaseDate = releaseDateHint,
+                    isSeries = isSeriesContent,
+                )
             }
             if (isFinishing) return@launch
             if (youtubeId.isNullOrBlank()) {
@@ -108,7 +121,12 @@ class TrailerActivity : BaseLocaleActivity() {
                 return@launch
             }
             if (sources.any { it is TrailerSource.Youtube && it.videoId == youtubeId }) return@launch
-            sources = listOf(TrailerSource.Youtube(youtubeId)) + sources
+            val tmdbSource = TrailerSource.Youtube(youtubeId)
+            sources = if (preferFirst) {
+                listOf(tmdbSource)
+            } else {
+                listOf(tmdbSource) + sources
+            }
             if (!playbackStarted) {
                 sourceIndex = 0
                 youtubeStep = 0
@@ -323,10 +341,16 @@ class TrailerActivity : BaseLocaleActivity() {
                 if (isFinishing) return@launch
                 if (direct != null) {
                     playDirectVideo(direct)
+                } else if (DeviceUi.isTvUi(this@TrailerActivity)) {
+                    advancePlayback()
                 } else {
                     playYoutubeEmbed(videoId)
                 }
             }
+            return
+        }
+        if (DeviceUi.isTvUi(this)) {
+            advancePlayback()
             return
         }
         playYoutubeEmbed(videoId)
@@ -592,14 +616,23 @@ class TrailerActivity : BaseLocaleActivity() {
     companion object {
         private const val EXTRA_URL = "trailer_url"
         private const val EXTRA_TITLE = "trailer_title"
+        private const val EXTRA_IS_SERIES = "trailer_is_series"
+        private const val EXTRA_RELEASE_DATE = "trailer_release_date"
         private const val LOAD_TIMEOUT_MS = 18_000L
         private const val YOUTUBE_STEPS_LAST = 6
         private const val EMBED_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 10; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-        fun intent(context: android.content.Context, url: String, title: String = "") =
-            android.content.Intent(context, TrailerActivity::class.java)
-                .putExtra(EXTRA_URL, url)
-                .putExtra(EXTRA_TITLE, title)
+        fun intent(
+            context: android.content.Context,
+            url: String,
+            title: String = "",
+            isSeries: Boolean = false,
+            releaseDate: String = "",
+        ) = android.content.Intent(context, TrailerActivity::class.java)
+            .putExtra(EXTRA_URL, url)
+            .putExtra(EXTRA_TITLE, title)
+            .putExtra(EXTRA_IS_SERIES, isSeries)
+            .putExtra(EXTRA_RELEASE_DATE, releaseDate)
     }
 }
