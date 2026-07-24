@@ -735,12 +735,21 @@ class PlayerActivity : BaseLocaleActivity() {
 
     override fun onStop() {
         saveProgress()
-        if (isLive) {
-            stopLivePlaybackNow()
-        } else {
-            player?.pause()
+        when {
+            isLive -> stopLivePlaybackNow()
+            isFinishing -> stopVodPlaybackNow()
+            else -> player?.pause()
         }
         super.onStop()
+    }
+
+    private fun stopVodPlaybackNow() {
+        try {
+            player?.playWhenReady = false
+            player?.stop()
+            player?.clearMediaItems()
+        } catch (_: Throwable) {
+        }
     }
 
     private fun stopLivePlaybackNow() {

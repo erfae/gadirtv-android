@@ -12,6 +12,7 @@ import com.gadir.tv.util.ImageLoader
 
 class CastMemberAdapter(
     private val items: List<CastMember>,
+    private val displayOnly: Boolean = false,
     private val onMoveUp: (() -> Unit)? = null,
     private val onMoveDown: (() -> Unit)? = null,
 ) : RecyclerView.Adapter<CastMemberAdapter.Holder>() {
@@ -30,9 +31,15 @@ class CastMemberAdapter(
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val item = items[position]
         holder.name.text = item.name
-        val avatarSize = (56 * holder.itemView.resources.displayMetrics.density).toInt()
+        val avatarSize = (48 * holder.itemView.resources.displayMetrics.density).toInt()
         holder.avatar.visibility = View.VISIBLE
         ImageLoader.loadCastAvatar(holder.avatar, item.imageUrl, avatarSize, item.name)
+
+        if (displayOnly) {
+            holder.itemView.isFocusable = false
+            holder.itemView.isFocusableInTouchMode = false
+            return
+        }
 
         val list = holder.itemView.parent as? RecyclerView
         if (list != null) {

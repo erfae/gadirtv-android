@@ -76,22 +76,8 @@ class MovieDetailActivity : BaseLocaleActivity() {
         castList = findViewById(R.id.movieCastList)
 
         btnMoviePlay.setOnClickListener { playMovie() }
-        TvFocusHelper.bindButton(btnMoviePlay, onActivate = { playMovie() }, onMoveDown = {
-            if (com.gadir.tv.util.DeviceUi.useDpadFocus(this) &&
-                castList.visibility == View.VISIBLE &&
-                (castList.adapter?.itemCount ?: 0) > 0
-            ) {
-                DetailTvNav.focusFirst(castList)
-            }
-        })
-        TvFocusHelper.bindButton(btnMovieTrailer, onActivate = { openTrailer() }, onMoveDown = {
-            if (com.gadir.tv.util.DeviceUi.useDpadFocus(this) &&
-                castList.visibility == View.VISIBLE &&
-                (castList.adapter?.itemCount ?: 0) > 0
-            ) {
-                DetailTvNav.focusFirst(castList)
-            }
-        })
+        TvFocusHelper.bindButton(btnMoviePlay, onActivate = { playMovie() })
+        TvFocusHelper.bindButton(btnMovieTrailer, onActivate = { openTrailer() })
         bindFavoriteButton()
         findViewById<ImageView>(R.id.btnMovieBack).apply {
             setOnClickListener { finish() }

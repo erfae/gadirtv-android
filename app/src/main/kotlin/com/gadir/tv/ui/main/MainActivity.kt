@@ -1501,6 +1501,7 @@ class MainActivity : BaseLocaleActivity() {
         pendingPreview = null
         cancelPreviewTimeout()
         disarmPreviewStallWatchdog()
+        releasePreviewGate()
         teardownLivePreviewPlayback()
         detachPreviewPlayersFromSurface()
         setPreviewVideoVisible(false)
@@ -4701,6 +4702,7 @@ class MainActivity : BaseLocaleActivity() {
         pendingPreview?.let { previewHandler.removeCallbacks(it) }
         pendingPreview = null
         disarmPreviewStallWatchdog()
+        releasePreviewGate()
         previewToken++
         miniVlcPlayer?.stop()
         miniExoPlayer?.stop()
@@ -4878,10 +4880,10 @@ class MainActivity : BaseLocaleActivity() {
             if (currentPreviewChannel?.streamId != channel.streamId) return@Runnable
             if (parentalStore.requiresPinForChannel(channel, selectedLiveCategoryId)) {
                 withChannelAccess(channel) {
-                    if (token == previewToken) previewChannel(channel, token)
+                    if (token == previewToken) previewChannel(channel, token, forcePlay = immediate)
                 }
             } else {
-                previewChannel(channel, token)
+                previewChannel(channel, token, forcePlay = immediate)
             }
         }
         pendingPreview = task
@@ -4898,6 +4900,7 @@ class MainActivity : BaseLocaleActivity() {
 
     private fun showNoSignal() {
         cancelPreviewTimeout()
+        releasePreviewGate()
         previewWorkingUrl = null
         setPreviewVideoVisible(false)
         panelLive?.findViewById<View>(R.id.miniNoSignal)?.visibility = View.VISIBLE
@@ -5047,7 +5050,10 @@ class MainActivity : BaseLocaleActivity() {
 
     /** Debounced EPG on channel focus (NetTV epgTimer ~500 ms). No live stream URL. */
     private fun scheduleDebouncedEpg(channel: LiveChannel) {
-        if (EpgCache.get(channel.streamId)?.isNotEmpty() == true) return
+        EpgCache.get(channel.streamId)?.takeIf { it.isNotEmpty() }?.let { cached ->
+            applyEpg(channel, cached)
+            return
+        }
         cancelEpgLoad()
         val streamId = channel.streamId
         val epgId = channel.epgChannelId
@@ -5113,7 +5119,7 @@ class MainActivity : BaseLocaleActivity() {
         teardownLivePreviewPlayback()
     }
 
-    private fun previewChannel(channel: LiveChannel, token: Int) {
+    private fun previewChannel(channel: LiveChannel, token: Int, forcePlay: Boolean = false) {
         if (token != previewToken || livePreviewPaused) return
         val profile = PlaylistRepository.profile ?: return
         runWhenPreviewSurfaceReady {
@@ -5122,13 +5128,18 @@ class MainActivity : BaseLocaleActivity() {
                 if (token == previewToken) showNoSignal()
                 return@runWhenPreviewSurfaceReady
             }
-            startPreviewPlayback(channel, token, profile)
+            startPreviewPlayback(channel, token, profile, forcePlay)
         }
     }
 
-    private fun startPreviewPlayback(channel: LiveChannel, token: Int, profile: Profile) {
+    private fun startPreviewPlayback(
+        channel: LiveChannel,
+        token: Int,
+        profile: Profile,
+        forcePlay: Boolean = false,
+    ) {
         if (token != previewToken || livePreviewPaused) return
-        if (!appSettings.autoplayPreview) {
+        if (!appSettings.autoplayPreview && !forcePlay) {
             cancelMiniPreviewPlayback()
             setPreviewVideoVisible(false)
             return
@@ -5181,6 +5192,7 @@ class MainActivity : BaseLocaleActivity() {
                 miniVlcPlayer?.play(url, volume)
             }
         } catch (_: Throwable) {
+            releasePreviewGate()
             if (token == previewToken && !tryNextPreviewUrl(token)) {
                 showNoSignal()
             }

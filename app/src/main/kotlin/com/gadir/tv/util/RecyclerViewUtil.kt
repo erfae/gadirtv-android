@@ -43,6 +43,42 @@ object RecyclerViewUtil {
         list.requestLayout()
     }
 
+    /** Grid cast list inside ScrollView — measure all rows so nothing is clipped. */
+    fun expandCastGrid(list: RecyclerView, columns: Int) {
+        list.isNestedScrollingEnabled = false
+        list.post {
+            val adapter = list.adapter ?: return@post
+            if (adapter.itemCount == 0) {
+                list.visibility = View.GONE
+                return@post
+            }
+            list.visibility = View.VISIBLE
+            val width = list.width.takeIf { it > 0 } ?: list.resources.displayMetrics.widthPixels
+            val cellWidth = width / columns.coerceAtLeast(1)
+            var rowHeight = 0
+            var totalHeight = list.paddingTop + list.paddingBottom
+            for (i in 0 until adapter.itemCount) {
+                val holder = adapter.createViewHolder(list, adapter.getItemViewType(i))
+                adapter.onBindViewHolder(holder, i)
+                holder.itemView.measure(
+                    View.MeasureSpec.makeMeasureSpec(cellWidth, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                )
+                rowHeight = maxOf(rowHeight, holder.itemView.measuredHeight)
+                if ((i + 1) % columns == 0 || i == adapter.itemCount - 1) {
+                    totalHeight += rowHeight
+                    rowHeight = 0
+                }
+            }
+            val params = list.layoutParams
+            if (params.height != totalHeight) {
+                params.height = totalHeight
+                list.layoutParams = params
+            }
+            list.requestLayout()
+        }
+    }
+
     /** RecyclerView inside ScrollView only measures one row unless height is set explicitly. */
     fun expandInScrollView(list: RecyclerView) {
         list.isNestedScrollingEnabled = false

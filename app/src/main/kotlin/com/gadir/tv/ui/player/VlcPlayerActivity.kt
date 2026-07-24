@@ -705,17 +705,13 @@ class VlcPlayerActivity : BaseLocaleActivity() {
 
     override fun onStop() {
         try {
-            if (isLivePlayback) {
-                // Live has no meaningful "resume position" — pausing just keeps the panel
-                // connection open in the background (sometimes for a long time, depending on
-                // how long Android keeps the backgrounded process alive), which looks to the
-                // panel like the account is still watching after the user left. Fully release
-                // so the connection actually closes; onResume() recreates the player fresh if
-                // the user comes back without the Activity being destroyed.
-                releaseVlcPlayer()
-                liveStoppedInBackground = true
-            } else {
-                mediaPlayer?.pause()
+            when {
+                isLivePlayback -> {
+                    releaseVlcPlayer()
+                    liveStoppedInBackground = true
+                }
+                isFinishing -> releaseVlcPlayer()
+                else -> mediaPlayer?.pause()
             }
         } catch (_: Throwable) {
         }
